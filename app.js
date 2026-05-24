@@ -611,11 +611,11 @@ const ShotScorer = (() => {
   }
 
   function grade(avgScore) {
-    if (avgScore >= 85) return {letter:'A',color:'#22c55e'};
-    if (avgScore >= 70) return {letter:'B',color:'#84cc16'};
-    if (avgScore >= 55) return {letter:'C',color:'#eab308'};
-    if (avgScore >= 40) return {letter:'D',color:'#f97316'};
-    return {letter:'F',color:'#ef4444'};
+    if (avgScore >= 85) return {letter:'A',color:'#16a34a'};
+    if (avgScore >= 70) return {letter:'B',color:'#4d7c0f'};
+    if (avgScore >= 55) return {letter:'C',color:'#b45309'};
+    if (avgScore >= 40) return {letter:'D',color:'#c2410c'};
+    return {letter:'F',color:'#dc2626'};
   }
 
   function scoreColor(s) {
@@ -913,7 +913,7 @@ const UI = (() => {
       const driverCarry = avg(driverShots,'carryDistance');
       return `
         <li>
-          <div class="session-card" data-id="${s.id}">
+          <div class="session-card" data-id="${s.id}"${grade?` data-grade="${grade.letter}"`:''}>
             <div class="sc-left">
               <div class="session-date">${formatDate(s.date)}</div>
               <div class="session-meta">${clubBreakdown(s.shots)} · ${s.shots.length} shots</div>
@@ -924,7 +924,18 @@ const UI = (() => {
               </div>
             </div>
             <div class="sc-right">
-              ${grade ? `<div class="session-grade" style="color:${grade.color}">${grade.letter}</div>` : ''}
+              ${grade ? `
+              <div class="session-grade">
+                <svg viewBox="0 0 52 52" width="52" height="52" data-offset="${(125.66*(1-avgScore/100)).toFixed(1)}">
+                  <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}26" stroke-width="3.5"/>
+                  <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}" stroke-width="3.5"
+                    stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66"
+                    transform="rotate(-90 26 26)" class="scard-ring-arc"/>
+                  <text x="26" y="26" text-anchor="middle" dominant-baseline="central"
+                    font-family="Outfit,sans-serif" font-size="17" font-weight="800"
+                    fill="${grade.color}">${grade.letter}</text>
+                </svg>
+              </div>` : ''}
               ${highFaults ? `<div class="fault-badge">${highFaults} ⚠</div>` : ''}
             </div>
           </div>
@@ -933,6 +944,12 @@ const UI = (() => {
 
     el.querySelectorAll('.session-card').forEach(c => {
       c.addEventListener('click', () => Router.showDetail(c.dataset.id));
+    });
+    requestAnimationFrame(() => {
+      el.querySelectorAll('.scard-ring-arc').forEach(arc => {
+        const svg = arc.closest('svg');
+        if (svg) arc.style.strokeDashoffset = svg.dataset.offset || '0';
+      });
     });
   }
 
@@ -1057,7 +1074,17 @@ const UI = (() => {
     const dist = [0,25,50,75,100].map(t => scores.filter(s=>s>=t && s<t+25).length);
     document.getElementById('scoreBanner').innerHTML = `
       <div class="score-banner-content">
-        <div class="score-letter" style="color:${g.color}">${g.letter}</div>
+        <div class="score-ring">
+          <svg viewBox="0 0 90 90" width="90" height="90" data-offset="${(226.19*(1-avgScore/100)).toFixed(1)}">
+            <circle cx="45" cy="45" r="36" fill="none" stroke="${g.color}1e" stroke-width="5"/>
+            <circle cx="45" cy="45" r="36" fill="none" stroke="${g.color}" stroke-width="5"
+              stroke-linecap="round" stroke-dasharray="226.19" stroke-dashoffset="226.19"
+              transform="rotate(-90 45 45)" class="score-ring-arc"/>
+            <text x="45" y="45" text-anchor="middle" dominant-baseline="central"
+              font-family="Outfit,sans-serif" font-size="30" font-weight="800"
+              fill="${g.color}">${g.letter}</text>
+          </svg>
+        </div>
         <div class="score-details">
           <div class="score-number">${avgScore}<span class="score-max">/100</span></div>
           <div class="score-label">Session quality score</div>
@@ -1069,21 +1096,26 @@ const UI = (() => {
           ${['Elite','Good','OK','Poor','Missed'].reverse().map((l,i) => {
             const idx = 4-i;
             const n = idx===4 ? scores.filter(s=>s<25).length : scores.filter(s=>s>=idx*25&&s<(idx+1)*25).length;
-            return `<div class="score-bd-row"><span class="score-bd-label">${l}</span><span class="score-bd-bar" style="width:${n>0?Math.max(8,n/scores.length*100):0}%;background:${['#ef4444','#f97316','#eab308','#84cc16','#22c55e'][idx]}"></span><span class="score-bd-n">${n}</span></div>`;
+            return `<div class="score-bd-row"><span class="score-bd-label">${l}</span><span class="score-bd-bar" style="width:${n>0?Math.max(8,n/scores.length*100):0}%;background:${['#fca5a5','#fdba74','#fde68a','#bbf7d0','#86efac'][idx]}"></span><span class="score-bd-n">${n}</span></div>`;
           }).join('')}
         </div>
       </div>`;
+    requestAnimationFrame(() => {
+      const arc = document.querySelector('.score-ring-arc');
+      const svg = arc && arc.closest('svg');
+      if (svg) arc.style.strokeDashoffset = svg.dataset.offset || '0';
+    });
   }
 
   // ── Metrics strip ─────────────────────────────────────────────
   function renderMetricsStrip(shots, allShots) {
     const M = [
-      {label:'Avg Smash',   field:'smashFactor',     dec:2, unit:''},
-      {label:'Ball Speed',  field:'ballSpeed',        dec:0, unit:'mph'},
-      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds'},
-      {label:'Launch Angle',field:'launchAngle',      dec:1, unit:'°'},
-      {label:'Club Speed',  field:'clubSpeed',        dec:0, unit:'mph'},
-      {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds'},
+      {label:'Avg Smash',   field:'smashFactor',     dec:2, unit:'',    col:'#16a34a'},
+      {label:'Ball Speed',  field:'ballSpeed',        dec:0, unit:'mph', col:'#2563eb'},
+      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds', col:'#0b4d2e'},
+      {label:'Launch Angle',field:'launchAngle',      dec:1, unit:'°',   col:'#b45309'},
+      {label:'Club Speed',  field:'clubSpeed',        dec:0, unit:'mph', col:'#7c3aed'},
+      {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds', col:'#0891b2'},
     ];
     const el = document.getElementById('metricsStrip');
     el.innerHTML = M.map(m => {
@@ -1094,12 +1126,26 @@ const UI = (() => {
         const d = val-allVal; const cls=d>=0?'up':'down'; const sign=d>=0?'+':'';
         delta = `<div class="metric-delta ${cls}">${sign}${fmt(d,m.dec)} vs all</div>`;
       }
-      return `<div class="metric-card">
+      return `<div class="metric-card" style="--mc:${m.col}">
         <div class="metric-label">${m.label}</div>
-        <div class="metric-value">${fmt(val,m.dec)}<small class="metric-unit">${m.unit}</small></div>
+        <div class="metric-value"><span class="mval" data-v="${val!==null?val:''}" data-d="${m.dec}">${fmt(val,m.dec)}</span><small class="metric-unit">${m.unit}</small></div>
         ${delta}
       </div>`;
     }).join('');
+    el.querySelectorAll('.mval[data-v]').forEach((span, i) => {
+      const target = parseFloat(span.dataset.v), dec = parseInt(span.dataset.d);
+      if (isNaN(target) || target === 0) return;
+      span.textContent = (0).toFixed(dec);
+      const t0 = performance.now() + i * 55;
+      const run = ts => {
+        const p = Math.min(1, (ts - t0) / 700);
+        if (p <= 0) { requestAnimationFrame(run); return; }
+        span.textContent = (target * (1 - Math.pow(1-p, 3))).toFixed(dec);
+        if (p < 1) requestAnimationFrame(run);
+        else span.textContent = fmt(target, dec);
+      };
+      requestAnimationFrame(run);
+    });
   }
 
   // ── Swing DNA ─────────────────────────────────────────────────
@@ -1141,7 +1187,7 @@ const UI = (() => {
       label:'Centre line',
       data:[{x:0,y:minCarry},{x:0,y:maxCarry}],
       type:'line',
-      borderColor:'#ffffff30',
+      borderColor:'#00000018',
       borderWidth:1,
       borderDash:[4,4],
       pointRadius:0,
@@ -1154,7 +1200,7 @@ const UI = (() => {
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#8891aa',font:{size:11}}},
+          legend:{labels:{color:'#496657',font:{size:11}}},
           tooltip:{
             callbacks:{
               label: ctx => {
@@ -1165,12 +1211,12 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:'#8891aa',font:{size:11}},
-            ticks:{color:'#8891aa'},
-            grid:{color: ctx => ctx.tick.value===0?'#ffffff40':'#2d3148'},
+          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:'#496657',font:{size:11}},
+            ticks:{color:'#496657'},
+            grid:{color: ctx => ctx.tick.value===0?'#00000025':'#d4e2d8'},
           },
-          y:{title:{display:true,text:'Carry Distance (yds)',color:'#8891aa',font:{size:11}},
-            ticks:{color:'#8891aa'},grid:{color:'#2d3148'},
+          y:{title:{display:true,text:'Carry Distance (yds)',color:'#496657',font:{size:11}},
+            ticks:{color:'#496657'},grid:{color:'#d4e2d8'},
           },
         },
       },
@@ -1219,9 +1265,9 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{ticks:{color:'#8891aa'},grid:{color:'#2d3148'}},
-          y:{ticks:{color:'#8891aa'},grid:{color:'#2d3148'},
-            title:{display:true,text:'Carry (yds)',color:'#8891aa',font:{size:11}}},
+          x:{ticks:{color:'#496657'},grid:{color:'#d4e2d8'}},
+          y:{ticks:{color:'#496657'},grid:{color:'#d4e2d8'},
+            title:{display:true,text:'Carry (yds)',color:'#496657',font:{size:11}}},
         },
       },
     });
@@ -1545,21 +1591,21 @@ const UI = (() => {
         responsive:true, maintainAspectRatio:true,
         plugins:{legend:{display:false}},
         scales:{
-          x:{ticks:{color:'#8891aa',font:{size:10}},grid:{color:'#2d3148'}},
-          y:{ticks:{color:'#8891aa',font:{size:10}},grid:{color:'#2d3148'},
-            title:{display:!!yLabel,text:yLabel||'',color:'#8891aa',font:{size:10}}},
+          x:{ticks:{color:'#496657',font:{size:10}},grid:{color:'#d4e2d8'}},
+          y:{ticks:{color:'#496657',font:{size:10}},grid:{color:'#d4e2d8'},
+            title:{display:!!yLabel,text:yLabel||'',color:'#496657',font:{size:10}}},
         },
       },
     });
 
     const defs=[
       {id:'chartSmash',     data:d('smashFactor'), color:'#16a34a',yLabel:'Smash Factor'},
-      {id:'chartCarry',     data:d('carryDistance'),color:'#3b82f6',yLabel:'Carry (yds)'},
-      {id:'chartLaunch',    data:d('launchAngle'), color:'#eab308',yLabel:'Launch Angle (°)'},
-      {id:'chartBallSpeed', data:d('ballSpeed'),   color:'#a855f7',yLabel:'Ball Speed (mph)'},
-      {id:'chartPath',      data:d('clubPath'),    color:'#06b6d4',yLabel:'Club Path (°)'},
-      {id:'chartAA',        data:d('attackAngle'), color:'#f97316',yLabel:'Attack Angle (°)'},
-      {id:'chartQuality',   data:qualityData,      color:'#22c55e',yLabel:'Session Score'},
+      {id:'chartCarry',     data:d('carryDistance'),color:'#2563eb',yLabel:'Carry (yds)'},
+      {id:'chartLaunch',    data:d('launchAngle'), color:'#d97706',yLabel:'Launch Angle (°)'},
+      {id:'chartBallSpeed', data:d('ballSpeed'),   color:'#7c3aed',yLabel:'Ball Speed (mph)'},
+      {id:'chartPath',      data:d('clubPath'),    color:'#0891b2',yLabel:'Club Path (°)'},
+      {id:'chartAA',        data:d('attackAngle'), color:'#ea580c',yLabel:'Attack Angle (°)'},
+      {id:'chartQuality',   data:qualityData,      color:'#15803d',yLabel:'Session Score'},
     ];
 
     defs.forEach(({id,data,color,yLabel})=>{
