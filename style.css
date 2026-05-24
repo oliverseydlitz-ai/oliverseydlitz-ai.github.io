@@ -851,3 +851,509 @@ tr:hover td { background: var(--surface2); }
   .records-grid { grid-template-columns: repeat(3,1fr); }
   .score-ring svg { width: 100px; height: 100px; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   v3 — FIELD BULLETIN / EDITORIAL ENHANCEMENT LAYER
+   Mixed type (serif + mono + condensed) · Measurement grid
+   Custom dropdowns · Decorative ornaments · Hero score
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+/* ── Measurement-grid background ────────────────────────────── */
+body {
+  background-image:
+    linear-gradient(rgba(11,77,46,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11,77,46,.028) 1px, transparent 1px) !important;
+  background-size: 28px 28px !important;
+  background-position: -1px -1px !important;
+  background-color: var(--bg) !important;
+}
+
+/* ── Top nav — diagonal stripe overlay + TOUR badge ────────── */
+.top-nav { overflow: hidden !important; }
+.top-nav::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    135deg, transparent 0 18px,
+    rgba(255,255,255,.025) 18px 19px
+  );
+  pointer-events: none; z-index: 0;
+}
+.top-nav-brand, .top-nav-links { position: relative; z-index: 1; }
+
+.brand-name {
+  display: inline-flex !important;
+  align-items: center;
+}
+.brand-name::after {
+  content: 'TOUR';
+  font-family: var(--font-mono);
+  font-size: .48em; font-weight: 600;
+  letter-spacing: .16em;
+  color: #c8eba1;
+  margin-left: 12px;
+  padding: 3px 7px 2px;
+  border: 1px solid rgba(200,235,161,.55);
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.top-nav-links .nav-link {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: .72rem !important;
+}
+
+/* ── Custom select dropdown ─────────────────────────────────── */
+.form-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%230b4d2e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 42px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: .88rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  transition: background-color .15s, border-color .15s, box-shadow .15s;
+}
+.form-group select:hover {
+  background-color: var(--surface2);
+  border-color: var(--pine);
+}
+
+/* ── Date input: monospace ─────────────────────────────────── */
+.form-group input[type="date"] {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+
+/* ── HERO SCORE BANNER ─────────────────────────────────────── */
+.score-banner-content {
+  padding: 1.6rem 1.7rem 1.5rem !important;
+  background:
+    radial-gradient(ellipse at top right, rgba(11,77,46,.055) 0%, transparent 55%),
+    radial-gradient(ellipse at bottom left, rgba(34,197,94,.04) 0%, transparent 50%),
+    var(--surface) !important;
+  position: relative;
+}
+.score-banner-content::after {
+  content: '◆';
+  position: absolute;
+  top: 14px; right: 16px;
+  font-size: .65rem;
+  color: var(--pine);
+  opacity: .4;
+  display: block;
+  font-style: normal;
+}
+.score-ring svg { width: 110px !important; height: 110px !important; }
+
+.score-label {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono) !important;
+  letter-spacing: .12em !important;
+  font-size: .6rem !important;
+}
+.score-label::before {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--turf);
+  box-shadow: 0 0 8px rgba(34,197,94,.6);
+  animation: blink 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── EDITORIAL SESSION CARDS ───────────────────────────────── */
+.session-card { padding: 1.2rem 1.35rem !important; }
+.session-date {
+  font-family: var(--font-serif) !important;
+  font-size: 1.4rem !important;
+  font-weight: 400 !important;
+  letter-spacing: -.01em !important;
+  text-transform: none !important;
+  color: var(--text);
+  line-height: 1.15;
+}
+.session-meta {
+  font-family: var(--font-mono) !important;
+  font-size: .65rem !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase;
+  margin-top: 6px !important;
+}
+.session-stats {
+  border-top: 1px dashed var(--border);
+  padding-top: .7rem !important;
+  margin-top: .8rem !important;
+  gap: 1.1rem !important;
+}
+.session-stat {
+  font-family: var(--font-mono) !important;
+  font-size: .65rem !important;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-dim) !important;
+}
+.session-stat strong {
+  font-family: var(--font-display) !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  margin-left: 6px;
+  color: var(--text) !important;
+  letter-spacing: -.01em;
+}
+
+/* ── METRIC CARDS — auto numbered ──────────────────────────── */
+.metrics-strip { counter-reset: metric; }
+.metric-card {
+  counter-increment: metric;
+  padding: 1.15rem .85rem .9rem !important;
+}
+.metric-card::after {
+  content: counter(metric, decimal-leading-zero);
+  position: absolute;
+  top: 9px; right: 12px;
+  font-family: var(--font-mono);
+  font-size: .56rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: .1em;
+  opacity: .8;
+}
+.metric-label {
+  font-family: var(--font-mono) !important;
+  font-weight: 500 !important;
+  font-size: .55rem !important;
+  letter-spacing: .12em !important;
+}
+
+/* ── SECTION TITLE — hairline trail ────────────────────────── */
+.section-title {
+  font-family: var(--font-mono) !important;
+  margin-bottom: 1.1rem !important;
+  letter-spacing: .13em !important;
+  font-weight: 500 !important;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--border-hi), transparent);
+}
+
+/* ── Decorative corner marks on cards ──────────────────────── */
+.chart-card, .trend-box, .insights-card { position: relative; }
+.chart-card::after,
+.trend-box::after,
+.insights-card::after {
+  content: '+';
+  position: absolute;
+  top: 10px; right: 14px;
+  font-family: var(--font-mono);
+  font-size: .85rem;
+  color: var(--text-dim);
+  opacity: .38;
+  line-height: 1;
+  pointer-events: none;
+  font-weight: 500;
+}
+
+/* ── Trend heading: pine pulse dot ─────────────────────────── */
+.trend-heading {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px;
+  font-family: var(--font-mono) !important;
+  letter-spacing: .13em !important;
+}
+.trend-heading::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--pine);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Insights title — mono ─────────────────────────────────── */
+.insights-title {
+  font-family: var(--font-mono) !important;
+  letter-spacing: .13em !important;
+}
+
+/* ── Fault labels — mono ──────────────────────────────────── */
+.fault-cat-label,
+.fault-section-title,
+.sm-faults-title,
+.disp-stat-label,
+.score-bd-label,
+.filter-label,
+.dna-cat,
+.metric-label,
+.settings-section-title {
+  font-family: var(--font-mono) !important;
+  letter-spacing: .12em !important;
+}
+
+/* ── Table headers — mono ─────────────────────────────────── */
+th {
+  font-family: var(--font-mono) !important;
+  font-weight: 500 !important;
+  letter-spacing: .13em !important;
+  font-size: .57rem !important;
+}
+
+/* ── Record cards — editorial serif ────────────────────────── */
+.record-value {
+  font-family: var(--font-serif) !important;
+  font-weight: 400 !important;
+  font-size: 2rem !important;
+  letter-spacing: -.015em !important;
+}
+.record-label {
+  font-family: var(--font-mono) !important;
+  font-size: .65rem !important;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  margin-top: .45rem !important;
+}
+.record-meta {
+  font-family: var(--font-mono);
+  font-size: .58rem !important;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .85;
+}
+
+/* ── Buttons — display uppercase ───────────────────────────── */
+.btn-primary, .btn-secondary, .btn-danger {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: .78rem;
+  padding: .72rem 1.4rem;
+  font-weight: 700;
+}
+.btn-sm {
+  font-size: .68rem;
+  padding: .4rem .9rem;
+  letter-spacing: .06em;
+}
+
+/* ── Chips — mono uppercase ────────────────────────────────── */
+.chip {
+  font-family: var(--font-mono) !important;
+  font-weight: 500 !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase;
+  font-size: .66rem !important;
+}
+
+/* ── Bottom nav labels — mono ──────────────────────────────── */
+.bnav-label {
+  font-family: var(--font-mono) !important;
+  font-size: .55rem !important;
+  font-weight: 500 !important;
+  letter-spacing: .09em !important;
+}
+
+/* ── DNA pill: refined typography ──────────────────────────── */
+.dna-val {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: .005em;
+  font-size: .9rem !important;
+}
+
+/* ── Plan items: editorial num ─────────────────────────────── */
+.plan-num {
+  font-family: var(--font-mono) !important;
+  font-size: .68rem !important;
+  letter-spacing: .03em;
+}
+.plan-min {
+  font-family: var(--font-mono) !important;
+  letter-spacing: .04em;
+  font-size: .72rem !important;
+}
+
+/* ── Drill card: condensed name ────────────────────────────── */
+.drill-name {
+  font-family: var(--font-display) !important;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  font-size: .85rem !important;
+}
+
+/* ── Modal title editorial ─────────────────────────────────── */
+.modal-title {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* ── View title — editorial mix ────────────────────────────── */
+.view-title {
+  font-family: var(--font-display);
+  font-size: 1.7rem !important;
+  font-weight: 700;
+  letter-spacing: .015em;
+  text-transform: uppercase;
+}
+
+/* ── Step heading mono accent ──────────────────────────────── */
+.step-heading {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+/* ── Drop zone: refined hint ───────────────────────────────── */
+.drop-label { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .03em; font-size: 1rem !important; }
+.drop-sub { font-family: var(--font-mono); font-size: .7rem !important; letter-spacing: .06em; text-transform: uppercase; }
+.import-hint { font-family: var(--font-mono); font-size: .65rem !important; letter-spacing: .05em; }
+
+/* ── Yardage meta — mono ───────────────────────────────────── */
+.yardage-meta {
+  font-family: var(--font-mono);
+  letter-spacing: .04em;
+  font-size: .68rem !important;
+}
+
+/* ── Empty state polish ────────────────────────────────────── */
+.empty-state h2 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.empty-state p { font-family: var(--font-mono); font-size: .8rem !important; letter-spacing: .03em; }
+
+/* ── Form labels — mono ────────────────────────────────────── */
+.form-group label {
+  font-family: var(--font-mono) !important;
+  letter-spacing: .12em !important;
+  font-size: .65rem !important;
+}
+
+/* ── Custom number values throughout ───────────────────────── */
+.trend-val, .score-bd-n, .sm-v, .disp-stat-val, .score-number, .score-max {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Section block divider ornament ────────────────────────── */
+.section-block + .section-block::before {
+  content: '';
+  display: block;
+  width: 30px; height: 1px;
+  background: var(--border-hi);
+  margin: 0 auto 1.5rem;
+  opacity: .4;
+}
+
+/* ── Desktop — hero proportions ────────────────────────────── */
+@media (min-width: 768px) {
+  .score-ring svg { width: 130px !important; height: 130px !important; }
+  .session-date { font-size: 1.6rem !important; }
+  .record-value { font-size: 2.2rem !important; }
+  .metric-value { font-size: 1.95rem !important; }
+  .view-title { font-size: 2rem !important; }
+}
+
+
+/* ── v3 fixes ─────────────────────────────────────────────── */
+.top-nav .btn-primary,
+.top-nav .btn-sm {
+  white-space: nowrap !important;
+  font-size: .7rem !important;
+  padding: .45rem .85rem !important;
+}
+
+.brand-name::after {
+  color: #d4f5a8 !important;
+  border-color: rgba(212, 245, 168, .7) !important;
+  background: rgba(255, 255, 255, .04);
+  font-size: .52em !important;
+  padding: 3px 8px 2px !important;
+  margin-left: 14px !important;
+  font-weight: 700 !important;
+}
+
+/* Slight background visibility boost for measurement grid */
+body {
+  background-image:
+    linear-gradient(rgba(11,77,46,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11,77,46,.045) 1px, transparent 1px) !important;
+}
+
+
+/* ── TOUR badge — high visibility on green nav ──────────────── */
+.brand-name::after {
+  content: 'TOUR' !important;
+  background: rgba(255,255,255,.18) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.3) !important;
+  font-size: .5em !important;
+  font-weight: 700 !important;
+  letter-spacing: .18em !important;
+  padding: 3px 8px 2px !important;
+  margin-left: 14px !important;
+  border-radius: 3px !important;
+  text-transform: uppercase;
+  line-height: 1;
+  align-self: center;
+  display: inline-block !important;
+}
+
+
+/* ── Animation override: ensure content is always visible ──── */
+.view.active {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+.section-block {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+
+/* ── BRAND-TAG (real <span>, replaces ::after pseudo) ──────── */
+.brand-tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 3px;
+  padding: 3px 8px 2px;
+  margin-left: 14px;
+  vertical-align: 5px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Hide the redundant ::after */
+.brand-name::after { display: none !important; }
