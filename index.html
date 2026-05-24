@@ -2,112 +2,263 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Agency</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #fff; }
-    a { color: inherit; text-decoration: none; }
-    button { font-family: inherit; cursor: pointer; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 16px; }
-    .hero { background: #f5f5f5; padding: 4rem 2rem; text-align: center; }
-    .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; font-weight: 500; }
-    .hero p { font-size: 1.1rem; color: #666; margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; }
-    .btn-primary { background: #0066cc; color: white; font-weight: 500; }
-    .btn-primary:hover { background: #0052a3; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 0 2rem; }
-    .nav { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: white; border-bottom: 1px solid #eee; }
-    .nav-brand { font-size: 1.2rem; font-weight: 500; }
-    .nav-links { display: flex; gap: 2rem; }
-    @media (max-width: 600px) { .nav-links { display: none; } .hero h1 { font-size: 1.8rem; } }
-    .section { padding: 3rem 2rem; }
-    .section h2 { font-size: 1.8rem; margin-bottom: 1.5rem; font-weight: 500; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 2rem; }
-    .card { background: #f9f9f9; padding: 2rem; border-radius: 12px; border: 1px solid #eee; }
-    .card h3 { font-size: 1.2rem; margin-bottom: 0.5rem; font-weight: 500; }
-    .card p { color: #666; font-size: 0.95rem; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 16px; }
-    .form-group textarea { resize: vertical; min-height: 100px; }
-    .footer { background: #f5f5f5; padding: 2rem; text-align: center; color: #666; border-top: 1px solid #eee; margin-top: 3rem; }
-    .success-msg { display: none; background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#16a34a">
+  <title>ShotLab</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="nav">
-  <div class="nav-brand">Your Agency</div>
-  <div class="nav-links">
-    <a href="#services">Services</a>
-    <a href="#contact">Contact</a>
+<!-- ═══════════════════════════════════════════════════════ TOP NAV (desktop) -->
+<header class="top-nav" id="topNav">
+  <div class="top-nav-brand">
+    <span class="brand-icon">⛳</span>
+    <span class="brand-name">ShotLab</span>
+  </div>
+  <nav class="top-nav-links">
+    <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
+    <a href="#" class="nav-link" data-view="progress">Progress</a>
+    <a href="#" class="nav-link" data-view="settings">Settings</a>
+    <button class="btn-primary btn-sm" id="topImportBtn">+ Import</button>
+  </nav>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════ VIEWS -->
+<main class="app-main" id="appMain">
+
+  <!-- ── Sessions ──────────────────────────────────────────── -->
+  <section class="view active" id="view-sessions">
+    <div class="view-header">
+      <h1 class="view-title">Sessions</h1>
+      <button class="btn-icon" id="sessionsImportBtn" aria-label="Import session">+</button>
+    </div>
+    <div id="sessions-empty" class="empty-state">
+      <div class="empty-icon">📊</div>
+      <h2>No sessions yet</h2>
+      <p>Import a Rapsodo CSV export to get started.</p>
+      <button class="btn-primary" id="emptyCTA">Import Session</button>
+    </div>
+    <ul class="session-list" id="sessionList" hidden></ul>
+  </section>
+
+  <!-- ── Import ────────────────────────────────────────────── -->
+  <section class="view" id="view-import">
+    <div class="view-header">
+      <button class="btn-back" id="importBackBtn">← Back</button>
+      <h1 class="view-title">Import Session</h1>
+    </div>
+
+    <!-- Step 1: file pick -->
+    <div class="import-step active" id="step-pick">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-icon">📂</div>
+        <p class="drop-label">Drop your Rapsodo CSV here</p>
+        <p class="drop-sub">or</p>
+        <button class="btn-secondary" id="browseBtn">Browse file</button>
+        <input type="file" id="fileInput" accept=".csv" hidden>
+      </div>
+      <p class="import-hint">Export from Rapsodo Cloud → Session → Share → CSV</p>
+    </div>
+
+    <!-- Step 2: preview -->
+    <div class="import-step" id="step-preview">
+      <h2 class="step-heading">Preview</h2>
+      <p class="step-sub" id="previewCount"></p>
+      <div class="table-wrap">
+        <table class="preview-table" id="previewTable"></table>
+      </div>
+      <div class="step-actions">
+        <button class="btn-secondary" id="previewBack">← Re-pick</button>
+        <button class="btn-primary" id="previewNext">Looks good →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: metadata -->
+    <div class="import-step" id="step-meta">
+      <h2 class="step-heading">Session details</h2>
+      <div class="form-group">
+        <label for="metaDate">Date</label>
+        <input type="date" id="metaDate">
+      </div>
+      <div class="form-group">
+        <label for="metaNotes">Notes <span class="label-opt">(optional)</span></label>
+        <textarea id="metaNotes" placeholder="e.g. range session, working on driver…" rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="metaWind">Wind</label>
+          <input type="text" id="metaWind" placeholder="e.g. 10mph W">
+        </div>
+        <div class="form-group">
+          <label for="metaTemp">Temp</label>
+          <input type="text" id="metaTemp" placeholder="e.g. 18°C">
+        </div>
+      </div>
+      <div class="step-actions">
+        <button class="btn-secondary" id="metaBack">← Back</button>
+        <button class="btn-primary" id="saveSession">Save Session</button>
+      </div>
+    </div>
+
+    <!-- Step 4: saving -->
+    <div class="import-step" id="step-saving">
+      <div class="saving-state">
+        <div class="spinner"></div>
+        <p>Saving session…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Session Detail ────────────────────────────────────── -->
+  <section class="view" id="view-session-detail">
+    <div class="view-header">
+      <button class="btn-back" id="detailBackBtn">← Sessions</button>
+      <div class="detail-header-info">
+        <h1 class="view-title" id="detailTitle">Session</h1>
+        <p class="detail-notes" id="detailNotes"></p>
+      </div>
+      <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session" title="Delete session">🗑</button>
+    </div>
+
+    <!-- Metrics strip -->
+    <div class="metrics-strip" id="metricsStrip"></div>
+
+    <!-- Club filter -->
+    <div class="filter-row">
+      <label class="filter-label">Club:</label>
+      <div class="filter-chips" id="clubFilter"></div>
+    </div>
+
+    <!-- Fault cards -->
+    <div class="section-block">
+      <h2 class="section-title">Fault Detection</h2>
+      <div class="fault-list" id="faultList"></div>
+    </div>
+
+    <!-- Benchmarking -->
+    <div class="section-block">
+      <h2 class="section-title">Benchmarking</h2>
+      <div class="table-wrap">
+        <table class="bench-table" id="benchTable"></table>
+      </div>
+    </div>
+
+    <!-- Shot log -->
+    <div class="section-block">
+      <h2 class="section-title">Shot Log</h2>
+      <div class="table-wrap">
+        <table class="shot-table" id="shotTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Progress ──────────────────────────────────────────── -->
+  <section class="view" id="view-progress">
+    <div class="view-header">
+      <h1 class="view-title">Progress</h1>
+    </div>
+    <div id="progress-empty" class="empty-state">
+      <div class="empty-icon">📈</div>
+      <h2>Not enough data</h2>
+      <p>Import at least 2 sessions to see trends.</p>
+    </div>
+    <div id="progress-content" hidden>
+      <div class="form-group progress-filter">
+        <label for="progressClub">Club</label>
+        <select id="progressClub"></select>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Smash Factor</h3>
+          <canvas id="chartSmash"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Carry Distance (yds)</h3>
+          <canvas id="chartCarry"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Launch Angle (°)</h3>
+          <canvas id="chartLaunch"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Ball Speed (mph)</h3>
+          <canvas id="chartBallSpeed"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Settings ──────────────────────────────────────────── -->
+  <section class="view" id="view-settings">
+    <div class="view-header">
+      <h1 class="view-title">Settings</h1>
+    </div>
+    <div class="settings-list">
+      <div class="settings-section">
+        <h2 class="settings-section-title">Data</h2>
+        <button class="settings-row" id="exportDataBtn">
+          <span>Export all data (JSON)</span>
+          <span class="settings-arrow">→</span>
+        </button>
+        <button class="settings-row danger" id="clearDataBtn">
+          <span>Clear all data</span>
+          <span class="settings-arrow">→</span>
+        </button>
+      </div>
+      <div class="settings-section">
+        <h2 class="settings-section-title">About</h2>
+        <div class="settings-row static">
+          <span>Version</span>
+          <span class="settings-value">1.0.0</span>
+        </div>
+        <div class="settings-row static">
+          <span>Works with</span>
+          <span class="settings-value">Rapsodo MLM2Pro</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════ BOTTOM NAV (mobile) -->
+<nav class="bottom-nav" id="bottomNav">
+  <button class="bottom-nav-item active" data-view="sessions">
+    <span class="bnav-icon">📋</span>
+    <span class="bnav-label">Sessions</span>
+  </button>
+  <button class="bottom-nav-item" data-view="import">
+    <span class="bnav-icon">+</span>
+    <span class="bnav-label">Import</span>
+  </button>
+  <button class="bottom-nav-item" data-view="progress">
+    <span class="bnav-icon">📈</span>
+    <span class="bnav-label">Progress</span>
+  </button>
+  <button class="bottom-nav-item" data-view="settings">
+    <span class="bnav-icon">⚙️</span>
+    <span class="bnav-label">Settings</span>
+  </button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal" hidden>
+  <div class="modal">
+    <h2 class="modal-title" id="confirmTitle">Are you sure?</h2>
+    <p class="modal-body" id="confirmBody"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="confirmCancel">Cancel</button>
+      <button class="btn-danger" id="confirmOk">Delete</button>
+    </div>
   </div>
 </div>
 
-<div class="hero">
-  <h1>Web Design & Development</h1>
-  <p>We build beautiful, interactive websites for businesses. Custom designs, fast deployment, competitive pricing.</p>
-  <button class="btn-primary" onclick="scrollTo('contact')">Get Started</button>
-</div>
-
-<div class="section container" id="services">
-  <h2>What We Offer</h2>
-  <div class="grid">
-    <div class="card">
-      <h3>Custom Website Design</h3>
-      <p>Tailored designs that match your brand. Interactive UI, mobile-responsive, fast loading.</p>
-    </div>
-    <div class="card">
-      <h3>Reservation Systems</h3>
-      <p>Book appointments, manage availability, handle payments. Fully automated with your branding.</p>
-    </div>
-    <div class="card">
-      <h3>Fast Deployment</h3>
-      <p>Live in days, not weeks. We handle hosting, domain setup, SSL security. Zero maintenance headache.</p>
-    </div>
-  </div>
-</div>
-
-<div class="section container" id="contact">
-  <h2>Quick Contact</h2>
-  <div style="max-width: 500px;">
-    <div class="success-msg" id="successMsg">Message sent! We'll get back to you soon.</div>
-    <form id="contactForm" onsubmit="handleSubmit(event)">
-      <div class="form-group">
-        <label for="name">Name</label>
-        <input type="text" id="name" name="name" required>
-      </div>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" required>
-      </div>
-      <div class="form-group">
-        <label for="message">Message</label>
-        <textarea id="message" name="message" required></textarea>
-      </div>
-      <button type="submit" class="btn-primary">Send Message</button>
-    </form>
-  </div>
-</div>
-
-<div class="footer">
-  <p>&copy; 2026 Your Agency. All rights reserved.</p>
-</div>
-
-<script>
-function scrollTo(id) {
-  const element = document.getElementById(id);
-  element.scrollIntoView({ behavior: 'smooth' });
-}
-
-function handleSubmit(e) {
-  e.preventDefault();
-  const form = document.getElementById('contactForm');
-  const msg = document.getElementById('successMsg');
-  msg.style.display = 'block';
-  form.reset();
-  setTimeout(() => { msg.style.display = 'none'; }, 3000);
-}
-</script>
-
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
