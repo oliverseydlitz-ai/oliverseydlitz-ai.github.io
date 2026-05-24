@@ -260,6 +260,70 @@ tr:hover td { background:var(--surface2); }
 .settings-arrow { color:var(--text-muted); }
 .settings-value { color:var(--text-muted); font-size:.82rem; text-align:right; max-width:60%; }
 
+/* ── Insights (coach's notes) ───────────────────────────────── */
+.insights-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1rem 1.25rem; margin-bottom:1.25rem; }
+.insights-card:empty { display:none; }
+.insights-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.75rem; }
+.insights-icon { font-size:1.1rem; }
+.insights-title { font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
+.insights-cols { display:flex; flex-direction:column; gap:1rem; }
+.insights-label { font-size:.78rem; font-weight:700; margin-bottom:.4rem; }
+.insights-label.good { color:var(--green-light); }
+.insights-label.bad  { color:var(--yellow); }
+.insights-list { list-style:none; display:flex; flex-direction:column; gap:.4rem; }
+.insights-list li { font-size:.85rem; color:var(--text); line-height:1.5; padding-left:.5rem; border-left:2px solid var(--border); }
+
+/* ── Dispersion stats ───────────────────────────────────────── */
+.dispersion-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; margin-top:.75rem; }
+.disp-stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.6rem; text-align:center; }
+.disp-stat-val { font-size:1rem; font-weight:700; }
+.disp-stat-label { font-size:.7rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+
+/* ── Practice plan ──────────────────────────────────────────── */
+.practice-plan { display:flex; flex-direction:column; gap:.6rem; }
+.plan-intro { font-size:.85rem; color:var(--text-muted); margin-bottom:.5rem; }
+.plan-item { display:flex; gap:.75rem; background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--yellow); border-radius:var(--radius); padding:.85rem 1rem; }
+.plan-item.severity-high { border-left-color:var(--red); }
+.plan-item.severity-low  { border-left-color:var(--blue); }
+.plan-num { width:24px; height:24px; border-radius:50%; background:var(--surface2); display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0; }
+.plan-body { flex:1; min-width:0; }
+.plan-head { display:flex; justify-content:space-between; align-items:center; font-weight:600; font-size:.9rem; margin-bottom:.35rem; gap:.5rem; }
+.plan-min { color:var(--green-light); font-size:.8rem; white-space:nowrap; }
+.plan-drill { font-size:.82rem; color:var(--text-muted); line-height:1.55; }
+
+/* ── Yardage book ───────────────────────────────────────────── */
+.yardage-intro { font-size:.88rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.5; }
+.yardage-meta { display:block; font-size:.78rem; margin-top:.25rem; color:var(--text-muted); }
+#yardageTable td { font-size:.85rem; }
+
+/* ── Personal bests ─────────────────────────────────────────── */
+.records-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.6rem; }
+.record-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.85rem 1rem; }
+.record-value { font-size:1.4rem; font-weight:800; line-height:1; }
+.record-unit { font-size:.6em; font-weight:400; color:var(--text-muted); margin-left:2px; }
+.record-label { font-size:.78rem; font-weight:600; margin-top:.3rem; }
+.record-meta { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+
+/* ── Shot detail modal ──────────────────────────────────────── */
+.modal-wide { max-width:440px; }
+.modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.modal-head .btn-icon { width:30px; height:30px; font-size:1rem; }
+.sm-grade { font-size:.85rem; font-weight:700; margin-left:.4rem; }
+.sm-table { width:100%; border-collapse:collapse; }
+.sm-table td { padding:.4rem .25rem; border-top:1px solid var(--border); white-space:nowrap; }
+.sm-table tr:first-child td { border-top:none; }
+.sm-k { color:var(--text-muted); font-size:.82rem; }
+.sm-v { font-weight:600; font-size:.85rem; text-align:right; }
+.sm-c { font-size:.75rem; text-align:right; padding-left:.5rem !important; }
+.sm-cmp.up { color:var(--green-light); }
+.sm-cmp.down { color:var(--red); }
+.sm-faults-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:1rem 0 .5rem; }
+.sm-fault { font-size:.85rem; padding:.4rem .65rem; border-radius:var(--radius-sm); background:var(--surface2); border-left:3px solid var(--yellow); margin-bottom:.35rem; }
+.sm-fault.severity-high { border-left-color:var(--red); }
+.sm-fault.severity-low  { border-left-color:var(--blue); }
+.sm-clean { color:var(--green-light); font-size:.85rem; margin-top:1rem; }
+.shot-row { cursor:pointer; }
+
 /* ── Modal ──────────────────────────────────────────────────── */
 .modal-overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:1.5rem; }
 .modal-overlay[hidden] { display:none; }
@@ -282,4 +346,8 @@ tr:hover td { background:var(--surface2); }
   .charts-grid { display:grid; grid-template-columns:1fr 1fr; }
   .dna-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.5rem; }
   .dispersion-card canvas { height:340px !important; }
+  .insights-cols { flex-direction:row; }
+  .insights-block { flex:1; }
+  .dispersion-stats { grid-template-columns:repeat(6,1fr); }
+  .records-grid { grid-template-columns:repeat(3,1fr); }
 }

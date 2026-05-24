@@ -20,6 +20,7 @@
   </div>
   <nav class="top-nav-links">
     <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
+    <a href="#" class="nav-link" data-view="yardages">Yardages</a>
     <a href="#" class="nav-link" data-view="progress">Progress</a>
     <a href="#" class="nav-link" data-view="settings">Settings</a>
     <button class="btn-primary btn-sm" id="topImportBtn">+ Import</button>
@@ -119,6 +120,9 @@
       <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session">🗑</button>
     </div>
 
+    <!-- Coach's notes -->
+    <div id="insightsCard" class="insights-card"></div>
+
     <!-- Score banner -->
     <div id="scoreBanner" class="score-banner"></div>
 
@@ -143,6 +147,7 @@
       <div class="chart-card dispersion-card">
         <canvas id="chartDispersion"></canvas>
       </div>
+      <div class="dispersion-stats" id="dispersionStats"></div>
     </div>
 
     <!-- Club gapping -->
@@ -166,6 +171,12 @@
     <div class="section-block">
       <h2 class="section-title">Fault Detection</h2>
       <div class="fault-list" id="faultList"></div>
+    </div>
+
+    <!-- Practice plan -->
+    <div class="section-block">
+      <h2 class="section-title">Your Practice Plan</h2>
+      <div class="practice-plan" id="practicePlan"></div>
     </div>
 
     <!-- Benchmarking -->
@@ -216,6 +227,28 @@
     </div>
   </section>
 
+  <!-- ── Yardage Book ────────────────────── -->
+  <section class="view" id="view-yardages">
+    <div class="view-header">
+      <h1 class="view-title">Yardage Book</h1>
+    </div>
+    <div id="yardages-empty" class="empty-state">
+      <div class="empty-icon">🎒</div>
+      <h2>No data yet</h2>
+      <p>Import a session to build your yardage book.</p>
+    </div>
+    <div id="yardages-content" hidden>
+      <p class="yardage-intro">Your stock carry per club across all sessions — use this for club selection on the course. <span id="yardageMeta" class="yardage-meta"></span></p>
+      <div class="table-wrap">
+        <table id="yardageTable"></table>
+      </div>
+      <div class="section-block" style="margin-top:2rem">
+        <h2 class="section-title">Personal Bests</h2>
+        <div class="records-grid" id="recordsGrid"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Settings ────────────────────────── -->
   <section class="view" id="view-settings">
     <div class="view-header">
@@ -256,6 +289,10 @@
     <span class="bnav-icon">📋</span>
     <span class="bnav-label">Sessions</span>
   </button>
+  <button class="bottom-nav-item" data-view="yardages">
+    <span class="bnav-icon">🎒</span>
+    <span class="bnav-label">Bag</span>
+  </button>
   <button class="bottom-nav-item" data-view="import">
     <span class="bnav-icon">+</span>
     <span class="bnav-label">Import</span>
@@ -269,6 +306,17 @@
     <span class="bnav-label">Settings</span>
   </button>
 </nav>
+
+<!-- ═══════════════════ SHOT DETAIL MODAL -->
+<div class="modal-overlay" id="shotModal" hidden>
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 class="modal-title" id="shotModalTitle">Shot</h2>
+      <button class="btn-icon" id="shotModalClose" aria-label="Close">✕</button>
+    </div>
+    <div id="shotModalBody"></div>
+  </div>
+</div>
 
 <!-- ═══════════════════ MODAL -->
 <div class="modal-overlay" id="confirmModal" hidden>

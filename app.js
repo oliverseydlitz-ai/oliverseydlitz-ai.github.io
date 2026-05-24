@@ -764,6 +764,127 @@ const Benchmarks = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Insights — auto-generated "coach's notes"
+// ────────────────────────────────────────────────────────────────
+const Insights = (() => {
+  function clubQuality(shots) {
+    return sortedClubs(shots).map(c => {
+      const cs = shots.filter(s=>s.clubType===c);
+      const sc = cs.map(ShotScorer.score).filter(x=>x!==null);
+      return { club:c, score: sc.length?sc.reduce((a,b)=>a+b,0)/sc.length:0, count: cs.length };
+    }).filter(c => c.count >= 2).sort((a,b)=>b.score-a.score);
+  }
+
+  function generate(shots) {
+    if (!shots.length) return null;
+    const scores = shots.map(ShotScorer.score).filter(x=>x!==null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const grade = ShotScorer.grade(avgScore);
+    const cq = clubQuality(shots);
+    const faults = FaultEngine.detectFaults(shots);
+    const highFaults = faults.filter(f=>f.severity==='high');
+
+    const strengths = [], improvements = [];
+
+    if (cq.length && cq[0].score >= 68)
+      strengths.push(`Your <strong>${clubLabel(cq[0].club)}</strong> was your most reliable club today (${Math.round(cq[0].score)}/100 quality).`);
+
+    const avgSmash = avg(shots,'smashFactor');
+    const allIron = shots.every(s=>isIron(s.clubType));
+    const benchSmash = allIron ? 1.35 : 1.43;
+    if (avgSmash && avgSmash >= benchSmash)
+      strengths.push(`Strike quality is excellent — average smash factor of <strong>${fmt(avgSmash,2)}</strong> meets tour-amateur benchmarks.`);
+
+    const sideStd = stdDev(shots.map(s=>s.sideCarry));
+    if (sideStd > 0 && sideStd < 12)
+      strengths.push(`Tight dispersion — most shots land within a <strong>${fmt(sideStd*2,0)}-yard</strong> window left-to-right.`);
+
+    const driverShots = shots.filter(s=>s.clubType==='d');
+    if (driverShots.length >= 2) {
+      const aa = avg(driverShots,'attackAngle');
+      if (aa !== null && aa >= 1)
+        strengths.push(`You're hitting <strong>up</strong> on the driver (+${fmt(aa,1)}°) — maximising carry efficiency.`);
+    }
+
+    if (highFaults.length)
+      improvements.push(`<strong>${highFaults[0].name}</strong> is your #1 priority — it affected ${highFaults[0].count} of ${highFaults[0].total} shots.`);
+    if (cq.length > 1 && cq[cq.length-1].score < 50) {
+      const w = cq[cq.length-1];
+      improvements.push(`Your <strong>${clubLabel(w.club)}</strong> struggled (${Math.round(w.score)}/100) — worth dedicated practice time.`);
+    }
+    if (!highFaults.length && faults.length)
+      improvements.push(`No major faults, but watch <strong>${faults[0].name.toLowerCase()}</strong> to tighten up further.`);
+
+    if (!strengths.length) strengths.push('Keep building — more reps will reveal your strengths in the data.');
+    if (!improvements.length) improvements.push('No significant faults detected. Excellent, consistent session!');
+
+    return { avgScore, grade, strengths, improvements, focus: highFaults[0]||faults[0]||null, faultCount: faults.length, shotCount: shots.length };
+  }
+  return { generate };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// Practice Plan — turn faults into a prioritised session
+// ────────────────────────────────────────────────────────────────
+const PracticePlan = (() => {
+  function generate(shots, totalMin = 45) {
+    const faults = FaultEngine.detectFaults(shots).filter(f => f.drills && f.drills.length);
+    if (!faults.length) return null;
+    const top = faults.slice(0,3);
+    const weights = top.map(f => f.severity==='high'?3 : f.severity==='medium'?2 : 1);
+    const totalW = weights.reduce((a,b)=>a+b,0);
+    return top.map((f,i) => ({
+      name: f.name, icon: f.icon, severity: f.severity,
+      minutes: Math.max(5, Math.round(totalMin * weights[i]/totalW)),
+      drill: f.drills[0],
+    }));
+  }
+  return { generate };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// Analytics — cross-session yardage book + personal bests
+// ────────────────────────────────────────────────────────────────
+const Analytics = (() => {
+  function yardageBook(sessions) {
+    const all = sessions.flatMap(s=>s.shots);
+    return sortedClubs(all).map(c => {
+      const cs = all.filter(s=>s.clubType===c);
+      const carries = cs.map(s=>s.carryDistance).filter(v=>v>0).sort((a,b)=>a-b);
+      return {
+        club:c, count:cs.length,
+        avgCarry: avg(cs,'carryDistance'),
+        minCarry: carries.length?carries[0]:null,
+        maxCarry: carries.length?carries[carries.length-1]:null,
+        avgTotal: avg(cs,'totalDistance'),
+        stdCarry: stdDev(carries),
+        avgSmash: avg(cs,'smashFactor'),
+        avgBall: avg(cs,'ballSpeed'),
+      };
+    });
+  }
+
+  function personalBests(sessions) {
+    const all = sessions.flatMap(s => s.shots.map(sh => ({...sh, _date:s.date})));
+    if (!all.length) return [];
+    const top = (field, label, unit, dec=0) => {
+      let best = null;
+      all.forEach(s => { if (s[field] > 0 && (!best || s[field] > best[field])) best = s; });
+      return best ? { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType), date: formatDate(best._date) } : null;
+    };
+    return [
+      top('carryDistance','Longest Carry','yds'),
+      top('totalDistance','Longest Total','yds'),
+      top('ballSpeed','Top Ball Speed','mph'),
+      top('clubSpeed','Top Club Speed','mph'),
+      top('smashFactor','Best Smash','',2),
+      top('apex','Highest Apex','ft'),
+    ].filter(Boolean);
+  }
+  return { yardageBook, personalBests };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // UI
 // ────────────────────────────────────────────────────────────────
 const UI = (() => {
@@ -833,15 +954,84 @@ const UI = (() => {
       : _session.shots.filter(s => s.clubType === _clubFilter);
 
     renderClubFilter(_session.shots);
+    renderInsights(shots);
     renderScoreBanner(shots);
     renderMetricsStrip(shots, _session.shots);
     renderSwingDNA(shots);
     renderDispersion(shots);
+    renderDispersionStats(shots);
     renderGapping(_session.shots);
     renderLaunchWindows(shots);
     renderFaultCards(shots);
+    renderPracticePlan(shots);
     renderBenchTable(shots);
     renderShotTable(shots);
+  }
+
+  // ── Insights (coach's notes) ──────────────────────────────────
+  function renderInsights(shots) {
+    const el = document.getElementById('insightsCard');
+    if (!el) return;
+    const ins = Insights.generate(shots);
+    if (!ins) { el.innerHTML=''; return; }
+    el.innerHTML = `
+      <div class="insights-head">
+        <span class="insights-icon">🧠</span>
+        <span class="insights-title">Coach's Notes</span>
+      </div>
+      <div class="insights-cols">
+        <div class="insights-block">
+          <div class="insights-label good">✓ What's working</div>
+          <ul class="insights-list">${ins.strengths.map(s=>`<li>${s}</li>`).join('')}</ul>
+        </div>
+        <div class="insights-block">
+          <div class="insights-label bad">→ Focus on</div>
+          <ul class="insights-list">${ins.improvements.map(s=>`<li>${s}</li>`).join('')}</ul>
+        </div>
+      </div>`;
+  }
+
+  // ── Dispersion statistics ─────────────────────────────────────
+  function renderDispersionStats(shots) {
+    const el = document.getElementById('dispersionStats');
+    if (!el) return;
+    const sides = shots.map(s=>s.sideCarry).filter(v=>typeof v==='number');
+    if (!sides.length) { el.innerHTML=''; return; }
+    const left  = sides.filter(v=>v < -7).length;
+    const online = sides.filter(v=>v >= -7 && v <= 7).length;
+    const right = sides.filter(v=>v > 7).length;
+    const avgMiss = sides.reduce((a,b)=>a+Math.abs(b),0)/sides.length;
+    const spread = Math.max(...sides) - Math.min(...sides);
+    const bias = avg(shots,'sideCarry');
+    const stats = [
+      {label:'Left', value:`${left} (${Math.round(left/sides.length*100)}%)`},
+      {label:'On line', value:`${online} (${Math.round(online/sides.length*100)}%)`},
+      {label:'Right', value:`${right} (${Math.round(right/sides.length*100)}%)`},
+      {label:'Avg miss', value:`${fmt(avgMiss,1)} yds`},
+      {label:'Spread', value:`${fmt(spread,0)} yds`},
+      {label:'Bias', value:`${bias>0?'+':''}${fmt(bias,1)} yds ${bias>2?'R':bias<-2?'L':''}`},
+    ];
+    el.innerHTML = stats.map(s=>`
+      <div class="disp-stat"><div class="disp-stat-val">${s.value}</div><div class="disp-stat-label">${s.label}</div></div>`).join('');
+  }
+
+  // ── Practice plan ─────────────────────────────────────────────
+  function renderPracticePlan(shots) {
+    const el = document.getElementById('practicePlan');
+    if (!el) return;
+    const plan = PracticePlan.generate(shots);
+    if (!plan) { el.innerHTML = `<div class="no-faults">✅ No faults to drill — keep grooving your swing!</div>`; return; }
+    const total = plan.reduce((a,b)=>a+b.minutes,0);
+    el.innerHTML = `
+      <div class="plan-intro">A ${total}-minute session targeting your top ${plan.length} fault${plan.length>1?'s':''}, time-weighted by severity:</div>
+      ${plan.map((p,i)=>`
+        <div class="plan-item severity-${p.severity}">
+          <div class="plan-num">${i+1}</div>
+          <div class="plan-body">
+            <div class="plan-head"><span>${p.icon} ${p.name}</span><span class="plan-min">${p.minutes} min</span></div>
+            <div class="plan-drill"><strong>${p.drill.name}:</strong> ${p.drill.desc}</div>
+          </div>
+        </div>`).join('')}`;
   }
 
   // ── Club filter ───────────────────────────────────────────────
@@ -1218,7 +1408,7 @@ const UI = (() => {
     const body = sorted.map((s,i) => {
       const sc = ShotScorer.score(s);
       const rowCls = sc===null?'': sc>=75?'row-good': sc>=50?'row-ok':'row-bad';
-      return `<tr class="${rowCls}">${COLS.map(c=>`<td>${c.render(s,i)}</td>`).join('')}</tr>`;
+      return `<tr class="${rowCls} shot-row" data-idx="${i}">${COLS.map(c=>`<td>${c.render(s,i)}</td>`).join('')}</tr>`;
     }).join('');
 
     el.innerHTML=`<thead><tr>${heads}</tr></thead><tbody>${body}</tbody>`;
@@ -1228,6 +1418,92 @@ const UI = (() => {
         renderShotTable(shots,f,_sortField===f?_sortDir*-1:1);
       });
     });
+    el.querySelectorAll('.shot-row').forEach(row=>{
+      row.addEventListener('click',()=>openShotModal(sorted[+row.dataset.idx], shots));
+    });
+  }
+
+  // ── Shot detail modal ─────────────────────────────────────────
+  function openShotModal(shot, sessionShots) {
+    const modal = document.getElementById('shotModal');
+    if (!modal || !shot) return;
+    const sc = ShotScorer.score(shot);
+    const g = sc!==null ? ShotScorer.grade(sc) : null;
+    const faults = FaultEngine.detectFaults([shot]);
+
+    const cmp = (field, dec) => {
+      const v = shot[field], a = avg(sessionShots, field);
+      if (typeof v!=='number' || a===null) return '';
+      const d = v - a;
+      return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs avg</span>`;
+    };
+
+    const rows = [
+      ['Club', clubLabel(shot.clubType), ''],
+      ['Ball Speed', `${fmt(shot.ballSpeed,1)} mph`, cmp('ballSpeed',1)],
+      ['Club Speed', `${fmt(shot.clubSpeed,1)} mph`, cmp('clubSpeed',1)],
+      ['Smash Factor', fmt(shot.smashFactor,2), cmp('smashFactor',2)],
+      ['Carry', `${fmt(shot.carryDistance,1)} yds`, cmp('carryDistance',1)],
+      ['Total', `${fmt(shot.totalDistance,1)} yds`, cmp('totalDistance',1)],
+      ['Launch Angle', `${fmt(shot.launchAngle,1)}°`, cmp('launchAngle',1)],
+      ['Launch Dir', `${fmt(shot.launchDirection,1)}°`, ''],
+      ['Side Carry', `${fmt(shot.sideCarry,1)} yds`, ''],
+      ['Club Path', `${fmt(shot.clubPath,1)}°`, ''],
+      ['Attack Angle', `${fmt(shot.attackAngle,1)}°`, ''],
+      ['Face-to-Path', `${fmt(facePath(shot),1)}°`, ''],
+      ['Apex', `${fmt(shot.apex,0)} ft`, ''],
+      shot.spinRate ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, ''] : null,
+      shot.spinAxis ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, ''] : null,
+    ].filter(Boolean);
+
+    document.getElementById('shotModalTitle').innerHTML =
+      `Shot #${shot._row||'?'} · ${clubLabel(shot.clubType)}` +
+      (g ? ` <span class="sm-grade" style="color:${g.color}">${sc}/100 (${g.letter})</span>` : '');
+
+    document.getElementById('shotModalBody').innerHTML = `
+      <table class="sm-table">${rows.map(([k,v,c])=>`<tr><td class="sm-k">${k}</td><td class="sm-v">${v}</td><td class="sm-c">${c}</td></tr>`).join('')}</table>
+      ${faults.length ? `
+        <div class="sm-faults-title">Faults on this shot</div>
+        ${faults.map(f=>`<div class="sm-fault severity-${f.severity}">${f.icon} ${f.name}</div>`).join('')}
+      ` : `<div class="sm-clean">✅ No faults flagged on this shot</div>`}`;
+
+    modal.hidden = false;
+  }
+
+  // ── Yardage book + personal bests ─────────────────────────────
+  function renderYardages(sessions) {
+    const empty = document.getElementById('yardages-empty');
+    const content = document.getElementById('yardages-content');
+    if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
+    empty.style.display='none'; content.hidden=false;
+
+    const book = Analytics.yardageBook(sessions);
+    const totalShots = sessions.reduce((a,s)=>a+s.shots.length,0);
+    document.getElementById('yardageMeta').textContent =
+      `${book.length} clubs · ${totalShots} shots · ${sessions.length} session${sessions.length>1?'s':''}`;
+
+    document.getElementById('yardageTable').innerHTML = `
+      <thead><tr><th>Club</th><th>Stock Carry</th><th>Range</th><th>Consistency</th><th>Avg Total</th><th>Shots</th></tr></thead>
+      <tbody>${book.map(b=>{
+        const cons = b.stdCarry===0?'—': b.stdCarry<6?'Tight':b.stdCarry<12?'Moderate':'Wide';
+        const consC = b.stdCarry<6?'var(--green-light)':b.stdCarry<12?'var(--yellow)':'var(--red)';
+        return `<tr>
+          <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
+          <td><strong style="font-size:1.05rem">${fmt(b.avgCarry,0)}</strong> yds</td>
+          <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
+          <td><span style="color:${consC}">${cons}</span> <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)}</small></td>
+          <td>${fmt(b.avgTotal,0)} yds</td>
+          <td>${b.count}</td>
+        </tr>`;
+      }).join('')}</tbody>`;
+
+    const bests = Analytics.personalBests(sessions);
+    document.getElementById('recordsGrid').innerHTML = bests.map(b=>`
+      <div class="record-card">
+        <div class="record-value">${b.value}<span class="record-unit">${b.unit}</span></div>
+        <div class="record-label">${b.label}</div>
+        <div class="record-meta">${b.club} · ${b.date}</div>
+      </div>`).join('');
   }
 
   // ── Progress ──────────────────────────────────────────────────
@@ -1325,7 +1601,7 @@ const UI = (() => {
       </div>`;
   }
 
-  return { renderSessionList, renderDetail, renderProgress };
+  return { renderSessionList, renderDetail, renderProgress, renderYardages };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1352,6 +1628,12 @@ const Router = (() => {
     show('progress');
   }
 
+  async function showYardages() {
+    const sessions = await DB.getSessions();
+    UI.renderYardages(sessions);
+    show('yardages');
+  }
+
   async function showSessions() {
     const sessions = await DB.getSessions();
     UI.renderSessionList(sessions);
@@ -1365,7 +1647,7 @@ const Router = (() => {
     show('import');
   }
 
-  return { show, showDetail, showProgress, showSessions, showImport };
+  return { show, showDetail, showProgress, showYardages, showSessions, showImport };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1460,6 +1742,7 @@ async function init() {
       const v = el.dataset.view;
       if (v==='import')   { Router.showImport(); return; }
       if (v==='progress') { await Router.showProgress(); return; }
+      if (v==='yardages') { await Router.showYardages(); return; }
       if (v==='sessions') { await Router.showSessions(); return; }
       Router.show(v);
     });
@@ -1509,6 +1792,11 @@ async function init() {
       await DB.clearAll(); await Router.showSessions();
     });
   });
+
+  // Shot detail modal close
+  const shotModal = document.getElementById('shotModal');
+  document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
+  shotModal.addEventListener('click', e=>{ if(e.target===shotModal) shotModal.hidden=true; });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
