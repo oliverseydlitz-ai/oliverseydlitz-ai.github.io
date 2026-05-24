@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════ TOP NAV (desktop) -->
+<!-- ═══════════════════ TOP NAV (desktop) -->
 <header class="top-nav" id="topNav">
   <div class="top-nav-brand">
     <span class="brand-icon">⛳</span>
@@ -26,10 +26,10 @@
   </nav>
 </header>
 
-<!-- ═══════════════════════════════════════════════════════ VIEWS -->
+<!-- ═══════════════════ VIEWS -->
 <main class="app-main" id="appMain">
 
-  <!-- ── Sessions ──────────────────────────────────────────── -->
+  <!-- ── Sessions ────────────────────────── -->
   <section class="view active" id="view-sessions">
     <div class="view-header">
       <h1 class="view-title">Sessions</h1>
@@ -44,14 +44,13 @@
     <ul class="session-list" id="sessionList" hidden></ul>
   </section>
 
-  <!-- ── Import ────────────────────────────────────────────── -->
+  <!-- ── Import ──────────────────────────── -->
   <section class="view" id="view-import">
     <div class="view-header">
       <button class="btn-back" id="importBackBtn">← Back</button>
       <h1 class="view-title">Import Session</h1>
     </div>
 
-    <!-- Step 1: file pick -->
     <div class="import-step active" id="step-pick">
       <div class="drop-zone" id="dropZone">
         <div class="drop-icon">📂</div>
@@ -63,7 +62,6 @@
       <p class="import-hint">Export from Rapsodo Cloud → Session → Share → CSV</p>
     </div>
 
-    <!-- Step 2: preview -->
     <div class="import-step" id="step-preview">
       <h2 class="step-heading">Preview</h2>
       <p class="step-sub" id="previewCount"></p>
@@ -76,7 +74,6 @@
       </div>
     </div>
 
-    <!-- Step 3: metadata -->
     <div class="import-step" id="step-meta">
       <h2 class="step-heading">Session details</h2>
       <div class="form-group">
@@ -103,7 +100,6 @@
       </div>
     </div>
 
-    <!-- Step 4: saving -->
     <div class="import-step" id="step-saving">
       <div class="saving-state">
         <div class="spinner"></div>
@@ -112,7 +108,7 @@
     </div>
   </section>
 
-  <!-- ── Session Detail ────────────────────────────────────── -->
+  <!-- ── Session Detail ──────────────────── -->
   <section class="view" id="view-session-detail">
     <div class="view-header">
       <button class="btn-back" id="detailBackBtn">← Sessions</button>
@@ -120,19 +116,53 @@
         <h1 class="view-title" id="detailTitle">Session</h1>
         <p class="detail-notes" id="detailNotes"></p>
       </div>
-      <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session" title="Delete session">🗑</button>
+      <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session">🗑</button>
     </div>
+
+    <!-- Score banner -->
+    <div id="scoreBanner" class="score-banner"></div>
 
     <!-- Metrics strip -->
     <div class="metrics-strip" id="metricsStrip"></div>
 
     <!-- Club filter -->
     <div class="filter-row">
-      <label class="filter-label">Club:</label>
+      <span class="filter-label">Club:</span>
       <div class="filter-chips" id="clubFilter"></div>
     </div>
 
-    <!-- Fault cards -->
+    <!-- Swing DNA -->
+    <div class="section-block">
+      <h2 class="section-title">Swing DNA</h2>
+      <div class="dna-grid" id="swingDna"></div>
+    </div>
+
+    <!-- Dispersion -->
+    <div class="section-block">
+      <h2 class="section-title">Shot Dispersion</h2>
+      <div class="chart-card dispersion-card">
+        <canvas id="chartDispersion"></canvas>
+      </div>
+    </div>
+
+    <!-- Club gapping -->
+    <div class="section-block" id="gappingSection">
+      <h2 class="section-title">Club Gapping</h2>
+      <div class="chart-card gapping-card">
+        <canvas id="chartGapping"></canvas>
+      </div>
+      <div class="table-wrap" style="margin-top:.75rem">
+        <table id="gapTable"></table>
+      </div>
+    </div>
+
+    <!-- Launch windows -->
+    <div class="section-block">
+      <h2 class="section-title">Launch Windows — Actual vs Optimal</h2>
+      <div id="launchWindows"></div>
+    </div>
+
+    <!-- Fault detection -->
     <div class="section-block">
       <h2 class="section-title">Fault Detection</h2>
       <div class="fault-list" id="faultList"></div>
@@ -140,7 +170,7 @@
 
     <!-- Benchmarking -->
     <div class="section-block">
-      <h2 class="section-title">Benchmarking</h2>
+      <h2 class="section-title">Benchmarking <span class="section-sub">(you / amateur avg / PGA avg)</span></h2>
       <div class="table-wrap">
         <table class="bench-table" id="benchTable"></table>
       </div>
@@ -148,50 +178,45 @@
 
     <!-- Shot log -->
     <div class="section-block">
-      <h2 class="section-title">Shot Log</h2>
+      <h2 class="section-title">Shot Log <span class="section-sub">(click headers to sort)</span></h2>
       <div class="table-wrap">
         <table class="shot-table" id="shotTable"></table>
       </div>
     </div>
   </section>
 
-  <!-- ── Progress ──────────────────────────────────────────── -->
+  <!-- ── Progress ────────────────────────── -->
   <section class="view" id="view-progress">
     <div class="view-header">
       <h1 class="view-title">Progress</h1>
     </div>
     <div id="progress-empty" class="empty-state">
       <div class="empty-icon">📈</div>
-      <h2>Not enough data</h2>
+      <h2>Not enough data yet</h2>
       <p>Import at least 2 sessions to see trends.</p>
     </div>
     <div id="progress-content" hidden>
       <div class="form-group progress-filter">
-        <label for="progressClub">Club</label>
+        <label for="progressClub">Club filter</label>
         <select id="progressClub"></select>
       </div>
+
+      <!-- Trend summary -->
+      <div id="progressTrend"></div>
+
       <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Smash Factor</h3>
-          <canvas id="chartSmash"></canvas>
-        </div>
-        <div class="chart-card">
-          <h3>Carry Distance (yds)</h3>
-          <canvas id="chartCarry"></canvas>
-        </div>
-        <div class="chart-card">
-          <h3>Launch Angle (°)</h3>
-          <canvas id="chartLaunch"></canvas>
-        </div>
-        <div class="chart-card">
-          <h3>Ball Speed (mph)</h3>
-          <canvas id="chartBallSpeed"></canvas>
-        </div>
+        <div class="chart-card"><h3>Session Quality Score</h3><canvas id="chartQuality"></canvas></div>
+        <div class="chart-card"><h3>Smash Factor</h3><canvas id="chartSmash"></canvas></div>
+        <div class="chart-card"><h3>Carry Distance (yds)</h3><canvas id="chartCarry"></canvas></div>
+        <div class="chart-card"><h3>Ball Speed (mph)</h3><canvas id="chartBallSpeed"></canvas></div>
+        <div class="chart-card"><h3>Launch Angle (°)</h3><canvas id="chartLaunch"></canvas></div>
+        <div class="chart-card"><h3>Club Path (°)</h3><canvas id="chartPath"></canvas></div>
+        <div class="chart-card"><h3>Attack Angle (°)</h3><canvas id="chartAA"></canvas></div>
       </div>
     </div>
   </section>
 
-  <!-- ── Settings ──────────────────────────────────────────── -->
+  <!-- ── Settings ────────────────────────── -->
   <section class="view" id="view-settings">
     <div class="view-header">
       <h1 class="view-title">Settings</h1>
@@ -210,21 +235,22 @@
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">About</h2>
-        <div class="settings-row static">
-          <span>Version</span>
-          <span class="settings-value">1.0.0</span>
-        </div>
-        <div class="settings-row static">
-          <span>Works with</span>
-          <span class="settings-value">Rapsodo MLM2Pro</span>
-        </div>
+        <div class="settings-row static"><span>Version</span><span class="settings-value">2.0.0</span></div>
+        <div class="settings-row static"><span>Works with</span><span class="settings-value">Rapsodo MLM2Pro</span></div>
+        <div class="settings-row static"><span>Data stored</span><span class="settings-value">Locally on device</span></div>
+      </div>
+      <div class="settings-section">
+        <h2 class="settings-section-title">Fault Engine</h2>
+        <div class="settings-row static"><span>Rules</span><span class="settings-value">20 fault rules</span></div>
+        <div class="settings-row static"><span>Categories</span><span class="settings-value">Contact · Path · AoA · Launch · Spin · Consistency</span></div>
+        <div class="settings-row static"><span>Benchmarks</span><span class="settings-value">PGA Tour + Amateur (15 clubs)</span></div>
       </div>
     </div>
   </section>
 
 </main>
 
-<!-- ═══════════════════════════════════════════════════════ BOTTOM NAV (mobile) -->
+<!-- ═══════════════════ BOTTOM NAV (mobile) -->
 <nav class="bottom-nav" id="bottomNav">
   <button class="bottom-nav-item active" data-view="sessions">
     <span class="bnav-icon">📋</span>
@@ -244,14 +270,14 @@
   </button>
 </nav>
 
-<!-- ═══════════════════════════════════════════════════════ CONFIRM MODAL -->
+<!-- ═══════════════════ MODAL -->
 <div class="modal-overlay" id="confirmModal" hidden>
   <div class="modal">
     <h2 class="modal-title" id="confirmTitle">Are you sure?</h2>
     <p class="modal-body" id="confirmBody"></p>
     <div class="modal-actions">
       <button class="btn-secondary" id="confirmCancel">Cancel</button>
-      <button class="btn-danger" id="confirmOk">Delete</button>
+      <button class="btn-danger" id="confirmOk">Confirm</button>
     </div>
   </div>
 </div>
