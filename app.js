@@ -260,12 +260,14 @@ const CloudDB = (() => {
       conditions: session.conditions,
       shots: session.shots,
       created_at: new Date(session.createdAt).toISOString(),
-    }]);
+    }], { onConflict: 'user_id,id' });
     if (error) throw error;
   }
 
   async function deleteSession(id) {
-    const { error } = await sb.from('sessions').delete().eq('id', id);
+    const user = Auth.getUser();
+    if (!user) return;
+    const { error } = await sb.from('sessions').delete().eq('id', id).eq('user_id', user.id);
     if (error) throw error;
   }
 
