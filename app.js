@@ -305,7 +305,7 @@ const CloudDB = (() => {
   return { getSessions, saveSession, deleteSession, migrateLocalSessions };
 })();
 
-// Unified data layer — cloud when logged in (IndexedDB as offline fallback), MemDB for guests
+// Unified data layer — cloud-only for logged-in users, MemDB (ephemeral) for guests
 const Store = (() => {
   function fromRow(r) {
     return {
@@ -317,37 +317,25 @@ const Store = (() => {
 
   async function getSessions() {
     if (cloud()) {
-      try {
-        const rows = await CloudDB.getSessions(Auth.getUser().id);
-        return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
-      } catch { return DB.getSessions(); }
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
     }
     return MemDB.getSessions();
   }
   async function getSession(id) {
     if (cloud()) {
-      try {
-        const rows = await CloudDB.getSessions(Auth.getUser().id);
-        const r = rows.find(x => x.id === id);
-        if (r) return fromRow(r);
-      } catch {}
-      return DB.getSession(id);
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      const r = rows.find(x => x.id === id);
+      return r ? fromRow(r) : null;
     }
     return MemDB.getSession(id);
   }
   async function saveSession(s) {
-    if (cloud()) {
-      try { await CloudDB.saveSession(s); }
-      catch(e) { toast('Cloud save failed — saved locally. ' + (e.message||'')); }
-      return DB.saveSession(s);
-    }
+    if (cloud()) { await CloudDB.saveSession(s); return; }
     MemDB.saveSession(s);
   }
   async function deleteSession(id) {
-    if (cloud()) {
-      try { await CloudDB.deleteSession(id); } catch {}
-      return DB.deleteSession(id);
-    }
+    if (cloud()) { await CloudDB.deleteSession(id); return; }
     MemDB.deleteSession(id);
   }
   return { getSessions, getSession, saveSession, deleteSession };
@@ -2271,11 +2259,8 @@ async function init() {
 
   document.getElementById('clearDataBtn').addEventListener('click', ()=>{
     showConfirm('Clear all data?','All sessions will be permanently deleted.', async ()=>{
-      if (Auth.getUser()) {
-        const rows = await CloudDB.getSessions(Auth.getUser().id);
-        for (const r of rows) await CloudDB.deleteSession(r.id);
-      }
-      await DB.clearAll();
+      const sessions = await Store.getSessions();
+      for (const s of sessions) await Store.deleteSession(s.id);
       await Router.showSessions();
     });
   });
