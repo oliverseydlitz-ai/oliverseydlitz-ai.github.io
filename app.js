@@ -104,6 +104,165 @@ const DB = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Supabase Auth & Cloud DB
+// ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const Auth = (() => {
+  let _user = null;
+
+  async function init() {
+    const { data: { user } } = await sb.auth.getUser();
+    _user = user;
+    updateUI();
+    return user;
+  }
+
+  async function signup(email, password) {
+    const { data, error } = await sb.auth.signUp({ email, password });
+    if (error) throw error;
+    _user = data.user;
+    updateUI();
+    return _user;
+  }
+
+  async function login(email, password) {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    _user = data.user;
+    updateUI();
+    return _user;
+  }
+
+  async function logout() {
+    await sb.auth.signOut();
+    _user = null;
+    updateUI();
+  }
+
+  function getUser() { return _user; }
+
+  function updateUI() {
+    const loggedIn = document.getElementById('authLoggedIn');
+    const loggedOut = document.getElementById('authLoggedOut');
+    const authModal = document.getElementById('authModal');
+    if (_user) {
+      loggedIn.hidden = false;
+      loggedOut.hidden = true;
+      document.getElementById('authUserEmail').textContent = _user.email;
+      authModal.hidden = true;
+    } else {
+      loggedIn.hidden = true;
+      loggedOut.hidden = false;
+    }
+  }
+
+  function showAuth() {
+    document.getElementById('authModal').hidden = false;
+    switchToLogin();
+  }
+
+  function switchToLogin() {
+    document.getElementById('authTabLogin').classList.add('active');
+    document.getElementById('authTabSignup').classList.remove('active');
+    document.getElementById('authLoginForm').classList.add('active');
+    document.getElementById('authSignupForm').classList.remove('active');
+    document.getElementById('authError').textContent = '';
+  }
+
+  function switchToSignup() {
+    document.getElementById('authTabSignup').classList.add('active');
+    document.getElementById('authTabLogin').classList.remove('active');
+    document.getElementById('authSignupForm').classList.add('active');
+    document.getElementById('authLoginForm').classList.remove('active');
+    document.getElementById('authError').textContent = '';
+  }
+
+  return { init, signup, login, logout, getUser, showAuth, switchToLogin, switchToSignup };
+})();
+
+const CloudDB = (() => {
+  async function getSessions(userId) {
+    const { data, error } = await sb
+      .from('sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function saveSession(session) {
+    const user = Auth.getUser();
+    if (!user) return;
+    const { error } = await sb.from('sessions').upsert([{
+      id: session.id,
+      user_id: user.id,
+      date: session.date,
+      notes: session.notes,
+      conditions: session.conditions,
+      shots: session.shots,
+      created_at: new Date(session.createdAt).toISOString(),
+    }]);
+    if (error) throw error;
+  }
+
+  async function deleteSession(id) {
+    const { error } = await sb.from('sessions').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async function migrateLocalSessions() {
+    const user = Auth.getUser();
+    if (!user) return;
+    const localSessions = await DB.exportAll();
+    for (const session of localSessions) {
+      await saveSession(session);
+    }
+  }
+
+  return { getSessions, saveSession, deleteSession, migrateLocalSessions };
+})();
+
+// Unified data layer — cloud when logged in (local kept as offline cache), local otherwise
+const Store = (() => {
+  function fromRow(r) {
+    return {
+      id: r.id, date: r.date, notes: r.notes, conditions: r.conditions,
+      shots: r.shots, createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+    };
+  }
+  const cloud = () => !!Auth.getUser();
+
+  async function getSessions() {
+    if (cloud()) {
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
+    }
+    return DB.getSessions();
+  }
+  async function getSession(id) {
+    if (cloud()) {
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      const r = rows.find(x => x.id === id);
+      return r ? fromRow(r) : null;
+    }
+    return DB.getSession(id);
+  }
+  async function saveSession(s) {
+    if (cloud()) await CloudDB.saveSession(s);
+    return DB.saveSession(s);
+  }
+  async function deleteSession(id) {
+    if (cloud()) await CloudDB.deleteSession(id);
+    return DB.deleteSession(id);
+  }
+  return { getSessions, getSession, saveSession, deleteSession };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // CSV Parser
 // ────────────────────────────────────────────────────────────────
 const CSVParser = (() => {
@@ -1814,26 +1973,26 @@ const Router = (() => {
   }
 
   async function showDetail(id) {
-    const session = await DB.getSession(id);
+    const session = await Store.getSession(id);
     if (!session) return;
     UI.renderDetail(session);
     show('session-detail');
   }
 
   async function showProgress() {
-    const sessions = await DB.getSessions();
+    const sessions = await Store.getSessions();
     UI.renderProgress(sessions);
     show('progress');
   }
 
   async function showYardages() {
-    const sessions = await DB.getSessions();
+    const sessions = await Store.getSessions();
     UI.renderYardages(sessions);
     show('yardages');
   }
 
   async function showSessions() {
-    const sessions = await DB.getSessions();
+    const sessions = await Store.getSessions();
     UI.renderHome(sessions);
     show('sessions');
   }
@@ -1904,7 +2063,7 @@ const ImportFlow = (() => {
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
     try {
-      await DB.saveSession(session);
+      await Store.saveSession(session);
       await Router.showDetail(session.id);
     } catch(err) {
       alert('Failed to save: '+err.message);
@@ -1979,14 +2138,14 @@ async function init() {
   // Delete
   document.getElementById('deleteSessionBtn').addEventListener('click', function() {
     showConfirm('Delete session?','This cannot be undone.', async ()=>{
-      await DB.deleteSession(this.dataset.id);
+      await Store.deleteSession(this.dataset.id);
       await Router.showSessions();
     });
   });
 
   // Settings
   document.getElementById('exportDataBtn').addEventListener('click', async ()=>{
-    const data = await DB.exportAll();
+    const data = await Store.getSessions();
     const a = Object.assign(document.createElement('a'),{
       href: URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),
       download: `shotlab-${new Date().toISOString().slice(0,10)}.json`,
@@ -1996,7 +2155,12 @@ async function init() {
 
   document.getElementById('clearDataBtn').addEventListener('click', ()=>{
     showConfirm('Clear all data?','All sessions will be permanently deleted.', async ()=>{
-      await DB.clearAll(); await Router.showSessions();
+      if (Auth.getUser()) {
+        const rows = await CloudDB.getSessions(Auth.getUser().id);
+        for (const r of rows) await CloudDB.deleteSession(r.id);
+      }
+      await DB.clearAll();
+      await Router.showSessions();
     });
   });
 
@@ -2004,6 +2168,81 @@ async function init() {
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
   shotModal.addEventListener('click', e=>{ if(e.target===shotModal) shotModal.hidden=true; });
+
+  // Auth
+  await Auth.init();
+
+  // Offer to upload any local sessions not yet in the cloud, then refresh
+  async function afterAuth() {
+    const user = Auth.getUser();
+    if (!user) return;
+    try {
+      const [local, cloudRows] = await Promise.all([DB.exportAll(), CloudDB.getSessions(user.id)]);
+      const cloudIds = new Set(cloudRows.map(r => r.id));
+      const unsynced = local.filter(s => !cloudIds.has(s.id));
+      if (unsynced.length > 0) {
+        showConfirm('Sync your sessions?', `You have ${unsynced.length} local session(s) not in the cloud. Upload them now?`, async () => {
+          try {
+            for (const s of unsynced) await CloudDB.saveSession(s);
+          } catch(err) { alert('Sync failed: ' + err.message); }
+          await Router.showSessions();
+        });
+      }
+    } catch(err) { /* cloud unreachable — stay on local cache */ }
+    await Router.showSessions();
+  }
+
+  // Auth tab switching
+  document.getElementById('authTabLogin').addEventListener('click', Auth.switchToLogin);
+  document.getElementById('authTabSignup').addEventListener('click', Auth.switchToSignup);
+  document.getElementById('authSwitchSignup').addEventListener('click', e=>{ e.preventDefault(); Auth.switchToSignup(); });
+  document.getElementById('authSwitchLogin').addEventListener('click', e=>{ e.preventDefault(); Auth.switchToLogin(); });
+
+  // Auth form submission
+  document.getElementById('authLoginBtn').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value.trim();
+    if (!email || !password) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
+    try {
+      await Auth.login(email, password);
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      await afterAuth();
+    } catch(err) {
+      document.getElementById('authError').textContent = err.message;
+    }
+  });
+
+  document.getElementById('authSignupBtn').addEventListener('click', async () => {
+    const email = document.getElementById('authSignupEmail').value.trim();
+    const password = document.getElementById('authSignupPassword').value.trim();
+    const confirm = document.getElementById('authSignupConfirm').value.trim();
+    if (!email || !password || !confirm) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
+    if (password !== confirm) { document.getElementById('authError').textContent = 'Passwords do not match.'; return; }
+    if (password.length < 6) { document.getElementById('authError').textContent = 'Password must be at least 6 characters.'; return; }
+    try {
+      await Auth.signup(email, password);
+      document.getElementById('authSignupEmail').value = '';
+      document.getElementById('authSignupPassword').value = '';
+      document.getElementById('authSignupConfirm').value = '';
+      if (Auth.getUser()) await afterAuth();
+      else document.getElementById('authError').textContent = 'Check your email to confirm your account, then sign in.';
+    } catch(err) {
+      document.getElementById('authError').textContent = err.message;
+    }
+  });
+
+  document.getElementById('authLogoutBtn').addEventListener('click', async () => {
+    await Auth.logout();
+    await Router.showSessions();
+  });
+
+  // Login button in auth status / open auth from a logged-out state
+  document.getElementById('authLoginCta')?.addEventListener('click', () => Auth.showAuth());
+  const authModal = document.getElementById('authModal');
+  authModal.addEventListener('click', e => { if (e.target === authModal) authModal.hidden = true; });
+
+  if (Auth.getUser()) await afterAuth();
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 

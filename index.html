@@ -357,6 +357,61 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
+
+<!-- ═══════════════════ AUTH MODAL -->
+<div class="modal-overlay" id="authModal" hidden>
+  <div class="modal">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="authTabLogin">Sign In</button>
+      <button class="auth-tab" id="authTabSignup">Sign Up</button>
+    </div>
+
+    <div id="authLoginForm" class="auth-form active">
+      <div class="form-group">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" id="authLoginBtn" style="width:100%">Sign In</button>
+      <p class="auth-hint">New to ShotLab? <a href="#" id="authSwitchSignup">Create account</a></p>
+    </div>
+
+    <div id="authSignupForm" class="auth-form">
+      <div class="form-group">
+        <label for="authSignupEmail">Email</label>
+        <input type="email" id="authSignupEmail" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="authSignupPassword">Password</label>
+        <input type="password" id="authSignupPassword" placeholder="••••••••" minlength="6">
+      </div>
+      <div class="form-group">
+        <label for="authSignupConfirm">Confirm Password</label>
+        <input type="password" id="authSignupConfirm" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" id="authSignupBtn" style="width:100%">Create Account</button>
+      <p class="auth-hint">Already have an account? <a href="#" id="authSwitchLogin">Sign in</a></p>
+    </div>
+
+    <p id="authError" class="auth-error"></p>
+  </div>
+</div>
+
+<!-- ═══════════════════ AUTH STATUS (top-right) -->
+<div id="authStatus" class="auth-status">
+  <span id="authLoggedOut">
+    <button id="authLoginCta" class="btn-sm btn-secondary">Sign in</button>
+  </span>
+  <span id="authLoggedIn" hidden>
+    <span id="authUserEmail"></span>
+    <button id="authLogoutBtn" class="btn-sm btn-secondary">Logout</button>
+  </span>
+</div>
+
 </body>
 </html>
