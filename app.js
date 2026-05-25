@@ -165,7 +165,10 @@ const Auth = (() => {
   async function oauth(provider) {
     const { error } = await sb.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: location.origin },
+      options: {
+        redirectTo: location.origin,
+        queryParams: { prompt: 'select_account' },
+      },
     });
     if (error) throw error;
     // On success the browser is redirected to the provider; we return on the
@@ -176,6 +179,7 @@ const Auth = (() => {
     await sb.auth.signOut();
     _user = null;
     updateUI();
+    showAuth(false);
   }
 
   function getUser() { return _user; }
