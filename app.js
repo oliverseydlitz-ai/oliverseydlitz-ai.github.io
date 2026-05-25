@@ -885,6 +885,49 @@ const Analytics = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Trajectory — SVG side-profile ball flight
+// ────────────────────────────────────────────────────────────────
+const Trajectory = (() => {
+  function arc(launch, apexFt, carryYds, descent, opts={}) {
+    const W=opts.w||340, H=opts.h||170, pad=opts.pad||26;
+    launch  = launch  > 0 ? launch  : 12;
+    descent = descent > 0 ? descent : 40;
+    const tl=Math.tan(launch*Math.PI/180), td=Math.tan(descent*Math.PI/180);
+    let frac = td/(tl+td);
+    if (!isFinite(frac) || frac<=0.05 || frac>=0.95) frac=0.6;
+    const gx0=pad, gx1=W-pad, gy=H-pad;
+    const uw=gx1-gx0, uh=H-pad*1.5;
+    const ax=gx0+uw*frac, ay=gy-uh;
+    const c1x=gx0+(ax-gx0)*0.55, c2x=ax+(gx1-ax)*0.45;
+    const line=`M ${gx0} ${gy} Q ${c1x} ${ay} ${ax} ${ay} Q ${c2x} ${ay} ${gx1} ${gy}`;
+    const area=`${line} L ${gx1} ${gy} L ${gx0} ${gy} Z`;
+    const uid='tg'+Math.random().toString(36).slice(2,7);
+    return `
+      <svg class="traj-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ball flight profile">
+        <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--turf)" stop-opacity="0.32"/>
+          <stop offset="100%" stop-color="var(--turf)" stop-opacity="0.02"/>
+        </linearGradient></defs>
+        <line x1="${gx0}" y1="${gy}" x2="${gx1}" y2="${gy}" stroke="var(--border-hi)" stroke-width="1.5"/>
+        <path d="${area}" fill="url(#${uid})"/>
+        <line x1="${ax}" y1="${ay}" x2="${ax}" y2="${gy}" stroke="var(--border-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${gx0}" cy="${gy}" r="3.5" fill="var(--pine)"/>
+        <circle cx="${ax}" cy="${ay}" r="4" fill="var(--turf)"/>
+        <circle cx="${gx1}" cy="${gy}" r="3.5" fill="var(--pine)"/>
+        <text x="${ax}" y="${ay-7}" text-anchor="middle" class="traj-lbl">${fmt(apexFt,0)} ft</text>
+        <text x="${gx0}" y="${gy+15}" text-anchor="start" class="traj-lbl">${fmt(launch,1)}° launch</text>
+        <text x="${gx1}" y="${gy+15}" text-anchor="end" class="traj-lbl">${fmt(carryYds,0)} yds carry</text>
+      </svg>`;
+  }
+  const shot = s => arc(s.launchAngle, s.apex, s.carryDistance, s.descentAngle);
+  const avgFlight = shots => shots.length
+    ? arc(avg(shots,'launchAngle'), avg(shots,'apex'), avg(shots,'carryDistance'), avg(shots,'descentAngle'))
+    : '';
+  return { shot, avgFlight, arc };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // UI
 // ────────────────────────────────────────────────────────────────
 const UI = (() => {
@@ -894,6 +937,106 @@ const UI = (() => {
 
   function destroyChart(id) {
     if (_charts[id]) { try { _charts[id].destroy(); } catch {} delete _charts[id]; }
+  }
+
+  // ── Home: dashboard + recent sessions ─────────────────────────
+  function renderHome(sessions) {
+    const dash=document.getElementById('dashboard');
+    const recent=document.getElementById('recentWrap');
+    if (!sessions.length) {
+      if(dash) dash.hidden=true;
+      if(recent) recent.hidden=true;
+      renderSessionList(sessions);
+      return;
+    }
+    if(dash) dash.hidden=false;
+    if(recent) recent.hidden=false;
+    renderDashboard(sessions, dash);
+    renderSessionList(sessions);
+  }
+
+  function sessionScore(s) {
+    const sc=s.shots.map(ShotScorer.score).filter(x=>x!==null);
+    return sc.length ? sc.reduce((a,b)=>a+b,0)/sc.length : null;
+  }
+
+  function renderDashboard(sessions, dash) {
+    if(!dash) return;
+    const all=sessions.flatMap(s=>s.shots);
+    const clubs=sortedClubs(all);
+    const recent3=sessions.slice(0,3).map(sessionScore).filter(x=>x!==null);
+    const prev3=sessions.slice(3,6).map(sessionScore).filter(x=>x!==null);
+    const form=recent3.length?Math.round(recent3.reduce((a,b)=>a+b,0)/recent3.length):0;
+    const prevForm=prev3.length?prev3.reduce((a,b)=>a+b,0)/prev3.length:null;
+    const g=ShotScorer.grade(form);
+    const trend=prevForm!==null?form-prevForm:null;
+    const bests=Analytics.personalBests(sessions);
+    const longest=bests.find(b=>b.label==='Longest Carry');
+    const topBall=bests.find(b=>b.label==='Top Ball Speed');
+    const last=sessions[0];
+    const lastFaults=FaultEngine.detectFaults(last.shots);
+    const topFault=lastFaults.find(f=>f.severity==='high')||lastFaults[0];
+
+    dash.innerHTML = `
+      <div class="dash-grid">
+        <div class="dash-hero">
+          <div class="dash-hero-ring">
+            <svg viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" class="dh-track"/>
+              <circle cx="60" cy="60" r="50" class="dh-arc" style="stroke:${g.color};stroke-dasharray:314;stroke-dashoffset:314"
+                data-offset="${(314*(1-form/100)).toFixed(0)}"/>
+            </svg>
+            <div class="dash-hero-num"><span class="dh-grade" style="color:${g.color}">${g.letter}</span><span class="dh-score">${form}<small>/100</small></span></div>
+          </div>
+          <div class="dash-hero-meta">
+            <div class="dash-hero-title">Current Form</div>
+            <div class="dash-hero-sub">across ${recent3.length} recent session${recent3.length>1?'s':''}</div>
+            ${trend!==null?`<div class="dash-trend ${trend>=0?'up':'down'}">${trend>=0?'▲':'▼'} ${Math.abs(Math.round(trend))} pts vs prior</div>`:''}
+          </div>
+        </div>
+        <div class="dash-tile"><div class="dt-val">${sessions.length}</div><div class="dt-label">Sessions</div></div>
+        <div class="dash-tile"><div class="dt-val">${all.length}</div><div class="dt-label">Shots logged</div></div>
+        <div class="dash-tile"><div class="dt-val">${clubs.length}</div><div class="dt-label">Clubs tracked</div></div>
+        ${longest?`<div class="dash-tile accent"><div class="dt-val">${longest.value}<small>yds</small></div><div class="dt-label">Longest carry · ${longest.club}</div></div>`:''}
+        ${topBall?`<div class="dash-tile"><div class="dt-val">${topBall.value}<small>mph</small></div><div class="dt-label">Top ball speed</div></div>`:''}
+        <div class="dash-tile wide clickable" data-goto-last="${last.id}">
+          <div class="dt-label">Last session · ${formatDate(last.date)}</div>
+          <div class="dt-lastline">${topFault?`<span class="dt-fault">${topFault.icon} ${topFault.name}</span>`:'<span class="dt-clean">✅ No major faults — clean session</span>'}</div>
+          <div class="dt-cta">View report →</div>
+        </div>
+      </div>
+      <div class="dash-heatmap-wrap">
+        <div class="dash-sub-title">Practice Activity <span class="hm-legend">less <i class="hm-cell hm-l0"></i><i class="hm-cell hm-l1"></i><i class="hm-cell hm-l2"></i><i class="hm-cell hm-l3"></i><i class="hm-cell hm-l4"></i> more</span></div>
+        <div class="heatmap" id="heatmap"></div>
+      </div>`;
+
+    renderHeatmap(sessions);
+    requestAnimationFrame(()=>{
+      const arc=dash.querySelector('.dh-arc');
+      if(arc) arc.style.strokeDashoffset=arc.dataset.offset||'0';
+    });
+    const lastTile=dash.querySelector('[data-goto-last]');
+    if(lastTile) lastTile.addEventListener('click',()=>Router.showDetail(lastTile.dataset.gotoLast));
+  }
+
+  function renderHeatmap(sessions) {
+    const el=document.getElementById('heatmap'); if(!el) return;
+    const WEEKS=18, days=WEEKS*7;
+    const today=new Date(); today.setHours(0,0,0,0);
+    const perDay={};
+    sessions.forEach(s=>{ const d=new Date(s.date); if(isNaN(d))return; d.setHours(0,0,0,0); const k=d.toISOString().slice(0,10); perDay[k]=(perDay[k]||0)+s.shots.length; });
+    const start=new Date(today); start.setDate(start.getDate()-(days-1));
+    const dow=(start.getDay()+6)%7; start.setDate(start.getDate()-dow); // align to Monday
+    const cells=[];
+    for(let i=0;i<WEEKS*7;i++){
+      const d=new Date(start); d.setDate(start.getDate()+i);
+      if(d>today){ cells.push(`<div class="hm-cell hm-empty"></div>`); continue; }
+      const k=d.toISOString().slice(0,10);
+      const n=perDay[k]||0;
+      const lvl=n===0?0:n<15?1:n<35?2:n<60?3:4;
+      cells.push(`<div class="hm-cell hm-l${lvl}" title="${k}: ${n} shot${n!==1?'s':''}"></div>`);
+    }
+    el.innerHTML=cells.join('');
   }
 
   // ── Sessions list ─────────────────────────────────────────────
@@ -977,12 +1120,20 @@ const UI = (() => {
     renderSwingDNA(shots);
     renderDispersion(shots);
     renderDispersionStats(shots);
+    renderBallFlight(shots);
     renderGapping(_session.shots);
     renderLaunchWindows(shots);
     renderFaultCards(shots);
     renderPracticePlan(shots);
     renderBenchTable(shots);
     renderShotTable(shots);
+  }
+
+  // ── Ball flight trajectory ────────────────────────────────────
+  function renderBallFlight(shots) {
+    const el=document.getElementById('ballFlight'); if(!el) return;
+    if(!shots.length){ el.innerHTML=''; return; }
+    el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(shots)}</div>`;
   }
 
   // ── Insights (coach's notes) ──────────────────────────────────
@@ -1507,6 +1658,7 @@ const UI = (() => {
       (g ? ` <span class="sm-grade" style="color:${g.color}">${sc}/100 (${g.letter})</span>` : '');
 
     document.getElementById('shotModalBody').innerHTML = `
+      <div class="sm-traj">${Trajectory.shot(shot)}</div>
       <table class="sm-table">${rows.map(([k,v,c])=>`<tr><td class="sm-k">${k}</td><td class="sm-v">${v}</td><td class="sm-c">${c}</td></tr>`).join('')}</table>
       ${faults.length ? `
         <div class="sm-faults-title">Faults on this shot</div>
@@ -1647,7 +1799,7 @@ const UI = (() => {
       </div>`;
   }
 
-  return { renderSessionList, renderDetail, renderProgress, renderYardages };
+  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1682,7 +1834,7 @@ const Router = (() => {
 
   async function showSessions() {
     const sessions = await DB.getSessions();
-    UI.renderSessionList(sessions);
+    UI.renderHome(sessions);
     show('sessions');
   }
 
@@ -1799,6 +1951,15 @@ async function init() {
   document.getElementById('emptyCTA')?.addEventListener('click', ()=>Router.showImport());
   document.getElementById('importBackBtn').addEventListener('click', ()=>Router.showSessions());
   document.getElementById('detailBackBtn').addEventListener('click', ()=>Router.showSessions());
+
+  // In-page section nav (session detail)
+  document.querySelectorAll('.subnav-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target=document.getElementById(link.dataset.target);
+      if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
 
   // File pick
   const fileInput=document.getElementById('fileInput'), dropZone=document.getElementById('dropZone');

@@ -35,7 +35,7 @@
   <!-- ── Sessions ────────────────────────── -->
   <section class="view active" id="view-sessions">
     <div class="view-header">
-      <h1 class="view-title">Sessions</h1>
+      <h1 class="view-title">Home</h1>
       <button class="btn-icon" id="sessionsImportBtn" aria-label="Import session">+</button>
     </div>
     <div id="sessions-empty" class="empty-state">
@@ -44,7 +44,11 @@
       <p>Import a Rapsodo CSV export to get started.</p>
       <button class="btn-primary" id="emptyCTA">Import Session</button>
     </div>
-    <ul class="session-list" id="sessionList" hidden></ul>
+    <div id="dashboard" class="dashboard" hidden></div>
+    <div id="recentWrap" hidden>
+      <h2 class="section-title recent-title">Recent Sessions</h2>
+      <ul class="session-list" id="sessionList"></ul>
+    </div>
   </section>
 
   <!-- ── Import ──────────────────────────── -->
@@ -122,6 +126,18 @@
       <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session">🗑</button>
     </div>
 
+    <!-- In-page section nav -->
+    <nav class="subnav" id="detailSubnav">
+      <a class="subnav-link" data-target="scoreBanner">Overview</a>
+      <a class="subnav-link" data-target="secFlight">Flight</a>
+      <a class="subnav-link" data-target="secDispersion">Dispersion</a>
+      <a class="subnav-link" data-target="gappingSection">Gapping</a>
+      <a class="subnav-link" data-target="secFaults">Faults</a>
+      <a class="subnav-link" data-target="secPlan">Plan</a>
+      <a class="subnav-link" data-target="secBench">Bench</a>
+      <a class="subnav-link" data-target="secShots">Shots</a>
+    </nav>
+
     <!-- Coach's notes -->
     <div id="insightsCard" class="insights-card"></div>
 
@@ -144,12 +160,18 @@
     </div>
 
     <!-- Dispersion -->
-    <div class="section-block">
+    <div class="section-block" id="secDispersion">
       <h2 class="section-title">Shot Dispersion</h2>
       <div class="chart-card dispersion-card">
         <canvas id="chartDispersion"></canvas>
       </div>
       <div class="dispersion-stats" id="dispersionStats"></div>
+    </div>
+
+    <!-- Ball flight -->
+    <div class="section-block" id="secFlight">
+      <h2 class="section-title">Ball Flight <span class="section-sub">average profile for selection</span></h2>
+      <div id="ballFlight"></div>
     </div>
 
     <!-- Club gapping -->
@@ -170,19 +192,19 @@
     </div>
 
     <!-- Fault detection -->
-    <div class="section-block">
+    <div class="section-block" id="secFaults">
       <h2 class="section-title">Fault Detection</h2>
       <div class="fault-list" id="faultList"></div>
     </div>
 
     <!-- Practice plan -->
-    <div class="section-block">
+    <div class="section-block" id="secPlan">
       <h2 class="section-title">Your Practice Plan</h2>
       <div class="practice-plan" id="practicePlan"></div>
     </div>
 
     <!-- Benchmarking -->
-    <div class="section-block">
+    <div class="section-block" id="secBench">
       <h2 class="section-title">Benchmarking <span class="section-sub">(you / amateur avg / PGA avg)</span></h2>
       <div class="table-wrap">
         <table class="bench-table" id="benchTable"></table>
@@ -190,8 +212,8 @@
     </div>
 
     <!-- Shot log -->
-    <div class="section-block">
-      <h2 class="section-title">Shot Log <span class="section-sub">(click headers to sort)</span></h2>
+    <div class="section-block" id="secShots">
+      <h2 class="section-title">Shot Log <span class="section-sub">(tap a row for detail · click headers to sort)</span></h2>
       <div class="table-wrap">
         <table class="shot-table" id="shotTable"></table>
       </div>
