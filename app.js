@@ -119,6 +119,13 @@ const _authError = /error=|error_code=|error_description=/.test(_redirectStr);
 const _authRedirect = _authError ||
   /type=(signup|magiclink|recovery|email_change|invite)|access_token=|[?&]code=/.test(_redirectStr);
 
+// Pull the human-readable error reason out of the redirect (hash or query)
+let _authErrorMsg = '';
+if (_authError) {
+  const p = new URLSearchParams(location.hash.replace(/^#/, '') + '&' + location.search.replace(/^\?/, ''));
+  _authErrorMsg = (p.get('error_description') || p.get('error') || '').replace(/\+/g, ' ');
+}
+
 function toast(msg) {
   let t = document.getElementById('toast');
   if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
@@ -2224,7 +2231,10 @@ async function init() {
   if (_authRedirect) {
     history.replaceState(null, '', location.pathname);
     if (_authError) {
-      toast('That link has expired. Please sign in or request a new one.');
+      const expired = /expired|otp_expired|invalid|access_denied/.test(_redirectStr);
+      toast(_authErrorMsg
+        ? `Sign-in failed: ${_authErrorMsg}`
+        : (expired ? 'That link has expired. Please sign in or request a new one.' : 'Sign-in failed. Please try again.'));
     } else {
       Auth.hideAuth();
       const fromEmail = /type=(signup|magiclink|recovery|email_change|invite)/.test(_redirectStr);
