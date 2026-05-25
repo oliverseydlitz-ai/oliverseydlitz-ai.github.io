@@ -160,6 +160,8 @@ const Auth = (() => {
   async function init() {
     // Reactively track auth changes (token refresh, signOut, OAuth callback)
     sb.auth.onAuthStateChange((event, session) => {
+      // Don't let a stale TOKEN_REFRESHED event re-authenticate after intentional logout
+      if (_user === null && event === 'TOKEN_REFRESHED') return;
       _user = session?.user || null;
       updateUI();
     });
@@ -200,11 +202,16 @@ const Auth = (() => {
   }
 
   async function logout() {
-    // signOut with scope:'local' clears the local token even if the server is unreachable
-    try { await sb.auth.signOut({ scope: 'local' }); } catch {}
+    // Clear state immediately — no waiting for network
     _user = null;
     updateUI();
+    // Nuke all Supabase auth tokens from localStorage directly (belt + suspenders)
+    for (const k of [...Object.keys(localStorage)]) {
+      if (k.startsWith('sb-')) localStorage.removeItem(k);
+    }
     showAuth(false);
+    // Fire signOut in background — local state is already cleared
+    sb.auth.signOut({ scope: 'local' }).catch(() => {});
   }
 
   function getUser() { return _user; }
