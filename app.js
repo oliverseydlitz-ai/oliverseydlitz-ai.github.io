@@ -110,8 +110,14 @@ const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Capture whether we arrived from an email confirmation / magic link redirect
-const _authRedirect = /[#&?](type=(signup|magiclink|recovery|email_change|invite)|access_token=)/.test(location.hash + location.search);
+// Capture whether we arrived from an email confirmation / magic link redirect.
+// Covers both implicit flow (#access_token / type=signup) and PKCE flow (?code=),
+// plus error redirects (e.g. an expired link). Read synchronously before the
+// Supabase client strips the URL.
+const _redirectStr = (location.hash + '&' + location.search).toLowerCase();
+const _authError = /error=|error_code=|error_description=/.test(_redirectStr);
+const _authRedirect = _authError ||
+  /type=(signup|magiclink|recovery|email_change|invite)|access_token=|[?&]code=/.test(_redirectStr);
 
 function toast(msg) {
   let t = document.getElementById('toast');
@@ -2207,8 +2213,12 @@ async function init() {
   // Landed here from an email confirmation / magic link
   if (_authRedirect) {
     history.replaceState(null, '', location.pathname);
-    Auth.hideAuth();
-    toast(Auth.getUser() ? 'Email verified — you’re signed in!' : 'Email verified — please sign in.');
+    if (_authError) {
+      toast('That link has expired. Please sign in or request a new one.');
+    } else {
+      Auth.hideAuth();
+      toast(Auth.getUser() ? 'Email verified — you’re signed in!' : 'Email verified — please sign in.');
+    }
   }
 
   // Offer to upload any local sessions not yet in the cloud, then refresh
