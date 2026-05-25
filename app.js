@@ -163,10 +163,11 @@ const Auth = (() => {
       _user = session?.user || null;
       updateUI();
     });
-    const { data: { user } } = await sb.auth.getUser();
-    _user = user;
+    // getSession reads the locally stored token — fast, never hangs on network
+    const { data: { session } } = await sb.auth.getSession();
+    _user = session?.user || null;
     updateUI();
-    return user;
+    return _user;
   }
 
   async function signup(email, password) {
@@ -2255,19 +2256,24 @@ async function init() {
 
   // Settings
   document.getElementById('exportDataBtn').addEventListener('click', async ()=>{
-    const data = await Store.getSessions();
-    const a = Object.assign(document.createElement('a'),{
-      href: URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),
-      download: `shotlab-${new Date().toISOString().slice(0,10)}.json`,
-    });
-    a.click();
+    try {
+      const data = await Store.getSessions();
+      const a = Object.assign(document.createElement('a'),{
+        href: URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),
+        download: `shotlab-${new Date().toISOString().slice(0,10)}.json`,
+      });
+      a.click();
+    } catch(err) { toast('Export failed: ' + (err.message || 'could not reach the cloud')); }
   });
 
   document.getElementById('clearDataBtn').addEventListener('click', ()=>{
     showConfirm('Clear all data?','All sessions will be permanently deleted.', async ()=>{
-      const sessions = await Store.getSessions();
-      for (const s of sessions) await Store.deleteSession(s.id);
-      await Router.showSessions();
+      try {
+        const sessions = await Store.getSessions();
+        for (const s of sessions) await Store.deleteSession(s.id);
+        await Router.showSessions();
+        toast(`Cleared ${sessions.length} session${sessions.length===1?'':'s'}.`);
+      } catch(err) { toast('Clear failed: ' + (err.message || 'could not reach the cloud')); }
     });
   });
 
@@ -2275,25 +2281,6 @@ async function init() {
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
   shotModal.addEventListener('click', e=>{ if(e.target===shotModal) shotModal.hidden=true; });
-
-  // Auth
-  await Auth.init();
-
-  // Landed here from an email confirmation / magic link
-  if (_authRedirect) {
-    history.replaceState(null, '', location.pathname);
-    if (_authError) {
-      const expired = /expired|otp_expired|invalid|access_denied/.test(_redirectStr);
-      toast(_authErrorMsg
-        ? `Sign-in failed: ${_authErrorMsg}`
-        : (expired ? 'That link has expired. Please sign in or request a new one.' : 'Sign-in failed. Please try again.'));
-    } else {
-      Auth.hideAuth();
-      const fromEmail = /type=(signup|magiclink|recovery|email_change|invite)/.test(_redirectStr);
-      if (Auth.getUser()) toast(fromEmail ? 'Email verified — you’re signed in!' : 'Signed in!');
-      else toast('Email verified — please sign in.');
-    }
-  }
 
   async function afterAuth() {
     const user = Auth.getUser();
@@ -2358,6 +2345,26 @@ async function init() {
     await Auth.logout();
     await Router.showSessions();
   });
+
+  // Auth — all UI handlers above are wired up first, so a slow network here
+  // can never leave Sign Out / Clear Data unresponsive
+  await Auth.init();
+
+  // Landed here from an email confirmation / magic link
+  if (_authRedirect) {
+    history.replaceState(null, '', location.pathname);
+    if (_authError) {
+      const expired = /expired|otp_expired|invalid|access_denied/.test(_redirectStr);
+      toast(_authErrorMsg
+        ? `Sign-in failed: ${_authErrorMsg}`
+        : (expired ? 'That link has expired. Please sign in or request a new one.' : 'Sign-in failed. Please try again.'));
+    } else {
+      Auth.hideAuth();
+      const fromEmail = /type=(signup|magiclink|recovery|email_change|invite)/.test(_redirectStr);
+      if (Auth.getUser()) toast(fromEmail ? 'Email verified — you’re signed in!' : 'Signed in!');
+      else toast('Email verified — please sign in.');
+    }
+  }
 
   if (Auth.getUser()) await afterAuth();
   else Auth.showAuth(true); // mandatory sign-in on open; guest option after 5s
