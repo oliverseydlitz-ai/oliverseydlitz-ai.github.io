@@ -158,6 +158,11 @@ const Auth = (() => {
   let _guestTimer = null;
 
   async function init() {
+    // Reactively track auth changes (token refresh, signOut, OAuth callback)
+    sb.auth.onAuthStateChange((event, session) => {
+      _user = session?.user || null;
+      updateUI();
+    });
     const { data: { user } } = await sb.auth.getUser();
     _user = user;
     updateUI();
@@ -194,7 +199,8 @@ const Auth = (() => {
   }
 
   async function logout() {
-    await sb.auth.signOut();
+    // signOut with scope:'local' clears the local token even if the server is unreachable
+    try { await sb.auth.signOut({ scope: 'local' }); } catch {}
     _user = null;
     updateUI();
     showAuth(false);
@@ -2341,7 +2347,10 @@ async function init() {
     catch(err) { document.getElementById('authError').textContent = err.message; }
   });
   // Continue as guest
-  document.getElementById('authGuestBtn').addEventListener('click', () => Auth.hideAuth());
+  document.getElementById('authGuestBtn').addEventListener('click', async () => {
+    Auth.hideAuth();
+    await Router.showSessions();
+  });
 
   // Settings account controls
   document.getElementById('accountSignInBtn').addEventListener('click', () => Auth.showAuth(false));
