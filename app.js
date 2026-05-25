@@ -156,14 +156,25 @@ function toast(msg) {
 const Auth = (() => {
   let _user = null;
   let _guestTimer = null;
+  let _signingOut = false;   // blocks ALL auth events during intentional logout
 
   async function init() {
-    // Reactively track auth changes (token refresh, signOut, OAuth callback)
-    sb.auth.onAuthStateChange((event, session) => {
-      // Don't let a stale TOKEN_REFRESHED event re-authenticate after intentional logout
+    sb.auth.onAuthStateChange(async (event, session) => {
+      // While signing out, ignore every Supabase event — prevents background
+      // refresh timers from re-authenticating the user after we cleared state
+      if (_signingOut) return;
       if (_user === null && event === 'TOKEN_REFRESHED') return;
+      const wasGuest = !_user;
       _user = session?.user || null;
       updateUI();
+      // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
+      if (wasGuest && _user && event === 'SIGNED_IN') {
+        await Router.showSessions();
+      }
+      // Expired / revoked session fires SIGNED_OUT — prompt to re-authenticate
+      if (!_user && event === 'SIGNED_OUT' && !_signingOut) {
+        showAuth(false);
+      }
     });
     // getSession reads the locally stored token — fast, never hangs on network
     const { data: { session } } = await sb.auth.getSession();
@@ -202,16 +213,15 @@ const Auth = (() => {
   }
 
   async function logout() {
-    // Clear state immediately — no waiting for network
-    _user = null;
-    updateUI();
-    // Nuke all Supabase auth tokens from localStorage directly (belt + suspenders)
+    _signingOut = true;       // block all Supabase events during logout
+    _user = null;             // wipe user state instantly
+    updateUI();               // settings: email hidden, sign-in shown, sign-out hidden
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
     }
-    showAuth(false);
-    // Fire signOut in background — local state is already cleared
     sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    setTimeout(() => { _signingOut = false; }, 3000);
+    // No showAuth() — caller navigates to guest sessions directly
   }
 
   function getUser() { return _user; }
@@ -332,12 +342,18 @@ const Store = (() => {
   async function getSessions() {
     if (cloud()) {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
-      return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
+      const cloudIds = new Set(rows.map(r => r.id));
+      // Include any MemDB sessions not yet synced to cloud (just-imported)
+      const pending = MemDB.getSessions().filter(s => !cloudIds.has(s.id));
+      return [...pending, ...rows.map(fromRow)].sort((a,b) => new Date(b.date) - new Date(a.date));
     }
     return MemDB.getSessions();
   }
   async function getSession(id) {
     if (cloud()) {
+      // Check MemDB first — covers just-imported sessions not yet in cloud
+      const mem = MemDB.getSession(id);
+      if (mem) return mem;
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const r = rows.find(x => x.id === id);
       return r ? fromRow(r) : null;
@@ -2176,17 +2192,19 @@ const ImportFlow = (() => {
     const notes = document.getElementById('metaNotes').value.trim();
     const wind  = document.getElementById('metaWind').value.trim();
     const temp  = document.getElementById('metaTemp').value.trim();
-    goStep('step-saving');
     const session = {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
-    try {
-      await Store.saveSession(session);
-      await Router.showDetail(session.id);
-    } catch(err) {
-      alert('Failed to save: '+err.message);
-      goStep('step-meta');
+    // Save to MemDB and show instantly — no spinner
+    MemDB.saveSession(session);
+    UI.renderDetail(session);
+    Router.show('session-detail');
+    // Persist to cloud in background if logged in
+    if (Auth.getUser()) {
+      CloudDB.saveSession(session).catch(() => {
+        toast('Cloud sync failed — session will be lost on refresh.');
+      });
     }
   }
 
@@ -2374,12 +2392,14 @@ async function init() {
     }
   }
 
-  if (Auth.getUser()) await afterAuth();
-  else Auth.showAuth(true); // mandatory sign-in on open; guest option after 5s
+  if (Auth.getUser()) {
+    await afterAuth();
+  } else {
+    Auth.showAuth(true); // mandatory sign-in; guest option after 5s
+    await Router.showSessions(); // render empty sessions behind the modal
+  }
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
-
-  await Router.showSessions();
 }
 
 document.addEventListener('DOMContentLoaded', init);
