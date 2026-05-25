@@ -1461,6 +1461,22 @@ body {
 .auth-hint { font-size:.8rem; color:var(--text-muted); margin-top:.75rem; text-align:center; }
 .auth-hint a { color:var(--pine); text-decoration:none; font-weight:700; }
 
+.auth-social { display:flex; flex-direction:column; gap:.55rem; margin-bottom:1.1rem; }
+.auth-social-btn {
+  display:flex; align-items:center; justify-content:center; gap:.6rem;
+  width:100%; padding:.65rem 1rem; font-size:.85rem; font-weight:600;
+  background:var(--surface); color:var(--text); border:1.5px solid var(--border-hi);
+  border-radius:var(--radius-sm);
+}
+.auth-social-btn:hover { background:var(--surface2); border-color:var(--pine); }
+.auth-social-btn svg { flex-shrink:0; }
+
+.auth-divider {
+  display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem;
+  color:var(--text-muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
+}
+.auth-divider::before, .auth-divider::after { content:''; flex:1; height:1.5px; background:var(--border); }
+
 .auth-guest {
   margin-top:1.1rem; padding-top:1.1rem; border-top:1.5px solid var(--border);
   animation:viewFadeIn .25s ease;

@@ -155,6 +155,16 @@ const Auth = (() => {
     return _user;
   }
 
+  async function oauth(provider) {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: location.origin },
+    });
+    if (error) throw error;
+    // On success the browser is redirected to the provider; we return on the
+    // OAuth callback URL, which init() handles on next load.
+  }
+
   async function logout() {
     await sb.auth.signOut();
     _user = null;
@@ -218,7 +228,7 @@ const Auth = (() => {
     document.getElementById('authError').textContent = '';
   }
 
-  return { init, signup, login, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
+  return { init, signup, login, oauth, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
 const CloudDB = (() => {
@@ -2217,7 +2227,9 @@ async function init() {
       toast('That link has expired. Please sign in or request a new one.');
     } else {
       Auth.hideAuth();
-      toast(Auth.getUser() ? 'Email verified — you’re signed in!' : 'Email verified — please sign in.');
+      const fromEmail = /type=(signup|magiclink|recovery|email_change|invite)/.test(_redirectStr);
+      if (Auth.getUser()) toast(fromEmail ? 'Email verified — you’re signed in!' : 'Signed in!');
+      else toast('Email verified — please sign in.');
     }
   }
 
@@ -2279,6 +2291,16 @@ async function init() {
     } catch(err) {
       document.getElementById('authError').textContent = err.message;
     }
+  });
+
+  // Social sign-in
+  document.getElementById('authGoogleBtn').addEventListener('click', async () => {
+    try { await Auth.oauth('google'); }
+    catch(err) { document.getElementById('authError').textContent = err.message; }
+  });
+  document.getElementById('authAppleBtn').addEventListener('click', async () => {
+    try { await Auth.oauth('apple'); }
+    catch(err) { document.getElementById('authError').textContent = err.message; }
   });
 
   // Continue as guest
