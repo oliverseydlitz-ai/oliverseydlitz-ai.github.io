@@ -1811,6 +1811,7 @@ const UI = (() => {
     el.querySelectorAll('.fault-card').forEach(card => {
       card.querySelector('.fault-header').addEventListener('click', () => card.classList.toggle('open'));
     });
+    applyPaywall(el, "Sign in to unlock fault detection & drills");
   }
 
   // ── Benchmarking ──────────────────────────────────────────────
