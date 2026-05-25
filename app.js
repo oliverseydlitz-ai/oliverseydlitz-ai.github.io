@@ -104,6 +104,24 @@ const DB = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// MemDB — ephemeral in-memory store for guest sessions (gone on page close)
+// ────────────────────────────────────────────────────────────────
+const MemDB = (() => {
+  const _sessions = [];
+  const getSessions = () => [..._sessions].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const getSession = id => _sessions.find(s => s.id === id) || null;
+  const saveSession = s => {
+    const i = _sessions.findIndex(x => x.id === s.id);
+    if (i >= 0) _sessions[i] = {...s}; else _sessions.push({...s});
+  };
+  const deleteSession = id => {
+    const i = _sessions.findIndex(s => s.id === id);
+    if (i >= 0) _sessions.splice(i, 1);
+  };
+  return { getSessions, getSession, saveSession, deleteSession };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // Supabase Auth & Cloud DB
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
@@ -287,7 +305,7 @@ const CloudDB = (() => {
   return { getSessions, saveSession, deleteSession, migrateLocalSessions };
 })();
 
-// Unified data layer — cloud when logged in (local kept as offline cache), local otherwise
+// Unified data layer — cloud when logged in (IndexedDB as offline fallback), MemDB for guests
 const Store = (() => {
   function fromRow(r) {
     return {
@@ -299,26 +317,38 @@ const Store = (() => {
 
   async function getSessions() {
     if (cloud()) {
-      const rows = await CloudDB.getSessions(Auth.getUser().id);
-      return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
+      try {
+        const rows = await CloudDB.getSessions(Auth.getUser().id);
+        return rows.map(fromRow).sort((a,b) => new Date(b.date) - new Date(a.date));
+      } catch { return DB.getSessions(); }
     }
-    return DB.getSessions();
+    return MemDB.getSessions();
   }
   async function getSession(id) {
     if (cloud()) {
-      const rows = await CloudDB.getSessions(Auth.getUser().id);
-      const r = rows.find(x => x.id === id);
-      return r ? fromRow(r) : null;
+      try {
+        const rows = await CloudDB.getSessions(Auth.getUser().id);
+        const r = rows.find(x => x.id === id);
+        if (r) return fromRow(r);
+      } catch {}
+      return DB.getSession(id);
     }
-    return DB.getSession(id);
+    return MemDB.getSession(id);
   }
   async function saveSession(s) {
-    if (cloud()) await CloudDB.saveSession(s);
-    return DB.saveSession(s);
+    if (cloud()) {
+      try { await CloudDB.saveSession(s); }
+      catch(e) { toast('Cloud save failed — saved locally. ' + (e.message||'')); }
+      return DB.saveSession(s);
+    }
+    MemDB.saveSession(s);
   }
   async function deleteSession(id) {
-    if (cloud()) await CloudDB.deleteSession(id);
-    return DB.deleteSession(id);
+    if (cloud()) {
+      try { await CloudDB.deleteSession(id); } catch {}
+      return DB.deleteSession(id);
+    }
+    MemDB.deleteSession(id);
   }
   return { getSessions, getSession, saveSession, deleteSession };
 })();
@@ -1148,6 +1178,26 @@ const Trajectory = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Paywall helper — blur section content for guest users
+// ────────────────────────────────────────────────────────────────
+function applyPaywall(el, cta) {
+  if (Auth.getUser()) return false;
+  if (!el || !el.innerHTML.trim()) return false;
+  const inner = el.innerHTML;
+  el.innerHTML = `
+    <div class="paywall-wrap">
+      <div class="paywall-blur" aria-hidden="true">${inner}</div>
+      <div class="paywall-overlay">
+        <span class="paywall-lock">🔒</span>
+        <span class="paywall-msg">${cta || 'Sign in to unlock'}</span>
+        <button class="btn-primary btn-sm paywall-btn">Sign In</button>
+      </div>
+    </div>`;
+  el.querySelector('.paywall-btn').addEventListener('click', () => Auth.showAuth(false));
+  return true;
+}
+
+// ────────────────────────────────────────────────────────────────
 // UI
 // ────────────────────────────────────────────────────────────────
 const UI = (() => {
@@ -1377,6 +1427,7 @@ const UI = (() => {
           <ul class="insights-list">${ins.improvements.map(s=>`<li>${s}</li>`).join('')}</ul>
         </div>
       </div>`;
+    applyPaywall(el, "Sign in to unlock your coaching notes");
   }
 
   // ── Dispersion statistics ─────────────────────────────────────
@@ -1420,6 +1471,7 @@ const UI = (() => {
             <div class="plan-drill"><strong>${p.drill.name}:</strong> ${p.drill.desc}</div>
           </div>
         </div>`).join('')}`;
+    applyPaywall(el, "Sign in to unlock your personalised practice plan");
   }
 
   // ── Club filter ───────────────────────────────────────────────
@@ -1471,11 +1523,14 @@ const UI = (() => {
           }).join('')}
         </div>
       </div>`;
-    requestAnimationFrame(() => {
-      const arc = document.querySelector('.score-ring-arc');
-      const svg = arc && arc.closest('svg');
-      if (svg) arc.style.strokeDashoffset = svg.dataset.offset || '0';
-    });
+    const bannerEl = document.getElementById('scoreBanner');
+    if (!applyPaywall(bannerEl, "Sign in to see your session quality score")) {
+      requestAnimationFrame(() => {
+        const arc = bannerEl.querySelector('.score-ring-arc');
+        const svg = arc && arc.closest('svg');
+        if (svg) arc.style.strokeDashoffset = svg.dataset.offset || '0';
+      });
+    }
   }
 
   // ── Metrics strip ─────────────────────────────────────────────
@@ -2249,23 +2304,9 @@ async function init() {
     }
   }
 
-  // Offer to upload any local sessions not yet in the cloud, then refresh
   async function afterAuth() {
     const user = Auth.getUser();
     if (!user) return;
-    try {
-      const [local, cloudRows] = await Promise.all([DB.exportAll(), CloudDB.getSessions(user.id)]);
-      const cloudIds = new Set(cloudRows.map(r => r.id));
-      const unsynced = local.filter(s => !cloudIds.has(s.id));
-      if (unsynced.length > 0) {
-        showConfirm('Sync your sessions?', `You have ${unsynced.length} local session(s) not in the cloud. Upload them now?`, async () => {
-          try {
-            for (const s of unsynced) await CloudDB.saveSession(s);
-          } catch(err) { alert('Sync failed: ' + err.message); }
-          await Router.showSessions();
-        });
-      }
-    } catch(err) { /* cloud unreachable — stay on local cache */ }
     await Router.showSessions();
   }
 

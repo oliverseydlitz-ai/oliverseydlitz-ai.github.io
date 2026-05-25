@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Pine green rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#0b4d2e"/>
+  <!-- Golf ball: white circle -->
+  <circle cx="16" cy="15" r="9" fill="#ffffff"/>
+  <!-- Dimple pattern (3 arcs suggesting a golf ball) -->
+  <path d="M10.5 11.5 Q13 9 16 10.5" fill="none" stroke="#d4e2d8" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M12 16.5 Q14.5 14 18 15.5" fill="none" stroke="#d4e2d8" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M16.5 12 Q19 10.5 21 13" fill="none" stroke="#d4e2d8" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M11 15.5 Q12 18 14 17" fill="none" stroke="#d4e2d8" stroke-width="1.1" stroke-linecap="round"/>
+  <path d="M17.5 16.5 Q20 15 21.5 17.5" fill="none" stroke="#d4e2d8" stroke-width="1.1" stroke-linecap="round"/>
+  <!-- Tee stem at bottom -->
+  <rect x="15.2" y="23" width="1.6" height="4" rx=".6" fill="#22c55e"/>
+  <!-- Tee head -->
+  <rect x="12.5" y="22.2" width="7" height="1.4" rx=".7" fill="#22c55e"/>
+</svg>

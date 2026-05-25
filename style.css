@@ -1494,3 +1494,35 @@ body {
 .toast.show { opacity:1; transform:translate(-50%, 0); }
 @media (min-width:768px) { .toast { bottom:1.5rem; } }
 
+/* ── Paywall (blur for guests) ─────────────────────────────── */
+.paywall-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+.paywall-blur {
+  filter: blur(5px);
+  pointer-events: none;
+  user-select: none;
+  transform: scale(1.01);
+}
+.paywall-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  background: rgba(237,244,238,.82);
+  border-radius: var(--radius);
+  z-index: 2;
+}
+.paywall-lock { font-size: 1.5rem; }
+.paywall-msg {
+  font-size: .82rem; font-weight: 600; color: var(--pine);
+  text-align: center; padding: 0 1.5rem; line-height: 1.45;
+  font-family: var(--font-mono);
+  letter-spacing: .04em;
+}
+

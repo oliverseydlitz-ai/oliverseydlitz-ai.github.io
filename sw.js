@@ -1,5 +1,5 @@
-const CACHE = 'shotlab-v17';
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js'];
+const CACHE = 'shotlab-v18';
+const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
