@@ -2308,11 +2308,6 @@ async function init() {
     try { await Auth.oauth('google'); }
     catch(err) { document.getElementById('authError').textContent = err.message; }
   });
-  document.getElementById('authAppleBtn')?.addEventListener('click', async () => {
-    try { await Auth.oauth('apple'); }
-    catch(err) { document.getElementById('authError').textContent = err.message; }
-  });
-
   // Continue as guest
   document.getElementById('authGuestBtn').addEventListener('click', () => Auth.hideAuth());
 
