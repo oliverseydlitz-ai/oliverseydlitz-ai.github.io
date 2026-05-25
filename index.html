@@ -280,6 +280,20 @@
     </div>
     <div class="settings-list">
       <div class="settings-section">
+        <h2 class="settings-section-title">Account</h2>
+        <div class="settings-row static" id="accountEmailRow" hidden>
+          <span>Signed in as</span><span class="settings-value" id="accountEmail"></span>
+        </div>
+        <button class="settings-row" id="accountSignInBtn">
+          <span>Sign in / Create account</span>
+          <span class="settings-arrow">→</span>
+        </button>
+        <button class="settings-row danger" id="accountSignOutBtn" hidden>
+          <span>Sign out</span>
+          <span class="settings-arrow">→</span>
+        </button>
+      </div>
+      <div class="settings-section">
         <h2 class="settings-section-title">Data</h2>
         <button class="settings-row" id="exportDataBtn">
           <span>Export all data (JSON)</span>
@@ -399,18 +413,11 @@
     </div>
 
     <p id="authError" class="auth-error"></p>
+    <div id="authGuestWrap" class="auth-guest" hidden>
+      <button id="authGuestBtn" class="btn-secondary" style="width:100%">Continue as guest</button>
+      <p class="auth-guest-note">Your data stays on this device only and won't sync.</p>
+    </div>
   </div>
-</div>
-
-<!-- ═══════════════════ AUTH STATUS (top-right) -->
-<div id="authStatus" class="auth-status">
-  <span id="authLoggedOut">
-    <button id="authLoginCta" class="btn-sm btn-secondary">Sign in</button>
-  </span>
-  <span id="authLoggedIn" hidden>
-    <span id="authUserEmail"></span>
-    <button id="authLogoutBtn" class="btn-sm btn-secondary">Logout</button>
-  </span>
 </div>
 
 </body>

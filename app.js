@@ -112,6 +112,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const Auth = (() => {
   let _user = null;
+  let _guestTimer = null;
 
   async function init() {
     const { data: { user } } = await sb.auth.getUser();
@@ -145,23 +146,42 @@ const Auth = (() => {
   function getUser() { return _user; }
 
   function updateUI() {
-    const loggedIn = document.getElementById('authLoggedIn');
-    const loggedOut = document.getElementById('authLoggedOut');
+    const emailRow = document.getElementById('accountEmailRow');
+    const signIn = document.getElementById('accountSignInBtn');
+    const signOut = document.getElementById('accountSignOutBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
-      loggedIn.hidden = false;
-      loggedOut.hidden = true;
-      document.getElementById('authUserEmail').textContent = _user.email;
+      clearTimeout(_guestTimer);
+      emailRow.hidden = false;
+      document.getElementById('accountEmail').textContent = _user.email;
+      signIn.hidden = true;
+      signOut.hidden = false;
       authModal.hidden = true;
     } else {
-      loggedIn.hidden = true;
-      loggedOut.hidden = false;
+      emailRow.hidden = true;
+      signIn.hidden = false;
+      signOut.hidden = true;
     }
   }
 
-  function showAuth() {
-    document.getElementById('authModal').hidden = false;
+  // mandatory=true: guest option hidden until 5s pass; false: guest shown right away
+  function showAuth(mandatory = false) {
+    const modal = document.getElementById('authModal');
+    const guest = document.getElementById('authGuestWrap');
+    modal.hidden = false;
     switchToLogin();
+    clearTimeout(_guestTimer);
+    if (mandatory) {
+      guest.hidden = true;
+      _guestTimer = setTimeout(() => { guest.hidden = false; }, 5000);
+    } else {
+      guest.hidden = false;
+    }
+  }
+
+  function hideAuth() {
+    clearTimeout(_guestTimer);
+    document.getElementById('authModal').hidden = true;
   }
 
   function switchToLogin() {
@@ -180,7 +200,7 @@ const Auth = (() => {
     document.getElementById('authError').textContent = '';
   }
 
-  return { init, signup, login, logout, getUser, showAuth, switchToLogin, switchToSignup };
+  return { init, signup, login, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
 const CloudDB = (() => {
@@ -2232,17 +2252,18 @@ async function init() {
     }
   });
 
-  document.getElementById('authLogoutBtn').addEventListener('click', async () => {
+  // Continue as guest
+  document.getElementById('authGuestBtn').addEventListener('click', () => Auth.hideAuth());
+
+  // Settings account controls
+  document.getElementById('accountSignInBtn').addEventListener('click', () => Auth.showAuth(false));
+  document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
     await Auth.logout();
     await Router.showSessions();
   });
 
-  // Login button in auth status / open auth from a logged-out state
-  document.getElementById('authLoginCta')?.addEventListener('click', () => Auth.showAuth());
-  const authModal = document.getElementById('authModal');
-  authModal.addEventListener('click', e => { if (e.target === authModal) authModal.hidden = true; });
-
   if (Auth.getUser()) await afterAuth();
+  else Auth.showAuth(true); // mandatory sign-in on open; guest option after 5s
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 

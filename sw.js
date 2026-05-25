@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v7';
+const CACHE = 'shotlab-v8';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js'];
 
 self.addEventListener('install', e => {
