@@ -1467,3 +1467,14 @@ body {
 }
 .auth-guest-note { font-size:.72rem; color:var(--text-muted); margin-top:.5rem; text-align:center; }
 
+/* Toast */
+.toast {
+  position:fixed; left:50%; bottom:calc(var(--bottom-nav-h) + 1rem);
+  transform:translate(-50%, 1rem); z-index:300;
+  background:var(--pine); color:#fff; font-weight:600; font-size:.85rem;
+  padding:.7rem 1.1rem; border-radius:var(--radius); box-shadow:var(--shadow-md);
+  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:90vw; text-align:center;
+}
+.toast.show { opacity:1; transform:translate(-50%, 0); }
+@media (min-width:768px) { .toast { bottom:1.5rem; } }
+

@@ -110,6 +110,18 @@ const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Capture whether we arrived from an email confirmation / magic link redirect
+const _authRedirect = /[#&?](type=(signup|magiclink|recovery|email_change|invite)|access_token=)/.test(location.hash + location.search);
+
+function toast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
 const Auth = (() => {
   let _user = null;
   let _guestTimer = null;
@@ -2191,6 +2203,13 @@ async function init() {
 
   // Auth
   await Auth.init();
+
+  // Landed here from an email confirmation / magic link
+  if (_authRedirect) {
+    history.replaceState(null, '', location.pathname);
+    Auth.hideAuth();
+    toast(Auth.getUser() ? 'Email verified — you’re signed in!' : 'Email verified — please sign in.');
+  }
 
   // Offer to upload any local sessions not yet in the cloud, then refresh
   async function afterAuth() {
