@@ -2201,12 +2201,9 @@ const ImportFlow = (() => {
     };
     // Save to MemDB instantly
     MemDB.saveSession(session);
+    // Show detail view
     UI.renderDetail(session);
     Router.show('session-detail');
-    // Cloud sync in background if authenticated
-    if (Auth.getUser()) {
-      CloudDB.saveSession(session).catch(() => {});
-    }
   }
 
   return { goStep, handleFile, save };
