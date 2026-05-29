@@ -1526,3 +1526,131 @@ body {
   letter-spacing: .04em;
 }
 
+/* ── Analytics sections ────────────────────────────────── */
+.analytics-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+.as-header {
+  margin-bottom: 1.5rem;
+}
+.as-title {
+  font-size: 1.1rem; font-weight: 700; color: var(--text);
+  margin-bottom: .3rem;
+}
+.as-desc {
+  font-size: .82rem; color: var(--text-muted);
+}
+.as-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+.as-list {
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+}
+
+/* Tendency cards */
+.tendency-card {
+  background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  text-align: center;
+  border-top: 3px solid var(--club-color, var(--pine));
+}
+.tc-club {
+  font-size: .85rem; font-weight: 700; color: var(--text-muted);
+  margin-bottom: .4rem;
+}
+.tc-tend {
+  font-size: 1.2rem; font-weight: 800; margin-bottom: .4rem;
+}
+.tc-counts {
+  font-size: .75rem; color: var(--text-dim);
+}
+
+/* Smash factor list */
+.sl-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .8rem;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+.sl-rank {
+  font-weight: 800; font-size: 1rem; color: var(--pine);
+  min-width: 2.5rem;
+}
+.sl-club {
+  flex: 1; font-weight: 600;
+}
+.sl-value {
+  font-weight: 700; font-size: 1.1rem; color: var(--text);
+}
+
+/* Consistency cards */
+.consistency-card {
+  padding: 1rem;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+}
+.cc-club {
+  font-size: .85rem; font-weight: 700; margin-bottom: .6rem;
+  color: var(--text-muted);
+}
+.cc-bar {
+  height: 6px;
+  background: var(--surface3);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: .5rem;
+}
+.cc-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+.cc-score {
+  font-size: .8rem; font-weight: 700; color: var(--text);
+}
+
+/* Best/Worst grid */
+.as-bw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+.bw-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.bw-title {
+  font-weight: 700; font-size: .95rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.bw-shot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .7rem;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  font-size: .9rem;
+}
+.bw-club {
+  font-weight: 600;
+}
+.bw-dist {
+  font-weight: 700; font-size: 1rem; color: var(--text);
+}
+
