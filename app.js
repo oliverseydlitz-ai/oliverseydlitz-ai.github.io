@@ -223,8 +223,8 @@ const Auth = (() => {
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
     }
-    sb.auth.signOut({ scope: 'local' }).catch(() => {});
-    setTimeout(() => { _signingOut = false; }, 3000);
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    setTimeout(() => { _signingOut = false; }, 500);  // brief delay to let final events clear
     // No showAuth() — caller navigates to guest sessions directly
   }
 
