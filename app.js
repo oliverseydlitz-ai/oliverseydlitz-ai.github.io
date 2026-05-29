@@ -2190,7 +2190,7 @@ const ImportFlow = (() => {
     goStep('step-preview');
   }
 
-  async function save() {
+  function save() {
     const date  = document.getElementById('metaDate').value;
     const notes = document.getElementById('metaNotes').value.trim();
     const wind  = document.getElementById('metaWind').value.trim();
@@ -2199,13 +2199,13 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
-    // Save using Store which routes to cloud or local based on auth
-    await Store.saveSession(session);
+    // Save to MemDB instantly
+    MemDB.saveSession(session);
     UI.renderDetail(session);
     Router.show('session-detail');
-    // Cloud sync attempted in background if authenticated
+    // Cloud sync in background if authenticated
     if (Auth.getUser()) {
-      CloudDB.saveSession(session).catch(() => {});  // silent fail for now
+      CloudDB.saveSession(session).catch(() => {});
     }
   }
 
