@@ -215,6 +215,10 @@ const Auth = (() => {
   async function logout() {
     _signingOut = true;       // block all Supabase events during logout
     _user = null;             // wipe user state instantly
+    const emailRow = document.getElementById('accountEmailRow');
+    const accountEmail = document.getElementById('accountEmail');
+    if (emailRow) emailRow.hidden = true;
+    if (accountEmail) accountEmail.textContent = '';  // clear email text so it can't flash back
     updateUI();               // settings: email hidden, sign-in shown, sign-out hidden
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
