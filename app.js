@@ -219,15 +219,15 @@ const Auth = (() => {
 
   async function logout() {
     _signingOut = true;       // block all Supabase events during logout
-    _user = null;             // wipe user state instantly
-    updateUI();
-    // Clear all Supabase tokens and session data
+    // Sign out from Supabase FIRST before clearing state
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    // Then clear all tokens and state
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
     }
-    // Sign out from all sessions (not just local)
-    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
-    setTimeout(() => { _signingOut = false; }, 500);  // brief delay to let final events clear
+    _user = null;             // wipe user state
+    updateUI();
+    setTimeout(() => { _signingOut = false; }, 1000);  // longer delay to ensure Supabase clears
     // No showAuth() — caller navigates to guest sessions directly
   }
 
@@ -2199,14 +2199,14 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
-    // Save to MemDB and show instantly — no spinner
-    MemDB.saveSession(session);
+    // Save using Store which routes to cloud or local based on auth
+    await Store.saveSession(session);
     UI.renderDetail(session);
     Router.show('session-detail');
-    // Persist to cloud in background if logged in
+    // If authenticated, ensure it's synced to cloud
     if (Auth.getUser()) {
-      CloudDB.saveSession(session).catch(() => {
-        toast('Cloud sync failed — session will be lost on refresh.');
+      await CloudDB.saveSession(session).catch(() => {
+        toast('Cloud sync failed');
       });
     }
   }
