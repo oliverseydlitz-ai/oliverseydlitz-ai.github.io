@@ -166,7 +166,7 @@ const Auth = (() => {
       if (_user === null && event === 'TOKEN_REFRESHED') return;
       const wasGuest = !_user;
       _user = session?.user || null;
-      await updateUI();
+      updateUI();
       // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
@@ -233,30 +233,21 @@ const Auth = (() => {
 
   function getUser() { return _user; }
 
-  async function updateUI() {
+  function updateUI() {
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
     const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
-    const emailRow = document.getElementById('accountEmailRow');
-    const accountEmail = document.getElementById('accountEmail');
     if (_user) {
       clearTimeout(_guestTimer);
       signIn.hidden = true;
       signOut.hidden = false;
       syncBtn.hidden = false;
-      emailRow.hidden = false;
       authModal.hidden = true;
-      // Get email from current session, not cached
-      const { data: { session } } = await sb.auth.getSession();
-      if (session && session.user && session.user.email) {
-        accountEmail.textContent = session.user.email;
-      }
     } else {
       signIn.hidden = false;
       signOut.hidden = true;
       syncBtn.hidden = true;
-      emailRow.hidden = true;
     }
   }
 
