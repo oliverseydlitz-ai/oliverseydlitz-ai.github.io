@@ -220,11 +220,7 @@ const Auth = (() => {
   async function logout() {
     _signingOut = true;       // block all Supabase events during logout
     _user = null;             // wipe user state instantly
-    const emailRow = document.getElementById('accountEmailRow');
-    const accountEmail = document.getElementById('accountEmail');
-    if (emailRow) emailRow.hidden = true;
-    if (accountEmail) accountEmail.textContent = '';  // clear email text so it can't flash back
-    updateUI();               // settings: email hidden, sign-in shown, sign-out hidden
+    updateUI();
     // Clear all Supabase tokens and session data
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
@@ -238,19 +234,15 @@ const Auth = (() => {
   function getUser() { return _user; }
 
   function updateUI() {
-    const emailRow = document.getElementById('accountEmailRow');
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
       clearTimeout(_guestTimer);
-      emailRow.hidden = false;
-      document.getElementById('accountEmail').textContent = _user.email;
       signIn.hidden = true;
       signOut.hidden = false;
       authModal.hidden = true;
     } else {
-      emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
     }
