@@ -160,12 +160,14 @@ const Auth = (() => {
 
   async function init() {
     sb.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AUTH EVENT]', event, 'session.user.email:', session?.user?.email);
       // While signing out, ignore every Supabase event — prevents background
       // refresh timers from re-authenticating the user after we cleared state
       if (_signingOut) return;
       if (_user === null && event === 'TOKEN_REFRESHED') return;
       const wasGuest = !_user;
       _user = session?.user || null;
+      console.log('[_user SET]', '_user.email:', _user?.email);
       updateUI();
       // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
       if (wasGuest && _user && event === 'SIGNED_IN') {
@@ -178,7 +180,9 @@ const Auth = (() => {
     });
     // getSession reads the locally stored token — fast, never hangs on network
     const { data: { session } } = await sb.auth.getSession();
+    console.log('[getSession]', 'session.user.email:', session?.user?.email);
     _user = session?.user || null;
+    console.log('[_user SET from getSession]', '_user.email:', _user?.email);
     updateUI();
     return _user;
   }
@@ -235,6 +239,7 @@ const Auth = (() => {
       clearTimeout(_guestTimer);
       emailRow.hidden = false;
       document.getElementById('accountEmail').textContent = _user.email;
+      console.log('[updateUI] displaying email:', _user.email);
       signIn.hidden = true;
       signOut.hidden = false;
       authModal.hidden = true;
@@ -242,6 +247,7 @@ const Auth = (() => {
       emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
+      console.log('[updateUI] no user, cleared email');
     }
   }
 
