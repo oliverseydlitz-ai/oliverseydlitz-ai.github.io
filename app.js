@@ -236,15 +236,18 @@ const Auth = (() => {
   function updateUI() {
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
+    const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
       clearTimeout(_guestTimer);
       signIn.hidden = true;
       signOut.hidden = false;
+      syncBtn.hidden = false;
       authModal.hidden = true;
     } else {
       signIn.hidden = false;
       signOut.hidden = true;
+      syncBtn.hidden = true;
     }
   }
 
@@ -285,6 +288,29 @@ const Auth = (() => {
   }
 
   return { init, signup, login, oauth, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// CloudDB — Manual sync to Supabase
+// ────────────────────────────────────────────────────────────────
+const CloudDB = (() => {
+  async function syncSessions(sessions) {
+    const user = Auth.getUser();
+    if (!user) throw new Error('Not signed in');
+
+    for (const session of sessions) {
+      await sb.from('sessions').upsert([{
+        id: session.id,
+        user_id: user.id,
+        date: session.date,
+        notes: session.notes,
+        conditions: session.conditions,
+        shots: session.shots,
+        created_at: new Date(session.createdAt).toISOString(),
+      }], { onConflict: 'user_id,id' }).catch(() => {});
+    }
+  }
+  return { syncSessions };
 })();
 
 // Unified data layer — local storage only (IndexedDB + MemDB)
@@ -2298,6 +2324,20 @@ async function init() {
   document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
     await Auth.logout();
     await Router.showSessions();
+  });
+  document.getElementById('syncCloudBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('syncCloudBtn');
+    const origText = btn.querySelector('span').textContent;
+    try {
+      btn.querySelector('span').textContent = 'Syncing...';
+      const sessions = await Store.getSessions();
+      await CloudDB.syncSessions(sessions);
+      btn.querySelector('span').textContent = '✓ Synced';
+      setTimeout(() => { btn.querySelector('span').textContent = origText; }, 2000);
+    } catch(e) {
+      btn.querySelector('span').textContent = '✗ Failed';
+      setTimeout(() => { btn.querySelector('span').textContent = origText; }, 2000);
+    }
   });
 
   // Auth — all UI handlers above are wired up first, so a slow network here
