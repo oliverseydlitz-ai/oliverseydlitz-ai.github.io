@@ -238,16 +238,23 @@ const Auth = (() => {
     const signOut = document.getElementById('accountSignOutBtn');
     const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
+    const emailRow = document.getElementById('accountEmailRow');
+    const accountEmail = document.getElementById('accountEmail');
+
     if (_user) {
       clearTimeout(_guestTimer);
       signIn.hidden = true;
       signOut.hidden = false;
       syncBtn.hidden = false;
+      emailRow.hidden = false;
+      accountEmail.textContent = _user.email || '—';
       authModal.hidden = true;
     } else {
       signIn.hidden = false;
       signOut.hidden = true;
       syncBtn.hidden = true;
+      emailRow.hidden = true;
+      accountEmail.textContent = '—';
     }
   }
 
