@@ -218,17 +218,24 @@ const Auth = (() => {
   }
 
   async function logout() {
-    _signingOut = true;       // block all Supabase events during logout
-    // Sign out from Supabase FIRST before clearing state
-    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
-    // Then clear all tokens and state
-    for (const k of [...Object.keys(localStorage)]) {
-      if (k.startsWith('sb-')) localStorage.removeItem(k);
-    }
-    _user = null;             // wipe user state
+    _signingOut = true;
+    _user = null;
     await updateUI();
-    setTimeout(() => { _signingOut = false; }, 1000);  // longer delay to ensure Supabase clears
-    // No showAuth() — caller navigates to guest sessions directly
+
+    // Clear Supabase session completely - both scopes
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+
+    // Clear ALL Supabase auth keys from storage
+    const keysToDelete = [];
+    for (const k of Object.keys(localStorage)) {
+      if (k.includes('supabase') || k.includes('sb-') || k.includes('auth')) {
+        keysToDelete.push(k);
+      }
+    }
+    keysToDelete.forEach(k => localStorage.removeItem(k));
+
+    setTimeout(() => { _signingOut = false; }, 500);
   }
 
   function getUser() { return _user; }
