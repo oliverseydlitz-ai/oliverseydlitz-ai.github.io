@@ -179,6 +179,11 @@ const Auth = (() => {
     // getSession reads the locally stored token — fast, never hangs on network
     const { data: { session } } = await sb.auth.getSession();
     _user = session?.user || null;
+    // Force refresh session to ensure we have latest user data from Supabase
+    if (_user) {
+      const { data: { user: freshUser }, error } = await sb.auth.getUser();
+      if (!error && freshUser) _user = freshUser;
+    }
     updateUI();
     return _user;
   }
@@ -220,10 +225,12 @@ const Auth = (() => {
     if (emailRow) emailRow.hidden = true;
     if (accountEmail) accountEmail.textContent = '';  // clear email text so it can't flash back
     updateUI();               // settings: email hidden, sign-in shown, sign-out hidden
+    // Clear all Supabase tokens and session data
     for (const k of [...Object.keys(localStorage)]) {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
     }
-    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    // Sign out from all sessions (not just local)
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
     setTimeout(() => { _signingOut = false; }, 500);  // brief delay to let final events clear
     // No showAuth() — caller navigates to guest sessions directly
   }
