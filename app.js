@@ -159,6 +159,7 @@ const Auth = (() => {
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
   async function init() {
+    console.log('[AUTH INIT] starting, _authRedirect:', _authRedirect);
     sb.auth.onAuthStateChange(async (event, session) => {
       console.log('[AUTH EVENT]', event, 'session.user.email:', session?.user?.email);
       // While signing out, ignore every Supabase event — prevents background
@@ -183,6 +184,18 @@ const Auth = (() => {
     console.log('[getSession]', 'session.user.email:', session?.user?.email);
     _user = session?.user || null;
     console.log('[_user SET from getSession]', '_user.email:', _user?.email);
+
+    // If coming from OAuth redirect, force refresh to get latest user data
+    if (_authRedirect && _user) {
+      console.log('[AUTH INIT] forcing refresh after OAuth redirect');
+      const { data: { user: freshUser }, error } = await sb.auth.getUser();
+      console.log('[getUser refresh]', 'freshUser.email:', freshUser?.email, 'error:', error);
+      if (!error && freshUser) {
+        _user = freshUser;
+        console.log('[_user REFRESHED after OAuth]', '_user.email:', _user?.email);
+      }
+    }
+
     updateUI();
     return _user;
   }
