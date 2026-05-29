@@ -230,15 +230,25 @@ const Auth = (() => {
   }
 
   async function logout() {
-    _signingOut = true;       // block all Supabase events during logout
-    _user = null;             // wipe user state instantly
-    updateUI();               // settings: email hidden, sign-in shown, sign-out hidden
-    for (const k of [...Object.keys(localStorage)]) {
-      if (k.startsWith('sb-')) localStorage.removeItem(k);
-    }
-    sb.auth.signOut({ scope: 'local' }).catch(() => {});
-    setTimeout(() => { _signingOut = false; }, 3000);
-    // No showAuth() — caller navigates to guest sessions directly
+    _signingOut = true;
+    _user = null;
+    updateUI();
+
+    // Clear Supabase auth with both scopes
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+
+    // Clear ALL localStorage (not just sb- keys)
+    [...Object.keys(localStorage)].forEach(k => localStorage.removeItem(k));
+
+    // Clear sessionStorage
+    sessionStorage.clear();
+
+    // Clear IndexedDB
+    await DB.clearAll();
+
+    // Force page reload to clear all memory/cached state
+    setTimeout(() => { location.reload(); }, 100);
   }
 
   function getUser() { return _user; }
