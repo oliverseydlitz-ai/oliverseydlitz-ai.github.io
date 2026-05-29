@@ -166,7 +166,7 @@ const Auth = (() => {
       if (_user === null && event === 'TOKEN_REFRESHED') return;
       const wasGuest = !_user;
       _user = session?.user || null;
-      updateUI();
+      await updateUI();
       // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
@@ -184,7 +184,7 @@ const Auth = (() => {
       const { data: { user: freshUser }, error } = await sb.auth.getUser();
       if (!error && freshUser) _user = freshUser;
     }
-    updateUI();
+    await updateUI();
     return _user;
   }
 
@@ -192,7 +192,7 @@ const Auth = (() => {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) throw error;
     _user = data.user;
-    updateUI();
+    await updateUI();
     return _user;
   }
 
@@ -200,7 +200,7 @@ const Auth = (() => {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
     _user = data.user;
-    updateUI();
+    await updateUI();
     return _user;
   }
 
@@ -226,28 +226,37 @@ const Auth = (() => {
       if (k.startsWith('sb-')) localStorage.removeItem(k);
     }
     _user = null;             // wipe user state
-    updateUI();
+    await updateUI();
     setTimeout(() => { _signingOut = false; }, 1000);  // longer delay to ensure Supabase clears
     // No showAuth() — caller navigates to guest sessions directly
   }
 
   function getUser() { return _user; }
 
-  function updateUI() {
+  async function updateUI() {
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
     const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
+    const emailRow = document.getElementById('accountEmailRow');
+    const accountEmail = document.getElementById('accountEmail');
     if (_user) {
       clearTimeout(_guestTimer);
       signIn.hidden = true;
       signOut.hidden = false;
       syncBtn.hidden = false;
+      emailRow.hidden = false;
       authModal.hidden = true;
+      // Fetch actual user data from Supabase
+      const { data: { user: freshUser } } = await sb.auth.getUser();
+      if (freshUser && freshUser.email) {
+        accountEmail.textContent = freshUser.email;
+      }
     } else {
       signIn.hidden = false;
       signOut.hidden = true;
       syncBtn.hidden = true;
+      emailRow.hidden = true;
     }
   }
 
@@ -298,17 +307,30 @@ const CloudDB = (() => {
     const user = Auth.getUser();
     if (!user) throw new Error('Not signed in');
 
+    let synced = 0;
+    let failed = 0;
+
     for (const session of sessions) {
-      await sb.from('sessions').upsert([{
-        id: session.id,
-        user_id: user.id,
-        date: session.date,
-        notes: session.notes,
-        conditions: session.conditions,
-        shots: session.shots,
-        created_at: new Date(session.createdAt).toISOString(),
-      }], { onConflict: 'user_id,id' }).catch(() => {});
+      try {
+        const { error } = await sb.from('sessions').upsert([{
+          id: session.id,
+          user_id: user.id,
+          date: session.date,
+          notes: session.notes,
+          conditions: session.conditions,
+          shots: session.shots,
+          created_at: new Date(session.createdAt).toISOString(),
+        }], { onConflict: 'user_id,id' });
+        if (error) failed++; else synced++;
+      } catch (e) {
+        failed++;
+      }
     }
+
+    if (failed > 0) {
+      throw new Error(`Synced ${synced}, failed ${failed}`);
+    }
+    return { synced, failed };
   }
   return { syncSessions };
 })();
@@ -2330,13 +2352,22 @@ async function init() {
     const origText = btn.querySelector('span').textContent;
     try {
       btn.querySelector('span').textContent = 'Syncing...';
+      btn.disabled = true;
       const sessions = await Store.getSessions();
-      await CloudDB.syncSessions(sessions);
+      const result = await CloudDB.syncSessions(sessions);
+      toast(`✓ Synced ${result.synced} session${result.synced !== 1 ? 's' : ''}`);
       btn.querySelector('span').textContent = '✓ Synced';
-      setTimeout(() => { btn.querySelector('span').textContent = origText; }, 2000);
+      setTimeout(() => {
+        btn.querySelector('span').textContent = origText;
+        btn.disabled = false;
+      }, 2000);
     } catch(e) {
+      toast(`✗ Sync failed: ${e.message}`);
       btn.querySelector('span').textContent = '✗ Failed';
-      setTimeout(() => { btn.querySelector('span').textContent = origText; }, 2000);
+      setTimeout(() => {
+        btn.querySelector('span').textContent = origText;
+        btn.disabled = false;
+      }, 2000);
     }
   });
 
