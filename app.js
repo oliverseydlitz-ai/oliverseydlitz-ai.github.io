@@ -247,10 +247,10 @@ const Auth = (() => {
       syncBtn.hidden = false;
       emailRow.hidden = false;
       authModal.hidden = true;
-      // Fetch actual user data from Supabase
-      const { data: { user: freshUser } } = await sb.auth.getUser();
-      if (freshUser && freshUser.email) {
-        accountEmail.textContent = freshUser.email;
+      // Get email from current session, not cached
+      const { data: { session } } = await sb.auth.getSession();
+      if (session && session.user && session.user.email) {
+        accountEmail.textContent = session.user.email;
       }
     } else {
       signIn.hidden = false;
