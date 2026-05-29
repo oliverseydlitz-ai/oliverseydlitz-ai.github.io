@@ -1378,38 +1378,9 @@ const UI = (() => {
       <div class="dash-heatmap-wrap">
         <div class="dash-sub-title">Practice Activity <span class="hm-legend">less <i class="hm-cell hm-l0"></i><i class="hm-cell hm-l1"></i><i class="hm-cell hm-l2"></i><i class="hm-cell hm-l3"></i><i class="hm-cell hm-l4"></i> more</span></div>
         <div class="heatmap" id="heatmap"></div>
-      </div>
-      <div class="analytics-section">
-        <div class="as-header">
-          <h3 class="as-title">Shot Tendencies</h3>
-          <p class="as-desc">Fade/draw patterns by club</p>
-        </div>
-        <div class="as-grid" id="tendenciesGrid"></div>
-      </div>
-      <div class="analytics-section">
-        <div class="as-header">
-          <h3 class="as-title">Smash Factor Leaders</h3>
-          <p class="as-desc">Your most efficient shots</p>
-        </div>
-        <div class="as-list" id="smashRankList"></div>
-      </div>
-      <div class="analytics-section">
-        <div class="as-header">
-          <h3 class="as-title">Swing Speed Consistency</h3>
-          <p class="as-desc">Consistency score by club (0-100)</p>
-        </div>
-        <div class="as-grid" id="consistencyGrid"></div>
-      </div>
-      <div class="analytics-section">
-        <div class="as-header">
-          <h3 class="as-title">Best & Worst Shots</h3>
-          <p class="as-desc">Top 5 and bottom 5 from all sessions</p>
-        </div>
-        <div class="as-bw-grid" id="bestWorstGrid"></div>
       </div>`;
 
     renderHeatmap(sessions);
-    renderAnalytics(all);
     requestAnimationFrame(()=>{
       const arc=dash.querySelector('.dh-arc');
       if(arc) arc.style.strokeDashoffset=arc.dataset.offset||'0';
