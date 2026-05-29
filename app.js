@@ -235,7 +235,8 @@ const Auth = (() => {
     }
     keysToDelete.forEach(k => localStorage.removeItem(k));
 
-    setTimeout(() => { _signingOut = false; }, 500);
+    // Force refresh to clear any cached state
+    setTimeout(() => { location.reload(); }, 500);
   }
 
   function getUser() { return _user; }
