@@ -287,88 +287,18 @@ const Auth = (() => {
   return { init, signup, login, oauth, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
-const CloudDB = (() => {
-  async function getSessions(userId) {
-    const { data, error } = await sb
-      .from('sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  }
-
-  async function saveSession(session) {
-    const user = Auth.getUser();
-    if (!user) return;
-    const { error } = await sb.from('sessions').upsert([{
-      id: session.id,
-      user_id: user.id,
-      date: session.date,
-      notes: session.notes,
-      conditions: session.conditions,
-      shots: session.shots,
-      created_at: new Date(session.createdAt).toISOString(),
-    }], { onConflict: 'user_id,id' });
-    if (error) throw error;
-  }
-
-  async function deleteSession(id) {
-    const user = Auth.getUser();
-    if (!user) return;
-    const { error } = await sb.from('sessions').delete().eq('id', id).eq('user_id', user.id);
-    if (error) throw error;
-  }
-
-  async function migrateLocalSessions() {
-    const user = Auth.getUser();
-    if (!user) return;
-    const localSessions = await DB.exportAll();
-    for (const session of localSessions) {
-      await saveSession(session);
-    }
-  }
-
-  return { getSessions, saveSession, deleteSession, migrateLocalSessions };
-})();
-
-// Unified data layer — cloud-only for logged-in users, MemDB (ephemeral) for guests
+// Unified data layer — local storage only (IndexedDB + MemDB)
 const Store = (() => {
-  function fromRow(r) {
-    return {
-      id: r.id, date: r.date, notes: r.notes, conditions: r.conditions,
-      shots: r.shots, createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
-    };
-  }
-  const cloud = () => !!Auth.getUser();
-
   async function getSessions() {
-    if (cloud()) {
-      const rows = await CloudDB.getSessions(Auth.getUser().id);
-      const cloudIds = new Set(rows.map(r => r.id));
-      // Include any MemDB sessions not yet synced to cloud (just-imported)
-      const pending = MemDB.getSessions().filter(s => !cloudIds.has(s.id));
-      return [...pending, ...rows.map(fromRow)].sort((a,b) => new Date(b.date) - new Date(a.date));
-    }
     return MemDB.getSessions();
   }
   async function getSession(id) {
-    if (cloud()) {
-      // Check MemDB first — covers just-imported sessions not yet in cloud
-      const mem = MemDB.getSession(id);
-      if (mem) return mem;
-      const rows = await CloudDB.getSessions(Auth.getUser().id);
-      const r = rows.find(x => x.id === id);
-      return r ? fromRow(r) : null;
-    }
     return MemDB.getSession(id);
   }
   async function saveSession(s) {
-    if (cloud()) { await CloudDB.saveSession(s); return; }
     MemDB.saveSession(s);
   }
   async function deleteSession(id) {
-    if (cloud()) { await CloudDB.deleteSession(id); return; }
     MemDB.deleteSession(id);
   }
   return { getSessions, getSession, saveSession, deleteSession };
