@@ -2203,11 +2203,9 @@ const ImportFlow = (() => {
     await Store.saveSession(session);
     UI.renderDetail(session);
     Router.show('session-detail');
-    // If authenticated, ensure it's synced to cloud
+    // Cloud sync attempted in background if authenticated
     if (Auth.getUser()) {
-      await CloudDB.saveSession(session).catch(() => {
-        toast('Cloud sync failed');
-      });
+      CloudDB.saveSession(session).catch(() => {});  // silent fail for now
     }
   }
 
