@@ -160,6 +160,22 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+// On-screen debug banner (tap to dismiss). Lets us see auth state on mobile
+// where the dev console isn't available.
+function showDebug(msg) {
+  let d = document.getElementById('debugBanner');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'debugBanner';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;' +
+      'font:12px/1.4 monospace;padding:8px 12px;white-space:pre-wrap;border-bottom:2px solid #0f0;max-height:40vh;overflow:auto';
+    d.onclick = () => d.remove();
+    document.body.appendChild(d);
+  }
+  const ts = new Date().toLocaleTimeString();
+  d.textContent = `[DEBUG ${ts}] (tap to close)\n` + msg;
+}
+
 const Auth = (() => {
   let _user = null;
   let _guestTimer = null;
@@ -169,9 +185,17 @@ const Auth = (() => {
   // getUser() validates the token against the server, so it can't return a
   // stale/cached identity the way reading localStorage can.
   async function refreshUserFromServer() {
+    const hadCode = /[?&]code=/.test(location.search);
+    const hadToken = /access_token=/.test(location.hash);
     const { data, error } = await sb.auth.getUser();
     _user = (!error && data?.user) ? data.user : null;
     console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
+    showDebug(
+      `URL had ?code=  : ${hadCode}\n` +
+      `URL had #token  : ${hadToken}\n` +
+      `getUser() email : ${_user?.email || '(none)'}\n` +
+      `getUser() error : ${error ? error.message : 'none'}`
+    );
     updateUI();
     return _user;
   }
@@ -220,10 +244,17 @@ const Auth = (() => {
   }
 
   async function oauth(provider) {
+    // Wipe any existing session BEFORE redirecting. This guarantees no stale
+    // account-A token can survive into the post-redirect load. signInWithOAuth
+    // then writes a fresh PKCE code-verifier, so the exchange on return yields
+    // exactly the account picked at Google. (Purge must happen before the call,
+    // never after, or we'd delete the verifier we just wrote.)
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    purgeAuthStorage();
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: location.origin,
+        redirectTo: location.origin + location.pathname,
         queryParams: { prompt: 'select_account' },
       },
     });
