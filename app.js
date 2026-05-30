@@ -1333,7 +1333,92 @@ const Analytics = (() => {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// Features — five self-contained, defensive enhancements.
+// Goals — user-defined performance targets and progress tracking
+// ════════════════════════════════════════════════════════════════
+const Goals = (() => {
+  const STORAGE_KEY = 'slGoals';
+
+  function getGoals() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch (_) { return {}; }
+  }
+
+  function setGoal(metric, target, unit) {
+    const goals = getGoals();
+    goals[metric] = { target, unit, set: Date.now() };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(goals)); } catch (_) {}
+  }
+
+  function deleteGoal(metric) {
+    const goals = getGoals();
+    delete goals[metric];
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(goals)); } catch (_) {}
+  }
+
+  function getProgress(metric, sessions) {
+    const all = sessions.flatMap(s => s.shots);
+    let current = null;
+    switch(metric) {
+      case 'carry':      current = Math.max(0, ...all.map(s => s.carryDistance || 0)); break;
+      case 'ball_speed': current = Math.max(0, ...all.map(s => s.ballSpeed || 0)); break;
+      case 'smash':      current = Math.max(0, ...all.map(s => s.smashFactor || 0)); break;
+      case 'sessions':   current = sessions.length; break;
+      case 'score':      {
+        const scores = sessions.slice(0,3).map(s => {
+          const sc = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+          return sc.length ? sc.reduce((a,b)=>a+b,0)/sc.length : null;
+        }).filter(x=>x!==null);
+        current = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      } break;
+    }
+    return current;
+  }
+
+  return { getGoals, setGoal, deleteGoal, getProgress };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ViewPrefs — customizable dashboard and view settings
+// ════════════════════════════════════════════════════════════════
+const ViewPrefs = (() => {
+  const STORAGE_KEY = 'slViewPrefs';
+
+  const defaults = {
+    showHeatmap: true,
+    showFaults: true,
+    showClubBreakdown: true,
+    showTrendChart: true,
+    showComparison: true,
+    densityMode: false,
+  };
+
+  function getPrefs() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch (_) { return defaults; }
+  }
+
+  function setPref(key, value) {
+    const prefs = getPrefs();
+    prefs[key] = value;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch (_) {}
+  }
+
+  function togglePref(key) {
+    const prefs = getPrefs();
+    prefs[key] = !prefs[key];
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch (_) {}
+    return prefs[key];
+  }
+
+  return { getPrefs, setPref, togglePref };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// Features — nine self-contained, defensive enhancements.
 // Each method is wrapped so a failure degrades gracefully (returns
 // empty/neutral) and can never break the surrounding render.
 // ════════════════════════════════════════════════════════════════
@@ -1462,7 +1547,80 @@ const Features = (() => {
     } catch (e) { console.error('searchSessions()', e); return sessions; }
   }
 
-  return { streak, achievements, focus, compare, searchSessions };
+  // ── 6. Goal progress visualization ────────────────────────────
+  function goalProgress(sessions) {
+    try {
+      const goals = Goals.getGoals();
+      const results = {};
+      Object.entries(goals).forEach(([metric, goal]) => {
+        const current = Goals.getProgress(metric, sessions);
+        const pct = Math.round((current / goal.target) * 100);
+        results[metric] = { current, target: goal.target, unit: goal.unit, pct: Math.min(pct, 100) };
+      });
+      return results;
+    } catch (e) { console.error('goalProgress()', e); return {}; }
+  }
+
+  // ── 7. Performance alerts (email notifications) ────────────────
+  function performanceAlerts(sessions) {
+    try {
+      if (sessions.length < 2) return [];
+      const recent = sessions[0];
+      const prev = sessions[1];
+      const recentScore = recent.shots.map(ShotScorer.score).filter(x=>x!==null).reduce((a,b)=>a+b,0)/recent.shots.length||0;
+      const prevScore = prev.shots.map(ShotScorer.score).filter(x=>x!==null).reduce((a,b)=>a+b,0)/prev.shots.length||0;
+      const alerts = [];
+
+      if (recentScore > prevScore + 10) alerts.push({ type: 'improvement', msg: `+${Math.round(recentScore-prevScore)} pts! Keep it up!` });
+      if (recentScore < prevScore - 10) alerts.push({ type: 'decline', msg: `Session was -${Math.round(prevScore-recentScore)} pts. Check your setup.` });
+
+      const faults = FaultEngine.detectFaults(recent.shots);
+      if (faults.some(f=>f.severity==='high')) alerts.push({ type: 'fault', msg: `${faults[0].name} detected. Want to drill it?` });
+
+      return alerts;
+    } catch (e) { console.error('performanceAlerts()', e); return []; }
+  }
+
+  // ── 8. Drill recommendation engine ────────────────────────────
+  function recommendDrill(sessions) {
+    try {
+      if (!sessions.length) return null;
+      const all = sessions.slice(0,5).flatMap(s=>s.shots);
+      const faults = {};
+      all.forEach(shot => {
+        const fault = FaultEngine.detectFault(shot);
+        if (fault) faults[fault.name] = (faults[fault.name]||0)+1;
+      });
+      if (!Object.keys(faults).length) return null;
+      const topFault = Object.entries(faults).sort((a,b)=>b[1]-a[1])[0];
+      const drills = {
+        'Slice': { name: 'In-to-Out Path Drill', time: 15, desc: 'Hit 10 balls focusing on swinging left-to-right' },
+        'Hook': { name: 'Out-to-In Path Drill', time: 15, desc: 'Hit 10 balls focusing on swinging right-to-left' },
+        'Thin': { name: 'Low Point Drill', time: 10, desc: 'Practice ball position to hit center' },
+        'Fat': { name: 'Weight Transfer Drill', time: 15, desc: 'Focus on smooth weight shift through impact' },
+      };
+      return { fault: topFault[0], count: topFault[1], drill: drills[topFault[0]] || { name: 'Technique Drill', time: 20, desc: 'Record 20 shots focusing on form.' } };
+    } catch (e) { console.error('recommendDrill()', e); return null; }
+  }
+
+  // ── 9. Session quality benchmarks ────────────────────────────
+  function benchmarks(sessions) {
+    try {
+      if (!sessions.length) return {};
+      const all = sessions.flatMap(s=>s.shots);
+      const clubs = {};
+      all.forEach(shot => {
+        if (!clubs[shot.clubType]) clubs[shot.clubType] = [];
+        clubs[shot.clubType].push(shot.carryDistance || 0);
+      });
+      return Object.entries(clubs).reduce((acc,[club,dists]) => {
+        acc[club] = { avg: Math.round(avg(dists.map(d=>({carryDistance:d})),'carryDistance')||0), count: dists.length };
+        return acc;
+      }, {});
+    } catch (e) { console.error('benchmarks()', e); return {}; }
+  }
+
+  return { streak, achievements, focus, compare, searchSessions, goalProgress, performanceAlerts, recommendDrill, benchmarks };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2415,6 +2573,59 @@ const UI = (() => {
     if (sessions.length<2) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
+    // Add performance alerts and goals at the top
+    try {
+      const alertsHost = document.getElementById('alertsHost');
+      if (alertsHost) {
+        const alerts = Features.performanceAlerts(sessions);
+        if (alerts.length) {
+          alertsHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">⚡ Alerts</div>' + alerts.map(a =>
+            `<div class="alert-item ${a.type}">${a.msg}</div>`
+          ).join('');
+        } else {
+          alertsHost.innerHTML = '';
+        }
+      }
+    } catch(e){ console.error('alerts',e); }
+
+    // Show goal progress
+    try {
+      const goalsHost = document.getElementById('goalsHost');
+      if (goalsHost) {
+        const progress = Features.goalProgress(sessions);
+        if (Object.keys(progress).length) {
+          const metricLabels = { carry: 'Longest Carry', ball_speed: 'Ball Speed', smash: 'Smash', score: 'Form Score', sessions: 'Sessions' };
+          goalsHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">🎯 Goals</div>' + Object.entries(progress).map(([m, p]) =>
+            `<div class="goal-item">
+              <div>
+                <div class="goal-metric">${metricLabels[m]}</div>
+                <div class="goal-progress"><strong>${p.current}${p.unit}</strong> / ${p.target}${p.unit}</div>
+                <div class="goal-bar"><div class="goal-bar-fill" style="width:${p.pct}%"></div></div>
+              </div>
+            </div>`
+          ).join('');
+        } else {
+          goalsHost.innerHTML = '';
+        }
+      }
+    } catch(e){ console.error('goals',e); }
+
+    // Show club benchmarks
+    try {
+      const benchHost = document.getElementById('benchHost');
+      if (benchHost) {
+        const benches = Features.benchmarks(sessions);
+        if (Object.keys(benches).length) {
+          benchHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">📊 Club Benchmarks</div>' +
+            '<table class="benchmark-table"><thead><tr><th>Club</th><th>Avg Carry</th><th>Shots</th></tr></thead><tbody>' +
+            Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.avg} yds</td><td>${b.count}</td></tr>`).join('') +
+            '</tbody></table>';
+        } else {
+          benchHost.innerHTML = '';
+        }
+      }
+    } catch(e){ console.error('benchmarks',e); }
+
     const allClubs = [...new Set(sessions.flatMap(s=>sortedClubs(s.shots)))];
     const clubSel = document.getElementById('progressClub');
     clubSel.innerHTML = ['all',...allClubs].map(c=>
@@ -2694,24 +2905,24 @@ async function init() {
   // Reflect persisted theme on the Settings switch (class already set early)
   applyTheme(document.documentElement.classList.contains('dark'));
 
-  // Nav
-  document.querySelectorAll('[data-view]').forEach(el => {
-    el.addEventListener('click', async e => {
-      e.preventDefault();
-      const v = el.dataset.view;
-      try {
-        if (v==='import')   { Router.showImport(); return; }
-        if (v==='progress') { await Router.showProgress(); return; }
-        if (v==='yardages') { await Router.showYardages(); return; }
-        if (v==='sessions') { await Router.showSessions(); return; }
-        Router.show(v);
-      } catch (err) {
-        // Never let a view-render error leave the tab feeling "dead"
-        console.error('Navigation error:', err);
-        toast('Could not open ' + v + ': ' + (err?.message || 'unknown error'));
-        Router.show(v);
-      }
-    });
+  // Nav — use event delegation on document for maximum robustness
+  document.addEventListener('click', async e => {
+    const el = e.target.closest('[data-view]');
+    if (!el) return;
+    e.preventDefault();
+    const v = el.dataset.view;
+    try {
+      if (v==='import')   { Router.showImport(); return; }
+      if (v==='progress') { await Router.showProgress(); return; }
+      if (v==='yardages') { await Router.showYardages(); return; }
+      if (v==='sessions') { await Router.showSessions(); return; }
+      Router.show(v);
+    } catch (err) {
+      // Never let a view-render error leave the tab feeling "dead"
+      console.error('Navigation error:', err);
+      toast('Could not open ' + v + ': ' + (err?.message || 'unknown error'));
+      Router.show(v);
+    }
   });
 
   document.getElementById('topImportBtn')?.addEventListener('click', ()=>Router.showImport());
@@ -2756,11 +2967,24 @@ async function init() {
   document.getElementById('exportDataBtn').addEventListener('click', async ()=>{
     try {
       const data = await Store.getSessions();
+      // Create CSV export
+      let csv = 'Date,Club,Carry,Total,Ball Speed,Smash,Launch,Spin,Notes\n';
+      data.forEach(s => {
+        s.shots.forEach(shot => {
+          csv += `${s.date},${shot.clubType},${shot.carryDistance||''},${shot.totalDistance||''},${shot.ballSpeed||''},${shot.smashFactor||''},${shot.launchAngle||''},${shot.spinRate||''},"${s.notes||''}"\n`;
+        });
+      });
+      // Offer both formats
+      const format = confirm('JSON (OK) or CSV (Cancel)?') ? 'json' : 'csv';
+      const blob = format === 'json'
+        ? new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+        : new Blob([csv],{type:'text/csv'});
       const a = Object.assign(document.createElement('a'),{
-        href: URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),
-        download: `shotlab-${new Date().toISOString().slice(0,10)}.json`,
+        href: URL.createObjectURL(blob),
+        download: `shotlab-${new Date().toISOString().slice(0,10)}.${format}`,
       });
       a.click();
+      toast(`Exported ${data.length} sessions as ${format.toUpperCase()}`);
     } catch(err) { toast('Export failed: ' + (err.message || 'could not reach the cloud')); }
   });
 
@@ -2887,6 +3111,60 @@ async function init() {
       btn.disabled = false;
     }
   });
+
+  // View preferences toggles
+  const prefs = ViewPrefs.getPrefs();
+  ['Heatmap','Faults','ClubBreak','Comparison','Density'].forEach(name => {
+    const key = name.charAt(0).toLowerCase() + name.slice(1);
+    const storageKey = 'show' + name[0].toUpperCase() + name.slice(1);
+    const btn = document.getElementById('pref' + name);
+    const toggle = document.getElementById('pref' + name + 'Toggle');
+    if (btn && toggle) {
+      btn.addEventListener('click', () => {
+        const newVal = ViewPrefs.togglePref(storageKey === 'showDensity' ? 'densityMode' : storageKey);
+        toggle.textContent = newVal ? '✓' : '';
+        toggle.style.color = newVal ? 'var(--pine)' : 'var(--text-dim)';
+      });
+      const isOn = prefs[storageKey === 'showDensity' ? 'densityMode' : storageKey];
+      toggle.textContent = isOn ? '✓' : '';
+      toggle.style.color = isOn ? 'var(--pine)' : 'var(--text-dim)';
+    }
+  });
+
+  // Goals management
+  const renderGoals = async () => {
+    const list = document.getElementById('goalsList');
+    if (!list) return;
+    const goals = Goals.getGoals();
+    const sessions = await Store.getSessions();
+    const metricLabels = { carry: 'Longest Carry', ball_speed: 'Ball Speed', smash: 'Smash', score: 'Form Score', sessions: 'Sessions' };
+    list.innerHTML = Object.entries(goals).map(([metric, goal]) => {
+      const progress = Goals.getProgress(metric, sessions);
+      const pct = Math.round((progress / goal.target) * 100);
+      return `<div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:.5rem">
+        <div>
+          <div style="font-weight:600;color:var(--text);font-size:.9rem">${metricLabels[metric]}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)"><strong>${progress}${goal.unit}</strong> of <strong>${goal.target}${goal.unit}</strong></div>
+          <div style="height:6px;background:var(--border);border-radius:3px;margin-top:.4rem;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--pine);transition:width .3s"></div></div>
+        </div>
+        <button onclick="Goals.deleteGoal('${metric}');location.reload()" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem">✕</button>
+      </div>`;
+    }).join('');
+  };
+
+  document.getElementById('setGoalBtn')?.addEventListener('click', async () => {
+    const metric = document.getElementById('goalMetric')?.value;
+    const target = parseInt(document.getElementById('goalTarget')?.value||0);
+    if (!metric || !target) { toast('Select metric and target'); return; }
+    const units = { carry: 'yds', ball_speed: 'mph', smash: '', score: '', sessions: '' };
+    Goals.setGoal(metric, target, units[metric]||'');
+    await renderGoals();
+    document.getElementById('goalMetric').value = '';
+    document.getElementById('goalTarget').value = '';
+    toast('Goal set! 🎯');
+  });
+
+  await renderGoals();
 
   // Auth — all UI handlers above are wired up first, so a slow network here
   // can never leave Sign Out / Clear Data unresponsive

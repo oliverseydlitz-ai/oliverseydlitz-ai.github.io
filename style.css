@@ -1717,8 +1717,55 @@ html.dark .fault-badge { background: #2e1414; border-color: #5a2424; }
 html.dark .paywall-overlay { background: rgba(10,20,14,.85); }
 html.dark .ach-item.got { background: linear-gradient(135deg, rgba(40,168,98,.12), transparent); }
 
+/* ─────────────────────────────────────────────────────────────
+   NEW FEATURES: Goals, View Preferences, Customization
+   ───────────────────────────────────────────────────────────── */
+
+.pref-toggle {
+  display: inline-block; width: 20px; text-align: center; font-weight: 700;
+  color: var(--text-dim); transition: color .2s;
+}
+
+.goal-inputs {
+  background: var(--surface2); padding: .8rem; border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.goal-item {
+  display: grid; grid-template-columns: 1fr auto; gap: .5rem;
+  align-items: center; padding: .6rem; background: var(--surface2);
+  border-radius: var(--radius-sm); margin-bottom: .5rem; transition: background .15s;
+}
+
+.goal-metric { font-weight: 600; color: var(--text); font-size: .9rem; }
+.goal-progress { font-size: .75rem; color: var(--text-muted); margin: .4rem 0 .4rem; }
+.goal-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.goal-bar-fill { height: 100%; background: var(--pine); transition: width .3s; }
+.goal-delete { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 1rem; }
+
+.alert-item {
+  padding: .7rem; border-left: 4px solid var(--yellow); background: rgba(251, 146, 60, .08);
+  border-radius: var(--radius-sm); margin-bottom: .6rem; font-size: .9rem;
+}
+.alert-item.improvement { border-left-color: var(--green); background: rgba(34, 197, 94, .08); }
+.alert-item.decline { border-left-color: var(--red); background: rgba(239, 68, 68, .08); }
+
+.benchmark-table {
+  width: 100%; border-collapse: collapse; font-size: .85rem;
+  margin-top: .8rem;
+}
+.benchmark-table th {
+  padding: .5rem; text-align: left; background: var(--surface2);
+  font-weight: 600; border-bottom: 1.5px solid var(--border);
+}
+.benchmark-table td {
+  padding: .5rem; border-bottom: 1px solid var(--border);
+}
+.benchmark-table tr:hover { background: var(--surface2); }
+
 /* Smooth theme transition */
 body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
-.focus-card, .compare-card, .ach-strip, .streak-chip, .search-bar {
+.focus-card, .compare-card, .ach-strip, .streak-chip, .search-bar, .goal-item,
+.alert-item, .benchmark-table {
   transition: background-color .25s ease, border-color .25s ease, color .25s ease;
 }

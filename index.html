@@ -237,6 +237,15 @@
         <select id="progressClub"></select>
       </div>
 
+      <!-- Performance alerts -->
+      <div id="alertsHost"></div>
+
+      <!-- Goal progress -->
+      <div id="goalsHost"></div>
+
+      <!-- Club benchmarks -->
+      <div id="benchHost"></div>
+
       <!-- Session comparison (feature) -->
       <div id="compareHost" class="compare-host"></div>
 
@@ -307,6 +316,47 @@
           <span>Dark mode</span>
           <span class="theme-switch" id="themeSwitch"><span class="theme-knob"></span></span>
         </button>
+      </div>
+      <div class="settings-section">
+        <h2 class="settings-section-title">View Preferences</h2>
+        <button class="settings-row" id="prefHeatmap">
+          <span>Show practice heatmap</span>
+          <span class="pref-toggle" id="prefHeatmapToggle">✓</span>
+        </button>
+        <button class="settings-row" id="prefFaults">
+          <span>Show fault detection</span>
+          <span class="pref-toggle" id="prefFaultsToggle">✓</span>
+        </button>
+        <button class="settings-row" id="prefClubBreak">
+          <span>Show club breakdown</span>
+          <span class="pref-toggle" id="prefClubBreakToggle">✓</span>
+        </button>
+        <button class="settings-row" id="prefComparison">
+          <span>Show session comparison</span>
+          <span class="pref-toggle" id="prefComparisonToggle">✓</span>
+        </button>
+        <button class="settings-row" id="prefDensity">
+          <span>Compact view (more data)</span>
+          <span class="pref-toggle" id="prefDensityToggle"></span>
+        </button>
+      </div>
+      <div class="settings-section">
+        <h2 class="settings-section-title">Goals</h2>
+        <div class="goal-inputs">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.8rem">
+            <select id="goalMetric" style="padding:.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+              <option value="">—</option>
+              <option value="carry">Longest Carry (yds)</option>
+              <option value="ball_speed">Ball Speed (mph)</option>
+              <option value="smash">Smash Factor</option>
+              <option value="score">Form Score (/100)</option>
+              <option value="sessions">Sessions (count)</option>
+            </select>
+            <input type="number" id="goalTarget" placeholder="Target" min="0" max="300" style="padding:.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+          </div>
+          <button id="setGoalBtn" style="width:100%;padding:.6rem;background:var(--pine);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">Set Goal</button>
+        </div>
+        <div id="goalsList" style="margin-top:.8rem"></div>
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">Data</h2>
