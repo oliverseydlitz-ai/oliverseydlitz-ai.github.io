@@ -170,18 +170,30 @@ function showDebug(msg) {
   if (!d) {
     d = document.createElement('div');
     d.id = 'debugBanner';
-    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;' +
-      'font:12px/1.4 monospace;padding:8px 12px;white-space:pre-wrap;border-bottom:2px solid #0f0;max-height:40vh;overflow:auto';
-    d.onclick = () => d.remove();
+    // Pinned to the BOTTOM with pointer-events:none so it can NEVER intercept
+    // taps on the UI beneath it (the top-pinned version was covering the Google
+    // button). A small close button re-enables pointer events just for itself.
+    d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;' +
+      'font:11px/1.4 monospace;padding:8px 12px;white-space:pre-wrap;border-top:2px solid #0f0;' +
+      'max-height:35vh;overflow:auto;pointer-events:none';
+    const close = document.createElement('button');
+    close.textContent = '✕ close';
+    close.style.cssText = 'pointer-events:auto;position:absolute;top:4px;right:8px;background:#0f0;' +
+      'color:#000;border:none;border-radius:4px;padding:2px 8px;font:bold 11px monospace;cursor:pointer';
+    close.onclick = () => d.remove();
+    d.appendChild(close);
     document.body.appendChild(d);
   }
   const ts = new Date().toLocaleTimeString();
-  d.textContent = `[DEBUG ${ts}] (tap to close)\n` + msg;
+  let body = d.querySelector('.dbg-body');
+  if (!body) { body = document.createElement('div'); body.className = 'dbg-body'; d.appendChild(body); }
+  body.textContent = `[DEBUG ${ts}]\n` + msg;
 }
 
 const Auth = (() => {
   let _user = null;
   let _guestTimer = null;
+  let _guest = false;        // true when user explicitly chose "continue as guest"
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
   // Single source of truth: ask the Supabase server who the JWT belongs to.
@@ -305,12 +317,20 @@ const Auth = (() => {
       signIn.hidden = true;
       signOut.hidden = false;
       authModal.hidden = true;
+    } else if (_guest) {
+      // Guest mode: show a clear "Guest" label instead of an empty dash
+      emailRow.hidden = false;
+      document.getElementById('accountEmail').textContent = 'Guest (local only)';
+      signIn.hidden = false;
+      signOut.hidden = true;
     } else {
       emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
     }
   }
+
+  function setGuest() { _guest = true; updateUI(); }
 
   // mandatory=true: guest option hidden until 5s pass; false: guest shown right away
   function showAuth(mandatory = false) {
@@ -348,7 +368,7 @@ const Auth = (() => {
     document.getElementById('authError').textContent = '';
   }
 
-  return { init, signup, login, oauth, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
+  return { init, signup, login, oauth, logout, getUser, setGuest, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
 const CloudDB = (() => {
@@ -2434,6 +2454,7 @@ async function init() {
   });
   // Continue as guest
   document.getElementById('authGuestBtn').addEventListener('click', async () => {
+    Auth.setGuest();
     Auth.hideAuth();
     await Router.showSessions();
   });
