@@ -309,6 +309,7 @@ const Auth = (() => {
     const emailRow = document.getElementById('accountEmailRow');
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
+    const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
       clearTimeout(_guestTimer);
@@ -316,6 +317,7 @@ const Auth = (() => {
       document.getElementById('accountEmail').textContent = _user.email;
       signIn.hidden = true;
       signOut.hidden = false;
+      if (syncBtn) syncBtn.hidden = false;   // sync only available when signed in
       authModal.hidden = true;
     } else if (_guest) {
       // Guest mode: show a clear "Guest" label instead of an empty dash
@@ -323,10 +325,12 @@ const Auth = (() => {
       document.getElementById('accountEmail').textContent = 'Guest (local only)';
       signIn.hidden = false;
       signOut.hidden = true;
+      if (syncBtn) syncBtn.hidden = true;
     } else {
       emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
+      if (syncBtn) syncBtn.hidden = true;
     }
   }
 
@@ -2327,11 +2331,18 @@ async function init() {
     el.addEventListener('click', async e => {
       e.preventDefault();
       const v = el.dataset.view;
-      if (v==='import')   { Router.showImport(); return; }
-      if (v==='progress') { await Router.showProgress(); return; }
-      if (v==='yardages') { await Router.showYardages(); return; }
-      if (v==='sessions') { await Router.showSessions(); return; }
-      Router.show(v);
+      try {
+        if (v==='import')   { Router.showImport(); return; }
+        if (v==='progress') { await Router.showProgress(); return; }
+        if (v==='yardages') { await Router.showYardages(); return; }
+        if (v==='sessions') { await Router.showSessions(); return; }
+        Router.show(v);
+      } catch (err) {
+        // Never let a view-render error leave the tab feeling "dead"
+        console.error('Navigation error:', err);
+        toast('Could not open ' + v + ': ' + (err?.message || 'unknown error'));
+        Router.show(v);
+      }
     });
   });
 
@@ -2464,6 +2475,32 @@ async function init() {
   document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
     await Auth.logout();
     await Router.showSessions();
+  });
+
+  // Manual cloud sync: push every local session up, then re-render from cloud
+  document.getElementById('syncCloudBtn').addEventListener('click', async () => {
+    if (!Auth.getUser()) { toast('Sign in to sync.'); return; }
+    const btn = document.getElementById('syncCloudBtn');
+    const label = btn.querySelector('span');
+    const original = label.textContent;
+    label.textContent = 'Syncing…';
+    btn.disabled = true;
+    try {
+      const local = MemDB.getSessions();
+      let pushed = 0;
+      for (const s of local) { await CloudDB.saveSession(s); pushed++; }
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      toast(`Synced ✓ (${pushed} uploaded, ${rows.length} in cloud)`);
+      showDebug(`CLOUD SYNC ✓\nuploaded: ${pushed}\nin cloud now: ${rows.length}`);
+      await Router.showSessions();
+    } catch (e) {
+      console.error('Sync failed:', e);
+      toast('Sync failed: ' + (e?.message || 'unknown error'));
+      showDebug('CLOUD SYNC FAILED:\n' + (e?.message || JSON.stringify(e)));
+    } finally {
+      label.textContent = original;
+      btn.disabled = false;
+    }
   });
 
   // Auth — all UI handlers above are wired up first, so a slow network here
