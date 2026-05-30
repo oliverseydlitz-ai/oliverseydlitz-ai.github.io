@@ -182,16 +182,38 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+// ── Dark mode ──────────────────────────────────────────────────
+// Applied synchronously at load (before paint) to avoid a flash; the toggle
+// lives in Settings and the choice is persisted to localStorage.
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  const sw = document.getElementById('themeSwitch');
+  if (sw) sw.classList.toggle('on', dark);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#0a140e' : '#0b4d2e');
+}
+(function initThemeEarly(){
+  try {
+    const saved = localStorage.getItem('slTheme');
+    const dark = saved ? saved === 'dark'
+      : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (dark) document.documentElement.classList.add('dark');
+  } catch(_) {}
+})();
+
 // On-screen debug banner (tap to dismiss). Lets us see auth state on mobile
 // where the dev console isn't available.
+// Diagnostics now log quietly to the console instead of an on-screen banner
+// (the banner was a temporary debugging aid while fixing OAuth — login works
+// now, so we keep the call sites but stop covering the UI). Toggle the on-screen
+// version any time from the console with: localStorage.setItem('slDebug','1')
 function showDebug(msg) {
+  console.log('[ShotLab]', msg);
+  if (localStorage.getItem('slDebug') !== '1') return;
   let d = document.getElementById('debugBanner');
   if (!d) {
     d = document.createElement('div');
     d.id = 'debugBanner';
-    // Pinned to the BOTTOM with pointer-events:none so it can NEVER intercept
-    // taps on the UI beneath it (the top-pinned version was covering the Google
-    // button). A small close button re-enables pointer events just for itself.
     d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;' +
       'font:11px/1.4 monospace;padding:8px 12px;white-space:pre-wrap;border-top:2px solid #0f0;' +
       'max-height:35vh;overflow:auto;pointer-events:none';
@@ -1310,6 +1332,139 @@ const Analytics = (() => {
   return { yardageBook, personalBests };
 })();
 
+// ════════════════════════════════════════════════════════════════
+// Features — five self-contained, defensive enhancements.
+// Each method is wrapped so a failure degrades gracefully (returns
+// empty/neutral) and can never break the surrounding render.
+// ════════════════════════════════════════════════════════════════
+const Features = (() => {
+
+  const dayKey = d => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+  const DAY = 86400000;
+
+  // ── 1. Practice streak (habit psychology) ──────────────────────
+  // Counts consecutive days (ending today or yesterday) with a session.
+  function streak(sessions) {
+    try {
+      if (!sessions?.length) return { current: 0, best: 0, active: false };
+      const days = [...new Set(sessions.map(s => dayKey(s.date)))].sort((a,b)=>b-a);
+      const today = dayKey(Date.now());
+      // current streak: walk back from today (grace: counts if last practice was today or yesterday)
+      let current = 0;
+      if (days[0] === today || days[0] === today - DAY) {
+        let cursor = days[0];
+        for (const d of days) {
+          if (d === cursor) { current++; cursor -= DAY; }
+          else if (d < cursor) break;
+        }
+      }
+      // best streak across history
+      let best = 1, run = 1;
+      for (let i = 1; i < days.length; i++) {
+        if (days[i] === days[i-1] - DAY) { run++; best = Math.max(best, run); }
+        else run = 1;
+      }
+      return { current, best: Math.max(best, current), active: days[0] === today };
+    } catch (e) { console.error('streak()', e); return { current: 0, best: 0, active: false }; }
+  }
+
+  // ── 2. Achievements / badges (gamification) ────────────────────
+  function achievements(sessions) {
+    try {
+      const all = sessions.flatMap(s => s.shots);
+      const bests = Analytics.personalBests(sessions);
+      const carry = Math.max(0, ...all.map(s => s.carryDistance || 0));
+      const ball  = Math.max(0, ...all.map(s => s.ballSpeed || 0));
+      const smash = Math.max(0, ...all.map(s => s.smashFactor || 0));
+      const clubs = sortedClubs(all).length;
+      const st = streak(sessions);
+      const defs = [
+        { id:'first',   icon:'🌱', name:'First Steps',     desc:'Log your first session',      got: sessions.length >= 1 },
+        { id:'dozen',   icon:'📚', name:'Getting Serious',  desc:'Log 12 sessions',             got: sessions.length >= 12 },
+        { id:'century',  icon:'💯', name:'Century',          desc:'Log 100 shots total',         got: all.length >= 100 },
+        { id:'grand',   icon:'🎯', name:'Range Rat',        desc:'Log 1,000 shots total',       got: all.length >= 1000 },
+        { id:'bag',     icon:'🎒', name:'Full Bag',         desc:'Track 10+ different clubs',   got: clubs >= 10 },
+        { id:'streak3', icon:'🔥', name:'On a Roll',        desc:'3-day practice streak',       got: st.best >= 3 },
+        { id:'streak7', icon:'⚡', name:'Week Warrior',     desc:'7-day practice streak',       got: st.best >= 7 },
+        { id:'smash',   icon:'🥎', name:'Pure Contact',     desc:'Hit 1.45+ smash factor',      got: smash >= 1.45 },
+        { id:'bomb',    icon:'🚀', name:'Bomber',           desc:'250+ yard carry',             got: carry >= 250 },
+        { id:'speed',   icon:'💨', name:'Speed Demon',      desc:'170+ mph ball speed',         got: ball >= 170 },
+      ];
+      const unlocked = defs.filter(d => d.got).length;
+      return { defs, unlocked, total: defs.length };
+    } catch (e) { console.error('achievements()', e); return { defs: [], unlocked: 0, total: 0 }; }
+  }
+
+  // ── 3. Focus — "what to work on" (personalised, confidence-rated) ─
+  // Aggregates fault frequency across recent sessions into one clear priority.
+  function focus(sessions) {
+    try {
+      const recent = sessions.slice(0, 5);
+      const shots = recent.flatMap(s => s.shots);
+      if (shots.length < 5) return null;
+      const faults = FaultEngine.detectFaults(shots);
+      if (!faults.length) return { clean: true };
+      const ranked = [...faults].sort((a,b) =>
+        (b.severity==='high'?2:b.severity==='low'?0:1) - (a.severity==='high'?2:a.severity==='low'?0:1)
+        || (b.count||0) - (a.count||0));
+      const top = ranked[0];
+      const pct = Math.round(((top.count||1) / shots.length) * 100);
+      const confidence = pct >= 40 ? 'High' : pct >= 20 ? 'Medium' : 'Low';
+      return { clean:false, name:top.name, icon:top.icon, severity:top.severity,
+               pct, confidence, count:top.count||0, sample:shots.length,
+               drill: (top.drills && top.drills[0]) || null };
+    } catch (e) { console.error('focus()', e); return null; }
+  }
+
+  // ── 4. Session comparison ──────────────────────────────────────
+  // Side-by-side metric deltas between two sessions (newer vs older).
+  function compare(a, b) {
+    try {
+      const metric = (s, f, dec=0) => fmt(avg(s.shots, f), dec);
+      const num = (s, f) => avg(s.shots, f);
+      const rows = [
+        ['Avg carry',  'carryDistance', 0, 'yds', true],
+        ['Ball speed', 'ballSpeed',     1, 'mph', true],
+        ['Smash',      'smashFactor',   2, '',    true],
+        ['Launch',     'launchAngle',   1, '°',   null],
+        ['Spin',       'spinRate',      0, 'rpm', null],
+        ['Apex',       'apex',          0, 'ft',  null],
+      ];
+      return rows.map(([label, f, dec, unit, higherBetter]) => {
+        const av = num(a, f), bv = num(b, f);
+        const delta = (av!=null && bv!=null) ? av - bv : null;
+        return {
+          label, unit,
+          a: metric(a, f, dec), b: metric(b, f, dec),
+          delta: delta!=null ? fmt(Math.abs(delta), dec) : null,
+          dir: delta==null||Math.abs(delta)<1e-9 ? 'flat' : delta>0 ? 'up' : 'down',
+          good: (delta==null||higherBetter==null) ? null : (higherBetter ? delta>0 : delta<0),
+        };
+      });
+    } catch (e) { console.error('compare()', e); return []; }
+  }
+
+  // ── 5. Session search/filter helper ────────────────────────────
+  // Matches a query against date, notes, club labels.
+  function searchSessions(sessions, query) {
+    try {
+      const q = (query||'').trim().toLowerCase();
+      if (!q) return sessions;
+      return sessions.filter(s => {
+        const hay = [
+          formatDate(s.date),
+          s.notes || '',
+          s.conditions?.wind || '', s.conditions?.temp || '',
+          ...new Set(s.shots.map(sh => clubLabel(sh.clubType))),
+        ].join(' ').toLowerCase();
+        return hay.includes(q);
+      });
+    } catch (e) { console.error('searchSessions()', e); return sessions; }
+  }
+
+  return { streak, achievements, focus, compare, searchSessions };
+})();
+
 // ────────────────────────────────────────────────────────────────
 // Trajectory — SVG side-profile ball flight
 // ────────────────────────────────────────────────────────────────
@@ -1398,7 +1553,104 @@ const UI = (() => {
     if(dash) dash.hidden=false;
     if(recent) recent.hidden=false;
     renderDashboard(sessions, dash);
+    // Feature cards are isolated so any failure can't break the dashboard
+    try { renderStreakAndFocus(sessions); } catch(e){ console.error('streak/focus',e); }
     renderSessionList(sessions);
+    try { renderSearchBar(sessions); } catch(e){ console.error('searchbar',e); }
+  }
+
+  // ── Feature: streak banner + "what to work on" focus card ──────
+  function renderStreakAndFocus(sessions) {
+    const dash = document.getElementById('dashboard');
+    if (!dash) return;
+    const st = Features.streak(sessions);
+    const fc = Features.focus(sessions);
+    const ach = Features.achievements(sessions);
+
+    const streakHtml = st.current > 0
+      ? `<div class="streak-chip ${st.active?'is-active':''}" title="Best: ${st.best} days">
+           <span class="streak-flame">🔥</span>
+           <span class="streak-n">${st.current}</span>
+           <span class="streak-lbl">day${st.current>1?'s':''}<br>streak</span>
+         </div>`
+      : `<div class="streak-chip streak-dim" title="Practice today to start a streak">
+           <span class="streak-flame">🔥</span>
+           <span class="streak-lbl">Start a<br>streak today</span>
+         </div>`;
+
+    let focusHtml = '';
+    if (fc && fc.clean) {
+      focusHtml = `<div class="focus-card focus-clean">
+          <div class="focus-head"><span class="focus-icon">✅</span><span class="focus-kicker">Focus</span></div>
+          <div class="focus-title">No major faults — keep grooving it</div>
+          <div class="focus-sub">Your recent sessions are clean. Maintain your routine.</div>
+        </div>`;
+    } else if (fc) {
+      focusHtml = `<div class="focus-card sev-${fc.severity}">
+          <div class="focus-head"><span class="focus-icon">${fc.icon||'🎯'}</span><span class="focus-kicker">Work on this</span>
+            <span class="focus-conf conf-${fc.confidence.toLowerCase()}">${fc.confidence} confidence</span></div>
+          <div class="focus-title">${fc.name}</div>
+          <div class="focus-sub">Seen in <strong>${fc.pct}%</strong> of your last ${fc.sample} shots.${fc.drill?` Try: <strong>${fc.drill.name}</strong>.`:''}</div>
+        </div>`;
+    }
+
+    const achHtml = `<div class="ach-strip" id="achStrip" role="button" tabindex="0">
+        <span class="ach-trophy">🏆</span>
+        <span class="ach-count">${ach.unlocked}/${ach.total}</span>
+        <span class="ach-lbl">achievements</span>
+        <span class="ach-go">View →</span>
+      </div>`;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'feature-row';
+    wrap.innerHTML = `<div class="streak-focus">${streakHtml}${focusHtml||'<div></div>'}</div>${achHtml}`;
+    dash.appendChild(wrap);
+
+    const achEl = wrap.querySelector('#achStrip');
+    if (achEl) {
+      const open = () => showAchievements(sessions);
+      achEl.addEventListener('click', open);
+      achEl.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); open(); } });
+    }
+  }
+
+  // ── Feature: achievements modal ────────────────────────────────
+  function showAchievements(sessions) {
+    const ach = Features.achievements(sessions);
+    const modal = document.getElementById('achModal');
+    const body = document.getElementById('achBody');
+    if (!modal || !body) return;
+    document.getElementById('achHeadCount').textContent = `${ach.unlocked} of ${ach.total} unlocked`;
+    body.innerHTML = ach.defs.map(d => `
+      <div class="ach-item ${d.got?'got':'locked'}">
+        <span class="ach-item-icon">${d.got?d.icon:'🔒'}</span>
+        <div class="ach-item-text">
+          <div class="ach-item-name">${d.name}</div>
+          <div class="ach-item-desc">${d.desc}</div>
+        </div>
+        ${d.got?'<span class="ach-item-check">✓</span>':''}
+      </div>`).join('');
+    modal.hidden = false;
+  }
+
+  // ── Feature: live session search ───────────────────────────────
+  function renderSearchBar(sessions) {
+    const recent = document.getElementById('recentWrap');
+    if (!recent || sessions.length < 4) return; // only worth showing with a few sessions
+    if (document.getElementById('sessionSearch')) return; // already present
+    const bar = document.createElement('div');
+    bar.className = 'search-bar';
+    bar.innerHTML = `<span class="search-ico">🔎</span>
+      <input id="sessionSearch" type="search" placeholder="Search sessions — date, club, notes…" autocomplete="off">`;
+    const title = recent.querySelector('.recent-title');
+    recent.insertBefore(bar, title ? title.nextSibling : recent.firstChild);
+    const input = bar.querySelector('#sessionSearch');
+    input.addEventListener('input', () => {
+      const filtered = Features.searchSessions(sessions, input.value);
+      renderSessionList(filtered);
+      // keep focus after re-render of the list (list is a sibling, not replaced)
+      input.focus();
+    });
   }
 
   function sessionScore(s) {
@@ -2169,6 +2421,47 @@ const UI = (() => {
       `<option value="${c}">${c==='all'?'All clubs':clubLabel(c)}</option>`).join('');
     clubSel.onchange = () => renderProgressCharts(sessions, clubSel.value);
     renderProgressCharts(sessions,'all');
+    try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
+  }
+
+  // ── Feature: side-by-side session comparison ───────────────────
+  function renderCompare(sessions) {
+    const host = document.getElementById('compareHost');
+    if (!host) return;
+    const opts = sessions.map((s,i)=>`<option value="${s.id}">${formatDate(s.date)} · ${s.shots.length} shots</option>`).join('');
+    host.innerHTML = `
+      <div class="section-title">Compare sessions</div>
+      <div class="compare-card">
+        <div class="compare-selects">
+          <select id="cmpA" class="cmp-sel">${opts}</select>
+          <span class="cmp-vs">vs</span>
+          <select id="cmpB" class="cmp-sel">${opts}</select>
+        </div>
+        <div id="cmpResult" class="compare-result"></div>
+      </div>`;
+    const selA = host.querySelector('#cmpA');
+    const selB = host.querySelector('#cmpB');
+    selA.selectedIndex = 0;
+    selB.selectedIndex = Math.min(1, sessions.length-1);
+    const draw = () => {
+      const a = sessions.find(s=>s.id===selA.value);
+      const b = sessions.find(s=>s.id===selB.value);
+      const res = host.querySelector('#cmpResult');
+      if (!a || !b || a.id===b.id) { res.innerHTML = `<p class="cmp-hint">Pick two different sessions to compare.</p>`; return; }
+      const rows = Features.compare(a, b);
+      res.innerHTML = rows.map(r => {
+        const arrow = r.dir==='up'?'▲':r.dir==='down'?'▼':'–';
+        const cls = r.good===true?'good':r.good===false?'bad':'neutral';
+        return `<div class="cmp-row">
+            <span class="cmp-label">${r.label}</span>
+            <span class="cmp-a">${r.a}<small>${r.unit}</small></span>
+            <span class="cmp-delta ${cls}">${arrow} ${r.delta!=null?r.delta:''}</span>
+            <span class="cmp-b">${r.b}<small>${r.unit}</small></span>
+          </div>`;
+      }).join('') + `<div class="cmp-legend"><span>${formatDate(a.date)} (left)</span><span>${formatDate(b.date)} (right)</span></div>`;
+    };
+    selA.onchange = draw; selB.onchange = draw;
+    draw();
   }
 
   function renderProgressCharts(sessions, clubFilter) {
@@ -2265,29 +2558,36 @@ const Router = (() => {
       el.classList.toggle('active', el.dataset.view===viewId));
   }
 
+  // Wrap a render so a single rendering error can never block navigation or
+  // freeze a tab — the view still switches, we just log and toast.
+  function safeRender(label, fn, viewId) {
+    try { fn(); }
+    catch (e) {
+      console.error(`[ShotLab] render error in ${label}:`, e);
+      toast(`Couldn't fully load ${label}.`);
+    }
+    show(viewId);
+  }
+
   async function showDetail(id) {
     const session = await Store.getSession(id);
-    if (!session) return;
-    UI.renderDetail(session);
-    show('session-detail');
+    if (!session) { toast('Session not found.'); return; }
+    safeRender('session', () => UI.renderDetail(session), 'session-detail');
   }
 
   async function showProgress() {
     const sessions = await Store.getSessions();
-    UI.renderProgress(sessions);
-    show('progress');
+    safeRender('progress', () => UI.renderProgress(sessions), 'progress');
   }
 
   async function showYardages() {
     const sessions = await Store.getSessions();
-    UI.renderYardages(sessions);
-    show('yardages');
+    safeRender('yardages', () => UI.renderYardages(sessions), 'yardages');
   }
 
   async function showSessions() {
     const sessions = await Store.getSessions();
-    UI.renderHome(sessions);
-    show('sessions');
+    safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
   }
 
   function showImport() {
@@ -2391,6 +2691,9 @@ function showConfirm(title, body, onOk) {
 // Main
 // ────────────────────────────────────────────────────────────────
 async function init() {
+  // Reflect persisted theme on the Settings switch (class already set early)
+  applyTheme(document.documentElement.classList.contains('dark'));
+
   // Nav
   document.querySelectorAll('[data-view]').forEach(el => {
     el.addEventListener('click', async e => {
@@ -2476,6 +2779,23 @@ async function init() {
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
   shotModal.addEventListener('click', e=>{ if(e.target===shotModal) shotModal.hidden=true; });
+
+  // Achievements modal close
+  const achModal = document.getElementById('achModal');
+  if (achModal) {
+    document.getElementById('achModalClose')?.addEventListener('click', ()=>achModal.hidden=true);
+    achModal.addEventListener('click', e=>{ if(e.target===achModal) achModal.hidden=true; });
+  }
+
+  // Dark-mode toggle (persisted)
+  const themeBtn = document.getElementById('themeToggleBtn');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const dark = !document.documentElement.classList.contains('dark');
+      applyTheme(dark);
+      try { localStorage.setItem('slTheme', dark ? 'dark' : 'light'); } catch(_) {}
+    });
+  }
 
   async function afterAuth() {
     const user = Auth.getUser();
@@ -2598,4 +2918,48 @@ async function init() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// ────────────────────────────────────────────────────────────────
+// Bulletproofing — global safety net
+// ────────────────────────────────────────────────────────────────
+// A friendly recovery screen so a fatal startup error never leaves a blank
+// page. Offers a reload and a "reset app" escape hatch (clears caches/SW).
+function showFatalError(err) {
+  console.error('[ShotLab fatal]', err);
+  try {
+    const existing = document.getElementById('slFatal');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'slFatal';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#edf4ee;display:flex;' +
+      'align-items:center;justify-content:center;padding:2rem;font-family:system-ui,sans-serif';
+    el.innerHTML =
+      '<div style="max-width:340px;text-align:center">' +
+      '<div style="font-size:2.5rem;margin-bottom:.5rem">⛳</div>' +
+      '<h2 style="font-size:1.2rem;color:#0c1f14;margin-bottom:.5rem">Something hiccuped</h2>' +
+      '<p style="color:#496657;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
+      'The app hit an unexpected snag while loading. Your saved data is safe.</p>' +
+      '<button id="slReload" style="background:#0b4d2e;color:#fff;border:none;border-radius:8px;' +
+      'padding:.7rem 1.4rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:.6rem">Reload app</button>' +
+      '<button id="slReset" style="background:none;color:#496657;border:1px solid #b8cebd;' +
+      'border-radius:8px;padding:.6rem 1.4rem;font-weight:600;cursor:pointer;width:100%">Reset &amp; reload</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    document.getElementById('slReload').onclick = () => location.reload();
+    document.getElementById('slReset').onclick = async () => {
+      try {
+        if ('caches' in window) { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+        if ('serviceWorker' in navigator) { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); }
+      } catch (_) {}
+      location.reload();
+    };
+  } catch (_) { /* last resort: do nothing rather than loop */ }
+}
+
+// Surface uncaught errors/rejections to the console (not as scary popups —
+// most are non-fatal). The recovery screen is reserved for startup failure.
+window.addEventListener('error', e => console.error('[ShotLab] uncaught:', e.error || e.message));
+window.addEventListener('unhandledrejection', e => console.error('[ShotLab] unhandled promise:', e.reason));
+
+document.addEventListener('DOMContentLoaded', () => {
+  init().catch(showFatalError);
+});

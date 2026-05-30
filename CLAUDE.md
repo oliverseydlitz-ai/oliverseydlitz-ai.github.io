@@ -171,6 +171,37 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 - **Charts** render on-demand in a view; don't render all charts at page load
 - **Service Worker** (sw.js) caches assets for offline; update cache version if changing files
 
+## Auth & Cloud Sync (current implementation)
+
+- **OAuth (Google):** implicit flow. The redirect token in the URL `#hash` is
+  captured synchronously at load into `_oauthTokens`, then installed explicitly
+  via `sb.auth.setSession()` in `Auth.init`. This deterministically overrides any
+  stale stored session — the fix for the "wrong email after switching accounts"
+  bug. `detectSessionInUrl` is **off** so there's one code path, no race.
+- **Source of truth:** `getUser()` (server-validated), never the cached session.
+- **Cloud sync:** `CloudDB.saveSession` upserts on `id`; if the table lacks the
+  PK constraint it falls back to delete-then-insert (failsafe). Run
+  `supabase-setup.sql` in the Supabase SQL editor to create the table/RLS
+  properly.
+- **Store is local-first:** always returns local sessions and merges cloud on
+  top; cloud errors degrade gracefully and never break tab navigation.
+
+## Features module (`Features` in app.js)
+
+Five self-contained, defensively-wrapped enhancements:
+1. **streak** — consecutive practice-day counter (habit loop)
+2. **achievements** — milestone badges (gamification), shown in `#achModal`
+3. **focus** — "what to work on" priority from aggregated recent faults
+4. **compare** — side-by-side session metric deltas (Progress view `#compareHost`)
+5. **searchSessions** — live filter of the session list by date/club/notes
+
+Plus **dark mode** (`html.dark` token overrides; toggle in Settings, persisted
+to `localStorage.slTheme`) and a **global error boundary** (`showFatalError`)
+that shows a friendly recovery screen instead of a blank page.
+
+Debugging: `showDebug()` logs to console only; set `localStorage.slDebug='1'`
+to re-enable the on-screen banner.
+
 ---
 
-**Last updated:** May 2025 for ShotLab v2
+**Last updated:** May 2026 — ShotLab v3 (deterministic auth, cloud sync, 5 features, dark mode)

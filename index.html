@@ -237,6 +237,9 @@
         <select id="progressClub"></select>
       </div>
 
+      <!-- Session comparison (feature) -->
+      <div id="compareHost" class="compare-host"></div>
+
       <!-- Trend summary -->
       <div id="progressTrend"></div>
 
@@ -299,6 +302,13 @@
         </button>
       </div>
       <div class="settings-section">
+        <h2 class="settings-section-title">Appearance</h2>
+        <button class="settings-row" id="themeToggleBtn">
+          <span>Dark mode</span>
+          <span class="theme-switch" id="themeSwitch"><span class="theme-knob"></span></span>
+        </button>
+      </div>
+      <div class="settings-section">
         <h2 class="settings-section-title">Data</h2>
         <button class="settings-row" id="exportDataBtn">
           <span>Export all data (JSON)</span>
@@ -358,6 +368,17 @@
       <button class="btn-icon" id="shotModalClose" aria-label="Close">✕</button>
     </div>
     <div id="shotModalBody"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ ACHIEVEMENTS MODAL -->
+<div class="modal-overlay" id="achModal" hidden>
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 class="modal-title">🏆 Achievements <span class="ach-head-count" id="achHeadCount"></span></h2>
+      <button class="btn-icon" id="achModalClose" aria-label="Close">✕</button>
+    </div>
+    <div id="achBody" class="ach-grid"></div>
   </div>
 </div>
 
