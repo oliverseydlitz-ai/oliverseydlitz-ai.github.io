@@ -159,44 +159,23 @@ const Auth = (() => {
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
   async function init() {
-    console.log('[AUTH INIT] starting, _authRedirect:', _authRedirect);
+    // onAuthStateChange fires INITIAL_SESSION on registration (current session or null),
+    // then SIGNED_IN after OAuth code exchange — no need to call getSession() separately.
+    // Calling getSession() after this causes a race: it can overwrite _user with stale
+    // cached data after onAuthStateChange already set the correct new user.
     sb.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AUTH EVENT]', event, 'session.user.email:', session?.user?.email);
-      // While signing out, ignore every Supabase event — prevents background
-      // refresh timers from re-authenticating the user after we cleared state
       if (_signingOut) return;
-      if (_user === null && event === 'TOKEN_REFRESHED') return;
+      if (event === 'TOKEN_REFRESHED' && _user === null) return;
       const wasGuest = !_user;
       _user = session?.user || null;
-      console.log('[_user SET]', '_user.email:', _user?.email);
       updateUI();
-      // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
       }
-      // Expired / revoked session fires SIGNED_OUT — prompt to re-authenticate
       if (!_user && event === 'SIGNED_OUT' && !_signingOut) {
         showAuth(false);
       }
     });
-    // getSession reads the locally stored token — fast, never hangs on network
-    const { data: { session } } = await sb.auth.getSession();
-    console.log('[getSession]', 'session.user.email:', session?.user?.email);
-    _user = session?.user || null;
-    console.log('[_user SET from getSession]', '_user.email:', _user?.email);
-
-    // If coming from OAuth redirect, force refresh to get latest user data
-    if (_authRedirect && _user) {
-      console.log('[AUTH INIT] forcing refresh after OAuth redirect');
-      const { data: { user: freshUser }, error } = await sb.auth.getUser();
-      console.log('[getUser refresh]', 'freshUser.email:', freshUser?.email, 'error:', error);
-      if (!error && freshUser) {
-        _user = freshUser;
-        console.log('[_user REFRESHED after OAuth]', '_user.email:', _user?.email);
-      }
-    }
-
-    updateUI();
     return _user;
   }
 
@@ -262,7 +241,6 @@ const Auth = (() => {
       clearTimeout(_guestTimer);
       emailRow.hidden = false;
       document.getElementById('accountEmail').textContent = _user.email;
-      console.log('[updateUI] displaying email:', _user.email);
       signIn.hidden = true;
       signOut.hidden = false;
       authModal.hidden = true;
@@ -270,7 +248,6 @@ const Auth = (() => {
       emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
-      console.log('[updateUI] no user, cleared email');
     }
   }
 
@@ -335,7 +312,7 @@ const CloudDB = (() => {
       conditions: session.conditions,
       shots: session.shots,
       created_at: new Date(session.createdAt).toISOString(),
-    }], { onConflict: 'user_id,id' });
+    }], { onConflict: 'id' });
     if (error) throw error;
   }
 
