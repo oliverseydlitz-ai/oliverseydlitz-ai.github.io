@@ -159,15 +159,17 @@ const Auth = (() => {
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
   async function init() {
-    // onAuthStateChange fires INITIAL_SESSION on registration (current session or null),
-    // then SIGNED_IN after OAuth code exchange — no need to call getSession() separately.
-    // Calling getSession() after this causes a race: it can overwrite _user with stale
-    // cached data after onAuthStateChange already set the correct new user.
     sb.auth.onAuthStateChange(async (event, session) => {
       if (_signingOut) return;
       if (event === 'TOKEN_REFRESHED' && _user === null) return;
       const wasGuest = !_user;
-      _user = session?.user || null;
+      // On SIGNED_IN, call getUser() to get server-validated user — avoids stale cache
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { data } = await sb.auth.getUser();
+        _user = data?.user || session.user;
+      } else {
+        _user = session?.user || null;
+      }
       updateUI();
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
@@ -176,6 +178,10 @@ const Auth = (() => {
         showAuth(false);
       }
     });
+    // getUser() validates with the Supabase server — more reliable than getSession() (localStorage)
+    const { data } = await sb.auth.getUser();
+    _user = data?.user || null;
+    updateUI();
     return _user;
   }
 
@@ -313,7 +319,10 @@ const CloudDB = (() => {
       shots: session.shots,
       created_at: new Date(session.createdAt).toISOString(),
     }], { onConflict: 'id' });
-    if (error) throw error;
+    if (error) {
+      console.error('CloudDB.saveSession error:', error);
+      throw new Error(error.message || error.code || JSON.stringify(error));
+    }
   }
 
   async function deleteSession(id) {
@@ -2208,8 +2217,8 @@ const ImportFlow = (() => {
     Router.show('session-detail');
     // Persist to cloud in background if logged in
     if (Auth.getUser()) {
-      CloudDB.saveSession(session).catch(() => {
-        toast('Cloud sync failed — session will be lost on refresh.');
+      CloudDB.saveSession(session).catch(e => {
+        toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
       });
     }
   }
