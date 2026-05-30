@@ -128,10 +128,13 @@ const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    flowType: 'pkce',          // modern, reliable OAuth for SPAs
+    // Implicit flow (#access_token) — this is what reliably logged users in.
+    // PKCE (?code=) needs a stored verifier that our pre-redirect purge wiped,
+    // which broke the login button. detectSessionInUrl still parses the redirect.
+    flowType: 'implicit',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,  // auto-exchange ?code= on redirect
+    detectSessionInUrl: true,
   },
 });
 
@@ -244,17 +247,14 @@ const Auth = (() => {
   }
 
   async function oauth(provider) {
-    // Wipe any existing session BEFORE redirecting. This guarantees no stale
-    // account-A token can survive into the post-redirect load. signInWithOAuth
-    // then writes a fresh PKCE code-verifier, so the exchange on return yields
-    // exactly the account picked at Google. (Purge must happen before the call,
-    // never after, or we'd delete the verifier we just wrote.)
-    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    // Clear any stored token first so a stale account can't be re-read after we
+    // come back (implicit flow needs no verifier, so purging here is safe).
+    // prompt:select_account makes Google always show the account chooser.
     purgeAuthStorage();
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: location.origin + location.pathname,
+        redirectTo: location.origin,
         queryParams: { prompt: 'select_account' },
       },
     });
