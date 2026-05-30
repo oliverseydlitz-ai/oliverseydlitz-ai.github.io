@@ -126,7 +126,14 @@ const MemDB = (() => {
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    flowType: 'pkce',          // modern, reliable OAuth for SPAs
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,  // auto-exchange ?code= on redirect
+  },
+});
 
 // Capture whether we arrived from an email confirmation / magic link redirect.
 // Covers both implicit flow (#access_token / type=signup) and PKCE flow (?code=),
@@ -158,31 +165,42 @@ const Auth = (() => {
   let _guestTimer = null;
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
+  // Single source of truth: ask the Supabase server who the JWT belongs to.
+  // getUser() validates the token against the server, so it can't return a
+  // stale/cached identity the way reading localStorage can.
+  async function refreshUserFromServer() {
+    const { data, error } = await sb.auth.getUser();
+    _user = (!error && data?.user) ? data.user : null;
+    console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
+    updateUI();
+    return _user;
+  }
+
   async function init() {
     sb.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AUTH EVENT]', event, '→ session user:', session?.user?.email || '(none)');
       if (_signingOut) return;
       if (event === 'TOKEN_REFRESHED' && _user === null) return;
-      const wasGuest = !_user;
-      // On SIGNED_IN, call getUser() to get server-validated user — avoids stale cache
-      if (event === 'SIGNED_IN' && session?.user) {
-        const { data } = await sb.auth.getUser();
-        _user = data?.user || session.user;
-      } else {
-        _user = session?.user || null;
+
+      if (event === 'SIGNED_OUT') {
+        _user = null;
+        updateUI();
+        if (!_signingOut) showAuth(false);
+        return;
       }
-      updateUI();
+
+      const wasGuest = !_user;
+      // Always re-validate against the server rather than trusting the event's session
+      await refreshUserFromServer();
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
       }
-      if (!_user && event === 'SIGNED_OUT' && !_signingOut) {
-        showAuth(false);
-      }
     });
-    // getUser() validates with the Supabase server — more reliable than getSession() (localStorage)
-    const { data } = await sb.auth.getUser();
-    _user = data?.user || null;
-    updateUI();
-    return _user;
+
+    // On first load (incl. returning from an OAuth redirect), detectSessionInUrl
+    // exchanges ?code= for a session before this resolves; then we read the
+    // server-validated user as the single source of truth.
+    return refreshUserFromServer();
   }
 
   async function signup(email, password) {
@@ -214,26 +232,32 @@ const Auth = (() => {
     // OAuth callback URL, which init() handles on next load.
   }
 
+  function purgeAuthStorage() {
+    // Remove every Supabase auth token so a stale identity can't be re-read
+    [...Object.keys(localStorage)].forEach(k => {
+      if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) {
+        localStorage.removeItem(k);
+      }
+    });
+    sessionStorage.clear();
+  }
+
   async function logout() {
-    _signingOut = true;
+    _signingOut = true;        // block onAuthStateChange from re-setting _user
     _user = null;
     updateUI();
 
-    // Clear Supabase auth with both scopes
-    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    // local first: revokes the in-memory session and stops the auto-refresh
+    // timer immediately, so it can't write the old token back into storage.
     await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    purgeAuthStorage();
 
-    // Clear ALL localStorage (not just sb- keys)
-    [...Object.keys(localStorage)].forEach(k => localStorage.removeItem(k));
+    // global revokes the refresh token server-side (best effort; may be offline)
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    purgeAuthStorage();        // clear again in case the client re-persisted
 
-    // Clear sessionStorage
-    sessionStorage.clear();
-
-    // Clear IndexedDB
-    await DB.clearAll();
-
-    // Force page reload to clear all memory/cached state
-    setTimeout(() => { location.reload(); }, 100);
+    // Hard reload to a clean origin — no #hash/?code leftovers, no JS heap state
+    window.location.replace(location.origin + location.pathname);
   }
 
   function getUser() { return _user; }
