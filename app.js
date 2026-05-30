@@ -128,13 +128,15 @@ const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    // Implicit flow (#access_token) — this is what reliably logged users in.
-    // PKCE (?code=) needs a stored verifier that our pre-redirect purge wiped,
-    // which broke the login button. detectSessionInUrl still parses the redirect.
+    // Implicit flow (#access_token) — reliably logs users in without a stored
+    // PKCE verifier (our pre-redirect purge would wipe that and break login).
     flowType: 'implicit',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // We parse the redirect hash OURSELVES (see _oauthTokens + Auth.init's
+    // setSession) so there's a single deterministic code path and no race
+    // between Supabase's auto-detect and our getUser() call.
+    detectSessionInUrl: false,
   },
 });
 
@@ -146,6 +148,23 @@ const _redirectStr = (location.hash + '&' + location.search).toLowerCase();
 const _authError = /error=|error_code=|error_description=/.test(_redirectStr);
 const _authRedirect = _authError ||
   /type=(signup|magiclink|recovery|email_change|invite)|access_token=|[?&]code=/.test(_redirectStr);
+
+// Synchronously grab the OAuth tokens out of the URL hash the INSTANT the page
+// loads — before the Supabase client, our debug code, or history.replaceState
+// can strip them. In implicit flow Google sends us back to
+// #access_token=...&refresh_token=...  We install these explicitly in Auth.init
+// via setSession(), which deterministically overwrites any stale stored session
+// with the account the user just picked (root-cause fix for "wrong email").
+const _oauthTokens = (() => {
+  try {
+    const h = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+    const p = new URLSearchParams(h);
+    const access_token = p.get('access_token');
+    const refresh_token = p.get('refresh_token');
+    if (access_token && refresh_token) return { access_token, refresh_token };
+  } catch (_) {}
+  return null;
+})();
 
 // Pull the human-readable error reason out of the redirect (hash or query)
 let _authErrorMsg = '';
@@ -200,17 +219,9 @@ const Auth = (() => {
   // getUser() validates the token against the server, so it can't return a
   // stale/cached identity the way reading localStorage can.
   async function refreshUserFromServer() {
-    const hadCode = /[?&]code=/.test(location.search);
-    const hadToken = /access_token=/.test(location.hash);
     const { data, error } = await sb.auth.getUser();
     _user = (!error && data?.user) ? data.user : null;
     console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
-    showDebug(
-      `URL had ?code=  : ${hadCode}\n` +
-      `URL had #token  : ${hadToken}\n` +
-      `getUser() email : ${_user?.email || '(none)'}\n` +
-      `getUser() error : ${error ? error.message : 'none'}`
-    );
     updateUI();
     return _user;
   }
@@ -229,17 +240,41 @@ const Auth = (() => {
       }
 
       const wasGuest = !_user;
-      // Always re-validate against the server rather than trusting the event's session
-      await refreshUserFromServer();
+      _user = session?.user || null;
+      updateUI();
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
       }
     });
 
-    // On first load (incl. returning from an OAuth redirect), detectSessionInUrl
-    // exchanges ?code= for a session before this resolves; then we read the
-    // server-validated user as the single source of truth.
-    return refreshUserFromServer();
+    // ── Deterministic OAuth handling ──────────────────────────────────────
+    // If we just came back from Google (implicit flow), the URL hash held a
+    // fresh access/refresh token that we captured synchronously into
+    // _oauthTokens. Install it EXPLICITLY with setSession() so the account the
+    // user just picked overwrites any stale stored session — this is the
+    // root-cause fix for the "wrong email" bug (no race with auto-detection).
+    if (_oauthTokens) {
+      try {
+        const { data, error } = await sb.auth.setSession(_oauthTokens);
+        if (error) throw error;
+        _user = data?.user || data?.session?.user || null;
+      } catch (e) {
+        console.error('[AUTH] setSession failed:', e);
+        showDebug('LOGIN INSTALL FAILED:\n' + (e?.message || JSON.stringify(e)));
+      }
+    }
+
+    // Read the server-validated user as the single source of truth (covers
+    // returning visitors with a stored session, and confirms the OAuth login).
+    await refreshUserFromServer();
+
+    // Diagnostic banner so the state is visible on mobile (no dev console).
+    showDebug(
+      `had #token   : ${!!_oauthTokens}\n` +
+      `signed in as : ${_user?.email || '(none)'}\n` +
+      `status       : ${_user ? '✓ logged in' : 'not logged in'}`
+    );
+    return _user;
   }
 
   async function signup(email, password) {
@@ -259,15 +294,17 @@ const Auth = (() => {
   }
 
   async function oauth(provider) {
-    // Clear any stored token first so a stale account can't be re-read after we
-    // come back (implicit flow needs no verifier, so purging here is safe).
-    // prompt:select_account makes Google always show the account chooser.
+    // Purge any stale token BEFORE leaving so nothing old lingers; the fresh
+    // token we get back is installed explicitly via setSession() in init().
+    // prompt:select_account makes Google always show the account chooser so the
+    // user can switch accounts.
     purgeAuthStorage();
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: location.origin,
         queryParams: { prompt: 'select_account' },
+        skipBrowserRedirect: false,
       },
     });
     if (error) throw error;
@@ -389,7 +426,7 @@ const CloudDB = (() => {
   async function saveSession(session) {
     const user = Auth.getUser();
     if (!user) return;
-    const { error } = await sb.from('sessions').upsert([{
+    const row = {
       id: session.id,
       user_id: user.id,
       date: session.date,
@@ -397,11 +434,28 @@ const CloudDB = (() => {
       conditions: session.conditions,
       shots: session.shots,
       created_at: new Date(session.createdAt).toISOString(),
-    }], { onConflict: 'id' });
-    if (error) {
-      console.error('CloudDB.saveSession error:', error);
-      throw new Error(error.message || error.code || JSON.stringify(error));
+    };
+
+    // Primary path: upsert (needs a PRIMARY KEY / UNIQUE constraint on id).
+    const { error } = await sb.from('sessions').upsert([row], { onConflict: 'id' });
+    if (!error) return;
+
+    // FAILSAFE: if the table is missing the id constraint, upsert throws
+    // "no unique or exclusion constraint matching the ON CONFLICT
+    // specification" (error 42P10). Fall back to delete-then-insert so sync
+    // still works even on a table that wasn't created with the right keys.
+    const missingConstraint = error.code === '42P10' ||
+      /on conflict|unique or exclusion/i.test(error.message || '');
+    if (missingConstraint) {
+      await sb.from('sessions').delete().eq('id', session.id).eq('user_id', user.id);
+      const { error: insErr } = await sb.from('sessions').insert([row]);
+      if (!insErr) return;
+      console.error('CloudDB.saveSession insert fallback error:', insErr);
+      throw new Error(insErr.message || insErr.code || JSON.stringify(insErr));
     }
+
+    console.error('CloudDB.saveSession error:', error);
+    throw new Error(error.message || error.code || JSON.stringify(error));
   }
 
   async function deleteSession(id) {
@@ -2304,9 +2358,10 @@ const ImportFlow = (() => {
     MemDB.saveSession(session);
     UI.renderDetail(session);
     Router.show('session-detail');
-    // Persist to cloud in background if logged in
+    // Persist to cloud in background if logged in (auto-sync on import)
     if (Auth.getUser()) {
       CloudDB.saveSession(session).then(() => {
+        toast('Saved to cloud ✓');
         showDebug('CLOUD SYNC: ✓ saved session to cloud as ' + Auth.getUser().email);
       }).catch(e => {
         toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
