@@ -434,33 +434,43 @@ const Store = (() => {
   const cloud = () => !!Auth.getUser();
 
   async function getSessions() {
-    if (cloud()) {
+    // Local-first so the app NEVER breaks if the cloud is unreachable. Merge
+    // cloud rows on top when signed in; on cloud error fall back to local and
+    // surface the reason instead of throwing (a throw here used to bubble up
+    // through the tab click handlers and silently kill navigation).
+    const local = MemDB.getSessions();
+    if (!cloud()) return local;
+    try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const cloudIds = new Set(rows.map(r => r.id));
-      // Include any MemDB sessions not yet synced to cloud (just-imported)
-      const pending = MemDB.getSessions().filter(s => !cloudIds.has(s.id));
+      const pending = local.filter(s => !cloudIds.has(s.id));
       return [...pending, ...rows.map(fromRow)].sort((a,b) => new Date(b.date) - new Date(a.date));
+    } catch (e) {
+      console.error('Cloud load failed:', e);
+      showDebug('CLOUD LOAD FAILED:\n' + (e?.message || JSON.stringify(e)) + '\n(showing local sessions)');
+      return local;
     }
-    return MemDB.getSessions();
   }
   async function getSession(id) {
-    if (cloud()) {
-      // Check MemDB first — covers just-imported sessions not yet in cloud
-      const mem = MemDB.getSession(id);
-      if (mem) return mem;
+    const mem = MemDB.getSession(id);   // covers just-imported sessions
+    if (mem) return mem;
+    if (!cloud()) return null;
+    try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const r = rows.find(x => x.id === id);
       return r ? fromRow(r) : null;
+    } catch (e) {
+      console.error('Cloud load failed:', e);
+      return null;
     }
-    return MemDB.getSession(id);
   }
   async function saveSession(s) {
-    if (cloud()) { await CloudDB.saveSession(s); return; }
-    MemDB.saveSession(s);
+    MemDB.saveSession(s);               // local first — instant, always works
+    if (cloud()) await CloudDB.saveSession(s);
   }
   async function deleteSession(id) {
-    if (cloud()) { await CloudDB.deleteSession(id); return; }
     MemDB.deleteSession(id);
+    if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
   }
   return { getSessions, getSession, saveSession, deleteSession };
 })();
