@@ -126,7 +126,14 @@ const MemDB = (() => {
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    flowType: 'pkce',          // modern, reliable OAuth for SPAs
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,  // auto-exchange ?code= on redirect
+  },
+});
 
 // Capture whether we arrived from an email confirmation / magic link redirect.
 // Covers both implicit flow (#access_token / type=signup) and PKCE flow (?code=),
@@ -153,46 +160,78 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+// On-screen debug banner (tap to dismiss). Lets us see auth state on mobile
+// where the dev console isn't available.
+function showDebug(msg) {
+  let d = document.getElementById('debugBanner');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'debugBanner';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#111;color:#0f0;' +
+      'font:12px/1.4 monospace;padding:8px 12px;white-space:pre-wrap;border-bottom:2px solid #0f0;max-height:40vh;overflow:auto';
+    d.onclick = () => d.remove();
+    document.body.appendChild(d);
+  }
+  const ts = new Date().toLocaleTimeString();
+  d.textContent = `[DEBUG ${ts}] (tap to close)\n` + msg;
+}
+
 const Auth = (() => {
   let _user = null;
   let _guestTimer = null;
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
+  // Single source of truth: ask the Supabase server who the JWT belongs to.
+  // getUser() validates the token against the server, so it can't return a
+  // stale/cached identity the way reading localStorage can.
+  async function refreshUserFromServer() {
+    const hadCode = /[?&]code=/.test(location.search);
+    const hadToken = /access_token=/.test(location.hash);
+    const { data, error } = await sb.auth.getUser();
+    _user = (!error && data?.user) ? data.user : null;
+    console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
+    showDebug(
+      `URL had ?code=  : ${hadCode}\n` +
+      `URL had #token  : ${hadToken}\n` +
+      `getUser() email : ${_user?.email || '(none)'}\n` +
+      `getUser() error : ${error ? error.message : 'none'}`
+    );
+    updateUI();
+    return _user;
+  }
+
   async function init() {
     sb.auth.onAuthStateChange(async (event, session) => {
-      // While signing out, ignore every Supabase event — prevents background
-      // refresh timers from re-authenticating the user after we cleared state
+      console.log('[AUTH EVENT]', event, '→ session user:', session?.user?.email || '(none)');
       if (_signingOut) return;
-      if (_user === null && event === 'TOKEN_REFRESHED') return;
+      if (event === 'TOKEN_REFRESHED' && _user === null) return;
+
+      if (event === 'SIGNED_OUT') {
+        _user = null;
+        updateUI();
+        if (!_signingOut) showAuth(false);
+        return;
+      }
+
       const wasGuest = !_user;
-      _user = session?.user || null;
-      updateUI();
-      // OAuth / email-confirm: SIGNED_IN fires after token exchange — load sessions
+      // Always re-validate against the server rather than trusting the event's session
+      await refreshUserFromServer();
       if (wasGuest && _user && event === 'SIGNED_IN') {
         await Router.showSessions();
       }
-      // Expired / revoked session fires SIGNED_OUT — prompt to re-authenticate
-      if (!_user && event === 'SIGNED_OUT' && !_signingOut) {
-        showAuth(false);
-      }
     });
-    // getSession reads the locally stored token — fast, never hangs on network
-    const { data: { session } } = await sb.auth.getSession();
-    _user = session?.user || null;
-    // Force refresh session to ensure we have latest user data from Supabase
-    if (_user) {
-      const { data: { user: freshUser }, error } = await sb.auth.getUser();
-      if (!error && freshUser) _user = freshUser;
-    }
-    await updateUI();
-    return _user;
+
+    // On first load (incl. returning from an OAuth redirect), detectSessionInUrl
+    // exchanges ?code= for a session before this resolves; then we read the
+    // server-validated user as the single source of truth.
+    return refreshUserFromServer();
   }
 
   async function signup(email, password) {
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) throw error;
     _user = data.user;
-    await updateUI();
+    updateUI();
     return _user;
   }
 
@@ -200,15 +239,22 @@ const Auth = (() => {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
     _user = data.user;
-    await updateUI();
+    updateUI();
     return _user;
   }
 
   async function oauth(provider) {
+    // Wipe any existing session BEFORE redirecting. This guarantees no stale
+    // account-A token can survive into the post-redirect load. signInWithOAuth
+    // then writes a fresh PKCE code-verifier, so the exchange on return yields
+    // exactly the account picked at Google. (Purge must happen before the call,
+    // never after, or we'd delete the verifier we just wrote.)
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    purgeAuthStorage();
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: location.origin,
+        redirectTo: location.origin + location.pathname,
         queryParams: { prompt: 'select_account' },
       },
     });
@@ -217,52 +263,52 @@ const Auth = (() => {
     // OAuth callback URL, which init() handles on next load.
   }
 
-  async function logout() {
-    _signingOut = true;
-    _user = null;
-    await updateUI();
-
-    // Clear Supabase session completely - both scopes
-    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
-    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
-
-    // Clear ALL Supabase auth keys from storage
-    const keysToDelete = [];
-    for (const k of Object.keys(localStorage)) {
-      if (k.includes('supabase') || k.includes('sb-') || k.includes('auth')) {
-        keysToDelete.push(k);
+  function purgeAuthStorage() {
+    // Remove every Supabase auth token so a stale identity can't be re-read
+    [...Object.keys(localStorage)].forEach(k => {
+      if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) {
+        localStorage.removeItem(k);
       }
-    }
-    keysToDelete.forEach(k => localStorage.removeItem(k));
+    });
+    sessionStorage.clear();
+  }
 
-    // Force refresh to clear any cached state
-    setTimeout(() => { location.reload(); }, 500);
+  async function logout() {
+    _signingOut = true;        // block onAuthStateChange from re-setting _user
+    _user = null;
+    updateUI();
+
+    // local first: revokes the in-memory session and stops the auto-refresh
+    // timer immediately, so it can't write the old token back into storage.
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    purgeAuthStorage();
+
+    // global revokes the refresh token server-side (best effort; may be offline)
+    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    purgeAuthStorage();        // clear again in case the client re-persisted
+
+    // Hard reload to a clean origin — no #hash/?code leftovers, no JS heap state
+    window.location.replace(location.origin + location.pathname);
   }
 
   function getUser() { return _user; }
 
   function updateUI() {
+    const emailRow = document.getElementById('accountEmailRow');
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
-    const syncBtn = document.getElementById('syncCloudBtn');
     const authModal = document.getElementById('authModal');
-    const emailRow = document.getElementById('accountEmailRow');
-    const accountEmail = document.getElementById('accountEmail');
-
     if (_user) {
       clearTimeout(_guestTimer);
+      emailRow.hidden = false;
+      document.getElementById('accountEmail').textContent = _user.email;
       signIn.hidden = true;
       signOut.hidden = false;
-      syncBtn.hidden = false;
-      emailRow.hidden = false;
-      accountEmail.textContent = _user.email || '—';
       authModal.hidden = true;
     } else {
+      emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
-      syncBtn.hidden = true;
-      emailRow.hidden = true;
-      accountEmail.textContent = '—';
     }
   }
 
@@ -305,54 +351,91 @@ const Auth = (() => {
   return { init, signup, login, oauth, logout, getUser, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
-// ────────────────────────────────────────────────────────────────
-// CloudDB — Manual sync to Supabase
-// ────────────────────────────────────────────────────────────────
 const CloudDB = (() => {
-  async function syncSessions(sessions) {
-    const user = Auth.getUser();
-    if (!user) throw new Error('Not signed in');
-
-    let synced = 0;
-    let failed = 0;
-
-    for (const session of sessions) {
-      try {
-        const { error } = await sb.from('sessions').upsert([{
-          id: session.id,
-          user_id: user.id,
-          date: session.date,
-          notes: session.notes,
-          conditions: session.conditions,
-          shots: session.shots,
-          created_at: new Date(session.createdAt).toISOString(),
-        }], { onConflict: 'user_id,id' });
-        if (error) failed++; else synced++;
-      } catch (e) {
-        failed++;
-      }
-    }
-
-    if (failed > 0) {
-      throw new Error(`Synced ${synced}, failed ${failed}`);
-    }
-    return { synced, failed };
+  async function getSessions(userId) {
+    const { data, error } = await sb
+      .from('sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
   }
-  return { syncSessions };
+
+  async function saveSession(session) {
+    const user = Auth.getUser();
+    if (!user) return;
+    const { error } = await sb.from('sessions').upsert([{
+      id: session.id,
+      user_id: user.id,
+      date: session.date,
+      notes: session.notes,
+      conditions: session.conditions,
+      shots: session.shots,
+      created_at: new Date(session.createdAt).toISOString(),
+    }], { onConflict: 'id' });
+    if (error) {
+      console.error('CloudDB.saveSession error:', error);
+      throw new Error(error.message || error.code || JSON.stringify(error));
+    }
+  }
+
+  async function deleteSession(id) {
+    const user = Auth.getUser();
+    if (!user) return;
+    const { error } = await sb.from('sessions').delete().eq('id', id).eq('user_id', user.id);
+    if (error) throw error;
+  }
+
+  async function migrateLocalSessions() {
+    const user = Auth.getUser();
+    if (!user) return;
+    const localSessions = await DB.exportAll();
+    for (const session of localSessions) {
+      await saveSession(session);
+    }
+  }
+
+  return { getSessions, saveSession, deleteSession, migrateLocalSessions };
 })();
 
-// Unified data layer — local storage only (IndexedDB + MemDB)
+// Unified data layer — cloud-only for logged-in users, MemDB (ephemeral) for guests
 const Store = (() => {
+  function fromRow(r) {
+    return {
+      id: r.id, date: r.date, notes: r.notes, conditions: r.conditions,
+      shots: r.shots, createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+    };
+  }
+  const cloud = () => !!Auth.getUser();
+
   async function getSessions() {
+    if (cloud()) {
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      const cloudIds = new Set(rows.map(r => r.id));
+      // Include any MemDB sessions not yet synced to cloud (just-imported)
+      const pending = MemDB.getSessions().filter(s => !cloudIds.has(s.id));
+      return [...pending, ...rows.map(fromRow)].sort((a,b) => new Date(b.date) - new Date(a.date));
+    }
     return MemDB.getSessions();
   }
   async function getSession(id) {
+    if (cloud()) {
+      // Check MemDB first — covers just-imported sessions not yet in cloud
+      const mem = MemDB.getSession(id);
+      if (mem) return mem;
+      const rows = await CloudDB.getSessions(Auth.getUser().id);
+      const r = rows.find(x => x.id === id);
+      return r ? fromRow(r) : null;
+    }
     return MemDB.getSession(id);
   }
   async function saveSession(s) {
+    if (cloud()) { await CloudDB.saveSession(s); return; }
     MemDB.saveSession(s);
   }
   async function deleteSession(id) {
+    if (cloud()) { await CloudDB.deleteSession(id); return; }
     MemDB.deleteSession(id);
   }
   return { getSessions, getSession, saveSession, deleteSession };
@@ -2174,7 +2257,7 @@ const ImportFlow = (() => {
     goStep('step-preview');
   }
 
-  function save() {
+  async function save() {
     const date  = document.getElementById('metaDate').value;
     const notes = document.getElementById('metaNotes').value.trim();
     const wind  = document.getElementById('metaWind').value.trim();
@@ -2183,11 +2266,19 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
-    // Save to MemDB instantly
+    // Save to MemDB and show instantly — no spinner
     MemDB.saveSession(session);
-    // Show detail view
     UI.renderDetail(session);
     Router.show('session-detail');
+    // Persist to cloud in background if logged in
+    if (Auth.getUser()) {
+      CloudDB.saveSession(session).then(() => {
+        showDebug('CLOUD SYNC: ✓ saved session to cloud as ' + Auth.getUser().email);
+      }).catch(e => {
+        toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
+        showDebug('CLOUD SYNC FAILED:\n' + (e?.message || JSON.stringify(e)));
+      });
+    }
   }
 
   return { goStep, handleFile, save };
@@ -2352,29 +2443,6 @@ async function init() {
   document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
     await Auth.logout();
     await Router.showSessions();
-  });
-  document.getElementById('syncCloudBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('syncCloudBtn');
-    const origText = btn.querySelector('span').textContent;
-    try {
-      btn.querySelector('span').textContent = 'Syncing...';
-      btn.disabled = true;
-      const sessions = await Store.getSessions();
-      const result = await CloudDB.syncSessions(sessions);
-      toast(`✓ Synced ${result.synced} session${result.synced !== 1 ? 's' : ''}`);
-      btn.querySelector('span').textContent = '✓ Synced';
-      setTimeout(() => {
-        btn.querySelector('span').textContent = origText;
-        btn.disabled = false;
-      }, 2000);
-    } catch(e) {
-      toast(`✗ Sync failed: ${e.message}`);
-      btn.querySelector('span').textContent = '✗ Failed';
-      setTimeout(() => {
-        btn.querySelector('span').textContent = origText;
-        btn.disabled = false;
-      }, 2000);
-    }
   });
 
   // Auth — all UI handlers above are wired up first, so a slow network here
