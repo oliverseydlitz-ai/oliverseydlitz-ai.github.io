@@ -2272,8 +2272,11 @@ const ImportFlow = (() => {
     Router.show('session-detail');
     // Persist to cloud in background if logged in
     if (Auth.getUser()) {
-      CloudDB.saveSession(session).catch(e => {
+      CloudDB.saveSession(session).then(() => {
+        showDebug('CLOUD SYNC: ✓ saved session to cloud as ' + Auth.getUser().email);
+      }).catch(e => {
         toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
+        showDebug('CLOUD SYNC FAILED:\n' + (e?.message || JSON.stringify(e)));
       });
     }
   }
