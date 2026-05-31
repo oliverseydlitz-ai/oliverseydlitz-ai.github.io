@@ -237,11 +237,21 @@ const Auth = (() => {
   let _guest = false;        // true when user explicitly chose "continue as guest"
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
+  let _installingOAuth = false;  // true while we process a fresh Google return
+
   // Single source of truth: ask the Supabase server who the JWT belongs to.
   // getUser() validates the token against the server, so it can't return a
   // stale/cached identity the way reading localStorage can.
-  async function refreshUserFromServer() {
-    const { data, error } = await sb.auth.getUser();
+  //
+  // IMPORTANT: pass an explicit access token when we have one (a fresh OAuth
+  // return). getUser() with NO argument validates whatever token is in storage,
+  // which can still be a stale session or an auto-refreshed old token — that was
+  // the real source of the "old email after Google login" bug. getUser(token)
+  // validates THAT exact token, so the account the user just picked always wins.
+  async function refreshUserFromServer(explicitToken) {
+    const { data, error } = explicitToken
+      ? await sb.auth.getUser(explicitToken)
+      : await sb.auth.getUser();
     _user = (!error && data?.user) ? data.user : null;
     console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
     updateUI();
@@ -252,6 +262,10 @@ const Auth = (() => {
     sb.auth.onAuthStateChange(async (event, session) => {
       console.log('[AUTH EVENT]', event, '→ session user:', session?.user?.email || '(none)');
       if (_signingOut) return;
+      // While we're deterministically installing a fresh Google login, ignore
+      // every background event (INITIAL_SESSION / TOKEN_REFRESHED from any stale
+      // stored session) so it can't clobber _user with the old identity.
+      if (_installingOAuth) return;
       if (event === 'TOKEN_REFRESHED' && _user === null) return;
 
       if (event === 'SIGNED_OUT') {
@@ -272,23 +286,32 @@ const Auth = (() => {
     // ── Deterministic OAuth handling ──────────────────────────────────────
     // If we just came back from Google (implicit flow), the URL hash held a
     // fresh access/refresh token that we captured synchronously into
-    // _oauthTokens. Install it EXPLICITLY with setSession() so the account the
-    // user just picked overwrites any stale stored session — this is the
-    // root-cause fix for the "wrong email" bug (no race with auto-detection).
+    // _oauthTokens. We:
+    //   1. purge any stale stored session FIRST (so nothing old can be read)
+    //   2. strip the hash so a refresh can't reprocess it
+    //   3. install the fresh token with setSession()
+    //   4. validate the EXACT fresh access token with getUser(token)
+    // This removes every race that could surface a previously-used account.
     if (_oauthTokens) {
+      _installingOAuth = true;
       try {
-        const { data, error } = await sb.auth.setSession(_oauthTokens);
+        purgeAuthStorage();                       // kill any lingering old session
+        history.replaceState(null, '', location.pathname);  // drop #access_token
+        const { error } = await sb.auth.setSession(_oauthTokens);
         if (error) throw error;
-        _user = data?.user || data?.session?.user || null;
+        // Validate the precise token we just received — immune to stale storage.
+        await refreshUserFromServer(_oauthTokens.access_token);
       } catch (e) {
         console.error('[AUTH] setSession failed:', e);
         showDebug('LOGIN INSTALL FAILED:\n' + (e?.message || JSON.stringify(e)));
+      } finally {
+        _installingOAuth = false;
       }
     }
 
     // Read the server-validated user as the single source of truth (covers
     // returning visitors with a stored session, and confirms the OAuth login).
-    await refreshUserFromServer();
+    if (!_user) await refreshUserFromServer();
 
     // Diagnostic banner so the state is visible on mobile (no dev console).
     showDebug(
@@ -1950,21 +1973,21 @@ const UI = (() => {
         '⚡ Quality over quantity: 20 focused shots beat 100 mindless ones.',
       ];
       const todayTip = tips[new Date().getDate() % tips.length];
-      const quickStatsHost = document.querySelector('.quick-stats');
-      if (quickStatsHost) {
-        const tipHtml = `<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
-        quickStatsHost.insertAdjacentHTML('beforebegin', tipHtml);
+      const tipHost = document.getElementById('tipHost');
+      if (tipHost) {
+        tipHost.innerHTML = `<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
       }
     } catch(e){ console.error('tip',e); }
 
-    // Render enhanced metrics widget
+    // Render enhanced metrics widget (replace, never append)
     try {
-      if (sessions.length) {
-        const stats = EnhancedMetricsWidget.renderMiniStats(sessions);
-        const widget = EnhancedMetricsWidget.renderWidget(stats);
-        const quickStatsHost = document.querySelector('.quick-stats');
-        if (quickStatsHost && widget) {
-          quickStatsHost.insertAdjacentHTML('beforebegin', widget);
+      const widgetHost = document.getElementById('metricsWidgetHost');
+      if (widgetHost) {
+        if (sessions.length) {
+          const stats = EnhancedMetricsWidget.renderMiniStats(sessions);
+          widgetHost.innerHTML = EnhancedMetricsWidget.renderWidget(stats) || '';
+        } else {
+          widgetHost.innerHTML = '';
         }
       }
     } catch(e){ console.error('metrics-widget',e); }
@@ -2002,11 +2025,12 @@ const UI = (() => {
       }
     } catch(e){ console.error('insights',e); }
 
-    // Render alerts
+    // Render alerts (replace, never append)
     try {
-      const alerts = PerformanceAlerts.generateAlerts(sessions);
-      if (alerts.length) {
-        const alertsHtml = `
+      const alertsHost = document.getElementById('alertsHost');
+      if (alertsHost) {
+        const alerts = PerformanceAlerts.generateAlerts(sessions);
+        alertsHost.innerHTML = alerts.length ? `
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
             ${alerts.map(a => `
               <div style="padding:.8rem;background:${a.severity==='high'?'rgba(239,68,68,.1)':a.severity==='info'?'rgba(96,165,250,.1)':'rgba(34,197,94,.1)'};border-left:4px solid ${a.severity==='high'?'#ef4444':a.severity==='info'?'#60a5fa':'#22c55e'};border-radius:var(--radius-sm)">
@@ -2014,20 +2038,17 @@ const UI = (() => {
                 <div style="font-size:.9rem;color:var(--text-dim)">${a.message}</div>
               </div>
             `).join('')}
-          </div>`;
-        const insightHost = document.getElementById('insightsHost');
-        if (insightHost) insightHost.insertAdjacentHTML('afterend', alertsHtml);
+          </div>` : '';
       }
     } catch(e){ console.error('alerts',e); }
 
-    // Render performance grade & coaching
+    // Render performance grade & coaching (replace, never append)
     try {
-      const coachHost = document.getElementById('insightsHost') || document.querySelector('#view-sessions');
+      const coachHost = document.getElementById('coachHost');
       if (coachHost) {
         const grade = PerformanceGrade.calculateFullGrade(sessions);
         const coach = PersonalCoach.analyzeSessions(sessions);
-        if (grade && coach) {
-          const coachHtml = `
+        coachHost.innerHTML = (grade && coach) ? `
             <div style="margin-top:1.5rem;padding:1.2rem;background:linear-gradient(135deg,rgba(11,77,46,.08),rgba(16,185,129,.04));border-radius:var(--radius-md);border:1px solid rgba(16,185,129,.2)">
               <div style="font-weight:700;margin-bottom:.5rem;font-size:1.05rem">${coach.greeting}</div>
               <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.8rem">${coach.assessment}</div>
@@ -2049,9 +2070,7 @@ const UI = (() => {
                 <strong>💡 Focus:</strong> ${coach.topFocus?.name || 'Consistency'} — ${coach.drillRecommendation}
               </div>
               <div style="font-size:.85rem;color:#a3e635;font-weight:600">${coach.motivationalMessage}</div>
-            </div>`;
-          if (coachHost.parentElement) coachHost.parentElement.insertAdjacentHTML('afterend', coachHtml);
-        }
+            </div>` : '';
       }
     } catch(e){ console.error('coaching',e); }
 
