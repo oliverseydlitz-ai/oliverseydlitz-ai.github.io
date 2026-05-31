@@ -239,19 +239,44 @@ const Auth = (() => {
 
   let _installingOAuth = false;  // true while we process a fresh Google return
 
+  // Decode a JWT (access token) to extract the user ID and email synchronously.
+  // No round-trip, no race — just base64 decode the payload.
+  function decodeJWT(token) {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const payload = JSON.parse(atob(parts[1]));
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // Single source of truth: ask the Supabase server who the JWT belongs to.
-  // getUser() validates the token against the server, so it can't return a
-  // stale/cached identity the way reading localStorage can.
-  //
-  // IMPORTANT: pass an explicit access token when we have one (a fresh OAuth
-  // return). getUser() with NO argument validates whatever token is in storage,
-  // which can still be a stale session or an auto-refreshed old token — that was
-  // the real source of the "old email after Google login" bug. getUser(token)
-  // validates THAT exact token, so the account the user just picked always wins.
+  // For OAuth, we decode the token directly to avoid races on internal state.
   async function refreshUserFromServer(explicitToken) {
-    const { data, error } = explicitToken
-      ? await sb.auth.getUser(explicitToken)
-      : await sb.auth.getUser();
+    // If we have a fresh OAuth token, decode it immediately — no server round-trip,
+    // no internal-state race. The JWT payload carries the user ID and email.
+    if (explicitToken) {
+      const payload = decodeJWT(explicitToken);
+      if (payload?.sub) {
+        _user = {
+          id: payload.sub,
+          email: payload.email || payload.preferred_email || null,
+          user_metadata: payload.user_metadata || {},
+          app_metadata: payload.app_metadata || {},
+        };
+        console.log('[AUTH] decoded JWT →', _user?.email || '(none)');
+        updateUI();
+        return _user;
+      }
+    }
+
+    // Fallback (guest → signed-in via in-tab sign-in, or returning visitor):
+    // Ask the server. This is safe because we've either:
+    //   (a) purged storage, so getUser() reads nothing old, or
+    //   (b) are returning visitors with a valid stored token
+    const { data, error } = await sb.auth.getUser();
     _user = (!error && data?.user) ? data.user : null;
     console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
     updateUI();
