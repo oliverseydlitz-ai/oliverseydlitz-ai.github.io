@@ -267,12 +267,14 @@ const Auth = (() => {
 
   async function oauth(provider) {
     // Start the OAuth flow; Supabase handles the redirect and session restoration.
+    // skipBrowserRedirect: false ensures the browser actually redirects to Google.
     // prompt: 'select_account' ensures Google shows the account chooser.
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: location.origin,
         queryParams: { prompt: 'select_account' },
+        skipBrowserRedirect: false,
       },
     });
     if (error) throw error;
