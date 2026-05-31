@@ -260,13 +260,13 @@ const Auth = (() => {
 
   async function init() {
     sb.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AUTH EVENT]', event, '→ session user:', session?.user?.email || '(none)');
+      const eventUser = session?.user || null;
+      console.log('[AUTH EVENT]', event, '→ session user:', eventUser?.email || '(none)');
       if (_signingOut) return;
       // While we're deterministically installing a fresh Google login, ignore
       // every background event (INITIAL_SESSION / TOKEN_REFRESHED from any stale
       // stored session) so it can't clobber _user with the old identity.
       if (_installingOAuth) return;
-      if (event === 'TOKEN_REFRESHED' && _user === null) return;
 
       if (event === 'SIGNED_OUT') {
         _user = null;
@@ -275,10 +275,23 @@ const Auth = (() => {
         return;
       }
 
-      const wasGuest = !_user;
-      _user = session?.user || null;
-      updateUI();
-      if (wasGuest && _user && event === 'SIGNED_IN') {
+      // IDENTITY IS OWNED BY EXPLICIT FLOWS (init's getUser, login, logout).
+      // The background listener must NEVER swap the signed-in account from
+      // under us — that's the intermittent "wrong email" bug: a stale
+      // INITIAL_SESSION / TOKEN_REFRESHED carrying the previous account could
+      // arrive just after the install guard lifted and overwrite _user.
+      // So: if we already know who's signed in, only accept events for that
+      // same user id; ignore anything for a different account.
+      if (_user && eventUser && eventUser.id !== _user.id) {
+        console.warn('[AUTH] ignoring event for a different account:', eventUser.email);
+        return;
+      }
+
+      // Genuine guest → signed-in transition (an in-tab sign-in that didn't go
+      // through our OAuth-hash path). Adopt the new user and refresh the view.
+      if (!_user && eventUser && event === 'SIGNED_IN') {
+        _user = eventUser;
+        updateUI();
         await Router.showSessions();
       }
     });
