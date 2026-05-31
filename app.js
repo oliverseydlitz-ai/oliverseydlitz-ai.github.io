@@ -129,11 +129,24 @@ const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Detect OAuth / magic-link redirects so we can show the right UI state.
-// Supabase handles token restoration automatically; we just check if we're in a redirect.
+// Also capture OAuth tokens from the hash immediately, before Supabase processes them.
 const _redirectStr = (location.hash + '&' + location.search).toLowerCase();
 const _authError = /error=|error_code=|error_description=/.test(_redirectStr);
 const _authRedirect = _authError ||
   /type=(signup|magiclink|recovery|email_change|invite)|access_token=|[?&]code=/.test(_redirectStr);
+
+// If we have OAuth tokens in the hash, extract them for manual processing.
+// This ensures we install the exact token that was returned, not stale storage.
+const _oauthTokens = (() => {
+  try {
+    const h = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+    const p = new URLSearchParams(h);
+    const access_token = p.get('access_token');
+    const refresh_token = p.get('refresh_token');
+    if (access_token && refresh_token) return { access_token, refresh_token };
+  } catch (_) {}
+  return null;
+})();
 
 // Pull the human-readable error reason out of the redirect (hash or query)
 let _authErrorMsg = '';
@@ -208,15 +221,11 @@ const Auth = (() => {
 
   async function init() {
     // Set up the listener first, before checking the session.
-    // This catches auth events that fire while we're loading.
     sb.auth.onAuthStateChange(async (event, session) => {
       const eventUser = session?.user || null;
       console.log('[AUTH]', event, '→', eventUser?.email || 'nobody');
-
-      // Skip all events if we're intentionally signing out
       if (_signingOut) return;
 
-      // User signed out
       if (event === 'SIGNED_OUT') {
         _user = null;
         updateUI();
@@ -224,11 +233,10 @@ const Auth = (() => {
         return;
       }
 
-      // User just signed in (OAuth return, password login, magic link, etc)
+      // User signed in or session restored
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && eventUser) {
         _user = eventUser;
         updateUI();
-        // If this is a fresh sign-in (not just initial session recovery), show home
         if (event === 'SIGNED_IN') {
           await Router.showSessions();
         }
@@ -236,14 +244,26 @@ const Auth = (() => {
       }
     });
 
-    // Restore any existing session from storage
+    // If we came back from OAuth with a token in the hash, install it now.
+    // This ensures we use the exact fresh token, not stale storage.
+    if (_oauthTokens) {
+      try {
+        const { error } = await sb.auth.setSession(_oauthTokens);
+        if (error) throw error;
+        console.log('[AUTH] installed OAuth token');
+      } catch (e) {
+        console.error('[AUTH] failed to install OAuth token:', e.message);
+      }
+    }
+
+    // Restore any existing session from storage (or refresh the one we just installed)
     const { data, error } = await sb.auth.getSession();
     if (data?.session?.user) {
       _user = data.session.user;
       updateUI();
-      console.log('[AUTH] restored session:', _user.email);
+      console.log('[AUTH] session user:', _user.email);
     } else {
-      console.log('[AUTH] no session in storage');
+      console.log('[AUTH] no session');
     }
 
     return _user;
