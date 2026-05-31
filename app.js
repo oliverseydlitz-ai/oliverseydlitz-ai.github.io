@@ -1970,6 +1970,41 @@ const UI = (() => {
       }
     } catch(e){ console.error('insights',e); }
 
+    // Render performance grade & coaching
+    try {
+      const coachHost = document.getElementById('insightsHost') || document.querySelector('#view-sessions');
+      if (coachHost) {
+        const grade = PerformanceGrade.calculateFullGrade(sessions);
+        const coach = PersonalCoach.analyzeSessions(sessions);
+        if (grade && coach) {
+          const coachHtml = `
+            <div style="margin-top:1.5rem;padding:1.2rem;background:linear-gradient(135deg,rgba(11,77,46,.08),rgba(16,185,129,.04));border-radius:var(--radius-md);border:1px solid rgba(16,185,129,.2)">
+              <div style="font-weight:700;margin-bottom:.5rem;font-size:1.05rem">${coach.greeting}</div>
+              <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.8rem">${coach.assessment}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem">
+                <div style="background:rgba(255,255,255,.05);padding:.8rem;border-radius:var(--radius-sm)">
+                  <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Overall Grade</div>
+                  <div style="font-size:1.8rem;font-weight:800;color:#4ade80">${grade.grade}</div>
+                  <div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${grade.overall}/100</div>
+                </div>
+                <div style="background:rgba(255,255,255,.05);padding:.8rem;border-radius:var(--radius-sm)">
+                  <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Next Goal</div>
+                  <div style="font-size:1rem;margin-bottom:.3rem">${coach.nextMilestone.progress}%</div>
+                  <div style="background:rgba(0,0,0,.2);height:4px;border-radius:2px;overflow:hidden">
+                    <div style="background:#4ade80;height:100%;width:${coach.nextMilestone.progress}%"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size:.9rem;padding:.8rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);margin-bottom:.8rem">
+                <strong>💡 Focus:</strong> ${coach.topFocus?.name || 'Consistency'} — ${coach.drillRecommendation}
+              </div>
+              <div style="font-size:.85rem;color:#a3e635;font-weight:600">${coach.motivationalMessage}</div>
+            </div>`;
+          if (coachHost.parentElement) coachHost.parentElement.insertAdjacentHTML('afterend', coachHtml);
+        }
+      }
+    } catch(e){ console.error('coaching',e); }
+
     const dash=document.getElementById('dashboard');
     const recent=document.getElementById('recentWrap');
     if (!sessions.length) {
@@ -2207,6 +2242,10 @@ const UI = (() => {
                 ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
                 ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${f.icon} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
               </div>
+              <div style="display:flex;gap:.4rem;margin-top:.6rem;font-size:.8rem">
+                <button data-share="${s.id}" style="background:rgba(74,222,128,.15);border:none;color:#4ade80;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">📤 Share</button>
+                <button data-export="${s.id}" style="background:rgba(96,165,250,.15);border:none;color:#60a5fa;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">📊 Export</button>
+              </div>
             </div>
             <div style="text-align:right">
               ${grade ? `
@@ -2231,6 +2270,31 @@ const UI = (() => {
     el.querySelectorAll('.session-card').forEach(c => {
       c.addEventListener('click', () => Router.showDetail(c.dataset.id));
     });
+
+    // Share and export button handlers
+    el.querySelectorAll('[data-share]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sessionId = btn.dataset.share;
+        const session = await DB.getSession(sessionId);
+        if (session) {
+          const text = SessionSharing.shareText(session);
+          SessionSharing.copyToClipboard(text);
+        }
+      });
+    });
+
+    el.querySelectorAll('[data-export]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sessionId = btn.dataset.export;
+        const session = await DB.getSession(sessionId);
+        if (session) {
+          SessionSharing.exportAsJSON([session]);
+        }
+      });
+    });
+
     requestAnimationFrame(() => {
       el.querySelectorAll('.scard-ring-arc').forEach(arc => {
         const svg = arc.closest('svg');
@@ -3335,6 +3399,116 @@ async function init() {
     });
   });
 
+  document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    if (!sessions.length) { toast('No sessions to analyze'); return; }
+    const metrics = AnalyticsHub.generateMetricsDashboard(sessions);
+    if (!metrics) { toast('Unable to generate metrics'); return; }
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
+            📊 Advanced Analytics
+            <button onclick="document.getElementById('analyticsModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="display:grid;gap:1rem">
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Sessions</div>
+              <div style="font-size:2rem;font-weight:800">${metrics.totalSessions}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Shots</div>
+              <div style="font-size:2rem;font-weight:800">${metrics.totalShots}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Avg Carry Distance</div>
+              <div style="font-size:2rem;font-weight:800">${metrics.avgCarry} yds</div>
+              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Ball Speed</div>
+              <div style="font-size:1.5rem;font-weight:800">${metrics.ballSpeedAvg} mph avg</div>
+              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Max: ${metrics.ballSpeedMax} mph</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Launch Angle</div>
+              <div style="font-size:1.5rem;font-weight:800">${metrics.launchAngleAvg}°</div>
+              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Range: ${metrics.launchAngleRange[0].toFixed(1)}° - ${metrics.launchAngleRange[1].toFixed(1)}°</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Practice Frequency</div>
+              <div style="font-size:1.5rem;font-weight:800">${metrics.sessionFrequency}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Trend</div>
+              <div style="font-size:1.1rem;font-weight:700;color:#4ade80">${metrics.improvementTrend}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Top Clubs</div>
+              <div style="display:flex;flex-direction:column;gap:.4rem">
+                ${metrics.topPerformers.map(c => `
+                  <div style="display:flex;justify-content:space-between;padding:.4rem .6rem;background:rgba(0,0,0,.1);border-radius:4px">
+                    <span>${c.club}</span>
+                    <span style="color:#60a5fa;font-weight:600">${c.avgCarry} yds (${c.shots} shots)</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+
+  document.getElementById('showBenchmarksBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    if (!sessions.length) { toast('No sessions to compare'); return; }
+    const comparison = CommunityInsights.compareToommunity(sessions);
+    if (!comparison) { toast('Unable to generate comparison'); return; }
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
+            🏆 Community Comparison
+            <button onclick="document.getElementById('benchmarkModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">vs ${comparison.skillLevel.toUpperCase()} golfers</div>
+          <div style="display:grid;gap:1rem">
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Carry Distance</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
+                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.carry.user} yds</strong></div>
+                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.carry.community} yds</strong></div>
+              </div>
+              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.carry.percentile}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Consistency</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
+                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.consistency.user}%</strong></div>
+                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.consistency.community}%</strong></div>
+              </div>
+              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.consistency.percentile}</div>
+            </div>
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Form Score</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
+                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.formScore.user}/100</strong></div>
+                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.formScore.community}/100</strong></div>
+              </div>
+              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.formScore.percentile}</div>
+            </div>
+            <div style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);padding:1rem;border-radius:var(--radius-sm);margin-top:.5rem">
+              <div style="font-size:.95rem;color:#4ade80"><strong>💡 Tip:</strong> Benchmarks are simulated. Real community data will be available soon!</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+
   // Shot detail modal close
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
@@ -3821,5 +3995,389 @@ const PerformanceGrade = (() => {
   }
 
   return { calculateFullGrade };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SessionSharing — Share, export, and clipboard functions
+// ════════════════════════════════════════════════════════════════
+const SessionSharing = (() => {
+  function shareText(session) {
+    const snap = SessionSnapshot.create(session);
+    return SessionSnapshot.toShareText(snap);
+  }
+
+  function copyToClipboard(text) {
+    return navigator.clipboard.writeText(text).then(() => {
+      toast('📋 Copied to clipboard!');
+      return true;
+    }).catch(() => {
+      toast('Unable to copy. Try manual copy.');
+      return false;
+    });
+  }
+
+  function exportAsJSON(sessions) {
+    const data = JSON.stringify(sessions, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shotlab-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('📥 Downloaded backup!');
+  }
+
+  function exportAsCSV(sessions) {
+    let csv = 'Date,Club,Ball Speed,Smash,Launch,Spin,Carry,Total,Notes\n';
+    sessions.forEach(s => {
+      s.shots.forEach(sh => {
+        csv += `"${formatDate(s.date)}","${clubLabel(sh.clubType)}",${sh.ballSpeed||''},${sh.smashFactor||''},${sh.launchAngle||''},${sh.spinRate||''},${sh.carryDistance||''},${sh.totalDistance||''},"${s.notes||''}"\n`;
+      });
+    });
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shotlab-data-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('📊 Exported to CSV!');
+  }
+
+  function createShareLink(session) {
+    const snap = SessionSnapshot.create(session);
+    const encoded = btoa(JSON.stringify(snap));
+    return `${window.location.origin}?shared=${encoded}`;
+  }
+
+  return { shareText, copyToClipboard, exportAsJSON, exportAsCSV, createShareLink };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// DrillTracker — Track completed practice drills
+// ════════════════════════════════════════════════════════════════
+const DrillTracker = (() => {
+  const storageKey = 'slDrillHistory';
+
+  function getDrillHistory() {
+    const stored = localStorage.getItem(storageKey);
+    return stored ? JSON.parse(stored) : {};
+  }
+
+  function recordDrill(drillId, sessionId) {
+    const history = getDrillHistory();
+    if (!history[drillId]) history[drillId] = [];
+    history[drillId].push({
+      sessionId,
+      date: new Date().toISOString(),
+      completed: true,
+    });
+    localStorage.setItem(storageKey, JSON.stringify(history));
+    return true;
+  }
+
+  function getDrillStats(drillId) {
+    const history = getDrillHistory();
+    const drills = history[drillId] || [];
+    return {
+      totalCompleted: drills.length,
+      lastCompleted: drills.length ? new Date(drills[drills.length-1].date).toLocaleDateString() : 'Never',
+      completionStreak: calculateStreak(drills),
+    };
+  }
+
+  function calculateStreak(drills) {
+    if (!drills.length) return 0;
+    let streak = 0;
+    const today = new Date();
+    for (let i = drills.length - 1; i >= 0; i--) {
+      const drillDate = new Date(drills[i].date);
+      const daysDiff = Math.floor((today - drillDate) / (1000*60*60*24));
+      if (daysDiff <= i + 1) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  function getAllStats() {
+    const history = getDrillHistory();
+    const stats = {};
+    Object.keys(history).forEach(drillId => {
+      stats[drillId] = getDrillStats(drillId);
+    });
+    return stats;
+  }
+
+  return { recordDrill, getDrillStats, getAllStats, getDrillHistory };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PersonalCoach — AI-style personalized coaching
+// ════════════════════════════════════════════════════════════════
+const PersonalCoach = (() => {
+  function analyzeSessions(sessions) {
+    if (!sessions.length) return null;
+
+    const recent = sessions.slice(0, 5);
+    const allShots = recent.flatMap(s => s.shots);
+    const faults = FaultEngine.detectFaults(allShots);
+    const topFault = faults[0];
+
+    const coachingPlan = {
+      greeting: getGreeting(),
+      assessment: generateAssessment(recent),
+      topFocus: topFault,
+      tips: CoachingMode.getTips(topFault?.name),
+      drillRecommendation: generateDrillRecommendation(topFault, recent),
+      motivationalMessage: getMotivation(sessions),
+      nextMilestone: calculateNextMilestone(sessions),
+    };
+
+    return coachingPlan;
+  }
+
+  function getGreeting() {
+    const greetings = [
+      '🎯 Ready to improve your game?',
+      '⛳ Let\'s work on your consistency!',
+      '🚀 Time to level up your swing.',
+      '💪 Keep grinding — you\'re getting better!',
+      '📈 Progress is the priority.',
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+
+  function generateAssessment(recentSessions) {
+    const shots = recentSessions.flatMap(s => s.shots);
+    const consistency = Math.round(100 - stdDev(shots.map(s => s.carryDistance || 0)));
+    const formScore = Math.round(avg(shots.map(ShotScorer.score), undefined) || 0);
+
+    if (consistency > 85) return '🌟 Excellent consistency! Your repeatable swing is a strength.';
+    if (consistency > 70) return '✅ Good consistency. One or two small tweaks could make a big difference.';
+    if (consistency > 50) return '📊 Moderate. Focus on one fundamental at a time for breakthrough improvement.';
+    return '🔧 High variability. Video your swing and identify one key pattern to fix.';
+  }
+
+  function generateDrillRecommendation(fault, sessions) {
+    const clubsUsed = new Set(sessions.flatMap(s => s.shots.map(sh => sh.clubType)));
+    const clubList = Array.from(clubsUsed).map(clubLabel).join(' & ');
+
+    if (!fault) return `Practice with your ${clubList} to build consistency.`;
+
+    const drills = {
+      'Slice': 'Inside-out drill: Swing from 4 o\'clock to 10 o\'clock feeling.',
+      'Hook': 'Outside-in feel: Exaggerate an out-to-in swing path.',
+      'Thin': 'Tee drill: Hit tees on the ground, contact after the tee.',
+      'Fat': 'Single-plane drill: Swing keeping your hands ahead at impact.',
+    };
+
+    return drills[fault.name] || `Work on ${fault.name.toLowerCase()} awareness with focused practice.`;
+  }
+
+  function getMotivation(sessions) {
+    const grade = PerformanceGrade.calculateFullGrade(sessions);
+    if (!grade) return 'Start by importing your first session!';
+
+    const messages = {
+      'A': '🏆 Top tier! You\'re mastering this. Push toward consistency at the highest level.',
+      'B': '👏 Strong performance! You\'re in the zone. Maintain this trajectory.',
+      'C': '💯 Good foundation. A few focused improvements will unlock your next level.',
+      'D': '📈 You\'re building skills. Every session teaches you something.',
+      'F': '🎯 Every pro started here. Focus on one thing and watch your improvement.',
+    };
+
+    return messages[grade.grade] || 'Keep practicing — progress takes time!';
+  }
+
+  function calculateNextMilestone(sessions) {
+    const shotCount = sessions.flatMap(s => s.shots).length;
+    const milestones = [100, 250, 500, 1000, 2500, 5000];
+    const nextMilestone = milestones.find(m => m > shotCount);
+
+    if (!nextMilestone) return { milestone: 10000, progress: 'You\'ve logged 5000+ shots! Legend status.' };
+
+    const progress = Math.round((shotCount / nextMilestone) * 100);
+    return {
+      milestone: nextMilestone,
+      current: shotCount,
+      progress,
+      message: `${nextMilestone} shots unlocks new insights!`,
+    };
+  }
+
+  return { analyzeSessions };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// AnalyticsHub — Advanced metrics dashboard
+// ════════════════════════════════════════════════════════════════
+const AnalyticsHub = (() => {
+  function generateMetricsDashboard(sessions) {
+    if (!sessions.length) return null;
+
+    const allShots = sessions.flatMap(s => s.shots);
+    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const ballSpeeds = allShots.map(s => s.ballSpeed || 0).filter(b => b > 0);
+    const launchAngles = allShots.map(s => s.launchAngle || 0);
+
+    return {
+      totalSessions: sessions.length,
+      totalShots: allShots.length,
+      avgCarry: fmt(avg(allShots, 'carryDistance'), 0),
+      carryConsistency: Math.round(100 - stdDev(carries)),
+      ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
+      ballSpeedMax: Math.max(...ballSpeeds),
+      launchAngleAvg: fmt(avg(allShots, 'launchAngle'), 1),
+      launchAngleRange: [Math.min(...launchAngles), Math.max(...launchAngles)],
+      sessionFrequency: calculateFrequency(sessions),
+      improvementTrend: calculateTrend(sessions),
+      topPerformers: getTopClubs(allShots),
+    };
+  }
+
+  function calculateFrequency(sessions) {
+    if (sessions.length < 2) return 'Starting';
+    const oldest = new Date(sessions[sessions.length-1].date);
+    const newest = new Date(sessions[0].date);
+    const days = Math.ceil((newest - oldest) / (1000*60*60*24));
+    const sessionsPerWeek = (sessions.length / days * 7).toFixed(1);
+    return `${sessionsPerWeek} sessions/week`;
+  }
+
+  function calculateTrend(sessions) {
+    if (sessions.length < 3) return 'Insufficient data';
+    const first3 = sessions.slice(-3).flatMap(s => s.shots).map(ShotScorer.score).filter(x=>x!==null);
+    const last3 = sessions.slice(0, 3).flatMap(s => s.shots).map(ShotScorer.score).filter(x=>x!==null);
+
+    if (!first3.length || !last3.length) return 'Insufficient data';
+
+    const firstAvg = first3.reduce((a,b)=>a+b,0) / first3.length;
+    const lastAvg = last3.reduce((a,b)=>a+b,0) / last3.length;
+    const change = lastAvg - firstAvg;
+
+    if (change > 5) return '📈 Strong improvement';
+    if (change > 0) return '📊 Slight improvement';
+    if (change < -5) return '📉 Needs attention';
+    return '→ Staying consistent';
+  }
+
+  function getTopClubs(shots) {
+    const clubStats = {};
+    shots.forEach(s => {
+      if (!clubStats[s.clubType]) {
+        clubStats[s.clubType] = { shots: 0, totalCarry: 0 };
+      }
+      clubStats[s.clubType].shots++;
+      clubStats[s.clubType].totalCarry += s.carryDistance || 0;
+    });
+
+    return Object.entries(clubStats)
+      .map(([club, stats]) => ({
+        club: clubLabel(club),
+        shots: stats.shots,
+        avgCarry: Math.round(stats.totalCarry / stats.shots),
+      }))
+      .sort((a, b) => b.shots - a.shots)
+      .slice(0, 5);
+  }
+
+  return { generateMetricsDashboard };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ContentLibrary — Video/article references for improvement
+// ════════════════════════════════════════════════════════════════
+const ContentLibrary = (() => {
+  const contents = {
+    'Slice': [
+      { title: 'Fix Your Slice Forever', duration: '12 min', type: 'video', level: 'beginner' },
+      { title: 'Inside-Out Swing Path Drill', duration: '8 min', type: 'video', level: 'intermediate' },
+      { title: 'Grip Pressure Fundamentals', duration: '6 min', type: 'video', level: 'beginner' },
+    ],
+    'Hook': [
+      { title: 'Stop the Hook: Complete Guide', duration: '15 min', type: 'video', level: 'beginner' },
+      { title: 'Club Face Control Drills', duration: '10 min', type: 'video', level: 'intermediate' },
+      { title: 'Stance & Alignment Secrets', duration: '7 min', type: 'video', level: 'beginner' },
+    ],
+    'Consistency': [
+      { title: 'The Key to Repeatable Swings', duration: '14 min', type: 'video', level: 'all' },
+      { title: 'Tempo Training for Better Control', duration: '9 min', type: 'video', level: 'intermediate' },
+      { title: 'Pre-Shot Routine Mastery', duration: '5 min', type: 'video', level: 'beginner' },
+    ],
+    'Distance': [
+      { title: 'Unlock Hidden Distance', duration: '13 min', type: 'video', level: 'all' },
+      { title: 'Smash Factor Optimization', duration: '8 min', type: 'video', level: 'intermediate' },
+      { title: 'Lag & Release Secrets', duration: '11 min', type: 'video', level: 'intermediate' },
+    ],
+  };
+
+  function getContentFor(topic) {
+    return contents[topic] || contents['Consistency'] || [];
+  }
+
+  function getByLevel(level) {
+    const allContent = Object.values(contents).flat();
+    return allContent.filter(c => c.level === 'all' || c.level === level);
+  }
+
+  return { getContentFor, getByLevel };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// CommunityInsights — Simulated community benchmarking
+// ════════════════════════════════════════════════════════════════
+const CommunityInsights = (() => {
+  // Simulated benchmark data (would be real in production)
+  const benchmarks = {
+    avgCarry: { all: 160, bySkill: { beginner: 140, intermediate: 165, advanced: 180 } },
+    consistency: { all: 72, bySkill: { beginner: 65, intermediate: 75, advanced: 85 } },
+    formScore: { all: 68, bySkill: { beginner: 60, intermediate: 70, advanced: 80 } },
+  };
+
+  function estimateSkillLevel(sessions) {
+    if (!sessions.length) return 'beginner';
+    const grade = PerformanceGrade.calculateFullGrade(sessions);
+    if (!grade) return 'beginner';
+    if (grade.overall >= 80) return 'advanced';
+    if (grade.overall >= 70) return 'intermediate';
+    return 'beginner';
+  }
+
+  function compareToommunity(sessions) {
+    const skillLevel = estimateSkillLevel(sessions);
+    const metrics = AnalyticsHub.generateMetricsDashboard(sessions);
+
+    if (!metrics) return null;
+
+    const userCarry = parseInt(metrics.avgCarry);
+    const userConsistency = metrics.carryConsistency;
+    const userForm = PerformanceGrade.calculateFullGrade(sessions)?.overall || 0;
+
+    return {
+      skillLevel,
+      carry: {
+        user: userCarry,
+        community: benchmarks.avgCarry.bySkill[skillLevel],
+        percentile: userCarry > benchmarks.avgCarry.bySkill[skillLevel] ? '↑ Above average' : '← Below average',
+      },
+      consistency: {
+        user: userConsistency,
+        community: benchmarks.consistency.bySkill[skillLevel],
+        percentile: userConsistency > benchmarks.consistency.bySkill[skillLevel] ? '↑ More consistent' : '← Work on it',
+      },
+      formScore: {
+        user: userForm,
+        community: benchmarks.formScore.bySkill[skillLevel],
+        percentile: userForm > benchmarks.formScore.bySkill[skillLevel] ? '↑ Better form' : '← Keep practicing',
+      },
+    };
+  }
+
+  return { compareToommunity, estimateSkillLevel };
 })();
 
