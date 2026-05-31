@@ -126,45 +126,14 @@ const MemDB = (() => {
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    // Implicit flow (#access_token) — reliably logs users in without a stored
-    // PKCE verifier (our pre-redirect purge would wipe that and break login).
-    flowType: 'implicit',
-    persistSession: true,
-    autoRefreshToken: true,
-    // We parse the redirect hash OURSELVES (see _oauthTokens + Auth.init's
-    // setSession) so there's a single deterministic code path and no race
-    // between Supabase's auto-detect and our getUser() call.
-    detectSessionInUrl: false,
-  },
-});
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Capture whether we arrived from an email confirmation / magic link redirect.
-// Covers both implicit flow (#access_token / type=signup) and PKCE flow (?code=),
-// plus error redirects (e.g. an expired link). Read synchronously before the
-// Supabase client strips the URL.
+// Detect OAuth / magic-link redirects so we can show the right UI state.
+// Supabase handles token restoration automatically; we just check if we're in a redirect.
 const _redirectStr = (location.hash + '&' + location.search).toLowerCase();
 const _authError = /error=|error_code=|error_description=/.test(_redirectStr);
 const _authRedirect = _authError ||
   /type=(signup|magiclink|recovery|email_change|invite)|access_token=|[?&]code=/.test(_redirectStr);
-
-// Synchronously grab the OAuth tokens out of the URL hash the INSTANT the page
-// loads — before the Supabase client, our debug code, or history.replaceState
-// can strip them. In implicit flow Google sends us back to
-// #access_token=...&refresh_token=...  We install these explicitly in Auth.init
-// via setSession(), which deterministically overwrites any stale stored session
-// with the account the user just picked (root-cause fix for "wrong email").
-const _oauthTokens = (() => {
-  try {
-    const h = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
-    const p = new URLSearchParams(h);
-    const access_token = p.get('access_token');
-    const refresh_token = p.get('refresh_token');
-    if (access_token && refresh_token) return { access_token, refresh_token };
-  } catch (_) {}
-  return null;
-})();
 
 // Pull the human-readable error reason out of the redirect (hash or query)
 let _authErrorMsg = '';
@@ -237,126 +206,46 @@ const Auth = (() => {
   let _guest = false;        // true when user explicitly chose "continue as guest"
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
-  let _installingOAuth = false;  // true while we process a fresh Google return
-
-  // Decode a JWT (access token) to extract the user ID and email synchronously.
-  // No round-trip, no race — just base64 decode the payload.
-  function decodeJWT(token) {
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-      const payload = JSON.parse(atob(parts[1]));
-      return payload;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // Single source of truth: ask the Supabase server who the JWT belongs to.
-  // For OAuth, we decode the token directly to avoid races on internal state.
-  async function refreshUserFromServer(explicitToken) {
-    // If we have a fresh OAuth token, decode it immediately — no server round-trip,
-    // no internal-state race. The JWT payload carries the user ID and email.
-    if (explicitToken) {
-      const payload = decodeJWT(explicitToken);
-      if (payload?.sub) {
-        _user = {
-          id: payload.sub,
-          email: payload.email || payload.preferred_email || null,
-          user_metadata: payload.user_metadata || {},
-          app_metadata: payload.app_metadata || {},
-        };
-        console.log('[AUTH] decoded JWT →', _user?.email || '(none)');
-        updateUI();
-        return _user;
-      }
-    }
-
-    // Fallback (guest → signed-in via in-tab sign-in, or returning visitor):
-    // Ask the server. This is safe because we've either:
-    //   (a) purged storage, so getUser() reads nothing old, or
-    //   (b) are returning visitors with a valid stored token
-    const { data, error } = await sb.auth.getUser();
-    _user = (!error && data?.user) ? data.user : null;
-    console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
-    updateUI();
-    return _user;
-  }
-
   async function init() {
+    // Set up the listener first, before checking the session.
+    // This catches auth events that fire while we're loading.
     sb.auth.onAuthStateChange(async (event, session) => {
       const eventUser = session?.user || null;
-      console.log('[AUTH EVENT]', event, '→ session user:', eventUser?.email || '(none)');
-      if (_signingOut) return;
-      // While we're deterministically installing a fresh Google login, ignore
-      // every background event (INITIAL_SESSION / TOKEN_REFRESHED from any stale
-      // stored session) so it can't clobber _user with the old identity.
-      if (_installingOAuth) return;
+      console.log('[AUTH]', event, '→', eventUser?.email || 'nobody');
 
+      // Skip all events if we're intentionally signing out
+      if (_signingOut) return;
+
+      // User signed out
       if (event === 'SIGNED_OUT') {
         _user = null;
         updateUI();
-        if (!_signingOut) showAuth(false);
+        showAuth(false);
         return;
       }
 
-      // IDENTITY IS OWNED BY EXPLICIT FLOWS (init's getUser, login, logout).
-      // The background listener must NEVER swap the signed-in account from
-      // under us — that's the intermittent "wrong email" bug: a stale
-      // INITIAL_SESSION / TOKEN_REFRESHED carrying the previous account could
-      // arrive just after the install guard lifted and overwrite _user.
-      // So: if we already know who's signed in, only accept events for that
-      // same user id; ignore anything for a different account.
-      if (_user && eventUser && eventUser.id !== _user.id) {
-        console.warn('[AUTH] ignoring event for a different account:', eventUser.email);
-        return;
-      }
-
-      // Genuine guest → signed-in transition (an in-tab sign-in that didn't go
-      // through our OAuth-hash path). Adopt the new user and refresh the view.
-      if (!_user && eventUser && event === 'SIGNED_IN') {
+      // User just signed in (OAuth return, password login, magic link, etc)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && eventUser) {
         _user = eventUser;
         updateUI();
-        await Router.showSessions();
+        // If this is a fresh sign-in (not just initial session recovery), show home
+        if (event === 'SIGNED_IN') {
+          await Router.showSessions();
+        }
+        return;
       }
     });
 
-    // ── Deterministic OAuth handling ──────────────────────────────────────
-    // If we just came back from Google (implicit flow), the URL hash held a
-    // fresh access/refresh token that we captured synchronously into
-    // _oauthTokens. We:
-    //   1. purge any stale stored session FIRST (so nothing old can be read)
-    //   2. strip the hash so a refresh can't reprocess it
-    //   3. install the fresh token with setSession()
-    //   4. validate the EXACT fresh access token with getUser(token)
-    // This removes every race that could surface a previously-used account.
-    if (_oauthTokens) {
-      _installingOAuth = true;
-      try {
-        purgeAuthStorage();                       // kill any lingering old session
-        history.replaceState(null, '', location.pathname);  // drop #access_token
-        const { error } = await sb.auth.setSession(_oauthTokens);
-        if (error) throw error;
-        // Validate the precise token we just received — immune to stale storage.
-        await refreshUserFromServer(_oauthTokens.access_token);
-      } catch (e) {
-        console.error('[AUTH] setSession failed:', e);
-        showDebug('LOGIN INSTALL FAILED:\n' + (e?.message || JSON.stringify(e)));
-      } finally {
-        _installingOAuth = false;
-      }
+    // Restore any existing session from storage
+    const { data, error } = await sb.auth.getSession();
+    if (data?.session?.user) {
+      _user = data.session.user;
+      updateUI();
+      console.log('[AUTH] restored session:', _user.email);
+    } else {
+      console.log('[AUTH] no session in storage');
     }
 
-    // Read the server-validated user as the single source of truth (covers
-    // returning visitors with a stored session, and confirms the OAuth login).
-    if (!_user) await refreshUserFromServer();
-
-    // Diagnostic banner so the state is visible on mobile (no dev console).
-    showDebug(
-      `had #token   : ${!!_oauthTokens}\n` +
-      `signed in as : ${_user?.email || '(none)'}\n` +
-      `status       : ${_user ? '✓ logged in' : 'not logged in'}`
-    );
     return _user;
   }
 
@@ -377,50 +266,31 @@ const Auth = (() => {
   }
 
   async function oauth(provider) {
-    // Purge any stale token BEFORE leaving so nothing old lingers; the fresh
-    // token we get back is installed explicitly via setSession() in init().
-    // prompt:select_account makes Google always show the account chooser so the
-    // user can switch accounts.
-    purgeAuthStorage();
+    // Start the OAuth flow; Supabase handles the redirect and session restoration.
+    // prompt: 'select_account' ensures Google shows the account chooser.
     const { error } = await sb.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: location.origin,
         queryParams: { prompt: 'select_account' },
-        skipBrowserRedirect: false,
       },
     });
     if (error) throw error;
-    // On success the browser is redirected to the provider; we return on the
-    // OAuth callback URL, which init() handles on next load.
-  }
-
-  function purgeAuthStorage() {
-    // Remove every Supabase auth token so a stale identity can't be re-read
-    [...Object.keys(localStorage)].forEach(k => {
-      if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) {
-        localStorage.removeItem(k);
-      }
-    });
-    sessionStorage.clear();
   }
 
   async function logout() {
-    _signingOut = true;        // block onAuthStateChange from re-setting _user
-    _user = null;
-    updateUI();
-
-    // local first: revokes the in-memory session and stops the auto-refresh
-    // timer immediately, so it can't write the old token back into storage.
-    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
-    purgeAuthStorage();
-
-    // global revokes the refresh token server-side (best effort; may be offline)
-    await sb.auth.signOut({ scope: 'global' }).catch(() => {});
-    purgeAuthStorage();        // clear again in case the client re-persisted
-
-    // Hard reload to a clean origin — no #hash/?code leftovers, no JS heap state
-    window.location.replace(location.origin + location.pathname);
+    _signingOut = true;
+    try {
+      // Sign out locally first (stops auto-refresh immediately)
+      await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+      // Then revoke globally (server-side, best effort)
+      await sb.auth.signOut({ scope: 'global' }).catch(() => {});
+    } finally {
+      // Clear local state and reload
+      _user = null;
+      updateUI();
+      window.location.replace(location.origin + location.pathname);
+    }
   }
 
   function getUser() { return _user; }
