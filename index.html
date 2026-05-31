@@ -35,16 +35,29 @@
 
   <!-- ── Sessions ────────────────────────── -->
   <section class="view active" id="view-sessions">
+    <!-- Quick stats always visible -->
+    <div class="quick-stats" id="quickStatsHost"></div>
+
     <div class="view-header">
       <h1 class="view-title">Home</h1>
       <button class="btn-icon" id="sessionsImportBtn" aria-label="Import session">+</button>
     </div>
+
     <div id="sessions-empty" class="empty-state">
       <div class="empty-icon">📊</div>
       <h2>No sessions yet</h2>
-      <p>Import a Rapsodo CSV export to get started.</p>
-      <button class="btn-primary" id="emptyCTA">Import Session</button>
+      <p>Upload a Rapsodo CSV to start analyzing your swing metrics, faults, and improvement trends.</p>
+      <div class="empty-cta-group">
+        <button class="btn-primary" id="emptyCTA">📤 Import First Session</button>
+      </div>
     </div>
+
+    <!-- Smart next-step recommendation -->
+    <div id="nextStepHost" style="padding:1rem"></div>
+
+    <!-- Session categories filter -->
+    <div id="categoryFilters" style="padding:1rem 0"></div>
+
     <div id="dashboard" class="dashboard" hidden></div>
     <div id="recentWrap" hidden>
       <h2 class="section-title recent-title">Recent Sessions</h2>
@@ -275,6 +288,9 @@
       <p>Import a session to build your yardage book.</p>
     </div>
     <div id="yardages-content" hidden>
+      <!-- Drill recommendations -->
+      <div id="drillFinderHost" style="margin-bottom:1.5rem"></div>
+
       <p class="yardage-intro">Your stock carry per club across all sessions — use this for club selection on the course. <span id="yardageMeta" class="yardage-meta"></span></p>
       <div class="table-wrap">
         <table id="yardageTable"></table>
@@ -409,6 +425,9 @@
     <span class="bnav-label">Settings</span>
   </button>
 </nav>
+
+<!-- Floating action button for quick import -->
+<button class="fab" id="fabImport" onclick="Router.showImport()" title="Quick import">📤</button>
 
 <!-- ═══════════════════ SHOT DETAIL MODAL -->
 <div class="modal-overlay" id="shotModal" hidden>

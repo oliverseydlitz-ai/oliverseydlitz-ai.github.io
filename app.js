@@ -1333,8 +1333,130 @@ const Analytics = (() => {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// Goals — user-defined performance targets and progress tracking
+// QuickStats — always-visible KPI dashboard + smart recommendations
 // ════════════════════════════════════════════════════════════════
+const QuickStats = (() => {
+  function renderStats(sessions) {
+    const host = document.getElementById('quickStatsHost');
+    if (!host) return;
+    if (!sessions.length) { host.innerHTML = ''; return; }
+
+    const all = sessions.flatMap(s => s.shots);
+    const recent10 = sessions.slice(0, 10);
+    const avgScore = (() => {
+      const scores = recent10.flatMap(s => s.shots.map(ShotScorer.score)).filter(x=>x!==null);
+      return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    })();
+    const bestCarry = Math.max(0, ...all.map(s => s.carryDistance || 0));
+    const avgCarry = Math.round(avg(all, 'carryDistance') || 0);
+    const consistency = Math.round(100 - stdDev(all.map(s => s.carryDistance || 0)));
+
+    host.innerHTML = `
+      <div class="quick-stat">
+        <div class="quick-stat-value">${avgScore}</div>
+        <div class="quick-stat-label">Form</div>
+      </div>
+      <div class="quick-stat">
+        <div class="quick-stat-value">${bestCarry}</div>
+        <div class="quick-stat-label">Best</div>
+      </div>
+      <div class="quick-stat">
+        <div class="quick-stat-value">${avgCarry}</div>
+        <div class="quick-stat-label">Avg</div>
+      </div>
+      <div class="quick-stat">
+        <div class="quick-stat-value">${consistency}%</div>
+        <div class="quick-stat-label">Consistency</div>
+      </div>`;
+  }
+
+  return { renderStats };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SmartRecommendations — context-aware next-step suggestions
+// ════════════════════════════════════════════════════════════════
+const SmartRecommendations = (() => {
+  function getNextStep(sessions) {
+    if (!sessions.length) return {
+      type: 'first',
+      title: 'Import your first session',
+      desc: 'Upload a Rapsodo CSV to start analyzing your swing',
+      icon: '📤', action: 'import'
+    };
+
+    if (sessions.length < 5) return {
+      type: 'buildup',
+      title: 'Build your baseline',
+      desc: `${5 - sessions.length} more sessions to establish patterns`,
+      icon: '📈', action: 'sessions'
+    };
+
+    const faults = FaultEngine.detectFaults(sessions[0].shots);
+    if (faults.length > 0) return {
+      type: 'drill',
+      title: `Work on ${faults[0].name}`,
+      desc: faults[0].name,
+      icon: faults[0].icon, action: 'drill'
+    };
+
+    const st = Features.streak(sessions);
+    if (st.current === 0) return {
+      type: 'streak',
+      title: 'Start your streak today',
+      desc: 'Practice to build consistency',
+      icon: '🔥', action: 'sessions'
+    };
+
+    const goals = Goals.getGoals();
+    if (Object.keys(goals).length === 0) return {
+      type: 'goal',
+      title: 'Set a goal',
+      desc: 'Give yourself something to chase',
+      icon: '🎯', action: 'settings'
+    };
+
+    return {
+      type: 'review',
+      title: 'Check your progress',
+      desc: 'See how you\'re improving',
+      icon: '📊', action: 'progress'
+    };
+  }
+
+  return { getNextStep };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SessionCategories — tag and organize sessions
+// ════════════════════════════════════════════════════════════════
+const SessionCategories = (() => {
+  const STORAGE_KEY = 'slSessionCategories';
+  const DEFAULT_CATS = ['Indoor', 'Outdoor', 'Range', 'Course', 'Tutorial', 'Testing'];
+
+  function getCategories() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch (_) { return {}; }
+  }
+
+  function tagSession(sessionId, category) {
+    const cats = getCategories();
+    if (!cats[category]) cats[category] = [];
+    if (!cats[category].includes(sessionId)) cats[category].push(sessionId);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cats)); } catch (_) {}
+  }
+
+  function filterByCategory(sessions, category) {
+    if (category === 'all') return sessions;
+    const cats = getCategories();
+    const ids = new Set(cats[category] || []);
+    return sessions.filter(s => ids.has(s.id));
+  }
+
+  return { DEFAULT_CATS, getCategories, tagSession, filterByCategory };
+})();
 const Goals = (() => {
   const STORAGE_KEY = 'slGoals';
 
@@ -1700,6 +1822,24 @@ const UI = (() => {
 
   // ── Home: dashboard + recent sessions ─────────────────────────
   function renderHome(sessions) {
+    // Always render quick stats at the top
+    try { QuickStats.renderStats(sessions); } catch(e){ console.error('quickstats',e); }
+
+    // Render smart next-step recommendation
+    try {
+      const nextHost = document.getElementById('nextStepHost');
+      if (nextHost) {
+        const next = SmartRecommendations.getNextStep(sessions);
+        nextHost.innerHTML = `
+          <div class="drill-card" onclick="Router.show('${next.action}')">
+            <div class="drill-icon">${next.icon}</div>
+            <div class="drill-title">${next.title}</div>
+            <div class="drill-desc">${next.desc}</div>
+            <div class="drill-time">→ Tap to go</div>
+          </div>`;
+      }
+    } catch(e){ console.error('nextStep',e); }
+
     const dash=document.getElementById('dashboard');
     const recent=document.getElementById('recentWrap');
     if (!sessions.length) {
@@ -1907,24 +2047,40 @@ const UI = (() => {
       const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
       const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
       const grade = avgScore ? ShotScorer.grade(avgScore) : null;
-      const highFaults = faults.filter(f=>f.severity==='high').length;
+      const highFaults = faults.filter(f=>f.severity==='high');
       const driverShots = s.shots.filter(x=>x.clubType==='d');
       const driverCarry = avg(driverShots,'carryDistance');
+      const prevScore = sessions[sessions.indexOf(s)+1]?.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const prevAvgScore = prevScore?.length ? Math.round(prevScore.reduce((a,b)=>a+b,0)/prevScore.length) : null;
+      const improved = avgScore && prevAvgScore && avgScore > prevAvgScore;
       return `
         <li>
-          <div class="session-card" data-id="${s.id}"${grade?` data-grade="${grade.letter}"`:''}>
-            <div class="sc-left">
-              <div class="session-date">${formatDate(s.date)}</div>
-              <div class="session-meta">${clubBreakdown(s.shots)} · ${s.shots.length} shots</div>
-              <div class="session-stats">
-                <span class="session-stat">Smash <strong>${fmt(avg(s.shots,'smashFactor'),2)}</strong></span>
-                <span class="session-stat">Carry <strong>${fmt(avg(s.shots,'carryDistance'),0)} yds</strong></span>
-                ${driverShots.length ? `<span class="session-stat">Driver <strong>${fmt(driverCarry,0)} yds</strong></span>` : ''}
+          <div class="session-card" data-id="${s.id}">
+            <div>
+              <div class="session-card-date">${formatDate(s.date)}</div>
+              <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
+                <div class="stat-card">
+                  <div class="stat-value">${fmt(avg(s.shots,'ballSpeed'),0)}</div>
+                  <div class="stat-label">Ball Speed</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${fmt(avg(s.shots,'carryDistance'),0)}</div>
+                  <div class="stat-label">Avg Carry</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">${fmt(avg(s.shots,'launchAngle'),1)}</div>
+                  <div class="stat-label">Launch</div>
+                </div>
+              </div>
+              <div class="session-card-badges">
+                ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
+                ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${f.icon} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
               </div>
             </div>
-            <div class="sc-right">
+            <div style="text-align:right">
               ${grade ? `
-              <div class="session-grade">
+              <div class="session-score-ring">
                 <svg viewBox="0 0 52 52" width="52" height="52" data-offset="${(125.66*(1-avgScore/100)).toFixed(1)}">
                   <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}26" stroke-width="3.5"/>
                   <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}" stroke-width="3.5"
@@ -1934,8 +2090,9 @@ const UI = (() => {
                     font-family="Outfit,sans-serif" font-size="17" font-weight="800"
                     fill="${grade.color}">${grade.letter}</text>
                 </svg>
+                <div class="session-score-num">${avgScore}</div>
+                <div class="session-score-label">Score</div>
               </div>` : ''}
-              ${highFaults ? `<div class="fault-badge">${highFaults} ⚠</div>` : ''}
             </div>
           </div>
         </li>`;
@@ -2542,16 +2699,39 @@ const UI = (() => {
     document.getElementById('yardageMeta').textContent =
       `${book.length} clubs · ${totalShots} shots · ${sessions.length} session${sessions.length>1?'s':''}`;
 
+    // Add drill finder for weakest clubs
+    try {
+      const drillHost = document.getElementById('drillFinderHost');
+      if (drillHost) {
+        const weakest = book.filter(b=>b.count>=5).sort((a,b)=>b.stdCarry-a.stdCarry).slice(0,2);
+        const drillTexts = {
+          'tight': { desc: 'Your distance is tight but repeatable', action: 'Maintain rhythm' },
+          'moderate': { desc: 'Working on consistency — build confidence', action: 'Target practice' },
+          'wide': { desc: 'Distance varies — focus on setup', action: 'Setup drill' }
+        };
+        drillHost.innerHTML = '<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill Focus</h3>' + weakest.map(b => {
+          const cons = b.stdCarry===0?'tight': b.stdCarry<6?'tight':b.stdCarry<12?'moderate':'wide';
+          const drillInfo = drillTexts[cons];
+          return `<div class="drill-card" onclick="Router.show('sessions')">
+            <div class="drill-icon">${clubColor(b.club)}</div>
+            <div class="drill-title">${clubLabel(b.club)} (${cons.toUpperCase()})</div>
+            <div class="drill-desc">${drillInfo.desc}</div>
+            <div class="drill-time">→ ${drillInfo.action}</div>
+          </div>`;
+        }).join('');
+      }
+    } catch(e){ console.error('drillFinder',e); }
+
     document.getElementById('yardageTable').innerHTML = `
       <thead><tr><th>Club</th><th>Stock Carry</th><th>Range</th><th>Consistency</th><th>Avg Total</th><th>Shots</th></tr></thead>
       <tbody>${book.map(b=>{
         const cons = b.stdCarry===0?'—': b.stdCarry<6?'Tight':b.stdCarry<12?'Moderate':'Wide';
-        const consC = b.stdCarry<6?'var(--green-light)':b.stdCarry<12?'var(--yellow)':'var(--red)';
+        const consC = b.stdCarry<6?'#22c55e':b.stdCarry<12?'#eab308':'#ef4444';
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
           <td><strong style="font-size:1.05rem">${fmt(b.avgCarry,0)}</strong> yds</td>
           <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
-          <td><span style="color:${consC}">${cons}</span> <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)}</small></td>
+          <td><span style="color:${consC};font-weight:600">${cons}</span> <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)}</small></td>
           <td>${fmt(b.avgTotal,0)} yds</td>
           <td>${b.count}</td>
         </tr>`;
@@ -3111,6 +3291,21 @@ async function init() {
       btn.disabled = false;
     }
   });
+
+  // Keyboard shortcuts for power users
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input,textarea,select')) return; // don't interfere with form inputs
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'i' || e.key === 'I') { e.preventDefault(); Router.showImport(); }
+      if (e.key === 'h' || e.key === 'H') { e.preventDefault(); Router.showSessions(); }
+      if (e.key === 'p' || e.key === 'P') { e.preventDefault(); Router.showProgress(); }
+      if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); Router.showYardages(); }
+    }
+  });
+
+  // Show keyboard tips in console
+  console.log('%cShotLab Keyboard Shortcuts', 'font-weight:bold;font-size:14px;color:#0b4d2e');
+  console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages');
 
   // View preferences toggles
   const prefs = ViewPrefs.getPrefs();

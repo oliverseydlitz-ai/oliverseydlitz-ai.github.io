@@ -1769,3 +1769,187 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .alert-item, .benchmark-table {
   transition: background-color .25s ease, border-color .25s ease, color .25s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   REDESIGN v5 — UX/NAVIGATION OVERHAUL
+   Information architecture, visual hierarchy, cognitive flow
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Quick stats always visible (sticky mini-dashboard) */
+.quick-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem;
+  padding: .6rem 1rem; background: var(--surface); border-bottom: 1.5px solid var(--border);
+  font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+  position: sticky; top: 0; z-index: 50;
+}
+.quick-stat {
+  text-align: center; padding: .4rem;
+  border-radius: var(--radius-sm); background: var(--surface2); transition: all .15s;
+}
+.quick-stat:hover { background: var(--surface3); }
+.quick-stat-value { font-size: 1.1rem; font-weight: 800; color: var(--pine);
+  font-family: var(--font-display); }
+.quick-stat-label { color: var(--text-muted); margin-top: 2px; }
+
+/* Session cards redesigned - visual + actionable */
+.session-card {
+  border: 1.5px solid var(--border); border-radius: var(--radius); overflow: visible;
+  background: var(--surface); cursor: pointer; transition: all .2s;
+  display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.session-card:hover {
+  border-color: var(--pine); box-shadow: 0 4px 12px rgba(11,77,46,.15);
+  transform: translateY(-2px);
+}
+.session-card-date { font-weight: 600; color: var(--text); font-size: .95rem; }
+.session-card-meta { font-size: .8rem; color: var(--text-muted); margin: .3rem 0; }
+.session-card-badges { display: flex; gap: .4rem; margin-top: .5rem; flex-wrap: wrap; }
+.session-badge { display: inline-block; padding: 3px 9px; background: var(--pine); color: #fff;
+  font-size: .65rem; font-weight: 700; border-radius: 12px; text-transform: uppercase;
+  letter-spacing: .04em; }
+.session-badge.fault { background: #ef4444; }
+.session-badge.improvement { background: #22c55e; }
+
+.session-score-ring { position: relative; width: 70px; height: 70px; }
+.session-score-ring svg { filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
+.session-score-num { font-size: 1.8rem; font-weight: 800; font-family: var(--font-display);
+  line-height: 1; text-align: center; }
+.session-score-label { font-size: .65rem; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .04em; text-align: center; }
+
+/* Quick actions sidebar */
+.quick-actions {
+  display: flex; flex-direction: column; gap: .6rem; padding: .8rem;
+  background: linear-gradient(135deg, rgba(11,77,46,.06), rgba(34,197,94,.05));
+  border: 1.5px dashed var(--border-hi); border-radius: var(--radius);
+  margin-bottom: 1.2rem;
+}
+.quick-action-btn {
+  padding: .7rem; background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: .5rem; font-weight: 600;
+  font-size: .85rem; color: var(--text);
+}
+.quick-action-btn:hover {
+  border-color: var(--pine); background: rgba(31,138,82,.08);
+  transform: translateX(2px);
+}
+
+/* Category/tag system */
+.session-categories {
+  display: flex; gap: .6rem; margin-bottom: 1rem; flex-wrap: wrap;
+}
+.category-chip {
+  padding: .5rem .9rem; background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 20px; font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: all .15s; color: var(--text-muted);
+}
+.category-chip:hover { border-color: var(--pine); color: var(--text); }
+.category-chip.active { background: var(--pine); color: #fff; border-color: var(--pine); }
+
+/* Drill recommendation cards */
+.drill-card {
+  padding: 1rem; background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(51,65,85,.04));
+  border: 1.5px solid var(--border-hi); border-radius: var(--radius);
+  cursor: pointer; transition: all .2s; margin-bottom: .8rem;
+}
+.drill-card:hover { border-color: var(--green); background: linear-gradient(135deg, rgba(34,197,94,.14), rgba(51,65,85,.06)); }
+.drill-icon { font-size: 1.5rem; margin-bottom: .4rem; }
+.drill-title { font-weight: 700; color: var(--text); margin-bottom: .2rem; }
+.drill-desc { font-size: .85rem; color: var(--text-muted); line-height: 1.4; }
+.drill-time { font-size: .75rem; color: var(--text-dim); margin-top: .4rem; }
+
+/* Statistics grid cards */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .6rem; margin-bottom: 1.2rem;
+}
+.stat-card {
+  padding: .8rem; background: var(--surface2); border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); text-align: center;
+}
+.stat-value { font-size: 1.5rem; font-weight: 800; color: var(--pine);
+  font-family: var(--font-display); }
+.stat-label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .05em; margin-top: .3rem; }
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .quick-stats { grid-template-columns: repeat(2, 1fr); gap: .4rem; padding: .5rem .8rem; }
+  .session-card { grid-template-columns: 1fr; }
+}
+
+html.dark .quick-stats { background: var(--surface); }
+html.dark .quick-action-btn { background: var(--surface); }
+html.dark .drill-card { background: linear-gradient(135deg, rgba(40,168,98,.08), rgba(51,65,85,.04)); }
+
+/* Mobile-first optimizations for touch interaction */
+@media (max-width: 480px) {
+  .quick-stats { grid-template-columns: repeat(2, 1fr); gap: .3rem; padding: .4rem .6rem; }
+  .quick-stat { padding: .3rem; }
+  .quick-stat-value { font-size: 0.95rem; }
+  .session-card { padding: .8rem; gap: .6rem; }
+  .stat-card { padding: .6rem; }
+  .stat-value { font-size: 1.2rem; }
+  .fab { width: 50px; height: 50px; font-size: 1.3rem; }
+  button { padding: .55rem 1rem !important; font-size: .8rem !important; }
+}
+
+/* Better keyboard hints */
+.kbd-hint {
+  display: inline-block; padding: 2px 6px; background: var(--surface3);
+  border: 1px solid var(--border); border-radius: 3px; font-family: var(--font-mono);
+  font-size: .65rem; color: var(--text-muted); margin-left: .3rem;
+}
+
+/* Session rating cards */
+.session-rating {
+  display: flex; gap: .5rem; padding: .6rem; background: var(--surface2);
+  border-radius: var(--radius-sm); align-items: center;
+}
+.rating-star { font-size: 1.5rem; cursor: pointer; opacity: .4; transition: opacity .15s; }
+.rating-star:hover, .rating-star.active { opacity: 1; }
+
+/* Better visual feedback on hover/active */
+button:active { transform: scale(0.98); }
+.session-card:active { transform: scale(0.99); }
+
+/* Smooth animations */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.quick-stats { animation: slideUp .3s ease; }
+.drill-card { animation: slideUp .4s ease; }
+
+/* Better form styling */
+input[type="number"], input[type="text"], input[type="email"],
+input[type="password"], select {
+  appearance: none; -webkit-appearance: none;
+  background-image: none;
+}
+
+select::-webkit-search-cancel-button,
+select::-webkit-outer-spin-button,
+select::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Touch-friendly tap targets */
+a, button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Better contrast for readability */
+.session-card-date {
+  font-size: 1rem;
+}
+
+/* Improved chart sizing */
+canvas {
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
