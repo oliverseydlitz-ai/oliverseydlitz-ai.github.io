@@ -1428,6 +1428,121 @@ const SmartRecommendations = (() => {
 })();
 
 // ════════════════════════════════════════════════════════════════
+// SessionFeedback — rate and review sessions for personalization
+// ════════════════════════════════════════════════════════════════
+const SessionFeedback = (() => {
+  const STORAGE_KEY = 'slSessionFeedback';
+
+  function rateSession(sessionId, rating) {
+    const feedback = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    feedback[sessionId] = { rating, rated: Date.now() };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(feedback)); } catch (_) {}
+  }
+
+  function getFeedback(sessionId) {
+    const feedback = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    return feedback[sessionId] || null;
+  }
+
+  function getAverageRating(sessions) {
+    const feedback = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const rated = sessions.filter(s => feedback[s.id]).map(s => feedback[s.id].rating);
+    return rated.length ? (rated.reduce((a,b)=>a+b,0)/rated.length).toFixed(1) : null;
+  }
+
+  return { rateSession, getFeedback, getAverageRating };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ClubComparison — compare club performance across sessions
+// ════════════════════════════════════════════════════════════════
+const ClubComparison = (() => {
+  function compareClubs(sessions, club1, club2) {
+    const shots1 = sessions.flatMap(s=>s.shots).filter(sh=>sh.clubType===club1);
+    const shots2 = sessions.flatMap(s=>s.shots).filter(sh=>sh.clubType===club2);
+
+    return {
+      club1: {
+        name: clubLabel(club1),
+        avgCarry: Math.round(avg(shots1,'carryDistance')||0),
+        avgBallSpeed: fmt(avg(shots1,'ballSpeed'),1),
+        avgSmash: fmt(avg(shots1,'smashFactor'),2),
+        shots: shots1.length,
+        consistency: Math.round(100 - stdDev(shots1.map(s=>s.carryDistance||0))),
+      },
+      club2: {
+        name: clubLabel(club2),
+        avgCarry: Math.round(avg(shots2,'carryDistance')||0),
+        avgBallSpeed: fmt(avg(shots2,'ballSpeed'),1),
+        avgSmash: fmt(avg(shots2,'smashFactor'),2),
+        shots: shots2.length,
+        consistency: Math.round(100 - stdDev(shots2.map(s=>s.carryDistance||0))),
+      }
+    };
+  }
+
+  return { compareClubs };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PracticePlans — AI-generated practice routines
+// ════════════════════════════════════════════════════════════════
+const PracticePlans = (() => {
+  function generatePlan(sessions) {
+    if (!sessions.length) return null;
+    const faults = FaultEngine.detectFaults(sessions[0].shots);
+    const st = Features.streak(sessions);
+
+    const plans = [];
+
+    // Consistency drill
+    plans.push({
+      name: '⏱️ Consistency Drill',
+      duration: 20,
+      desc: 'Hit 10 shots with each club, focusing on repeatable swing',
+      focus: 'Rhythm',
+      difficulty: 'Easy'
+    });
+
+    // Distance control
+    if (faults.length > 0) {
+      plans.push({
+        name: `🎯 ${faults[0].name} Drill`,
+        duration: 30,
+        desc: `Target your #1 issue: ${faults[0].name}`,
+        focus: 'Technique',
+        difficulty: 'Hard'
+      });
+    }
+
+    // Course simulation
+    plans.push({
+      name: '⛳ Course Simulation',
+      duration: 45,
+      desc: 'Simulate 9 holes - pick clubs like you would on course',
+      focus: 'Pressure',
+      difficulty: 'Hard'
+    });
+
+    // Short game if irons present
+    const hasIrons = sessions.flatMap(s=>s.shots).some(sh=>isIron(sh.clubType) && sh.carryDistance<150);
+    if (hasIrons) {
+      plans.push({
+        name: '🎪 Short Game Focus',
+        duration: 25,
+        desc: 'Drill approach shots and wedges for accuracy',
+        focus: 'Accuracy',
+        difficulty: 'Medium'
+      });
+    }
+
+    return plans;
+  }
+
+  return { generatePlan };
+})();
+
+// ════════════════════════════════════════════════════════════════
 // SessionCategories — tag and organize sessions
 // ════════════════════════════════════════════════════════════════
 const SessionCategories = (() => {
@@ -2935,7 +3050,28 @@ const UI = (() => {
       </div>`;
   }
 
-  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages };
+  function renderPractice(sessions) {
+    const empty = document.getElementById('practice-empty');
+    const content = document.getElementById('practice-content');
+    if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
+    empty.style.display='none'; content.hidden=false;
+
+    const plans = PracticePlans.generatePlan(sessions);
+    const grid = document.getElementById('practiceGrid');
+    if (!grid || !plans) return;
+
+    grid.innerHTML = plans.map((p,i) => `
+      <div class="drill-card" style="padding:1rem;cursor:pointer;text-align:center">
+        <div style="font-size:2rem;margin-bottom:.4rem">${p.name.split(' ')[0]}</div>
+        <div class="drill-title" style="font-size:.9rem">${p.name.substring(p.name.indexOf(' ')+1)}</div>
+        <div class="drill-time" style="margin-top:.5rem">${p.duration} min</div>
+        <div style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem">${p.difficulty}</div>
+        <button class="btn-primary" onclick="toast('${p.name} session started!')" style="width:100%;margin-top:.6rem;padding:.4rem;font-size:.75rem">Start</button>
+      </div>`
+    ).join('');
+  }
+
+  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2981,6 +3117,11 @@ const Router = (() => {
     safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
   }
 
+  async function showPractice() {
+    const sessions = await Store.getSessions();
+    safeRender('practice', () => UI.renderPractice(sessions), 'practice');
+  }
+
   function showImport() {
     document.querySelectorAll('.import-step').forEach(s=>s.classList.remove('active'));
     document.getElementById('step-pick').classList.add('active');
@@ -2988,7 +3129,7 @@ const Router = (() => {
     show('import');
   }
 
-  return { show, showDetail, showProgress, showYardages, showSessions, showImport };
+  return { show, showDetail, showProgress, showYardages, showSessions, showPractice, showImport };
 })();
 
 // ────────────────────────────────────────────────────────────────

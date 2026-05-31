@@ -24,6 +24,7 @@
   <nav class="top-nav-links">
     <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
     <a href="#" class="nav-link" data-view="yardages">Yardages</a>
+    <a href="#" class="nav-link" data-view="practice">Practice</a>
     <a href="#" class="nav-link" data-view="progress">Progress</a>
     <a href="#" class="nav-link" data-view="settings">Settings</a>
     <button class="btn-primary btn-sm" id="topImportBtn">+ Import</button>
@@ -274,6 +275,22 @@
         <div class="chart-card"><h3>Club Path (°)</h3><canvas id="chartPath"></canvas></div>
         <div class="chart-card"><h3>Attack Angle (°)</h3><canvas id="chartAA"></canvas></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ── Practice Plans ────────────────────────── -->
+  <section class="view" id="view-practice">
+    <div class="view-header">
+      <h1 class="view-title">Practice Plans</h1>
+    </div>
+    <div id="practice-empty" class="empty-state">
+      <div class="empty-icon">🎯</div>
+      <h2>No data yet</h2>
+      <p>Import sessions to get AI-generated practice routines.</p>
+    </div>
+    <div id="practice-content" hidden>
+      <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:.9rem">Smart routines personalized to your swing. Pick one and dive in.</p>
+      <div id="practiceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-bottom:2rem"></div>
     </div>
   </section>
 
