@@ -3693,3 +3693,133 @@ const InsightEngine = (() => {
   return { generateInsights };
 })();
 
+
+// ════════════════════════════════════════════════════════════════
+// CoachingMode — Interactive guidance system
+// ════════════════════════════════════════════════════════════════
+const CoachingMode = (() => {
+  const TIPS = {
+    'Slice': [
+      '🎯 Grip: Check your grip pressure - aim for 6/10 tightness',
+      '📐 Path: Feel like you\'re swinging from inside-to-out',
+      '🔄 Rotation: Ensure full shoulder turn on backswing',
+      '📍 Alignment: Check your shoulders point slightly left of target',
+    ],
+    'Hook': [
+      '📍 Alignment: Try opening your stance slightly',
+      '🎯 Grip: Check for over-strong grip',
+      '📐 Path: Focus on outside-to-in path feels',
+      '🔄 Rotation: Practice 3/4 swing to feel the path',
+    ],
+    'Thin': [
+      '📍 Ball Position: Move ball forward in stance',
+      '🧍 Posture: Maintain spine angle through impact',
+      '👀 Eye Focus: Keep your eyes on the back of the ball',
+      '🔄 Low Point: Practice hitting divots 2 inches AFTER the ball',
+    ],
+    'Fat': [
+      '⚖️ Weight Transfer: Shift weight to front foot during downswing',
+      '🧍 Posture: Keep your head still until after impact',
+      '📍 Ball Position: Try moving ball back in stance',
+      '🔄 Practice: Hit tees in the ground - swing over them',
+    ],
+  };
+
+  function getTips(faultName) {
+    return TIPS[faultName] || [
+      '🎯 Focus on your fundamentals',
+      '📊 Record your swing on video',
+      '🔄 Practice with purpose, not just volume',
+      '💪 Work on one thing at a time',
+    ];
+  }
+
+  function generateSession(fault) {
+    return {
+      warmup: '5 min light stretching & 10 swings to loosen up',
+      focus: `Work on ${fault || 'consistency'}`,
+      drills: getTips(fault),
+      cooldown: 'Review what worked and what didn\'t',
+      duration: 30,
+    };
+  }
+
+  return { getTips, generateSession };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SessionSnapshot — Create shareable summaries
+// ════════════════════════════════════════════════════════════════
+const SessionSnapshot = (() => {
+  function create(session) {
+    const shots = session.shots;
+    const scores = shots.map(ShotScorer.score).filter(x=>x!==null);
+    const avg_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const grade = ShotScorer.grade(avg_score);
+    const faults = FaultEngine.detectFaults(shots).slice(0, 3);
+
+    return {
+      date: formatDate(session.date),
+      shotCount: shots.length,
+      formScore: avg_score,
+      grade: grade.letter,
+      avgCarry: fmt(avg(shots, 'carryDistance'), 0),
+      avgBallSpeed: fmt(avg(shots, 'ballSpeed'), 1),
+      topFault: faults[0]?.name || 'None',
+      faultCount: FaultEngine.detectFaults(shots).length,
+      clubs: sortedClubs(shots).map(clubLabel).join(', '),
+      notes: session.notes || '',
+      summary: `${shots.length} shots | Form: ${avg_score}/100 (${grade.letter}) | ${session.notes || 'Range session'}`
+    };
+  }
+
+  function toShareText(snapshot) {
+    return `📊 ShotLab Session Summary\n\n` +
+      `Date: ${snapshot.date}\n` +
+      `Score: ${snapshot.formScore}/100 (${snapshot.grade})\n` +
+      `Shots: ${snapshot.shotCount}\n` +
+      `Avg Carry: ${snapshot.avgCarry} yds\n` +
+      `Top Issue: ${snapshot.topFault}\n` +
+      `\n${snapshot.summary}\n\n` +
+      `Tracked with ShotLab 🎯`;
+  }
+
+  return { create, toShareText };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PerformanceGrade — Comprehensive scoring
+// ════════════════════════════════════════════════════════════════
+const PerformanceGrade = (() => {
+  function calculateFullGrade(sessions) {
+    if (!sessions.length) return null;
+
+    const all_shots = sessions.flatMap(s => s.shots);
+    const scores = all_shots.map(ShotScorer.score).filter(x => x !== null);
+    const form_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    
+    const carries = all_shots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const consistency = Math.round(100 - stdDev(carries));
+    
+    const session_count = sessions.length;
+    const total_shots = all_shots.length;
+    
+    const st = Features.streak(sessions);
+    const streak_bonus = st.current >= 3 ? 10 : st.current === 2 ? 5 : 0;
+
+    const overall = Math.min(100, Math.round((form_score * 0.5 + consistency * 0.3 + (session_count > 10 ? 20 : session_count * 2)) * 0.9 + streak_bonus));
+
+    return {
+      overall,
+      form: form_score,
+      consistency,
+      frequency: session_count,
+      totalShots: total_shots,
+      streak: st.current,
+      grade: ShotScorer.grade(overall).letter,
+    };
+  }
+
+  return { calculateFullGrade };
+})();
+
