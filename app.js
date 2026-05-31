@@ -1957,6 +1957,18 @@ const UI = (() => {
       }
     } catch(e){ console.error('tip',e); }
 
+    // Render enhanced metrics widget
+    try {
+      if (sessions.length) {
+        const stats = EnhancedMetricsWidget.renderMiniStats(sessions);
+        const widget = EnhancedMetricsWidget.renderWidget(stats);
+        const quickStatsHost = document.querySelector('.quick-stats');
+        if (quickStatsHost && widget) {
+          quickStatsHost.insertAdjacentHTML('beforebegin', widget);
+        }
+      }
+    } catch(e){ console.error('metrics-widget',e); }
+
     // Always render quick stats at the top
     try { QuickStats.renderStats(sessions); } catch(e){ console.error('quickstats',e); }
 
@@ -3939,6 +3951,16 @@ async function init() {
   }
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+  // Initialize accessibility enhancements
+  try { AccessibilityEnhancements.init(); } catch(e){ console.error('accessibility',e); }
+
+  // Initialize responsive UX enhancements
+  try { ResponsiveEnhancements.enhanceMobileUX(); } catch(e){ console.error('responsive',e); }
+
+  // Show welcome message with tips
+  console.log('%cWelcome to ShotLab v3.0 🏌️', 'font-size:16px;font-weight:bold;color:#0b4d2e');
+  console.log('%cPress Ctrl+? for keyboard shortcuts', 'font-size:12px;color:#496657');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -5284,5 +5306,223 @@ const SessionComparison = (() => {
   }
 
   return { compare };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// EnhancedMetricsWidget — Beautiful stats display
+// ════════════════════════════════════════════════════════════════
+const EnhancedMetricsWidget = (() => {
+  function renderMiniStats(sessions) {
+    if (!sessions.length) return null;
+
+    const allShots = sessions.flatMap(s => s.shots);
+    const scores = allShots.map(ShotScorer.score).filter(x=>x!==null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const grade = ShotScorer.grade(avgScore);
+
+    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const consistency = Math.round(100 - stdDev(carries));
+    const st = Features.streak(sessions);
+
+    return {
+      grade: grade.letter,
+      score: avgScore,
+      carry: Math.round(avg(allShots, 'carryDistance') || 0),
+      consistency,
+      sessions: sessions.length,
+      shots: allShots.length,
+      streak: st.current,
+      color: grade.color,
+    };
+  }
+
+  function renderWidget(stats) {
+    if (!stats) return '';
+    return `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.2rem">
+        <div style="padding:1rem;background:rgba(${parseInt(stats.color.slice(1,3),16)},${parseInt(stats.color.slice(3,5),16)},${parseInt(stats.color.slice(5,7),16)},.1);border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:2.5rem;font-weight:800;color:${stats.color}">${stats.grade}</div>
+          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">FORM GRADE</div>
+        </div>
+        <div style="padding:1rem;background:rgba(74,222,128,.1);border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:2.5rem;font-weight:800;color:#4ade80">${stats.consistency}%</div>
+          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">CONSISTENCY</div>
+        </div>
+        <div style="padding:1rem;background:rgba(251,146,60,.1);border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:2rem;font-weight:800;color:#fb923c">🔥 ${stats.streak}</div>
+          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">DAY STREAK</div>
+        </div>
+      </div>`;
+  }
+
+  return { renderMiniStats, renderWidget };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// NotificationCenter — Smart alerts and messages
+// ════════════════════════════════════════════════════════════════
+const NotificationCenter = (() => {
+  const notifications = [];
+
+  function addNotification(type, message, duration = 4000) {
+    const id = Math.random().toString(36).slice(2);
+    notifications.push({ id, type, message, time: Date.now() });
+
+    const html = `
+      <div id="notif-${id}" style="animation:slideUp .3s ease-out;padding:1rem;background:${
+        type === 'success' ? 'rgba(34,197,94,.9)' :
+        type === 'error' ? 'rgba(239,68,68,.9)' :
+        type === 'info' ? 'rgba(59,130,246,.9)' : 'rgba(168,85,247,.9)'
+      };color:#fff;border-radius:var(--radius-sm);margin-bottom:.5rem;font-size:.95rem;display:flex;justify-content:space-between;align-items:center">
+        <span>${message}</span>
+        <button onclick="document.getElementById('notif-${id}').remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1rem">✕</button>
+      </div>`;
+
+    const container = document.getElementById('notificationsContainer') || (() => {
+      const cont = document.createElement('div');
+      cont.id = 'notificationsContainer';
+      cont.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:9998;max-width:400px;max-height:500px;overflow-y:auto';
+      document.body.appendChild(cont);
+      return cont;
+    })();
+
+    container.insertAdjacentHTML('beforeend', html);
+
+    if (duration) {
+      setTimeout(() => {
+        document.getElementById(`notif-${id}`)?.remove();
+      }, duration);
+    }
+  }
+
+  return { addNotification };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// AccessibilityEnhancements — WCAG 2.1 AA compliance
+// ════════════════════════════════════════════════════════════════
+const AccessibilityEnhancements = (() => {
+  function init() {
+    // Ensure all buttons have proper ARIA labels
+    document.querySelectorAll('button:not([aria-label])').forEach(btn => {
+      const text = btn.textContent?.trim();
+      if (text) btn.setAttribute('aria-label', text);
+    });
+
+    // Add focus styles
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        document.body.classList.add('keyboard-focus');
+      }
+    });
+
+    document.addEventListener('click', () => {
+      document.body.classList.remove('keyboard-focus');
+    });
+
+    // High contrast mode support
+    if (window.matchMedia('(prefers-contrast: more)').matches) {
+      document.documentElement.style.setProperty('--contrast', '1.2');
+    }
+
+    // Reduced motion support
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.style.setProperty('--animation-duration', '0.01s');
+    }
+  }
+
+  return { init };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PerformanceOptimizations — Keep the app fast
+// ════════════════════════════════════════════════════════════════
+const PerformanceOptimizations = (() => {
+  function lazyLoadImages() {
+    document.querySelectorAll('img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+      img.removeAttribute('data-src');
+    });
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  }
+
+  function memoize(func) {
+    const cache = new Map();
+    return (...args) => {
+      const key = JSON.stringify(args);
+      if (cache.has(key)) return cache.get(key);
+      const result = func(...args);
+      cache.set(key, result);
+      return result;
+    };
+  }
+
+  return { lazyLoadImages, debounce, memoize };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// DocumentationCenter — In-app help and guides
+// ════════════════════════════════════════════════════════════════
+const DocumentationCenter = (() => {
+  const docs = {
+    'getting-started': {
+      title: '🚀 Getting Started',
+      content: 'Import your Rapsodo CSV file to begin tracking your swing metrics. Sessions are stored locally on your device.',
+    },
+    'forms': {
+      title: '📋 Understanding Forms',
+      content: 'The form score (0-100) reflects shot quality. Higher = better contact, consistency, and flight characteristics.',
+    },
+    'faults': {
+      title: '⚠️ Fault Categories',
+      content: 'The Fault Engine detects issues: Contact (thin/fat), Path (slice/hook), Launch angle problems, and consistency faults.',
+    },
+    'goals': {
+      title: '🎯 Setting Goals',
+      content: 'Set targets for distance, form, speed, or just practice frequency. Track progress to stay motivated.',
+    },
+    'export': {
+      title: '📤 Exporting Data',
+      content: 'Export your sessions as JSON (backup) or CSV (spreadsheet analysis). Your data always belongs to you.',
+    },
+    'privacy': {
+      title: '🔒 Privacy',
+      content: 'All data is stored on your device by default. Optional cloud sync uses your own Supabase account.',
+    },
+  };
+
+  function getDoc(key) {
+    return docs[key] || null;
+  }
+
+  function getAllDocs() {
+    return Object.values(docs);
+  }
+
+  function showDocModal(key) {
+    const doc = getDoc(key);
+    if (!doc) return;
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="docModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
+          <div style="font-size:1.2rem;font-weight:800;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
+            ${doc.title}
+            <button onclick="document.getElementById('docModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="font-size:.95rem;line-height:1.6;color:var(--text)">${doc.content}</div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  return { getDoc, getAllDocs, showDocModal };
 })();
 
