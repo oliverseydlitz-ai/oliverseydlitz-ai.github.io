@@ -3594,6 +3594,96 @@ async function init() {
     document.body.insertAdjacentHTML('beforeend', html);
   });
 
+  document.getElementById('showClubAnalysisBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    if (!sessions.length) { toast('No data to analyze'); return; }
+    const clubs = ClubAnalyzer.compareClubs(sessions);
+    if (!clubs.length) { toast('No club data'); return; }
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
+            🏌️ Club Performance Analysis
+            <button onclick="document.getElementById('clubModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="display:grid;gap:.8rem">
+            ${clubs.map(c => `
+              <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);border-left:4px solid ${clubColor(c.club === clubLabel(c.club) ? Object.keys(CLUB_LABELS).find(k => CLUB_LABELS[k] === c.club) : c.club)}">
+                <div style="font-weight:600;margin-bottom:.6rem">${c.club}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem">
+                  <div>
+                    <div style="font-size:.8rem;color:var(--text-dim)">Avg Carry</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.avgCarry} yds</div>
+                  </div>
+                  <div>
+                    <div style="font-size:.8rem;color:var(--text-dim)">Shots</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.shotCount}</div>
+                  </div>
+                  <div>
+                    <div style="font-size:.8rem;color:var(--text-dim)">Consistency</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.consistency}%</div>
+                  </div>
+                  <div>
+                    <div style="font-size:.8rem;color:var(--text-dim)">Ball Speed</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
+                  </div>
+                </div>
+                <div style="font-size:.9rem;color:${c.trend.startsWith('📈') ? '#4ade80' : c.trend.startsWith('📉') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${c.trend}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+
+  document.getElementById('showEfficiencyBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    if (!sessions.length) { toast('No sessions yet'); return; }
+    const efficiency = PracticeEfficiency.calculateEfficiency(sessions);
+    if (!efficiency) { toast('Unable to calculate'); return; }
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
+            ⚡ Practice Efficiency
+            <button onclick="document.getElementById('efficiencyModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="display:grid;gap:1rem">
+            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Rating</div>
+              <div style="font-size:2rem;font-weight:800;color:#4ade80">${efficiency.efficiencyRating}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Sessions (recent 5)</div>
+                <div style="font-size:1.6rem;font-weight:800">${efficiency.recentSessions}</div>
+              </div>
+              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Total Shots</div>
+                <div style="font-size:1.6rem;font-weight:800">${efficiency.totalShots}</div>
+              </div>
+              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Shots/Hour</div>
+                <div style="font-size:1.6rem;font-weight:800">${efficiency.shotsPerHour}</div>
+              </div>
+              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Avg Quality</div>
+                <div style="font-size:1.6rem;font-weight:800">${efficiency.avgQuality}/100</div>
+              </div>
+            </div>
+            <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="font-weight:600;margin-bottom:.4rem">💡 Recommendation</div>
+              <div style="font-size:.95rem;color:var(--text)">${efficiency.recommendation}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+
   // Shot detail modal close
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
@@ -4951,5 +5041,248 @@ const ResponsiveEnhancements = (() => {
   }
 
   return { enhanceMobileUX, getViewportSize, addOrientationListener };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ClubAnalyzer — Deep-dive club-by-club performance
+// ════════════════════════════════════════════════════════════════
+const ClubAnalyzer = (() => {
+  function analyzeClub(shots, clubType) {
+    const clubShots = shots.filter(s => s.clubType === clubType);
+    if (!clubShots.length) return null;
+
+    const carries = clubShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const ballSpeeds = clubShots.map(s => s.ballSpeed || 0).filter(b => b > 0);
+
+    const analysis = {
+      club: clubLabel(clubType),
+      shotCount: clubShots.length,
+      avgCarry: carries.length ? Math.round(carries.reduce((a,b)=>a+b,0)/carries.length) : 0,
+      bestCarry: Math.max(...carries, 0),
+      worstCarry: Math.min(...carries, 1000),
+      carryRange: Math.max(...carries, 0) - Math.min(...carries, 1000),
+      consistency: Math.round(100 - stdDev(carries)),
+      avgBallSpeed: ballSpeeds.length ? fmt(ballSpeeds.reduce((a,b)=>a+b,0)/ballSpeeds.length, 1) : '—',
+      maxBallSpeed: Math.max(...ballSpeeds, 0),
+      gapToNext: null, // filled in by Gap Engine
+      gapToPrev: null,
+      trend: calculateClubTrend(clubShots),
+    };
+
+    return analysis;
+  }
+
+  function calculateClubTrend(clubShots) {
+    if (clubShots.length < 3) return '→ Insufficient data';
+    const recent = clubShots.slice(0, 3).map(s => s.carryDistance || 0).filter(c => c > 0);
+    const older = clubShots.slice(3, 6).map(s => s.carryDistance || 0).filter(c => c > 0);
+
+    if (!recent.length || !older.length) return '→ Insufficient data';
+
+    const recentAvg = recent.reduce((a,b)=>a+b,0)/recent.length;
+    const olderAvg = older.reduce((a,b)=>a+b,0)/older.length;
+    const change = recentAvg - olderAvg;
+
+    if (change > 3) return '📈 Improving';
+    if (change < -3) return '📉 Declining';
+    return '→ Stable';
+  }
+
+  function compareClubs(sessions) {
+    const allShots = sessions.flatMap(s => s.shots);
+    const clubs = sortedClubs(allShots);
+    return clubs.map(c => analyzeClub(allShots, c)).filter(Boolean);
+  }
+
+  return { analyzeClub, compareClubs };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// FormQualityTimeline — Visual progression of swing quality
+// ════════════════════════════════════════════════════════════════
+const FormQualityTimeline = (() => {
+  function buildTimeline(sessions) {
+    if (!sessions.length) return [];
+
+    return sessions.map((s, idx) => {
+      const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const formScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      const grade = ShotScorer.grade(formScore);
+      const faults = FaultEngine.detectFaults(s.shots);
+
+      return {
+        date: formatDate(s.date),
+        dayIndex: idx,
+        formScore,
+        grade: grade.letter,
+        color: grade.color,
+        faults: faults.length,
+        topFault: faults[0]?.name || null,
+        shotCount: s.shots.length,
+      };
+    });
+  }
+
+  function getVisualization(sessions) {
+    const timeline = buildTimeline(sessions);
+    if (!timeline.length) return null;
+
+    const maxScore = Math.max(...timeline.map(t => t.formScore), 80);
+    const minScore = Math.min(...timeline.map(t => t.formScore), 40);
+    const range = maxScore - minScore || 1;
+
+    return timeline.map(t => {
+      const normalized = (t.formScore - minScore) / range;
+      return {
+        ...t,
+        barHeight: Math.round(normalized * 100),
+      };
+    });
+  }
+
+  return { buildTimeline, getVisualization };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PracticeEfficiency — Calculate quality vs quantity metrics
+// ════════════════════════════════════════════════════════════════
+const PracticeEfficiency = (() => {
+  function calculateEfficiency(sessions) {
+    if (!sessions.length) return null;
+
+    const recent = sessions.slice(0, 5);
+    const allShots = recent.flatMap(s => s.shots);
+    const totalTime = recent.length * 1; // assume 1 hour per session
+
+    const scores = allShots.map(ShotScorer.score).filter(x=>x!==null);
+    const qualityScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const shotCount = allShots.length;
+    const efficiencyRatio = Math.round((qualityScore / 100) * (shotCount / (totalTime * 60)));
+
+    return {
+      recentSessions: recent.length,
+      totalShots: shotCount,
+      avgQuality: qualityScore,
+      hoursSpent: totalTime,
+      shotsPerHour: Math.round(shotCount / totalTime),
+      qualityPerHour: Math.round((qualityScore * shotCount) / (totalTime * 100)),
+      efficiencyRating: efficiencyRatio > 80 ? 'Excellent' : efficiencyRatio > 60 ? 'Good' : efficiencyRatio > 40 ? 'Fair' : 'Low',
+      recommendation: generateEfficiencyRecommendation(efficiencyRatio, shotCount, qualityScore),
+    };
+  }
+
+  function generateEfficiencyRecommendation(ratio, shotCount, quality) {
+    if (ratio > 80) return '🎯 Great focus! Keep up the intentional practice.';
+    if (shotCount > 500 && quality < 60) return '📈 Try fewer, more focused shots. Quality > Quantity.';
+    if (quality > 80 && shotCount < 200) return '💪 You\'re doing well! Add more volume to solidify skills.';
+    return '⚡ Mix it up: balance quality feedback with practice volume.';
+  }
+
+  return { calculateEfficiency };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// GapAnalysis — Understand club gapping and distances
+// ════════════════════════════════════════════════════════════════
+const GapAnalysis = (() => {
+  function analyzeGaps(sessions) {
+    const allShots = sessions.flatMap(s => s.shots);
+    const clubs = sortedClubs(allShots);
+
+    const clubData = clubs.map(c => {
+      const clubShots = allShots.filter(s => s.clubType === c);
+      const carries = clubShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+      return {
+        club: c,
+        label: clubLabel(c),
+        avgCarry: carries.length ? Math.round(carries.reduce((a,b)=>a+b,0)/carries.length) : 0,
+        count: clubShots.length,
+      };
+    }).filter(c => c.count > 0);
+
+    // Calculate gaps
+    const gaps = [];
+    for (let i = 0; i < clubData.length - 1; i++) {
+      const gap = clubData[i].avgCarry - clubData[i+1].avgCarry;
+      gaps.push({
+        fromClub: clubData[i].label,
+        toClub: clubData[i+1].label,
+        gap: gap,
+        status: gap < 5 ? '⚠️ Small gap' : gap > 15 ? '⚠️ Large gap' : '✓ Good gap',
+      });
+    }
+
+    return {
+      clubData,
+      gaps,
+      consistency: calculateGapConsistency(gaps),
+    };
+  }
+
+  function calculateGapConsistency(gaps) {
+    if (!gaps.length) return 'Insufficient data';
+    const gapValues = gaps.map(g => g.gap).filter(g => g > 0);
+    const avgGap = gapValues.reduce((a,b)=>a+b,0) / gapValues.length;
+    const variance = Math.sqrt(gapValues.map(g => (g-avgGap)**2).reduce((a,b)=>a+b,0) / gapValues.length);
+
+    if (variance < 3) return 'Excellent — consistent gaps';
+    if (variance < 6) return 'Good — mostly consistent';
+    return 'Needs work — inconsistent gaps';
+  }
+
+  return { analyzeGaps };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SessionComparison — Side-by-side session metrics
+// ════════════════════════════════════════════════════════════════
+const SessionComparison = (() => {
+  function compare(sessionA, sessionB) {
+    const getMetrics = (s) => {
+      const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const avgScore = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : 0;
+      const carries = s.shots.map(s => s.carryDistance || 0).filter(c => c > 0);
+      return {
+        date: formatDate(s.date),
+        shotCount: s.shots.length,
+        formScore: Math.round(avgScore),
+        grade: ShotScorer.grade(avgScore).letter,
+        avgCarry: Math.round(avg(s.shots, 'carryDistance') || 0),
+        consistency: Math.round(100 - stdDev(carries)),
+        avgBallSpeed: fmt(avg(s.shots, 'ballSpeed'), 1),
+        faultCount: FaultEngine.detectFaults(s.shots).length,
+      };
+    };
+
+    const metricsA = getMetrics(sessionA);
+    const metricsB = getMetrics(sessionB);
+
+    const comparison = {
+      sessionA: metricsA,
+      sessionB: metricsB,
+      deltas: {
+        formScore: metricsB.formScore - metricsA.formScore,
+        avgCarry: metricsB.avgCarry - metricsA.avgCarry,
+        consistency: metricsB.consistency - metricsA.consistency,
+        faults: metricsB.faultCount - metricsA.faultCount,
+      },
+      verdict: generateComparisonVerdict(metricsA, metricsB),
+    };
+
+    return comparison;
+  }
+
+  function generateComparisonVerdict(a, b) {
+    const improvements = [];
+    if (b.formScore > a.formScore) improvements.push('Form improved 📈');
+    if (b.avgCarry > a.avgCarry) improvements.push('Distance increased 💪');
+    if (b.consistency > a.consistency) improvements.push('Consistency improved ✓');
+    if (b.faultCount < a.faultCount) improvements.push('Fewer faults 🎯');
+
+    if (!improvements.length) return 'Work to do — focus on one area';
+    return improvements.join(' · ');
+  }
+
+  return { compare };
 })();
 
