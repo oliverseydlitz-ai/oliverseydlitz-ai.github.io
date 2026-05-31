@@ -1955,6 +1955,21 @@ const UI = (() => {
       }
     } catch(e){ console.error('nextStep',e); }
 
+    // Render actionable insights
+    try {
+      const insightHost = document.getElementById('insightsHost');
+      if (insightHost) {
+        const insights = InsightEngine.generateInsights(sessions);
+        if (insights.length) {
+          insightHost.innerHTML = insights.map(i =>
+            `<div style="padding:.7rem;background:rgba(11,77,46,.06);border-left:4px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
+              <span style="font-size:1rem;margin-right:.4rem">${i.icon}</span>${i.text}
+            </div>`
+          ).join('');
+        }
+      }
+    } catch(e){ console.error('insights',e); }
+
     const dash=document.getElementById('dashboard');
     const recent=document.getElementById('recentWrap');
     if (!sessions.length) {
@@ -3577,3 +3592,104 @@ window.addEventListener('unhandledrejection', e => console.error('[ShotLab] unha
 document.addEventListener('DOMContentLoaded', () => {
   init().catch(showFatalError);
 });
+
+// ════════════════════════════════════════════════════════════════
+// SwingAnalytics — Advanced swing pattern detection
+// ════════════════════════════════════════════════════════════════
+const SwingAnalytics = (() => {
+  function detectPattern(shots) {
+    if (!shots.length) return null;
+
+    const carries = shots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const launches = shots.map(s => s.launchAngle || 0);
+    const ballSpeeds = shots.map(s => s.ballSpeed || 0).filter(b => b > 0);
+
+    const pattern = {
+      consistency: Math.round(100 - stdDev(carries)),
+      avgCarry: Math.round(avg(shots, 'carryDistance') || 0),
+      bestCarry: Math.max(...carries),
+      worstCarry: Math.min(...carries),
+      launchTendency: launches.length ? Math.round(avg(shots, 'launchAngle') * 10) / 10 : 0,
+      ballSpeedTrend: ballSpeeds.length ? 'stable' : 'unknown',
+      dispersalPattern: stdDev(carries) < 5 ? 'tight' : stdDev(carries) < 12 ? 'moderate' : 'wide',
+    };
+
+    return pattern;
+  }
+
+  function compareToBaseline(sessions, club) {
+    const allClubShots = sessions.flatMap(s => s.shots).filter(sh => sh.clubType === club);
+    const recentShots = sessions.slice(0, 3).flatMap(s => s.shots).filter(sh => sh.clubType === club);
+
+    if (!allClubShots.length) return null;
+
+    const allPattern = detectPattern(allClubShots);
+    const recentPattern = detectPattern(recentShots);
+
+    return {
+      baseline: allPattern,
+      recent: recentPattern,
+      improvement: recentPattern && allPattern ? recentPattern.avgCarry - allPattern.avgCarry : 0,
+      consistencyChange: recentPattern && allPattern ? recentPattern.consistency - allPattern.consistency : 0,
+    };
+  }
+
+  return { detectPattern, compareToBaseline };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// InsightEngine — Generate actionable insights
+// ════════════════════════════════════════════════════════════════
+const InsightEngine = (() => {
+  function generateInsights(sessions) {
+    const insights = [];
+
+    if (!sessions.length) return insights;
+
+    const recent5 = sessions.slice(0, 5);
+    const scores = recent5.flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
+    const recent_avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+
+    // Insight 1: Form trend
+    if (sessions.length >= 3) {
+      const recent3_scores = sessions.slice(0, 3).flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
+      const prev3_scores = sessions.slice(3, 6).flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
+      const recent3_avg = recent3_scores.length ? Math.round(recent3_scores.reduce((a,b)=>a+b,0)/recent3_scores.length) : 0;
+      const prev3_avg = prev3_scores.length ? Math.round(prev3_scores.reduce((a,b)=>a+b,0)/prev3_scores.length) : 0;
+
+      if (recent3_avg > prev3_avg + 5) {
+        insights.push({ icon: '📈', text: `You're improving! +${recent3_avg - prev3_avg} pts vs last week`, type: 'positive' });
+      } else if (recent3_avg < prev3_avg - 5) {
+        insights.push({ icon: '⚠️', text: `Form dipped slightly. Focus on ${FaultEngine.detectFaults(sessions[0].shots)[0]?.name || 'basics'}`, type: 'warning' });
+      }
+    }
+
+    // Insight 2: Consistency
+    const allShots = sessions.flatMap(s => s.shots);
+    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const consistency = 100 - stdDev(carries);
+    if (consistency > 85) {
+      insights.push({ icon: '🎯', text: `Your swing is very consistent (${Math.round(consistency)}%)`, type: 'positive' });
+    }
+
+    // Insight 3: Practice frequency
+    const st = Features.streak(sessions);
+    if (st.current >= 3 && st.current <= 7) {
+      insights.push({ icon: '🔥', text: `Nice ${st.current}-day streak! Keep it going`, type: 'positive' });
+    }
+
+    // Insight 4: Fatigue detection
+    if (sessions.length >= 2) {
+      const shot_counts = sessions.slice(0, 3).map(s => s.shots.length);
+      const avg_shots = shot_counts.reduce((a,b)=>a+b,0) / shot_counts.length;
+      if (shot_counts[0] > avg_shots * 1.3) {
+        insights.push({ icon: '😴', text: `Long session! Make sure to rest between rounds`, type: 'info' });
+      }
+    }
+
+    return insights;
+  }
+
+  return { generateInsights };
+})();
+
