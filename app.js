@@ -1937,6 +1937,26 @@ const UI = (() => {
 
   // ── Home: dashboard + recent sessions ─────────────────────────
   function renderHome(sessions) {
+    // Render tip of the day
+    try {
+      const tips = [
+        '💡 Pro tip: Consistency matters more than distance. Focus on repeatable swings.',
+        '🎯 Track your practice: Use notes to reflect on what\'s working.',
+        '📊 Check your analytics: Understand your swing patterns.',
+        '🏆 Set a goal: Use the Goals feature to stay motivated.',
+        '🔥 Build a streak: Practice regularly to build momentum.',
+        '📚 Learn something new: Visit the Learning Library today.',
+        '🎨 Experiment: Try different clubs to find your strengths.',
+        '⚡ Quality over quantity: 20 focused shots beat 100 mindless ones.',
+      ];
+      const todayTip = tips[new Date().getDate() % tips.length];
+      const quickStatsHost = document.querySelector('.quick-stats');
+      if (quickStatsHost) {
+        const tipHtml = `<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
+        quickStatsHost.insertAdjacentHTML('beforebegin', tipHtml);
+      }
+    } catch(e){ console.error('tip',e); }
+
     // Always render quick stats at the top
     try { QuickStats.renderStats(sessions); } catch(e){ console.error('quickstats',e); }
 
@@ -1969,6 +1989,24 @@ const UI = (() => {
         }
       }
     } catch(e){ console.error('insights',e); }
+
+    // Render alerts
+    try {
+      const alerts = PerformanceAlerts.generateAlerts(sessions);
+      if (alerts.length) {
+        const alertsHtml = `
+          <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
+            ${alerts.map(a => `
+              <div style="padding:.8rem;background:${a.severity==='high'?'rgba(239,68,68,.1)':a.severity==='info'?'rgba(96,165,250,.1)':'rgba(34,197,94,.1)'};border-left:4px solid ${a.severity==='high'?'#ef4444':a.severity==='info'?'#60a5fa':'#22c55e'};border-radius:var(--radius-sm)">
+                <div style="font-weight:600;margin-bottom:.3rem">${a.icon} ${a.title}</div>
+                <div style="font-size:.9rem;color:var(--text-dim)">${a.message}</div>
+              </div>
+            `).join('')}
+          </div>`;
+        const insightHost = document.getElementById('insightsHost');
+        if (insightHost) insightHost.insertAdjacentHTML('afterend', alertsHtml);
+      }
+    } catch(e){ console.error('alerts',e); }
 
     // Render performance grade & coaching
     try {
@@ -3509,6 +3547,53 @@ async function init() {
     document.body.insertAdjacentHTML('beforeend', html);
   });
 
+  document.getElementById('showLearningBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    const path = LearningPath.generatePath(sessions);
+    const tips = ContentLibrary.getContentFor('Consistency');
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
+            📚 Learning Library
+            <button onclick="document.getElementById('learningModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          ${path ? `
+            <div style="margin-bottom:1.5rem">
+              <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.6rem">Your Skill Level: <strong>${path.skillLevel.toUpperCase()}</strong></div>
+              <div style="display:grid;gap:.8rem">
+                ${path.modules.map((m, i) => `
+                  <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,.1);opacity:${m.status==='locked'?'0.5':'1'}">
+                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.4rem">
+                      <div style="flex:1">
+                        <div style="font-weight:600;margin-bottom:.2rem">${m.icon} ${m.title}</div>
+                        <div style="font-size:.85rem;color:var(--text-dim)">${m.description}</div>
+                      </div>
+                      <div style="font-size:.75rem;background:${m.status==='in-progress'?'rgba(74,222,128,.2)':m.status==='recommended'?'rgba(251,146,60,.2)':'rgba(107,114,128,.2)'};color:${m.status==='in-progress'?'#4ade80':m.status==='recommended'?'#fb923c':'#9ca3af'};padding:.3rem .6rem;border-radius:3px;white-space:nowrap;margin-left:.5rem">${m.status}</div>
+                    </div>
+                    <div style="font-size:.8rem;color:var(--text-dim)">${m.lessons} lessons</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:1rem;margin-top:1rem">
+            <div style="font-weight:600;margin-bottom:.8rem">💡 Recommended Content</div>
+            <div style="display:grid;gap:.6rem">
+              ${tips.slice(0, 3).map(t => `
+                <div style="padding:.8rem;background:rgba(96,165,250,.1);border-left:3px solid #60a5fa;border-radius:4px">
+                  <div style="font-weight:600;font-size:.95rem">${t.title}</div>
+                  <div style="font-size:.8rem;color:var(--text-dim);margin-top:.3rem">${t.duration} • ${t.level}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+
   // Shot detail modal close
   const shotModal = document.getElementById('shotModal');
   document.getElementById('shotModalClose').addEventListener('click', ()=>shotModal.hidden=true);
@@ -3630,12 +3715,57 @@ async function init() {
       if (e.key === 'h' || e.key === 'H') { e.preventDefault(); Router.showSessions(); }
       if (e.key === 'p' || e.key === 'P') { e.preventDefault(); Router.showProgress(); }
       if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); Router.showYardages(); }
+      if (e.key === '/' || e.key === '?') { e.preventDefault(); showKeyboardShortcuts(); }
+      if (e.key === 's' || e.key === 'S') { e.preventDefault(); Router.showYardages(); }
+      if (e.key === 'g' || e.key === 'G') { e.preventDefault(); toast('👁️ Quick actions coming soon'); }
     }
   });
 
+  function showKeyboardShortcuts() {
+    const shortcuts = [
+      { key: 'Ctrl+I', action: 'Import CSV' },
+      { key: 'Ctrl+H', action: 'Home / Sessions' },
+      { key: 'Ctrl+P', action: 'Progress' },
+      { key: 'Ctrl+Y', action: 'Yardages' },
+      { key: 'Ctrl+S', action: 'Yardages' },
+      { key: 'Ctrl+?', action: 'Show this help' },
+    ];
+
+    const html = `
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
+            ⌨️ Keyboard Shortcuts
+            <button onclick="document.getElementById('shortcutsModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+          <div style="display:grid;gap:.8rem">
+            ${shortcuts.map(s => `
+              <div style="display:flex;justify-content:space-between;padding:.6rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm)">
+                <span style="font-family:monospace;font-weight:600;color:#60a5fa">${s.key}</span>
+                <span style="color:var(--text-dim)">${s.action}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:1.2rem;padding:.8rem;background:rgba(99,102,241,.1);border-radius:var(--radius-sm);font-size:.85rem;color:var(--text-dim)">
+            Press <kbd style="background:rgba(0,0,0,.2);padding:.2rem .4rem;border-radius:3px;font-size:.8rem">Escape</kbd> to close this dialog
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    // Close on Escape
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('shortcutsModal')?.remove();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+  }
+
   // Show keyboard tips in console
   console.log('%cShotLab Keyboard Shortcuts', 'font-weight:bold;font-size:14px;color:#0b4d2e');
-  console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages');
+  console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages | Ctrl+?: Help');
 
   // View preferences toggles
   const prefs = ViewPrefs.getPrefs();
@@ -4379,5 +4509,447 @@ const CommunityInsights = (() => {
   }
 
   return { compareToommunity, estimateSkillLevel };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// LearningPath — Personalized improvement curriculum
+// ════════════════════════════════════════════════════════════════
+const LearningPath = (() => {
+  function generatePath(sessions) {
+    if (!sessions.length) return null;
+
+    const faults = FaultEngine.detectFaults(sessions.flatMap(s => s.shots));
+    const topFaults = faults.slice(0, 3);
+    const skillLevel = CommunityInsights.estimateSkillLevel(sessions);
+
+    const modules = [];
+
+    if (skillLevel === 'beginner') {
+      modules.push({
+        level: 1,
+        title: '⛳ Fundamentals',
+        description: 'Master grip, stance, and alignment',
+        lessons: 6,
+        icon: '🎯',
+        status: 'in-progress',
+      });
+      modules.push({
+        level: 2,
+        title: '🔄 The Swing',
+        description: 'Build a repeatable swing motion',
+        lessons: 8,
+        icon: '🔄',
+        status: 'locked',
+      });
+    } else if (skillLevel === 'intermediate') {
+      modules.push({
+        level: 1,
+        title: '⚡ Ball Striking',
+        description: 'Improve contact consistency',
+        lessons: 7,
+        icon: '⚡',
+        status: 'in-progress',
+      });
+      modules.push({
+        level: 2,
+        title: '📊 Swing Patterns',
+        description: 'Understand your swing characteristics',
+        lessons: 5,
+        icon: '📊',
+        status: 'in-progress',
+      });
+    } else {
+      modules.push({
+        level: 1,
+        title: '🎨 Shot Shaping',
+        description: 'Master curve and trajectory control',
+        lessons: 6,
+        icon: '🎨',
+        status: 'in-progress',
+      });
+      modules.push({
+        level: 2,
+        title: '💪 Swing Speed',
+        description: 'Optimize tempo and acceleration',
+        lessons: 5,
+        icon: '💪',
+        status: 'available',
+      });
+    }
+
+    const faultCourses = topFaults.map(f => ({
+      level: 'priority',
+      title: `Fix ${f.name}`,
+      description: `Target your #${faults.indexOf(f)+1} fault`,
+      lessons: 4,
+      icon: f.icon,
+      status: 'recommended',
+    }));
+
+    return {
+      skillLevel,
+      modules: [...modules, ...faultCourses],
+      nextUp: modules.find(m => m.status === 'in-progress') || modules[0],
+    };
+  }
+
+  return { generatePath };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// SessionNotes — Rich journaling and reflections
+// ════════════════════════════════════════════════════════════════
+const SessionNotes = (() => {
+  const storageKey = 'slSessionNotes';
+
+  function saveNotes(sessionId, notes, reflection) {
+    const store = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    store[sessionId] = {
+      notes,
+      reflection,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(storageKey, JSON.stringify(store));
+    return true;
+  }
+
+  function getNotes(sessionId) {
+    const store = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    return store[sessionId] || null;
+  }
+
+  function getAllNotes() {
+    return JSON.parse(localStorage.getItem(storageKey) || '{}');
+  }
+
+  function generatePrompts() {
+    return [
+      'What went well today?',
+      'What was the biggest challenge?',
+      'Which fault showed up the most?',
+      'What will you work on next time?',
+      'How did your consistency compare to last session?',
+      'Did you feel fatigued? When?',
+      'What club surprised you today?',
+    ];
+  }
+
+  return { saveNotes, getNotes, getAllNotes, generatePrompts };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PerformanceAlerts — Pro-active notifications
+// ════════════════════════════════════════════════════════════════
+const PerformanceAlerts = (() => {
+  function generateAlerts(sessions) {
+    const alerts = [];
+
+    if (!sessions.length) return alerts;
+
+    const recent = sessions.slice(0, 3);
+    const allShots = recent.flatMap(s => s.shots);
+    const faults = FaultEngine.detectFaults(allShots);
+
+    // Consistency alert
+    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
+    const consistency = Math.round(100 - stdDev(carries));
+    if (consistency < 60) {
+      alerts.push({
+        icon: '⚠️',
+        severity: 'high',
+        title: 'Consistency Alert',
+        message: `Low carry distance consistency (${consistency}%). Focus on repeatable swing.',`,
+      });
+    }
+
+    // Fault escalation
+    if (faults[0]?.severity === 'high') {
+      alerts.push({
+        icon: '🔴',
+        severity: 'high',
+        title: faults[0].name,
+        message: `${faults[0].name} detected in ${Math.round(faults[0].pct * 100)}% of recent shots. Priority fix.`,
+      });
+    }
+
+    // Streak alert
+    const st = Features.streak(sessions);
+    if (st.current > 3 && st.current % 5 === 0) {
+      alerts.push({
+        icon: '🔥',
+        severity: 'info',
+        title: `Streak Milestone!`,
+        message: `${st.current} day streak! Keep the momentum going.`,
+      });
+    }
+
+    // Recovery suggestion
+    if (sessions[0] && new Date() - new Date(sessions[0].date) > 7*24*60*60*1000) {
+      alerts.push({
+        icon: '📅',
+        severity: 'info',
+        title: 'Time to practice',
+        message: `It's been ${Math.floor((new Date() - new Date(sessions[0].date)) / (24*60*60*1000))} days. Schedule a session!`,
+      });
+    }
+
+    return alerts;
+  }
+
+  return { generateAlerts };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// PerformanceTimeline — Historical trend visualization
+// ════════════════════════════════════════════════════════════════
+const PerformanceTimeline = (() => {
+  function generateTimeline(sessions) {
+    if (!sessions.length) return [];
+
+    return sessions.map((s, idx) => {
+      const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const formScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      const grade = ShotScorer.grade(formScore);
+      const shotCount = s.shots.length;
+      const avgCarry = Math.round(avg(s.shots, 'carryDistance') || 0);
+
+      return {
+        date: s.date,
+        formattedDate: formatDate(s.date),
+        formScore,
+        grade: grade.letter,
+        shotCount,
+        avgCarry,
+        clubs: sortedClubs(s.shots).length,
+        improvement: idx > 0 ? {
+          formDelta: formScore - (sessions[idx-1].shots.map(ShotScorer.score).filter(x=>x!==null).reduce((a,b)=>a+b,0) / sessions[idx-1].shots.map(ShotScorer.score).filter(x=>x!==null).length || 0),
+          carrydelta: avgCarry - Math.round(avg(sessions[idx-1].shots, 'carryDistance') || 0),
+        } : null,
+      };
+    });
+  }
+
+  return { generateTimeline };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// UICustomizer — Store and apply UI preferences
+// ════════════════════════════════════════════════════════════════
+const UICustomizer = (() => {
+  function getPreferences() {
+    return JSON.parse(localStorage.getItem('slUIPrefs') || '{}');
+  }
+
+  function setPreferences(prefs) {
+    const current = getPreferences();
+    const updated = { ...current, ...prefs };
+    localStorage.setItem('slUIPrefs', JSON.stringify(updated));
+    applyPreferences(updated);
+  }
+
+  function applyPreferences(prefs) {
+    if (prefs.compactMode) document.body.style.setProperty('--spacing-scale', '0.85');
+    if (prefs.largeText) document.body.style.setProperty('--text-scale', '1.1');
+    if (prefs.reducedAnimations) document.body.style.setProperty('--animation-duration', '0.05s');
+  }
+
+  function resetPreferences() {
+    localStorage.removeItem('slUIPrefs');
+    applyPreferences({});
+  }
+
+  return { getPreferences, setPreferences, applyPreferences, resetPreferences };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// WeeklySummary — Generate weekly practice reports
+// ════════════════════════════════════════════════════════════════
+const WeeklySummary = (() => {
+  function generateReport(sessions) {
+    if (!sessions.length) return null;
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const weekSessions = sessions.filter(s => new Date(s.date) >= oneWeekAgo);
+
+    if (!weekSessions.length) return null;
+
+    const allShots = weekSessions.flatMap(s => s.shots);
+    const scores = allShots.map(ShotScorer.score).filter(x=>x!==null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    const grade = ShotScorer.grade(avgScore);
+
+    const faults = FaultEngine.detectFaults(allShots);
+    const clubs = sortedClubs(allShots);
+    const bestSession = weekSessions.reduce((best, s) => {
+      const sScores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const sAvg = sScores.length ? sScores.reduce((a,b)=>a+b,0)/sScores.length : 0;
+      const bScores = best.shots.map(ShotScorer.score).filter(x=>x!==null);
+      const bAvg = bScores.length ? bScores.reduce((a,b)=>a+b,0)/bScores.length : 0;
+      return sAvg > bAvg ? s : best;
+    });
+
+    return {
+      weekStart: formatDate(new Date(new Date().getTime() - 7*24*60*60*1000)),
+      weekEnd: formatDate(new Date()),
+      sessionCount: weekSessions.length,
+      totalShots: allShots.length,
+      avgFormScore: avgScore,
+      grade: grade.letter,
+      topFault: faults[0]?.name || 'None',
+      clubCount: clubs.length,
+      bestSession: {
+        date: formatDate(bestSession.date),
+        shots: bestSession.shots.length,
+      },
+      summary: `${weekSessions.length} sessions · ${allShots.length} shots · Grade: ${grade.letter}`,
+    };
+  }
+
+  function formatAsText(report) {
+    if (!report) return 'No practice this week. Let\'s get started!';
+    return `📊 Week in Review\n\n` +
+      `Sessions: ${report.sessionCount}\n` +
+      `Total Shots: ${report.totalShots}\n` +
+      `Grade: ${report.grade}\n` +
+      `Top Focus: ${report.topFault}\n` +
+      `Clubs Worked: ${report.clubCount}\n\n` +
+      `Keep grinding! 🎯`;
+  }
+
+  return { generateReport, formatAsText };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// AdvancedFilters — Complex session filtering
+// ════════════════════════════════════════════════════════════════
+const AdvancedFilters = (() => {
+  function filterSessions(sessions, criteria) {
+    return sessions.filter(s => {
+      // Filter by date range
+      if (criteria.dateFrom) {
+        const sDate = new Date(s.date);
+        if (sDate < new Date(criteria.dateFrom)) return false;
+      }
+      if (criteria.dateTo) {
+        const sDate = new Date(s.date);
+        if (sDate > new Date(criteria.dateTo)) return false;
+      }
+
+      // Filter by clubs
+      if (criteria.clubs && criteria.clubs.length) {
+        const clubsInSession = new Set(s.shots.map(sh => sh.clubType));
+        const hasAllClubs = criteria.clubs.every(c => clubsInSession.has(c));
+        if (!hasAllClubs) return false;
+      }
+
+      // Filter by shot count
+      if (criteria.minShots && s.shots.length < criteria.minShots) return false;
+      if (criteria.maxShots && s.shots.length > criteria.maxShots) return false;
+
+      // Filter by form score
+      if (criteria.minScore || criteria.maxScore) {
+        const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
+        const avgScore = scores.length ? scores.reduce((a,b)=>a+b,0)/scores.length : 0;
+        if (criteria.minScore && avgScore < criteria.minScore) return false;
+        if (criteria.maxScore && avgScore > criteria.maxScore) return false;
+      }
+
+      // Filter by faults
+      if (criteria.hasFault) {
+        const faults = FaultEngine.detectFaults(s.shots);
+        const hasFault = faults.some(f => f.name === criteria.hasFault);
+        if (!hasFault) return false;
+      }
+
+      return true;
+    });
+  }
+
+  return { filterSessions };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// QuickActions — Rapid-access common operations
+// ════════════════════════════════════════════════════════════════
+const QuickActions = (() => {
+  const actions = {
+    'share-last': { label: 'Share last session', icon: '📤', action: async () => {
+      const sessions = await Store.getSessions();
+      if (sessions.length) {
+        const text = SessionSharing.shareText(sessions[0]);
+        SessionSharing.copyToClipboard(text);
+      }
+    }},
+    'export-all': { label: 'Export all data', icon: '📊', action: async () => {
+      const sessions = await Store.getSessions();
+      SessionSharing.exportAsJSON(sessions);
+    }},
+    'view-grade': { label: 'View your grade', icon: '🏆', action: async () => {
+      const sessions = await Store.getSessions();
+      const grade = PerformanceGrade.calculateFullGrade(sessions);
+      if (grade) toast(`Your Grade: ${grade.grade} (${grade.overall}/100)`);
+      else toast('No data yet. Import a session!');
+    }},
+    'see-insights': { label: 'Generate insights', icon: '💡', action: async () => {
+      const sessions = await Store.getSessions();
+      const insights = InsightEngine.generateInsights(sessions);
+      if (insights.length) {
+        const text = insights.map(i => `${i.icon} ${i.text}`).join('\n');
+        toast(text.substring(0, 100) + '...');
+      }
+    }},
+  };
+
+  function getActions() {
+    return Object.entries(actions).map(([id, action]) => ({ id, ...action }));
+  }
+
+  function executeAction(actionId) {
+    const action = actions[actionId];
+    if (action) action.action();
+  }
+
+  return { getActions, executeAction };
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ResponsiveEnhancements — Mobile-first UX optimizations
+// ════════════════════════════════════════════════════════════════
+const ResponsiveEnhancements = (() => {
+  function enhanceMobileUX() {
+    // Add swipe support for session cards
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 100) {
+        const card = e.target.closest('.session-card');
+        if (card && diff > 0) {
+          // Swiped left — show more actions
+          card.style.transform = 'translateX(-20px)';
+          setTimeout(() => card.style.transform = '', 300);
+        }
+      }
+    }, { passive: true });
+  }
+
+  function getViewportSize() {
+    return {
+      isPhone: window.innerWidth < 480,
+      isTablet: window.innerWidth >= 480 && window.innerWidth < 1024,
+      isDesktop: window.innerWidth >= 1024,
+    };
+  }
+
+  function addOrientationListener(callback) {
+    window.addEventListener('orientationchange', callback);
+  }
+
+  return { enhanceMobileUX, getViewportSize, addOrientationListener };
 })();
 
