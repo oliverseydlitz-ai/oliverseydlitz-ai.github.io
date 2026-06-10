@@ -2001,7 +2001,7 @@ const Trajectory = (() => {
           <animateMotion dur="${Math.max(1.5, sim.hangTime * 0.45).toFixed(1)}s" repeatCount="indefinite" path="${line}"/>
         </circle>
         <text x="${ax.toFixed(1)}" y="${(ay - 7 < 20 ? ay + 18 : ay - 7).toFixed(1)}" text-anchor="middle" class="traj-lbl">${labels.predicted ? '≈' : ''}${fmt(labels.apexFt, 0)} ft</text>
-        <text x="${gx0}" y="${pad - 9}" text-anchor="start" class="traj-lbl">${fmt(labels.launch, 1)}° · ${fmt(labels.ballSpeed, 0)} mph · ${labels.spinEstimated ? '~' : ''}${fmt(labels.spin, 0)} rpm</text>
+        <text x="${gx0}" y="${pad - 9}" text-anchor="start" class="traj-lbl">${fmt(labels.launch, 1)}° · ${fmt(labels.ballSpeed, 0)} mph · ${fmt(labels.spin, 0)} rpm${labels.spinEstimated ? '*' : ''}</text>
         <text x="${gx1}" y="${pad - 9}" text-anchor="end" class="traj-lbl">↓${fmt(labels.descent, 0)}° · ${fmt(sim.hangTime, 1)}s</text>
         <text x="${gx1}" y="${gy + 14}" text-anchor="end" class="traj-lbl">${labels.predicted ? '≈' : ''}${fmt(labels.carryYds, 0)} yds</text>
         ${labels.predicted ? `<text x="${gx0}" y="${pad + 6}" text-anchor="start" class="traj-tick" style="fill:var(--gold)">predicted · ${labels.predicted.toLowerCase()} ball</text>` : ''}
@@ -2092,18 +2092,83 @@ const Trajectory = (() => {
       </svg>`;
   }
 
+  // ── Spin estimation for non-RPT balls ─────────────────────────
+  // Backspin from delivery: spin grows with club speed × spin loft
+  // (dynamic loft minus attack angle), with friction rising at higher
+  // lofts. Calibrated against typical TrackMan deliveries: driver
+  // ~2700rpm, 7-iron ~6900rpm, PW ~10000rpm.
+  const TYPICAL_AOA = t => t === 'd' ? 1.5 : isWood(t) ? 0 : isHybrid(t) ? -1.5
+    : isShort(t) ? -5 : isMid(t) ? -3.5 : -2.5;
+  const TYPICAL_SMASH = t => isWood(t) ? 1.46 : isHybrid(t) ? 1.41
+    : isShort(t) ? 1.26 : isMid(t) ? 1.33 : 1.38;
+
+  function estimateSpin({ clubSpeed, ballSpeed, smash, launch, attackAngle, clubType, hit }) {
+    if (!(launch > 0)) return null;
+    const cs = clubSpeed > 20 ? clubSpeed
+      : (ballSpeed > 30 ? ballSpeed / (smash > 1 ? smash : TYPICAL_SMASH(clubType)) : 0);
+    if (!(cs > 20)) return null;
+    const aoa = typeof attackAngle === 'number' && isFinite(attackAngle)
+      ? attackAngle : TYPICAL_AOA(clubType);
+    // launch sits ~85% of the way from attack angle to dynamic loft
+    const dynLoft = (launch - 0.15 * aoa) / 0.85;
+    const spinLoft = Math.min(50, Math.max(5, dynLoft - aoa));
+    const c = 1.8 + 0.035 * spinLoft;          // loft-dependent friction
+    const rpm = cs * spinLoft * c * coverSpin(hit || 'premium', clubType);
+    return Math.round(Math.min(12000, Math.max(1000, rpm)));
+  }
+
+  // Spin axis from where the ball started vs where it ended: the curve
+  // component (offline minus the straight start-line offline) is inverted
+  // through the flight model itself — probe how much curve 8° of axis
+  // produces for this shot, then scale.
+  function estimateAxis({ ballSpeed, launch, spin, carry, sideCarry, launchDir, hit }) {
+    if (!(ballSpeed > 30) || !(launch > 0) || !(carry > 20)) return null;
+    if (typeof sideCarry !== 'number' || !isFinite(sideCarry)) return null;
+    const dir = (typeof launchDir === 'number' && isFinite(launchDir)) ? launchDir : 0;
+    const curve = sideCarry - carry * Math.tan(dir * Math.PI / 180);
+    if (Math.abs(curve) < 1) return 0;
+    try {
+      const probe = simulateFlight(ballSpeed, launch, spin, 0, 8, hit || 'premium');
+      if (!(Math.abs(probe.offlineYds) > 0.5)) return null;
+      const axis = curve / (probe.offlineYds / 8);
+      return Math.max(-30, Math.min(30, axis));
+    } catch (_) { return null; }
+  }
+
   function render(ballSpeed, launch, spin, clubType, measured = {}) {
-    const { carry, apexFt, descent, launchDir, spinAxis, sideCarry } = measured;
+    const { carry, apexFt, descent, launchDir, spinAxis, sideCarry,
+            clubSpeed, attackAngle, smash } = measured;
     if (!(ballSpeed > 30) || !(launch > 0)) {
       return arc(launch, apexFt, carry, descent);
     }
     const hit = ballHit();
     const show = ballShow();
     const target = show === 'same' ? hit : show;
-    const useSpin = spin > 500 ? spin : Math.round(defaultSpin(clubType) * coverSpin(hit, clubType));
+
+    // Spin: trust the number only when an RPT ball measured it. Otherwise
+    // estimate it from the delivery (club speed × spin loft), falling back
+    // to the CSV's own estimate, then to per-club defaults.
+    const spinMeasured = BALLS[hit].measured && spin > 500;
+    let useSpin, spinStar = false;
+    if (spinMeasured) {
+      useSpin = spin;
+    } else {
+      spinStar = true;
+      useSpin = estimateSpin({ clubSpeed, ballSpeed, smash, launch, attackAngle, clubType, hit })
+        || (spin > 500 ? spin : Math.round(defaultSpin(clubType) * coverSpin(hit, clubType)));
+    }
+
+    // Spin axis: same idea — measured only on RPT; otherwise derive it from
+    // the start line vs where the ball actually ended up.
+    let useAxis = spinAxis || 0;
+    if (!BALLS[hit].measured || !spinAxis) {
+      const est = estimateAxis({ ballSpeed, launch, spin: useSpin, carry,
+        sideCarry, launchDir, hit });
+      if (est !== null && (!spinAxis || !BALLS[hit].measured)) useAxis = est;
+    }
     try {
       // base: the flight of the ball you actually hit, anchored to measured data
-      const simH = simulateFlight(ballSpeed, launch, useSpin, launchDir || 0, spinAxis || 0, hit);
+      const simH = simulateFlight(ballSpeed, launch, useSpin, launchDir || 0, useAxis, hit);
       if (!(simH.carryYds > 5)) return arc(launch, apexFt, carry, descent);
       const measCarry = carry > 0 ? carry : simH.carryYds;
       const measApex = apexFt > 0 ? apexFt : simH.apexFt;
@@ -2116,7 +2181,7 @@ const Trajectory = (() => {
       let sim = simH, labels;
       if (predicting) {
         const predSpin = Math.round(useSpin * coverSpin(target, clubType) / coverSpin(hit, clubType));
-        const simT = simulateFlight(ballSpeed, launch, predSpin, launchDir || 0, spinAxis || 0, target);
+        const simT = simulateFlight(ballSpeed, launch, predSpin, launchDir || 0, useAxis, target);
         sim = simT;
         labels = {
           launch, ballSpeed, spin: predSpin,
@@ -2130,23 +2195,26 @@ const Trajectory = (() => {
       } else {
         labels = {
           launch, ballSpeed, spin: useSpin,
-          spinEstimated: !BALLS[hit].measured,
+          spinEstimated: spinStar,
           carryYds: measCarry,
           apexFt: measApex,
           descent: descent > 0 ? descent : simH.descentDeg,
         };
       }
       const side = flightSVG(sim, labels);
+      const legend = (spinStar || labels.spinEstimated)
+        ? `<div class="traj-legend">* spin estimated from club delivery &amp; ball flight — non-RPT balls (range / premium) have no measured spin</div>`
+        : '';
       // only show the top view when we have real direction/shape data
       const hasShape = (typeof launchDir === 'number' && launchDir !== 0) ||
-                       (typeof spinAxis === 'number' && spinAxis !== 0) ||
+                       useAxis !== 0 ||
                        (typeof sideCarry === 'number' && sideCarry !== 0);
-      if (!hasShape) return side;
+      if (!hasShape) return side + legend;
       const top = topSVG(sim, {
         offlineYds: typeof sideCarry === 'number' ? sideCarry : undefined,
         launchDir: launchDir || 0,
       });
-      return side + top;
+      return side + top + legend;
     } catch (e) {
       console.error('Trajectory sim:', e);
       return arc(launch, apexFt, carry, descent);
@@ -2156,6 +2224,7 @@ const Trajectory = (() => {
   const shot = s => render(s.ballSpeed, s.launchAngle, s.spinRate, s.clubType, {
     carry: s.carryDistance, apexFt: s.apex, descent: s.descentAngle,
     launchDir: s.launchDirection, spinAxis: s.spinAxis, sideCarry: s.sideCarry,
+    clubSpeed: s.clubSpeed, attackAngle: s.attackAngle, smash: s.smashFactor,
   });
   const avgFlight = shots => shots.length
     ? render(avg(shots,'ballSpeed'), avg(shots,'launchAngle'), avg(shots,'spinRate'),
@@ -2163,10 +2232,12 @@ const Trajectory = (() => {
           carry: avg(shots,'carryDistance'), apexFt: avg(shots,'apex'),
           descent: avg(shots,'descentAngle'), launchDir: avg(shots,'launchDirection'),
           spinAxis: avg(shots,'spinAxis'), sideCarry: avg(shots,'sideCarry'),
+          clubSpeed: avg(shots,'clubSpeed'), attackAngle: avg(shots,'attackAngle'),
+          smash: avg(shots,'smashFactor'),
         })
     : '';
   return { shot, avgFlight, arc, simulateFlight, defaultSpin, BALLS, coverSpin,
-           ballHit, setBallHit, ballShow, setBallShow };
+           estimateSpin, ballHit, setBallHit, ballShow, setBallShow };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -3271,6 +3342,9 @@ const UI = (() => {
         spin: avg(shots, 'spinRate'),
         carry: avg(shots, 'carryDistance'),
         apexFt: avg(shots, 'apex'),
+        clubSpeed: avg(shots, 'clubSpeed'),
+        attackAngle: avg(shots, 'attackAngle'),
+        smash: avg(shots, 'smashFactor'),
       }))
       .filter(c => c.ballSpeed > 30 && c.launch > 0)
       .sort((a, b) => clubOrder(a.club) - clubOrder(b.club));
@@ -3281,7 +3355,13 @@ const UI = (() => {
     const show = Trajectory.ballShow();
     const ball = show === 'same' ? hit : show;
     const flights = clubs.map(c => {
-      const spin = c.spin > 500 ? c.spin : Math.round(Trajectory.defaultSpin(c.club) * Trajectory.coverSpin(hit, c.club));
+      const measured = Trajectory.BALLS[hit].measured && c.spin > 500;
+      const spin = measured ? c.spin
+        : (Trajectory.estimateSpin({ clubSpeed: c.clubSpeed, ballSpeed: c.ballSpeed,
+            smash: c.smash, launch: c.launch, attackAngle: c.attackAngle,
+            clubType: c.club, hit })
+          || (c.spin > 500 ? c.spin
+            : Math.round(Trajectory.defaultSpin(c.club) * Trajectory.coverSpin(hit, c.club))));
       const sim = Trajectory.simulateFlight(c.ballSpeed, c.launch,
         Math.round(spin * Trajectory.coverSpin(ball, c.club) / Trajectory.coverSpin(hit, c.club)), 0, 0, ball);
       return { ...c, sim };

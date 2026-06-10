@@ -1209,6 +1209,10 @@ tr:hover td { background: var(--surface2); }
 .traj-svg { width: 100%; height: auto; display: block; }
 .traj-lbl { fill: var(--text-muted); font-size: 10px; font-family: var(--font-body); font-weight: 700; }
 .traj-tick { fill: var(--text-dim); font-size: 8px; font-family: var(--font-mono); }
+.traj-legend {
+  font-family: var(--font-mono); font-size: .62rem; color: var(--text-dim);
+  letter-spacing: .03em; margin-top: .4rem; padding: 0 .2rem; line-height: 1.5;
+}
 .sm-traj { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .4rem; margin-bottom: .9rem; }
 
 /* ── Auth modal ─────────────────────────────────────────── */
