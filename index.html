@@ -43,6 +43,9 @@
     <!-- Quick stats always visible -->
     <div class="quick-stats" id="quickStatsHost"></div>
 
+    <!-- Personal records strip -->
+    <div id="prHost"></div>
+
     <div class="view-header">
       <h1 class="view-title">Home</h1>
       <button class="btn-icon" id="sessionsImportBtn" aria-label="Import session">+</button>
@@ -263,7 +266,7 @@
       </div>
 
       <!-- Performance alerts -->
-      <div id="alertsHost"></div>
+      <div id="progressAlertsHost"></div>
 
       <!-- Goal progress -->
       <div id="goalsHost"></div>
@@ -473,9 +476,6 @@
     <span class="bnav-label">Settings</span>
   </button>
 </nav>
-
-<!-- Floating action button for quick import -->
-<button class="fab" id="fabImport" onclick="Router.showImport()" title="Quick import">📤</button>
 
 <!-- ═══════════════════ SHOT DETAIL MODAL -->
 <div class="modal-overlay" id="shotModal" hidden>

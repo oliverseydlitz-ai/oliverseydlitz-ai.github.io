@@ -202,6 +202,26 @@ that shows a friendly recovery screen instead of a blank page.
 Debugging: `showDebug()` logs to console only; set `localStorage.slDebug='1'`
 to re-enable the on-screen banner.
 
+## v6 "Clubhouse" overhaul (June 2026)
+
+- **style.css rewritten as ONE coherent design system** (was six stacked
+  redesign layers fighting via `!important`). Identity: warm ivory · deep
+  pine · tournament gold. Type: Barlow Condensed (numerals), DM Sans (body),
+  DM Serif Display (editorial), JetBrains Mono (micro-labels). Dark mode is
+  token overrides only at the bottom of the file.
+- **Local persistence for signed-in users:** `Store` now mirrors sessions to
+  IndexedDB (`DB`) when authenticated — data survives offline/tab close even
+  if cloud sync fails. Guests remain ephemeral (MemDB) by design.
+- **PR detection:** import flow compares the new session against history and
+  toasts new personal records; Home shows a `#prHost` records strip (top 3
+  all-time bests, links to Yardage Book).
+- **Shared metric:** `carryConsistency(shots)` (per-club spread, 0-100) is the
+  one consistency formula for everything user-facing on Home.
+- **Known fixed bugs:** duplicate `#alertsHost` id (progress one is now
+  `#progressAlertsHost`), drill cards rendering hex colors as text, invisible
+  benchmark-table headers, unrounded "Best" stat.
+
 ---
 
-**Last updated:** May 2026 — ShotLab v3 (deterministic auth, cloud sync, 5 features, dark mode)
+**Last updated:** June 2026 — ShotLab v6 (Clubhouse design system, local
+persistence, PR celebrations, standard OAuth)

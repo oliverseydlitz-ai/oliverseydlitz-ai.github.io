@@ -49,6 +49,18 @@ function stdDev(values) {
   return Math.sqrt(v.map(x => (x-mean)**2).reduce((a,b) => a+b,0) / v.length);
 }
 
+// Single shared consistency metric (0-100, or null with too little data).
+// Per-club carry spread averaged across clubs — a global std-dev would mix
+// 100-yard club gaps and produce meaningless (even negative) numbers.
+function carryConsistency(shots) {
+  const byClub = {};
+  shots.forEach(s => { if (s.clubType && s.carryDistance) (byClub[s.clubType] ??= []).push(s.carryDistance); });
+  const stds = Object.values(byClub).filter(a => a.length >= 5).map(stdDev);
+  if (!stds.length) return null;
+  const meanStd = stds.reduce((a,b)=>a+b,0) / stds.length;
+  return Math.max(0, Math.min(100, Math.round(100 - meanStd * 3)));
+}
+
 function fmt(val, decimals=1) {
   if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '—';
   return Number(val).toFixed(decimals);
@@ -462,12 +474,26 @@ const Store = (() => {
   }
   const cloud = () => !!Auth.getUser();
 
+  // Local layer: guests stay in ephemeral MemDB (privacy: nothing persists).
+  // Signed-in users ALSO persist to IndexedDB so their data survives offline —
+  // previously everything lived in memory only and a tab close before a
+  // successful cloud sync silently lost the session.
+  async function localSessions() {
+    const mem = MemDB.getSessions();
+    if (!cloud()) return mem;
+    try {
+      const idb = await DB.getSessions();
+      const memIds = new Set(mem.map(s => s.id));
+      return [...mem, ...idb.filter(s => !memIds.has(s.id))];
+    } catch (e) { console.error('IndexedDB read failed:', e); return mem; }
+  }
+
   async function getSessions() {
     // Local-first so the app NEVER breaks if the cloud is unreachable. Merge
     // cloud rows on top when signed in; on cloud error fall back to local and
     // surface the reason instead of throwing (a throw here used to bubble up
     // through the tab click handlers and silently kill navigation).
-    const local = MemDB.getSessions();
+    const local = await localSessions();
     if (!cloud()) return local;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
@@ -484,6 +510,8 @@ const Store = (() => {
     const mem = MemDB.getSession(id);   // covers just-imported sessions
     if (mem) return mem;
     if (!cloud()) return null;
+    const idb = await DB.getSession(id).catch(() => null);
+    if (idb) return idb;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const r = rows.find(x => x.id === id);
@@ -495,11 +523,17 @@ const Store = (() => {
   }
   async function saveSession(s) {
     MemDB.saveSession(s);               // local first — instant, always works
-    if (cloud()) await CloudDB.saveSession(s);
+    if (cloud()) {
+      await DB.saveSession(s).catch(e => console.error('IndexedDB save failed:', e));
+      await CloudDB.saveSession(s);
+    }
   }
   async function deleteSession(id) {
     MemDB.deleteSession(id);
-    if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
+    if (cloud()) {
+      await DB.deleteSession(id).catch(e => console.error('IndexedDB delete failed:', e));
+      try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); }
+    }
   }
   return { getSessions, getSession, saveSession, deleteSession };
 })();
@@ -1300,9 +1334,9 @@ const QuickStats = (() => {
       const scores = recent10.flatMap(s => s.shots.map(ShotScorer.score)).filter(x=>x!==null);
       return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     })();
-    const bestCarry = Math.max(0, ...all.map(s => s.carryDistance || 0));
+    const bestCarry = Math.round(Math.max(0, ...all.map(s => s.carryDistance || 0)));
     const avgCarry = Math.round(avg(all, 'carryDistance') || 0);
-    const consistency = Math.round(100 - stdDev(all.map(s => s.carryDistance || 0)));
+    const consistency = carryConsistency(all);
 
     host.innerHTML = `
       <div class="quick-stat">
@@ -1318,7 +1352,7 @@ const QuickStats = (() => {
         <div class="quick-stat-label">Avg</div>
       </div>
       <div class="quick-stat">
-        <div class="quick-stat-value">${consistency}%</div>
+        <div class="quick-stat-value">${consistency === null ? '—' : consistency + '%'}</div>
         <div class="quick-stat-label">Consistency</div>
       </div>`;
   }
@@ -1905,7 +1939,7 @@ const UI = (() => {
       const todayTip = tips[new Date().getDate() % tips.length];
       const tipHost = document.getElementById('tipHost');
       if (tipHost) {
-        tipHost.innerHTML = `<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
+        tipHost.innerHTML = `<div style="background:var(--gold-soft,rgba(176,141,47,.1));border:1px solid rgba(176,141,47,.35);padding:.8rem 1rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.9rem;color:var(--text)">${todayTip}</div>`;
       }
     } catch(e){ console.error('tip',e); }
 
@@ -1924,6 +1958,24 @@ const UI = (() => {
 
     // Always render quick stats at the top
     try { QuickStats.renderStats(sessions); } catch(e){ console.error('quickstats',e); }
+
+    // Personal records strip — top 3 all-time bests, links to the Yardage Book
+    try {
+      const prHost = document.getElementById('prHost');
+      if (prHost) {
+        const bests = sessions.length ? Analytics.personalBests(sessions).slice(0, 3) : [];
+        prHost.innerHTML = bests.length ? `
+          <div class="pr-strip" onclick="Router.show('yardages')" role="button" title="View all personal bests">
+            ${bests.map(b => `
+              <div class="pr-item">
+                <div class="pr-val">${b.value}<span class="pr-unit">${b.unit}</span></div>
+                <div class="pr-lbl">${b.label}</div>
+                <div class="pr-club">${b.club}</div>
+              </div>`).join('')}
+            <div class="pr-trophy">🏆</div>
+          </div>` : '';
+      }
+    } catch(e){ console.error('prStrip',e); }
 
     // Render smart next-step recommendation
     try {
@@ -2912,7 +2964,7 @@ const UI = (() => {
           const cons = b.stdCarry===0?'tight': b.stdCarry<6?'tight':b.stdCarry<12?'moderate':'wide';
           const drillInfo = drillTexts[cons];
           return `<div class="drill-card" onclick="Router.show('sessions')">
-            <div class="drill-icon">${clubColor(b.club)}</div>
+            <div class="drill-icon"><span class="club-dot" style="background:${clubColor(b.club)};width:14px;height:14px"></span></div>
             <div class="drill-title">${clubLabel(b.club)} (${cons.toUpperCase()})</div>
             <div class="drill-desc">${drillInfo.desc}</div>
             <div class="drill-time">→ ${drillInfo.action}</div>
@@ -2954,7 +3006,7 @@ const UI = (() => {
 
     // Add performance alerts and goals at the top
     try {
-      const alertsHost = document.getElementById('alertsHost');
+      const alertsHost = document.getElementById('progressAlertsHost');
       if (alertsHost) {
         const alerts = Features.performanceAlerts(sessions);
         if (alerts.length) {
@@ -3261,6 +3313,29 @@ const ImportFlow = (() => {
     goStep('step-preview');
   }
 
+  // Compare the new session against history and return new personal records.
+  function detectNewRecords(history, session) {
+    const records = [];
+    try {
+      const prevShots = history.flatMap(s => s.shots || []);
+      const best = (shots, field) => Math.max(0, ...shots.map(s => s[field] || 0));
+      const checks = [
+        ['carryDistance', 'Longest carry', 'yds', 0],
+        ['ballSpeed', 'Fastest ball speed', 'mph', 0],
+        ['smashFactor', 'Best smash factor', '', 2],
+      ];
+      for (const [field, label, unit, dec] of checks) {
+        const prev = best(prevShots, field);
+        const now = best(session.shots, field);
+        if (prev > 0 && now > prev) {
+          const shot = session.shots.find(s => (s[field] || 0) === now);
+          records.push(`${label}: ${fmt(now, dec)}${unit ? ' ' + unit : ''}${shot ? ` (${clubLabel(shot.clubType)})` : ''}`);
+        }
+      }
+    } catch (e) { console.error('PR detect:', e); }
+    return records;
+  }
+
   async function save() {
     const date  = document.getElementById('metaDate').value;
     const notes = document.getElementById('metaNotes').value.trim();
@@ -3270,14 +3345,23 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
     };
+    // Snapshot history BEFORE saving so we can detect new personal records
+    const history = await Store.getSessions().catch(() => []);
+
     // Save to MemDB and show instantly — no spinner
     MemDB.saveSession(session);
     UI.renderDetail(session);
     Router.show('session-detail');
-    // Persist to cloud in background if logged in (auto-sync on import)
+
+    // Celebrate new personal records
+    const prs = detectNewRecords(history, session);
+    if (prs.length) toast('🏆 New personal record! ' + prs[0]);
+
+    // Persist locally + to cloud in background if logged in
     if (Auth.getUser()) {
+      DB.saveSession(session).catch(e => console.error('IndexedDB save failed:', e));
       CloudDB.saveSession(session).then(() => {
-        toast('Saved to cloud ✓');
+        if (!prs.length) toast('Saved to cloud ✓');
         showDebug('CLOUD SYNC: ✓ saved session to cloud as ' + Auth.getUser().email);
       }).catch(e => {
         toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
@@ -5275,8 +5359,7 @@ const EnhancedMetricsWidget = (() => {
     const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     const grade = ShotScorer.grade(avgScore);
 
-    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const consistency = Math.round(100 - stdDev(carries));
+    const consistency = carryConsistency(allShots) ?? 0;
     const st = Features.streak(sessions);
 
     return {
