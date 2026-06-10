@@ -3475,6 +3475,7 @@ async function init() {
       try {
         const sessions = await Store.getSessions();
         for (const s of sessions) await Store.deleteSession(s.id);
+        document.querySelectorAll('#analyticsModal, #benchmarkModal, #learningModal, #clubModal, #efficiencyModal, #shortcutsModal').forEach(el => el.remove());
         await Router.showSessions();
         toast(`Cleared ${sessions.length} session${sessions.length===1?'':'s'}.`);
       } catch(err) { toast('Clear failed: ' + (err.message || 'could not reach the cloud')); }
@@ -3482,13 +3483,14 @@ async function init() {
   });
 
   document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
+    document.getElementById('analyticsModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions to analyze'); return; }
     const metrics = AnalyticsHub.generateMetricsDashboard(sessions);
     if (!metrics) { toast('Unable to generate metrics'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             📊 Advanced Analytics
@@ -3544,13 +3546,14 @@ async function init() {
   });
 
   document.getElementById('showBenchmarksBtn')?.addEventListener('click', async () => {
+    document.getElementById('benchmarkModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions to compare'); return; }
     const comparison = CommunityInsights.compareToommunity(sessions);
     if (!comparison) { toast('Unable to generate comparison'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             🏆 Community Comparison
@@ -3592,12 +3595,13 @@ async function init() {
   });
 
   document.getElementById('showLearningBtn')?.addEventListener('click', async () => {
+    document.getElementById('learningModal')?.remove();
     const sessions = await Store.getSessions();
     const path = LearningPath.generatePath(sessions);
     const tips = ContentLibrary.getContentFor('Consistency');
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             📚 Learning Library
@@ -3639,13 +3643,14 @@ async function init() {
   });
 
   document.getElementById('showClubAnalysisBtn')?.addEventListener('click', async () => {
+    document.getElementById('clubModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No data to analyze'); return; }
     const clubs = ClubAnalyzer.compareClubs(sessions);
     if (!clubs.length) { toast('No club data'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             🏌️ Club Performance Analysis
@@ -3683,13 +3688,14 @@ async function init() {
   });
 
   document.getElementById('showEfficiencyBtn')?.addEventListener('click', async () => {
+    document.getElementById('efficiencyModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions yet'); return; }
     const efficiency = PracticeEfficiency.calculateEfficiency(sessions);
     if (!efficiency) { toast('Unable to calculate'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ⚡ Practice Efficiency
@@ -3726,6 +3732,13 @@ async function init() {
         </div>
       </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
+  });
+
+  // Click-outside-to-close for all dynamically inserted modals
+  document.addEventListener('click', e => {
+    if (e.target.matches('#analyticsModal, #benchmarkModal, #learningModal, #clubModal, #efficiencyModal, #shortcutsModal')) {
+      e.target.remove();
+    }
   });
 
   // Shot detail modal close
@@ -3856,6 +3869,7 @@ async function init() {
   });
 
   function showKeyboardShortcuts() {
+    document.getElementById('shortcutsModal')?.remove();
     const shortcuts = [
       { key: 'Ctrl+I', action: 'Import CSV' },
       { key: 'Ctrl+H', action: 'Home / Sessions' },
@@ -3866,7 +3880,7 @@ async function init() {
     ];
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ⌨️ Keyboard Shortcuts
@@ -5543,7 +5557,7 @@ const DocumentationCenter = (() => {
     if (!doc) return;
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="docModal">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="docModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
           <div style="font-size:1.2rem;font-weight:800;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
             ${doc.title}
