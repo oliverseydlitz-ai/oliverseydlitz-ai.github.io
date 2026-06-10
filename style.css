@@ -73,10 +73,8 @@ html { height: 100%; }
 body {
   background-color: var(--bg);
   background-image:
-    linear-gradient(rgba(10,74,44,.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(10,74,44,.035) 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-position: -1px -1px;
+    radial-gradient(120% 60% at 50% 0%, rgba(10,74,44,.045) 0%, transparent 60%);
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: var(--font-body);
   font-size: 15px;
@@ -161,15 +159,7 @@ button:active { transform: scale(.98); }
   height: var(--nav-h);
   align-items: center; justify-content: space-between; gap: 1rem;
   box-shadow: 0 2px 24px rgba(10,74,44,.32);
-  overflow: hidden;
 }
-.top-nav::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(135deg, transparent 0 18px, rgba(255,255,255,.025) 18px 19px);
-  pointer-events: none; z-index: 0;
-}
-.top-nav-brand, .top-nav-links { position: relative; z-index: 1; }
 .top-nav-brand { display: flex; align-items: center; gap: .6rem; }
 .brand-icon { font-size: 1.1rem; }
 .brand-name {
@@ -558,11 +548,6 @@ input[type="number"], input[type="text"], input[type="email"], input[type="passw
   box-shadow: var(--shadow-sm);
   position: relative;
 }
-.score-banner-content::after {
-  content: '◆';
-  position: absolute; top: 14px; right: 16px;
-  font-size: .65rem; color: var(--gold); opacity: .55;
-}
 
 /* Hidden — replaced by SVG ring in JS */
 .score-letter { display: none !important; }
@@ -613,7 +598,6 @@ input[type="number"], input[type="text"], input[type="email"], input[type="passw
 .metrics-strip {
   display: grid; grid-template-columns: repeat(3,1fr);
   gap: .55rem; margin-bottom: 1.5rem;
-  counter-reset: metric;
 }
 .metric-card {
   background: var(--surface);
@@ -621,7 +605,6 @@ input[type="number"], input[type="text"], input[type="email"], input[type="passw
   border-radius: var(--radius-sm);
   padding: 1.1rem .85rem .9rem;
   position: relative; overflow: hidden;
-  counter-increment: metric;
   transition: border-color .2s, box-shadow .2s, transform .18s;
 }
 .metric-card::before {
@@ -629,13 +612,6 @@ input[type="number"], input[type="text"], input[type="email"], input[type="passw
   position: absolute; top: 0; left: 0; right: 0; height: 3px;
   background: var(--mc, var(--pine));
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-}
-.metric-card::after {
-  content: counter(metric, decimal-leading-zero);
-  position: absolute; top: 9px; right: 12px;
-  font-family: var(--font-mono);
-  font-size: .56rem; font-weight: 600;
-  color: var(--text-dim); letter-spacing: .1em; opacity: .8;
 }
 .metric-card:hover { border-color: var(--border-hi); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 
@@ -742,15 +718,6 @@ input[type="number"], input[type="text"], input[type="email"], input[type="passw
   padding: 1.1rem;
   box-shadow: var(--shadow-sm);
   position: relative;
-}
-.chart-card::after,
-.trend-box::after,
-.insights-card::after {
-  content: '+';
-  position: absolute; top: 10px; right: 14px;
-  font-family: var(--font-mono);
-  font-size: .85rem; color: var(--text-dim); opacity: .38;
-  line-height: 1; pointer-events: none; font-weight: 500;
 }
 .chart-card h3 {
   font-family: var(--font-mono);
@@ -1626,8 +1593,7 @@ html.dark {
 html.dark body {
   background-color: var(--bg);
   background-image:
-    linear-gradient(rgba(31,138,82,.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31,138,82,.05) 1px, transparent 1px);
+    radial-gradient(120% 60% at 50% 0%, rgba(31,138,82,.07) 0%, transparent 60%);
 }
 html.dark .top-nav { background: linear-gradient(110deg, #07301a 0%, #0a3f24 45%, #0f5733 100%); }
 html.dark th { background: #14402a; color: rgba(255,255,255,.82); }
