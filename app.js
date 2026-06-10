@@ -2096,7 +2096,11 @@ const UI = (() => {
   }
 
   // ── Feature: live session search ───────────────────────────────
+  let _searchableSessions = [];
   function renderSearchBar(sessions) {
+    // Always refresh the searchable list — the input's listener reads this,
+    // so search stays current even after new sessions are imported.
+    _searchableSessions = sessions;
     const recent = document.getElementById('recentWrap');
     if (!recent || sessions.length < 4) return; // only worth showing with a few sessions
     if (document.getElementById('sessionSearch')) return; // already present
@@ -2108,7 +2112,7 @@ const UI = (() => {
     recent.insertBefore(bar, title ? title.nextSibling : recent.firstChild);
     const input = bar.querySelector('#sessionSearch');
     input.addEventListener('input', () => {
-      const filtered = Features.searchSessions(sessions, input.value);
+      const filtered = Features.searchSessions(_searchableSessions, input.value);
       renderSessionList(filtered);
       // keep focus after re-render of the list (list is a sibling, not replaced)
       input.focus();
@@ -2311,6 +2315,9 @@ const UI = (() => {
       ? session.notes + (session.conditions ? ` · ${[session.conditions.wind,session.conditions.temp].filter(Boolean).join(', ')}` : '')
       : '';
     document.getElementById('deleteSessionBtn').dataset.id = session.id;
+    // Gapping always uses the full session, so render it once per session
+    // open instead of rebuilding its chart on every club-filter tap.
+    renderGapping(session.shots);
     renderForFilter();
   }
 
@@ -2327,7 +2334,6 @@ const UI = (() => {
     renderDispersion(shots);
     renderDispersionStats(shots);
     renderBallFlight(shots);
-    renderGapping(_session.shots);
     renderLaunchWindows(shots);
     renderFaultCards(shots);
     renderPracticePlan(shots);

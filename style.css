@@ -1948,8 +1948,12 @@ a, button {
   font-size: 1rem;
 }
 
-/* Improved chart sizing */
-canvas {
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
+/* Respect users who prefer less motion: stop the always-running
+   decorative animations (badge pulses, status dots, floating icons) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
