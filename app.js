@@ -1851,20 +1851,126 @@ const Features = (() => {
 // Trajectory — SVG side-profile ball flight
 // ────────────────────────────────────────────────────────────────
 const Trajectory = (() => {
-  function arc(launch, apexFt, carryYds, descent, opts={}) {
-    const W=opts.w||340, H=opts.h||170, pad=opts.pad||26;
+  // ── Real flight physics ────────────────────────────────────────
+  // Numerically integrates the ball through the air using drag + Magnus
+  // lift, so launch angle, ball speed and spin rate each genuinely change
+  // the curve: low spin flies flat, high spin balloons, wedges drop steep.
+  // Calibrated against typical TrackMan/Rapsodo numbers (driver 155mph /
+  // 12° / 2600rpm → ~237yds carry, ~99ft apex, 41° descent).
+  function simulateFlight(ballSpeedMph, launchDeg, spinRpm) {
+    const v0 = ballSpeedMph * 0.44704;            // mph → m/s
+    const th = launchDeg * Math.PI / 180;
+    let w = spinRpm * 2 * Math.PI / 60;           // rpm → rad/s backspin
+    const r = 0.02134, m = 0.04593, rho = 1.225;  // ball radius/mass, air
+    const k = 0.5 * rho * (Math.PI * r * r) / m;
+    const g = 9.81, dt = 0.01, tauSpin = 28;      // spin decay constant
+
+    let x = 0, y = 0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+    let apexM = 0, apexX = 0, t = 0;
+    const pts = [{ x: 0, y: 0 }];
+    while (y >= 0 && t < 15) {
+      const v = Math.hypot(vx, vy) || 0.01;
+      const S = Math.min(0.5, (r * w) / v);       // spin parameter
+      const Cd = Math.min(0.45, 0.24 + 0.32 * S);
+      const Cl = Math.min(0.35, 0.10 + 0.96 * S);
+      // drag opposes velocity; backspin lift is perpendicular to it
+      const ax = -k * v * (Cd * vx + Cl * vy);
+      const ay = -g - k * v * (Cd * vy - Cl * vx);
+      vx += ax * dt; vy += ay * dt;
+      x += vx * dt;  y += vy * dt;
+      w *= Math.exp(-dt / tauSpin);
+      t += dt;
+      if (y > apexM) { apexM = y; apexX = x; }
+      pts.push({ x, y: Math.max(0, y) });
+    }
+    return {
+      pts, apexX,
+      carryM: x, apexM,
+      carryYds: x * 1.09361,
+      apexFt: apexM * 3.28084,
+      descentDeg: Math.abs(Math.atan2(vy, vx) * 180 / Math.PI),
+      hangTime: t,
+    };
+  }
+
+  // Sensible spin defaults when the CSV row has no spin (estimated data)
+  function defaultSpin(clubType) {
+    if (isWood(clubType)) return clubType === 'd' ? 2700 : 3500;
+    if (isHybrid(clubType)) return 4500;
+    if (isShort(clubType)) return 9000;
+    if (isMid(clubType)) return 6500;
+    return 5000;
+  }
+
+  // Render a simulated flight. Measured carry/apex (when present) anchor the
+  // scale — physics supplies the SHAPE, the launch monitor stays the truth.
+  function flightSVG(sim, labels, opts = {}) {
+    const W = opts.w || 340, H = opts.h || 170, pad = 26;
+    const gx0 = pad, gx1 = W - pad, gy = H - pad;
+    const uw = gx1 - gx0, uh = H - pad * 1.9;
+
+    const xf = (labels.carryYds > 0 && sim.carryYds > 5) ? labels.carryYds / sim.carryYds : 1;
+    const yf = (labels.apexFt > 0 && sim.apexFt > 3) ? labels.apexFt / sim.apexFt : 1;
+    const carryM = sim.carryM * xf, apexM = sim.apexM * yf;
+
+    const xs = uw / carryM;
+    const ys = Math.min(xs * 2, uh / apexM);   // ≤2× vertical exaggeration
+
+    const px = mx => gx0 + mx * xf * xs;
+    const py = my => gy - my * yf * ys;
+
+    // sample every ~4th point; always include the last
+    const pts = sim.pts.filter((_, i) => i % 4 === 0 || i === sim.pts.length - 1);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'} ${px(p.x).toFixed(1)} ${py(p.y).toFixed(1)}`).join(' ');
+    const area = `${line} L ${gx1} ${gy} L ${gx0} ${gy} Z`;
+
+    // ground ticks every 50 yds for real scale context
+    const tickStep = labels.carryYds > 160 ? 50 : 25;
+    let ticks = '';
+    for (let yd = tickStep; yd < labels.carryYds * 0.8; yd += tickStep) {
+      const tx = gx0 + (yd / labels.carryYds) * uw;
+      ticks += `<line x1="${tx.toFixed(1)}" y1="${gy}" x2="${tx.toFixed(1)}" y2="${gy + 4}" stroke="var(--border-hi)" stroke-width="1"/>
+        <text x="${tx.toFixed(1)}" y="${gy + 14}" text-anchor="middle" class="traj-tick">${yd}</text>`;
+    }
+
+    const ax = px(sim.apexX), ay = py(sim.apexM);
+    const uid = 'tg' + Math.random().toString(36).slice(2, 7);
+    return `
+      <svg class="traj-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ball flight profile">
+        <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--turf)" stop-opacity="0.32"/>
+          <stop offset="100%" stop-color="var(--turf)" stop-opacity="0.02"/>
+        </linearGradient></defs>
+        <line x1="${gx0}" y1="${gy}" x2="${gx1}" y2="${gy}" stroke="var(--border-hi)" stroke-width="1.5"/>
+        ${ticks}
+        <path d="${area}" fill="url(#${uid})"/>
+        <line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${ax.toFixed(1)}" y2="${gy}" stroke="var(--border-hi)" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${gx0}" cy="${gy}" r="3.5" fill="var(--pine)"/>
+        <circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="4" fill="var(--turf)"/>
+        <circle cx="${gx1}" cy="${gy}" r="3.5" fill="var(--pine)"/>
+        <text x="${ax.toFixed(1)}" y="${(ay - 7 < 20 ? ay + 18 : ay - 7).toFixed(1)}" text-anchor="middle" class="traj-lbl">${fmt(labels.apexFt, 0)} ft</text>
+        <text x="${gx0}" y="${pad - 9}" text-anchor="start" class="traj-lbl">${fmt(labels.launch, 1)}° · ${fmt(labels.ballSpeed, 0)} mph · ${fmt(labels.spin, 0)} rpm</text>
+        <text x="${gx1}" y="${pad - 9}" text-anchor="end" class="traj-lbl">↓${fmt(labels.descent, 0)}° · ${fmt(sim.hangTime, 1)}s</text>
+        <text x="${gx1}" y="${gy + 14}" text-anchor="end" class="traj-lbl">${fmt(labels.carryYds, 0)} yds</text>
+      </svg>`;
+  }
+
+  // Stylized fallback when there isn't enough data to simulate
+  function arc(launch, apexFt, carryYds, descent, opts = {}) {
+    const W = opts.w || 340, H = opts.h || 170, pad = opts.pad || 26;
     launch  = launch  > 0 ? launch  : 12;
     descent = descent > 0 ? descent : 40;
-    const tl=Math.tan(launch*Math.PI/180), td=Math.tan(descent*Math.PI/180);
-    let frac = td/(tl+td);
-    if (!isFinite(frac) || frac<=0.05 || frac>=0.95) frac=0.6;
-    const gx0=pad, gx1=W-pad, gy=H-pad;
-    const uw=gx1-gx0, uh=H-pad*1.5;
-    const ax=gx0+uw*frac, ay=gy-uh;
-    const c1x=gx0+(ax-gx0)*0.55, c2x=ax+(gx1-ax)*0.45;
-    const line=`M ${gx0} ${gy} Q ${c1x} ${ay} ${ax} ${ay} Q ${c2x} ${ay} ${gx1} ${gy}`;
-    const area=`${line} L ${gx1} ${gy} L ${gx0} ${gy} Z`;
-    const uid='tg'+Math.random().toString(36).slice(2,7);
+    const tl = Math.tan(launch * Math.PI / 180), td = Math.tan(descent * Math.PI / 180);
+    let frac = td / (tl + td);
+    if (!isFinite(frac) || frac <= 0.05 || frac >= 0.95) frac = 0.6;
+    const gx0 = pad, gx1 = W - pad, gy = H - pad;
+    const uw = gx1 - gx0, uh = H - pad * 1.5;
+    const ax = gx0 + uw * frac, ay = gy - uh;
+    const c1x = gx0 + (ax - gx0) * 0.55, c2x = ax + (gx1 - ax) * 0.45;
+    const line = `M ${gx0} ${gy} Q ${c1x} ${ay} ${ax} ${ay} Q ${c2x} ${ay} ${gx1} ${gy}`;
+    const area = `${line} L ${gx1} ${gy} L ${gx0} ${gy} Z`;
+    const uid = 'tg' + Math.random().toString(36).slice(2, 7);
     return `
       <svg class="traj-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Ball flight profile">
         <defs><linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
@@ -1883,11 +1989,34 @@ const Trajectory = (() => {
         <text x="${gx1}" y="${gy+15}" text-anchor="end" class="traj-lbl">${fmt(carryYds,0)} yds carry</text>
       </svg>`;
   }
-  const shot = s => arc(s.launchAngle, s.apex, s.carryDistance, s.descentAngle);
+
+  function render(ballSpeed, launch, spin, clubType, measuredCarry, measuredApex, measuredDescent) {
+    if (!(ballSpeed > 30) || !(launch > 0)) {
+      return arc(launch, measuredApex, measuredCarry, measuredDescent);
+    }
+    const useSpin = spin > 500 ? spin : defaultSpin(clubType);
+    try {
+      const sim = simulateFlight(ballSpeed, launch, useSpin);
+      if (!(sim.carryYds > 5)) return arc(launch, measuredApex, measuredCarry, measuredDescent);
+      return flightSVG(sim, {
+        launch, ballSpeed, spin: useSpin,
+        carryYds: measuredCarry > 0 ? measuredCarry : sim.carryYds,
+        apexFt: measuredApex > 0 ? measuredApex : sim.apexFt,
+        descent: measuredDescent > 0 ? measuredDescent : sim.descentDeg,
+      });
+    } catch (e) {
+      console.error('Trajectory sim:', e);
+      return arc(launch, measuredApex, measuredCarry, measuredDescent);
+    }
+  }
+
+  const shot = s => render(s.ballSpeed, s.launchAngle, s.spinRate, s.clubType,
+    s.carryDistance, s.apex, s.descentAngle);
   const avgFlight = shots => shots.length
-    ? arc(avg(shots,'launchAngle'), avg(shots,'apex'), avg(shots,'carryDistance'), avg(shots,'descentAngle'))
+    ? render(avg(shots,'ballSpeed'), avg(shots,'launchAngle'), avg(shots,'spinRate'),
+        shots[0]?.clubType, avg(shots,'carryDistance'), avg(shots,'apex'), avg(shots,'descentAngle'))
     : '';
-  return { shot, avgFlight, arc };
+  return { shot, avgFlight, arc, simulateFlight };
 })();
 
 // ────────────────────────────────────────────────────────────────
