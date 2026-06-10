@@ -1857,7 +1857,30 @@ const Trajectory = (() => {
   // the curve: low spin flies flat, high spin balloons, wedges drop steep.
   // Calibrated against typical TrackMan/Rapsodo numbers (driver 155mph /
   // 12° / 2600rpm → ~237yds carry, ~99ft apex, 41° descent).
-  function simulateFlight(ballSpeedMph, launchDeg, spinRpm, launchDirDeg = 0, spinAxisDeg = 0) {
+  // Ball construction models. The launch monitor already measures the speed
+  // and spin of the ball you actually hit — what it can NOT know is the
+  // aerodynamics. Range balls have firmer covers and shallower/worn dimples:
+  // more drag, less lift, so they fly 5-10% shorter than a premium ball at
+  // IDENTICAL launch numbers (launch monitors assume premium aero). Hard
+  // two-piece balls are aerodynamically close to premium but spin less, so
+  // only their default-spin estimate differs much.
+  //   cd/cl: multipliers on drag/lift coefficients
+  //   spin:  multiplier on the per-club DEFAULT spin (measured spin is used as-is)
+  const BALLS = {
+    premium: { label: 'Premium',  cd: 1,    cl: 1,    spin: 1    },
+    firm:    { label: 'Hard 2pc', cd: 0.98, cl: 0.96, spin: 0.85 },
+    range:   { label: 'Range',    cd: 1.08, cl: 0.92, spin: 0.75 },
+  };
+  function ballType() {
+    const t = localStorage.getItem('slBallType');
+    return BALLS[t] ? t : 'premium';
+  }
+  function setBallType(t) {
+    if (BALLS[t]) try { localStorage.setItem('slBallType', t); } catch (_) {}
+  }
+
+  function simulateFlight(ballSpeedMph, launchDeg, spinRpm, launchDirDeg = 0, spinAxisDeg = 0, ball = 'premium') {
+    const B = BALLS[ball] || BALLS.premium;
     const v0 = ballSpeedMph * 0.44704;            // mph → m/s
     const th = launchDeg * Math.PI / 180;
     const dir = launchDirDeg * Math.PI / 180;     // + = starts right
@@ -1877,8 +1900,8 @@ const Trajectory = (() => {
     while (y >= 0 && t < 15) {
       const v = Math.hypot(vx, vy, vz) || 0.01;
       const S = Math.min(0.5, (r * w) / v);       // spin parameter
-      const Cd = Math.min(0.45, 0.24 + 0.32 * S);
-      const Cl = Math.min(0.35, 0.10 + 0.96 * S);
+      const Cd = Math.min(0.5, (0.24 + 0.32 * S) * B.cd);
+      const Cl = Math.min(0.38, (0.10 + 0.96 * S) * B.cl);
       // drag opposes velocity; backspin lift is perpendicular to it,
       // tilted sideways by the spin axis (tilt → draw/fade curvature)
       const ax = -k * v * (Cd * vx + Cl * cosE * vy);
@@ -1965,6 +1988,7 @@ const Trajectory = (() => {
         <text x="${gx0}" y="${pad - 9}" text-anchor="start" class="traj-lbl">${fmt(labels.launch, 1)}° · ${fmt(labels.ballSpeed, 0)} mph · ${fmt(labels.spin, 0)} rpm</text>
         <text x="${gx1}" y="${pad - 9}" text-anchor="end" class="traj-lbl">↓${fmt(labels.descent, 0)}° · ${fmt(sim.hangTime, 1)}s</text>
         <text x="${gx1}" y="${gy + 14}" text-anchor="end" class="traj-lbl">${fmt(labels.carryYds, 0)} yds</text>
+        ${labels.premiumEst ? `<text x="${gx1}" y="${pad + 6}" text-anchor="end" class="traj-tick" style="fill:var(--gold)">≈ ${fmt(labels.premiumEst, 0)} yds w/ premium ball</text>` : ''}
       </svg>`;
   }
 
@@ -2056,13 +2080,23 @@ const Trajectory = (() => {
     if (!(ballSpeed > 30) || !(launch > 0)) {
       return arc(launch, apexFt, carry, descent);
     }
-    const useSpin = spin > 500 ? spin : defaultSpin(clubType);
+    const ball = ballType();
+    const useSpin = spin > 500 ? spin : Math.round(defaultSpin(clubType) * BALLS[ball].spin);
     try {
-      const sim = simulateFlight(ballSpeed, launch, useSpin, launchDir || 0, spinAxis || 0);
+      const sim = simulateFlight(ballSpeed, launch, useSpin, launchDir || 0, spinAxis || 0, ball);
       if (!(sim.carryYds > 5)) return arc(launch, apexFt, carry, descent);
+      const carryShown = carry > 0 ? carry : sim.carryYds;
+      // What the same launch numbers would do with a premium ball — useful
+      // when practicing with range balls (launch monitors assume premium aero)
+      let premiumEst = null;
+      if (ball !== 'premium') {
+        const simP = simulateFlight(ballSpeed, launch, useSpin, 0, 0, 'premium');
+        const ratio = simP.carryYds / sim.carryYds;
+        if (ratio > 1.02) premiumEst = carryShown * ratio;
+      }
       const side = flightSVG(sim, {
-        launch, ballSpeed, spin: useSpin,
-        carryYds: carry > 0 ? carry : sim.carryYds,
+        launch, ballSpeed, spin: useSpin, premiumEst,
+        carryYds: carryShown,
         apexFt: apexFt > 0 ? apexFt : sim.apexFt,
         descent: descent > 0 ? descent : sim.descentDeg,
       });
@@ -2094,7 +2128,7 @@ const Trajectory = (() => {
           spinAxis: avg(shots,'spinAxis'), sideCarry: avg(shots,'sideCarry'),
         })
     : '';
-  return { shot, avgFlight, arc, simulateFlight, defaultSpin };
+  return { shot, avgFlight, arc, simulateFlight, defaultSpin, BALLS, ballType, setBallType };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2604,7 +2638,23 @@ const UI = (() => {
   function renderBallFlight(shots) {
     const el=document.getElementById('ballFlight'); if(!el) return;
     if(!shots.length){ el.innerHTML=''; return; }
-    el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(shots)}</div>`;
+    // ball-type selector: range balls fly shorter at identical launch
+    // numbers, so the sim's aero model has to know what you were hitting
+    const cur = Trajectory.ballType();
+    const chips = Object.entries(Trajectory.BALLS).map(([key, b]) =>
+      `<button class="chip ${key===cur?'active':''}" data-ball="${key}">${b.label}</button>`).join('');
+    el.innerHTML = `
+      <div class="filter-row" style="margin-bottom:.6rem">
+        <span class="filter-label">Ball:</span>
+        <div class="filter-chips">${chips}</div>
+      </div>
+      <div class="chart-card traj-card">${Trajectory.avgFlight(shots)}</div>`;
+    el.querySelectorAll('[data-ball]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        Trajectory.setBallType(btn.dataset.ball);
+        renderBallFlight(shots);
+      });
+    });
   }
 
   // ── Insights (coach's notes) ──────────────────────────────────
@@ -3169,9 +3219,10 @@ const UI = (() => {
       .sort((a, b) => clubOrder(a.club) - clubOrder(b.club));
     if (clubs.length < 2) { host.innerHTML = ''; return; }
 
+    const ball = Trajectory.ballType();
     const flights = clubs.map(c => {
-      const spin = c.spin > 500 ? c.spin : Trajectory.defaultSpin(c.club);
-      const sim = Trajectory.simulateFlight(c.ballSpeed, c.launch, spin);
+      const spin = c.spin > 500 ? c.spin : Math.round(Trajectory.defaultSpin(c.club) * Trajectory.BALLS[ball].spin);
+      const sim = Trajectory.simulateFlight(c.ballSpeed, c.launch, spin, 0, 0, ball);
       return { ...c, sim };
     }).filter(f => f.sim.carryYds > 5);
     if (flights.length < 2) { host.innerHTML = ''; return; }
@@ -3209,6 +3260,9 @@ const UI = (() => {
         <text x="${exX.toFixed(1)}" y="${gy - 7}" text-anchor="middle" class="traj-tick" fill="${col}" style="fill:${col};font-weight:700">${clubLabel(f.club)}</text>`;
     }).join('');
 
+    const rangeNote = ball === 'range'
+      ? `<p style="font-size:.72rem;color:var(--text-muted);margin-top:.5rem;font-family:var(--font-mono)">Hit with range balls — expect roughly 4-8% more carry with a premium ball on course.</p>`
+      : '';
     host.innerHTML = `
       <h3 class="section-title" style="margin-bottom:.8rem">🪽 Your Bag in Flight</h3>
       <div class="chart-card traj-card" style="padding:.8rem">
@@ -3217,6 +3271,7 @@ const UI = (() => {
           ${ticks}
           ${curves}
         </svg>
+        ${rangeNote}
       </div>`;
   }
 
