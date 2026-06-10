@@ -1857,38 +1857,47 @@ const Trajectory = (() => {
   // the curve: low spin flies flat, high spin balloons, wedges drop steep.
   // Calibrated against typical TrackMan/Rapsodo numbers (driver 155mph /
   // 12° / 2600rpm → ~237yds carry, ~99ft apex, 41° descent).
-  function simulateFlight(ballSpeedMph, launchDeg, spinRpm) {
+  function simulateFlight(ballSpeedMph, launchDeg, spinRpm, launchDirDeg = 0, spinAxisDeg = 0) {
     const v0 = ballSpeedMph * 0.44704;            // mph → m/s
     const th = launchDeg * Math.PI / 180;
+    const dir = launchDirDeg * Math.PI / 180;     // + = starts right
+    const eps = spinAxisDeg * Math.PI / 180;      // spin axis tilt; + = fade
     let w = spinRpm * 2 * Math.PI / 60;           // rpm → rad/s backspin
     const r = 0.02134, m = 0.04593, rho = 1.225;  // ball radius/mass, air
     const k = 0.5 * rho * (Math.PI * r * r) / m;
     const g = 9.81, dt = 0.01, tauSpin = 28;      // spin decay constant
+    const cosE = Math.cos(eps), sinE = Math.sin(eps);
 
-    let x = 0, y = 0, vx = v0 * Math.cos(th), vy = v0 * Math.sin(th);
+    let x = 0, y = 0, z = 0;                      // downrange, up, right
+    let vx = v0 * Math.cos(th) * Math.cos(dir);
+    let vy = v0 * Math.sin(th);
+    let vz = v0 * Math.cos(th) * Math.sin(dir);
     let apexM = 0, apexX = 0, t = 0;
-    const pts = [{ x: 0, y: 0 }];
+    const pts = [{ x: 0, y: 0, z: 0 }];
     while (y >= 0 && t < 15) {
-      const v = Math.hypot(vx, vy) || 0.01;
+      const v = Math.hypot(vx, vy, vz) || 0.01;
       const S = Math.min(0.5, (r * w) / v);       // spin parameter
       const Cd = Math.min(0.45, 0.24 + 0.32 * S);
       const Cl = Math.min(0.35, 0.10 + 0.96 * S);
-      // drag opposes velocity; backspin lift is perpendicular to it
-      const ax = -k * v * (Cd * vx + Cl * vy);
-      const ay = -g - k * v * (Cd * vy - Cl * vx);
-      vx += ax * dt; vy += ay * dt;
-      x += vx * dt;  y += vy * dt;
+      // drag opposes velocity; backspin lift is perpendicular to it,
+      // tilted sideways by the spin axis (tilt → draw/fade curvature)
+      const ax = -k * v * (Cd * vx + Cl * cosE * vy);
+      const ay = -g - k * v * (Cd * vy - Cl * cosE * vx);
+      const az = -k * v * Cd * vz + k * v * Cl * sinE * Math.hypot(vx, vy);
+      vx += ax * dt; vy += ay * dt; vz += az * dt;
+      x += vx * dt;  y += vy * dt;  z += vz * dt;
       w *= Math.exp(-dt / tauSpin);
       t += dt;
       if (y > apexM) { apexM = y; apexX = x; }
-      pts.push({ x, y: Math.max(0, y) });
+      pts.push({ x, y: Math.max(0, y), z });
     }
     return {
       pts, apexX,
-      carryM: x, apexM,
+      carryM: x, apexM, offlineM: z,
       carryYds: x * 1.09361,
       apexFt: apexM * 3.28084,
-      descentDeg: Math.abs(Math.atan2(vy, vx) * 180 / Math.PI),
+      offlineYds: z * 1.09361,
+      descentDeg: Math.abs(Math.atan2(vy, Math.hypot(vx, vz)) * 180 / Math.PI),
       hangTime: t,
     };
   }
@@ -1949,10 +1958,62 @@ const Trajectory = (() => {
         <circle cx="${gx0}" cy="${gy}" r="3.5" fill="var(--pine)"/>
         <circle cx="${ax.toFixed(1)}" cy="${ay.toFixed(1)}" r="4" fill="var(--turf)"/>
         <circle cx="${gx1}" cy="${gy}" r="3.5" fill="var(--pine)"/>
+        <circle r="3" fill="var(--gold-bright)">
+          <animateMotion dur="${Math.max(1.5, sim.hangTime * 0.45).toFixed(1)}s" repeatCount="indefinite" path="${line}"/>
+        </circle>
         <text x="${ax.toFixed(1)}" y="${(ay - 7 < 20 ? ay + 18 : ay - 7).toFixed(1)}" text-anchor="middle" class="traj-lbl">${fmt(labels.apexFt, 0)} ft</text>
         <text x="${gx0}" y="${pad - 9}" text-anchor="start" class="traj-lbl">${fmt(labels.launch, 1)}° · ${fmt(labels.ballSpeed, 0)} mph · ${fmt(labels.spin, 0)} rpm</text>
         <text x="${gx1}" y="${pad - 9}" text-anchor="end" class="traj-lbl">↓${fmt(labels.descent, 0)}° · ${fmt(sim.hangTime, 1)}s</text>
         <text x="${gx1}" y="${gy + 14}" text-anchor="end" class="traj-lbl">${fmt(labels.carryYds, 0)} yds</text>
+      </svg>`;
+  }
+
+  // Top-down view: the shot's shape over the ground (draw/fade curvature).
+  // Lateral scale is exaggerated up to 4× downrange scale so gentle curves
+  // stay visible; the offline label always shows the true number.
+  function topSVG(sim, labels) {
+    const W = 340, H = 120, pad = 26;
+    const gx0 = pad, gx1 = W - pad, gym = H / 2;          // mid = target line
+    const uw = gx1 - gx0, uhh = H / 2 - pad * 0.7;
+
+    // anchor lateral scale to the measured side carry when meaningful
+    let zf = 1;
+    if (typeof labels.offlineYds === 'number' && Math.abs(sim.offlineYds) > 2) {
+      zf = labels.offlineYds / sim.offlineYds;
+      zf = Math.max(-3, Math.min(3, zf));
+    }
+    const shownOffline = (typeof labels.offlineYds === 'number')
+      ? labels.offlineYds : sim.offlineYds;
+
+    const xs = uw / sim.carryM;
+    const zmax = Math.max(...sim.pts.map(p => Math.abs(p.z * zf)), sim.carryM * 0.04);
+    const zs = Math.min(xs * 4, uhh / zmax);
+
+    const px = mx => gx0 + mx * xs;
+    const pz = mz => gym + mz * zf * zs;                  // + offline drawn downward = right
+
+    const pts = sim.pts.filter((_, i) => i % 4 === 0 || i === sim.pts.length - 1);
+    const line = pts.map((p, i) => `${i ? 'L' : 'M'} ${px(p.x).toFixed(1)} ${pz(p.z).toFixed(1)}`).join(' ');
+    const ex = px(sim.carryM), ez = pz(sim.offlineM);
+
+    const side = shownOffline >= 0 ? 'R' : 'L';
+    const shape = (() => {
+      // classify from the same number we display, start line removed
+      const curve = shownOffline - (labels.launchDir || 0) * 1.8;
+      if (Math.abs(shownOffline) < 4) return 'straight';
+      if (Math.abs(curve) < 4) return shownOffline >= 0 ? 'push' : 'pull';
+      if (curve > 12) return 'slice'; if (curve > 0) return 'fade';
+      if (curve < -12) return 'hook'; return 'draw';
+    })();
+
+    return `
+      <svg class="traj-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Shot shape from above">
+        <line x1="${gx0}" y1="${gym}" x2="${gx1}" y2="${gym}" stroke="var(--border-hi)" stroke-width="1" stroke-dasharray="4 4"/>
+        <path d="${line}" fill="none" stroke="var(--pine)" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${gx0}" cy="${gym}" r="3.5" fill="var(--pine)"/>
+        <circle cx="${ex.toFixed(1)}" cy="${ez.toFixed(1)}" r="4" fill="var(--turf)"/>
+        <text x="${gx0}" y="${gym - 8}" text-anchor="start" class="traj-lbl">top view · ${shape}</text>
+        <text x="${gx1}" y="${(ez + (sim.offlineM * zf >= 0 ? 16 : -9)).toFixed(1)}" text-anchor="end" class="traj-lbl">${fmt(Math.abs(shownOffline), 0)} yds ${side}</text>
       </svg>`;
   }
 
@@ -1990,33 +2051,50 @@ const Trajectory = (() => {
       </svg>`;
   }
 
-  function render(ballSpeed, launch, spin, clubType, measuredCarry, measuredApex, measuredDescent) {
+  function render(ballSpeed, launch, spin, clubType, measured = {}) {
+    const { carry, apexFt, descent, launchDir, spinAxis, sideCarry } = measured;
     if (!(ballSpeed > 30) || !(launch > 0)) {
-      return arc(launch, measuredApex, measuredCarry, measuredDescent);
+      return arc(launch, apexFt, carry, descent);
     }
     const useSpin = spin > 500 ? spin : defaultSpin(clubType);
     try {
-      const sim = simulateFlight(ballSpeed, launch, useSpin);
-      if (!(sim.carryYds > 5)) return arc(launch, measuredApex, measuredCarry, measuredDescent);
-      return flightSVG(sim, {
+      const sim = simulateFlight(ballSpeed, launch, useSpin, launchDir || 0, spinAxis || 0);
+      if (!(sim.carryYds > 5)) return arc(launch, apexFt, carry, descent);
+      const side = flightSVG(sim, {
         launch, ballSpeed, spin: useSpin,
-        carryYds: measuredCarry > 0 ? measuredCarry : sim.carryYds,
-        apexFt: measuredApex > 0 ? measuredApex : sim.apexFt,
-        descent: measuredDescent > 0 ? measuredDescent : sim.descentDeg,
+        carryYds: carry > 0 ? carry : sim.carryYds,
+        apexFt: apexFt > 0 ? apexFt : sim.apexFt,
+        descent: descent > 0 ? descent : sim.descentDeg,
       });
+      // only show the top view when we have real direction/shape data
+      const hasShape = (typeof launchDir === 'number' && launchDir !== 0) ||
+                       (typeof spinAxis === 'number' && spinAxis !== 0) ||
+                       (typeof sideCarry === 'number' && sideCarry !== 0);
+      if (!hasShape) return side;
+      const top = topSVG(sim, {
+        offlineYds: typeof sideCarry === 'number' ? sideCarry : undefined,
+        launchDir: launchDir || 0,
+      });
+      return side + top;
     } catch (e) {
       console.error('Trajectory sim:', e);
-      return arc(launch, measuredApex, measuredCarry, measuredDescent);
+      return arc(launch, apexFt, carry, descent);
     }
   }
 
-  const shot = s => render(s.ballSpeed, s.launchAngle, s.spinRate, s.clubType,
-    s.carryDistance, s.apex, s.descentAngle);
+  const shot = s => render(s.ballSpeed, s.launchAngle, s.spinRate, s.clubType, {
+    carry: s.carryDistance, apexFt: s.apex, descent: s.descentAngle,
+    launchDir: s.launchDirection, spinAxis: s.spinAxis, sideCarry: s.sideCarry,
+  });
   const avgFlight = shots => shots.length
     ? render(avg(shots,'ballSpeed'), avg(shots,'launchAngle'), avg(shots,'spinRate'),
-        shots[0]?.clubType, avg(shots,'carryDistance'), avg(shots,'apex'), avg(shots,'descentAngle'))
+        shots[0]?.clubType, {
+          carry: avg(shots,'carryDistance'), apexFt: avg(shots,'apex'),
+          descent: avg(shots,'descentAngle'), launchDir: avg(shots,'launchDirection'),
+          spinAxis: avg(shots,'spinAxis'), sideCarry: avg(shots,'sideCarry'),
+        })
     : '';
-  return { shot, avgFlight, arc, simulateFlight };
+  return { shot, avgFlight, arc, simulateFlight, defaultSpin };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -3067,6 +3145,81 @@ const UI = (() => {
     modal.hidden = false;
   }
 
+  // ── Whole-bag flight fan ──────────────────────────────────────
+  function renderFlightFan(sessions) {
+    const host = document.getElementById('flightFanHost');
+    if (!host) return;
+
+    // average launch numbers per club (need a few shots to be meaningful)
+    const byClub = {};
+    sessions.flatMap(s => s.shots).forEach(s => {
+      if (s.clubType) (byClub[s.clubType] ??= []).push(s);
+    });
+    const clubs = Object.entries(byClub)
+      .filter(([, shots]) => shots.length >= 3)
+      .map(([club, shots]) => ({
+        club,
+        ballSpeed: avg(shots, 'ballSpeed'),
+        launch: avg(shots, 'launchAngle'),
+        spin: avg(shots, 'spinRate'),
+        carry: avg(shots, 'carryDistance'),
+        apexFt: avg(shots, 'apex'),
+      }))
+      .filter(c => c.ballSpeed > 30 && c.launch > 0)
+      .sort((a, b) => clubOrder(a.club) - clubOrder(b.club));
+    if (clubs.length < 2) { host.innerHTML = ''; return; }
+
+    const flights = clubs.map(c => {
+      const spin = c.spin > 500 ? c.spin : Trajectory.defaultSpin(c.club);
+      const sim = Trajectory.simulateFlight(c.ballSpeed, c.launch, spin);
+      return { ...c, sim };
+    }).filter(f => f.sim.carryYds > 5);
+    if (flights.length < 2) { host.innerHTML = ''; return; }
+
+    const W = 680, H = 240, pad = 30;
+    const gx0 = pad, gx1 = W - pad, gy = H - pad;
+    const uw = gx1 - gx0, uh = H - pad * 2.2;
+
+    // shared real-world scale: x anchored to each club's MEASURED carry,
+    // y anchored to measured apex, so the fan shows true gapping
+    const maxCarry = Math.max(...flights.map(f => f.carry > 0 ? f.carry : f.sim.carryYds));
+    const maxApex = Math.max(...flights.map(f => f.apexFt > 0 ? f.apexFt : f.sim.apexFt));
+    const xs = uw / maxCarry, ys = uh / maxApex;
+
+    let ticks = '';
+    const tickStep = maxCarry > 180 ? 50 : 25;
+    for (let yd = tickStep; yd < maxCarry * 0.97; yd += tickStep) {
+      const tx = gx0 + yd * xs;
+      ticks += `<line x1="${tx.toFixed(1)}" y1="${gy}" x2="${tx.toFixed(1)}" y2="${gy + 4}" stroke="var(--border-hi)" stroke-width="1"/>
+        <text x="${tx.toFixed(1)}" y="${gy + 14}" text-anchor="middle" class="traj-tick">${yd}</text>`;
+    }
+
+    const curves = flights.map(f => {
+      const carryYds = f.carry > 0 ? f.carry : f.sim.carryYds;
+      const apexFt = f.apexFt > 0 ? f.apexFt : f.sim.apexFt;
+      const xf = carryYds / f.sim.carryYds, yf = apexFt / f.sim.apexFt;
+      const pts = f.sim.pts.filter((_, i) => i % 6 === 0 || i === f.sim.pts.length - 1);
+      const line = pts.map((p, i) =>
+        `${i ? 'L' : 'M'} ${(gx0 + p.x * 1.09361 * xf * xs).toFixed(1)} ${(gy - p.y * 3.28084 * yf * ys).toFixed(1)}`).join(' ');
+      const exX = gx0 + carryYds * xs;
+      const col = clubColor(f.club);
+      return `
+        <path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" opacity=".9"/>
+        <circle cx="${exX.toFixed(1)}" cy="${gy}" r="3" fill="${col}"/>
+        <text x="${exX.toFixed(1)}" y="${gy - 7}" text-anchor="middle" class="traj-tick" fill="${col}" style="fill:${col};font-weight:700">${clubLabel(f.club)}</text>`;
+    }).join('');
+
+    host.innerHTML = `
+      <h3 class="section-title" style="margin-bottom:.8rem">🪽 Your Bag in Flight</h3>
+      <div class="chart-card traj-card" style="padding:.8rem">
+        <svg class="traj-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Average flight of every club">
+          <line x1="${gx0}" y1="${gy}" x2="${gx1}" y2="${gy}" stroke="var(--border-hi)" stroke-width="1.5"/>
+          ${ticks}
+          ${curves}
+        </svg>
+      </div>`;
+  }
+
   // ── Yardage book + personal bests ─────────────────────────────
   function renderYardages(sessions) {
     const empty = document.getElementById('yardages-empty');
@@ -3078,6 +3231,10 @@ const UI = (() => {
     const totalShots = sessions.reduce((a,s)=>a+s.shots.length,0);
     document.getElementById('yardageMeta').textContent =
       `${book.length} clubs · ${totalShots} shots · ${sessions.length} session${sessions.length>1?'s':''}`;
+
+    // Whole-bag flight fan: every club's average flight, physics-simulated,
+    // in one chart — gapping at a glance.
+    try { renderFlightFan(sessions); } catch(e){ console.error('flightFan', e); }
 
     // Add drill finder for weakest clubs
     try {

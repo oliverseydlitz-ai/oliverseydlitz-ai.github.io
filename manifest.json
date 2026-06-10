@@ -4,8 +4,8 @@
   "description": "Golf swing analysis powered by your launch monitor data",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#edf4ee",
-  "theme_color": "#0b4d2e",
+  "background_color": "#f4f1e6",
+  "theme_color": "#0a4a2c",
   "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230b4d2e'/><circle cx='96' cy='96' r='40' fill='white' opacity='0.9'/><circle cx='96' cy='96' r='28' fill='%230b4d2e'/></svg>",
