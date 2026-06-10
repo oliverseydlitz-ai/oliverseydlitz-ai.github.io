@@ -190,7 +190,7 @@ function applyTheme(dark) {
   const sw = document.getElementById('themeSwitch');
   if (sw) sw.classList.toggle('on', dark);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#0a140e' : '#0b4d2e');
+  if (meta) meta.setAttribute('content', dark ? '#000000' : '#ffffff');
 }
 (function initThemeEarly(){
   try {
@@ -2030,7 +2030,7 @@ const UI = (() => {
         const insights = InsightEngine.generateInsights(sessions);
         if (insights.length) {
           insightHost.innerHTML = insights.map(i =>
-            `<div style="padding:.7rem;background:rgba(11,77,46,.06);border-left:4px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
+            `<div style="padding:.7rem;background:rgba(0,112,243,.05);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
               <span style="font-size:1rem;margin-right:.4rem">${i.icon}</span>${i.text}
             </div>`
           ).join('');
@@ -2046,7 +2046,7 @@ const UI = (() => {
         alertsHost.innerHTML = alerts.length ? `
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
             ${alerts.map(a => `
-              <div style="padding:.8rem;background:${a.severity==='high'?'rgba(239,68,68,.1)':a.severity==='info'?'rgba(96,165,250,.1)':'rgba(34,197,94,.1)'};border-left:4px solid ${a.severity==='high'?'#ef4444':a.severity==='info'?'#60a5fa':'#22c55e'};border-radius:var(--radius-sm)">
+              <div style="padding:.8rem;background:${a.severity==='high'?'rgba(238,0,0,.06)':a.severity==='info'?'rgba(0,112,243,.06)':'rgba(0,112,243,.06)'};border-left:3px solid ${a.severity==='high'?'var(--red)':a.severity==='info'?'var(--accent)':'var(--accent)'};border-radius:var(--radius-sm)">
                 <div style="font-weight:600;margin-bottom:.3rem">${a.icon} ${a.title}</div>
                 <div style="font-size:.9rem;color:var(--text-dim)">${a.message}</div>
               </div>
@@ -2557,7 +2557,7 @@ const UI = (() => {
     const M = [
       {label:'Avg Smash',   field:'smashFactor',     dec:2, unit:'',    col:'#16a34a'},
       {label:'Ball Speed',  field:'ballSpeed',        dec:0, unit:'mph', col:'#2563eb'},
-      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds', col:'#0b4d2e'},
+      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds', col:'#0070f3'},
       {label:'Launch Angle',field:'launchAngle',      dec:1, unit:'°',   col:'#b45309'},
       {label:'Club Speed',  field:'clubSpeed',        dec:0, unit:'mph', col:'#7c3aed'},
       {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds', col:'#0891b2'},
@@ -4026,13 +4026,13 @@ function showFatalError(err) {
     el.innerHTML =
       '<div style="max-width:340px;text-align:center">' +
       '<div style="font-size:2.5rem;margin-bottom:.5rem">⛳</div>' +
-      '<h2 style="font-size:1.2rem;color:#0c1f14;margin-bottom:.5rem">Something hiccuped</h2>' +
-      '<p style="color:#496657;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
+      '<h2 style="font-size:1.2rem;color:#000;margin-bottom:.5rem">Something hiccuped</h2>' +
+      '<p style="color:#666;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
       'The app hit an unexpected snag while loading. Your saved data is safe.</p>' +
-      '<button id="slReload" style="background:#0b4d2e;color:#fff;border:none;border-radius:8px;' +
-      'padding:.7rem 1.4rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:.6rem">Reload app</button>' +
-      '<button id="slReset" style="background:none;color:#496657;border:1px solid #b8cebd;' +
-      'border-radius:8px;padding:.6rem 1.4rem;font-weight:600;cursor:pointer;width:100%">Reset &amp; reload</button>' +
+      '<button id="slReload" style="background:#000;color:#fff;border:none;border-radius:6px;' +
+      'padding:.7rem 1.4rem;font-weight:600;cursor:pointer;width:100%;margin-bottom:.6rem">Reload app</button>' +
+      '<button id="slReset" style="background:none;color:#666;border:1px solid #eaeaea;' +
+      'border-radius:6px;padding:.6rem 1.4rem;font-weight:500;cursor:pointer;width:100%">Reset &amp; reload</button>' +
       '</div>';
     document.body.appendChild(el);
     document.getElementById('slReload').onclick = () => location.reload();
