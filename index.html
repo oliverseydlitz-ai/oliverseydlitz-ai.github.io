@@ -7,7 +7,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0b4d2e">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com;">
-  <title>ShotLab</title>
+  <title>ShotLab TOUR — Golf Swing Analysis for Rapsodo</title>
+  <meta name="description" content="Import your Rapsodo launch monitor CSV and get instant swing analysis: club gapping, dispersion, fault detection, yardage book, and progress trends. Free, private, works offline.">
+  <meta property="og:title" content="ShotLab TOUR — Golf Swing Analysis">
+  <meta property="og:description" content="Turn Rapsodo launch monitor data into insights: gapping, dispersion, faults, yardages, and trends.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://oliverseydlitz-ai.github.io/">
+  <meta name="twitter:card" content="summary">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +21,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<noscript>
+  <div style="padding:2rem;text-align:center;font-family:sans-serif">
+    <h1>ShotLab needs JavaScript</h1>
+    <p>Please enable JavaScript to analyze your golf swing data.</p>
+  </div>
+</noscript>
 
 <!-- ═══════════════════ TOP NAV (desktop) -->
 <header class="top-nav" id="topNav">
@@ -264,7 +277,7 @@
       </div>
 
       <!-- Performance alerts -->
-      <div id="alertsHost"></div>
+      <div id="progressAlertsHost"></div>
 
       <!-- Goal progress -->
       <div id="goalsHost"></div>
@@ -464,6 +477,10 @@
   <button class="bottom-nav-item" data-view="import">
     <span class="bnav-icon">+</span>
     <span class="bnav-label">Import</span>
+  </button>
+  <button class="bottom-nav-item" data-view="practice">
+    <span class="bnav-icon">🎯</span>
+    <span class="bnav-label">Practice</span>
   </button>
   <button class="bottom-nav-item" data-view="progress">
     <span class="bnav-icon">📈</span>

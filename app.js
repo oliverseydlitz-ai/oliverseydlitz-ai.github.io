@@ -3031,7 +3031,7 @@ const UI = (() => {
 
     // Add performance alerts and goals at the top
     try {
-      const alertsHost = document.getElementById('alertsHost');
+      const alertsHost = document.getElementById('progressAlertsHost');
       if (alertsHost) {
         const alerts = Features.performanceAlerts(sessions);
         if (alerts.length) {
