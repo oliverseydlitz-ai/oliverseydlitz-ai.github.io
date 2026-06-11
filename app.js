@@ -2645,7 +2645,7 @@ const UI = (() => {
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#496657',font:{size:11}}},
+          legend:{labels:{color:'#888888',font:{size:11}}},
           tooltip:{
             callbacks:{
               label: ctx => {
@@ -2656,12 +2656,12 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:'#496657',font:{size:11}},
-            ticks:{color:'#496657'},
-            grid:{color: ctx => ctx.tick.value===0?'#00000025':'#d4e2d8'},
+          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:'#888888',font:{size:11}},
+            ticks:{color:'#888888'},
+            grid:{color: ctx => ctx.tick.value===0?'rgba(0,0,0,0.15)':'#ebebeb'},
           },
-          y:{title:{display:true,text:'Carry Distance (yds)',color:'#496657',font:{size:11}},
-            ticks:{color:'#496657'},grid:{color:'#d4e2d8'},
+          y:{title:{display:true,text:'Carry Distance (yds)',color:'#888888',font:{size:11}},
+            ticks:{color:'#888888'},grid:{color:'#ebebeb'},
           },
         },
       },
@@ -2710,9 +2710,9 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{ticks:{color:'#496657'},grid:{color:'#d4e2d8'}},
-          y:{ticks:{color:'#496657'},grid:{color:'#d4e2d8'},
-            title:{display:true,text:'Carry (yds)',color:'#496657',font:{size:11}}},
+          x:{ticks:{color:'#888888'},grid:{color:'#ebebeb'}},
+          y:{ticks:{color:'#888888'},grid:{color:'#ebebeb'},
+            title:{display:true,text:'Carry (yds)',color:'#888888',font:{size:11}}},
         },
       },
     });
@@ -3155,9 +3155,9 @@ const UI = (() => {
         responsive:true, maintainAspectRatio:true,
         plugins:{legend:{display:false}},
         scales:{
-          x:{ticks:{color:'#496657',font:{size:10}},grid:{color:'#d4e2d8'}},
-          y:{ticks:{color:'#496657',font:{size:10}},grid:{color:'#d4e2d8'},
-            title:{display:!!yLabel,text:yLabel||'',color:'#496657',font:{size:10}}},
+          x:{ticks:{color:'#888888',font:{size:10}},grid:{color:'#ebebeb'}},
+          y:{ticks:{color:'#888888',font:{size:10}},grid:{color:'#ebebeb'},
+            title:{display:!!yLabel,text:yLabel||'',color:'#888888',font:{size:10}}},
         },
       },
     });
@@ -3912,7 +3912,7 @@ async function init() {
   }
 
   // Show keyboard tips in console
-  console.log('%cShotLab Keyboard Shortcuts', 'font-weight:bold;font-size:14px;color:#0b4d2e');
+  console.log('%cShotLab Keyboard Shortcuts', 'font-weight:bold;font-size:14px;color:#0070f3');
   console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages | Ctrl+?: Help');
 
   // View preferences toggles
@@ -4005,8 +4005,8 @@ async function init() {
   try { ResponsiveEnhancements.enhanceMobileUX(); } catch(e){ console.error('responsive',e); }
 
   // Show welcome message with tips
-  console.log('%cWelcome to ShotLab v3.0 🏌️', 'font-size:16px;font-weight:bold;color:#0b4d2e');
-  console.log('%cPress Ctrl+? for keyboard shortcuts', 'font-size:12px;color:#496657');
+  console.log('%cWelcome to ShotLab v3.0 🏌️', 'font-size:16px;font-weight:bold;color:#0070f3');
+  console.log('%cPress Ctrl+? for keyboard shortcuts', 'font-size:12px;color:#888888');
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -4021,17 +4021,17 @@ function showFatalError(err) {
     if (existing) return;
     const el = document.createElement('div');
     el.id = 'slFatal';
-    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#edf4ee;display:flex;' +
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#fafafa;display:flex;' +
       'align-items:center;justify-content:center;padding:2rem;font-family:system-ui,sans-serif';
     el.innerHTML =
       '<div style="max-width:340px;text-align:center">' +
       '<div style="font-size:2.5rem;margin-bottom:.5rem">⛳</div>' +
-      '<h2 style="font-size:1.2rem;color:#000;margin-bottom:.5rem">Something hiccuped</h2>' +
-      '<p style="color:#666;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
+      '<h2 style="font-size:1.2rem;color:#171717;margin-bottom:.5rem">Something hiccuped</h2>' +
+      '<p style="color:#4d4d4d;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
       'The app hit an unexpected snag while loading. Your saved data is safe.</p>' +
-      '<button id="slReload" style="background:#000;color:#fff;border:none;border-radius:6px;' +
+      '<button id="slReload" style="background:#171717;color:#fff;border:none;border-radius:6px;' +
       'padding:.7rem 1.4rem;font-weight:600;cursor:pointer;width:100%;margin-bottom:.6rem">Reload app</button>' +
-      '<button id="slReset" style="background:none;color:#666;border:1px solid #eaeaea;' +
+      '<button id="slReset" style="background:none;color:#4d4d4d;border:1px solid #ebebeb;' +
       'border-radius:6px;padding:.6rem 1.4rem;font-weight:500;cursor:pointer;width:100%">Reset &amp; reload</button>' +
       '</div>';
     document.body.appendChild(el);
