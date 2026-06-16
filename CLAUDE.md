@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Workflow Policy (READ FIRST)
+
+1. **Push directly to `main`.** All updates go straight to `main` — do **not**
+   create new feature branches for changes in this repo. (`main` auto-deploys to
+   the live site via GitHub Pages.)
+2. **Always test in a sandbox first, then push.** Validate changes before every
+   push — at minimum: `node --check app.js` (syntax), confirm `index.html` IDs
+   referenced by JS exist, verify JSON files parse, and exercise the change
+   locally (`python3 -m http.server 8000`). Only push once it works.
+3. When app files change, **bump the service-worker cache** version in `sw.js`
+   so clients get the update.
+
 ## Project Overview
 
 **ShotLab TOUR** is a golf swing analysis web app that imports Rapsodo launch monitor CSV exports and provides visualization & insights into swing metrics, club gapping, consistency, and performance trends.

@@ -180,6 +180,8 @@ const MemDB = (() => {
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
+// Contact for privacy / data-deletion requests. EDIT THIS to your real address.
+const SUPPORT_EMAIL = 'your-support-email@example.com';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     // Implicit flow (#access_token) — reliably logs users in without a stored
@@ -459,6 +461,7 @@ const Auth = (() => {
     const signIn = document.getElementById('accountSignInBtn');
     const signOut = document.getElementById('accountSignOutBtn');
     const syncBtn = document.getElementById('syncCloudBtn');
+    const delAcct = document.getElementById('deleteAccountBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
       clearTimeout(_guestTimer);
@@ -467,6 +470,7 @@ const Auth = (() => {
       signIn.hidden = true;
       signOut.hidden = false;
       if (syncBtn) syncBtn.hidden = false;   // sync only available when signed in
+      if (delAcct) delAcct.hidden = false;   // account deletion only when signed in
       authModal.hidden = true;
     } else if (_guest) {
       // Guest mode: show a clear "Guest" label instead of an empty dash
@@ -475,11 +479,13 @@ const Auth = (() => {
       signIn.hidden = false;
       signOut.hidden = true;
       if (syncBtn) syncBtn.hidden = true;
+      if (delAcct) delAcct.hidden = true;
     } else {
       emailRow.hidden = true;
       signIn.hidden = false;
       signOut.hidden = true;
       if (syncBtn) syncBtn.hidden = true;
+      if (delAcct) delAcct.hidden = true;
     }
   }
 
@@ -2068,7 +2074,7 @@ const UI = (() => {
       if (nextHost) {
         const next = SmartRecommendations.getNextStep(sessions);
         nextHost.innerHTML = `
-          <div class="drill-card" onclick="Router.show('${next.action}')">
+          <div class="drill-card" data-route="${Sanitize.escape(next.action)}">
             <div class="drill-icon">${next.icon}</div>
             <div class="drill-title">${next.title}</div>
             <div class="drill-desc">${next.desc}</div>
@@ -3042,7 +3048,7 @@ const UI = (() => {
         drillHost.innerHTML = '<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill Focus</h3>' + weakest.map(b => {
           const cons = b.stdCarry===0?'tight': b.stdCarry<6?'tight':b.stdCarry<12?'moderate':'wide';
           const drillInfo = drillTexts[cons];
-          return `<div class="drill-card" onclick="Router.show('sessions')">
+          return `<div class="drill-card" data-route="sessions">
             <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(b.club)}"></div>
             <div class="drill-title">${clubLabel(b.club)} (${cons.toUpperCase()})</div>
             <div class="drill-desc">${drillInfo.desc}</div>
@@ -3281,7 +3287,7 @@ const UI = (() => {
         <div class="drill-title" style="font-size:.9rem">${p.name.substring(p.name.indexOf(' ')+1)}</div>
         <div class="drill-time" style="margin-top:.5rem">${p.duration} min</div>
         <div style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem">${p.difficulty}</div>
-        <button class="btn-primary" onclick="toast('${p.name} session started!')" style="width:100%;margin-top:.6rem;padding:.4rem;font-size:.75rem">Start</button>
+        <button class="btn-primary" data-start-plan="${Sanitize.escape(p.name)}" style="width:100%;margin-top:.6rem;padding:.4rem;font-size:.75rem">Start</button>
       </div>`
     ).join('');
   }
@@ -3484,6 +3490,59 @@ async function init() {
     }
   });
 
+  // ── Delegated action handler (CSP-safe replacement for inline onclick) ──
+  // Every dynamically-rendered button/card uses a data-* attribute instead of
+  // an inline onclick handler. This lets us keep a strict CSP (no
+  // script-src 'unsafe-inline') while still wiring up elements created later.
+  document.addEventListener('click', async e => {
+    const t = e.target.closest(
+      '[data-route],[data-start-plan],[data-close],[data-close-modal],[data-export-close],[data-del-goal]'
+    );
+    if (!t) return;
+
+    // Close a modal by element id
+    if (t.hasAttribute('data-close')) {
+      document.getElementById(t.getAttribute('data-close'))?.remove();
+      return;
+    }
+    // Close the nearest modal overlay
+    if (t.hasAttribute('data-close-modal')) {
+      t.closest('.modal-overlay')?.remove();
+      return;
+    }
+    // Export data, then close the surrounding modal
+    if (t.hasAttribute('data-export-close')) {
+      document.getElementById('exportDataBtn')?.click();
+      t.closest('.modal-overlay')?.remove();
+      return;
+    }
+    // Delete a goal then refresh
+    if (t.hasAttribute('data-del-goal')) {
+      try { Goals.deleteGoal(t.getAttribute('data-del-goal')); } catch (_) {}
+      location.reload();
+      return;
+    }
+    // Practice-plan "Start" stub
+    if (t.hasAttribute('data-start-plan')) {
+      toast(t.getAttribute('data-start-plan') + ' session started!');
+      return;
+    }
+    // Route to a view (same logic as the data-view nav delegator)
+    if (t.hasAttribute('data-route')) {
+      const v = t.getAttribute('data-route');
+      try {
+        if (v==='import')   { Router.showImport(); return; }
+        if (v==='progress') { await Router.showProgress(); return; }
+        if (v==='yardages') { await Router.showYardages(); return; }
+        if (v==='sessions' || v==='drill') { await Router.showSessions(); return; }
+        Router.show(v);
+      } catch (err) {
+        console.error('Route action error:', err);
+        Router.show(v);
+      }
+    }
+  });
+
   document.getElementById('topImportBtn')?.addEventListener('click', ()=>Router.showImport());
   document.getElementById('sessionsImportBtn')?.addEventListener('click', ()=>Router.showImport());
   document.getElementById('emptyCTA')?.addEventListener('click', ()=>Router.showImport());
@@ -3556,11 +3615,29 @@ async function init() {
       `Your account (${user.email}) and ALL sessions will be permanently deleted. This cannot be undone.`,
       async ()=>{
         try {
+          // 1. Delete all session data (anon key + RLS lets a user delete THEIR rows).
           const sessions = await Store.getSessions();
           for (const s of sessions) await Store.deleteSession(s.id);
-          await CloudDB.deleteSession('all').catch(()=>{});
+
+          // 2. Remove the auth account (email/login) itself. The browser cannot do
+          //    this with the publishable key — it requires the service_role, so we
+          //    call the `delete-account` Edge Function (see SECURITY-HEADERS.md).
+          let acctRemoved = false;
+          try {
+            const { error } = await sb.functions.invoke('delete-account');
+            if (!error) acctRemoved = true;
+          } catch (_) { /* function not deployed → fall back to email request */ }
+
+          if (!acctRemoved) {
+            // Data is gone, but the login record needs a manual/admin removal.
+            window.alert(
+              'All your session data has been permanently deleted.\n\n' +
+              'To also remove your account login/email, email ' + SUPPORT_EMAIL +
+              ' with the subject "Data Deletion Request". We remove it within 48 hours.'
+            );
+          }
+          // 3. Sign out & purge tokens regardless (hard reload to a clean origin).
           await Auth.logout();
-          toast('Account permanently deleted');
         } catch(err) { toast('Delete failed: ' + (err.message || 'unknown error')); }
       }
     );
@@ -3575,7 +3652,7 @@ async function init() {
       <div class="modal modal-wide">
         <div class="modal-head">
           <h2 class="modal-title">📋 Your Data & Rights</h2>
-          <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">✕</button>
+          <button class="btn-icon" data-close-modal>✕</button>
         </div>
         <div style="padding:1.2rem;color:var(--text)">
           <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
@@ -3638,10 +3715,10 @@ async function init() {
             <strong style="color:#dc2626">⚠️ This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
           </div>
 
-          <button class="btn-primary" onclick="document.getElementById('exportDataBtn').click(); this.closest('.modal-overlay').remove()" style="width:100%;margin-top:1.5rem">
+          <button class="btn-primary" data-export-close style="width:100%;margin-top:1.5rem">
             📥 Export My Data First (Recommended)
           </button>
-          <button class="btn-danger" onclick="this.closest('.modal-overlay').remove()" style="width:100%;margin-top:.6rem">
+          <button class="btn-danger" data-close-modal style="width:100%;margin-top:.6rem">
             Close
           </button>
         </div>
@@ -3679,7 +3756,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             📊 Advanced Analytics
-            <button onclick="document.getElementById('analyticsModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="analyticsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:1rem">
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
@@ -3742,7 +3819,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             🏆 Community Comparison
-            <button onclick="document.getElementById('benchmarkModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="benchmarkModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">vs ${comparison.skillLevel.toUpperCase()} golfers</div>
           <div style="display:grid;gap:1rem">
@@ -3790,7 +3867,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             📚 Learning Library
-            <button onclick="document.getElementById('learningModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="learningModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           ${path ? `
             <div style="margin-bottom:1.5rem">
@@ -3839,7 +3916,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             🏌️ Club Performance Analysis
-            <button onclick="document.getElementById('clubModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="clubModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
             ${clubs.map(c => `
@@ -3884,7 +3961,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ⚡ Practice Efficiency
-            <button onclick="document.getElementById('efficiencyModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="efficiencyModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:1rem">
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
@@ -4069,7 +4146,7 @@ async function init() {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ⌨️ Keyboard Shortcuts
-            <button onclick="document.getElementById('shortcutsModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="shortcutsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
             ${shortcuts.map(s => `
@@ -4135,7 +4212,7 @@ async function init() {
           <div style="font-size:.75rem;color:var(--text-muted)"><strong>${progress}${goal.unit}</strong> of <strong>${goal.target}${goal.unit}</strong></div>
           <div style="height:6px;background:var(--border);border-radius:3px;margin-top:.4rem;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--pine);transition:width .3s"></div></div>
         </div>
-        <button onclick="Goals.deleteGoal('${metric}');location.reload()" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem">✕</button>
+        <button data-del-goal="${Sanitize.escape(metric)}" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem">✕</button>
       </div>`;
     }).join('');
   };
@@ -5606,7 +5683,7 @@ const NotificationCenter = (() => {
         type === 'info' ? 'rgba(59,130,246,.9)' : 'rgba(168,85,247,.9)'
       };color:#fff;border-radius:var(--radius-sm);margin-bottom:.5rem;font-size:.95rem;display:flex;justify-content:space-between;align-items:center">
         <span>${message}</span>
-        <button onclick="document.getElementById('notif-${id}').remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1rem">✕</button>
+        <button data-close="notif-${id}" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1rem">✕</button>
       </div>`;
 
     const container = document.getElementById('notificationsContainer') || (() => {
@@ -5746,7 +5823,7 @@ const DocumentationCenter = (() => {
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
           <div style="font-size:1.2rem;font-weight:800;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
             ${doc.title}
-            <button onclick="document.getElementById('docModal').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button data-close="docModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="font-size:.95rem;line-height:1.6;color:var(--text)">${doc.content}</div>
         </div>

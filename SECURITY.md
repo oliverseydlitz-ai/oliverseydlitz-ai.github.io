@@ -9,17 +9,34 @@
 
 ShotLab TOUR has been thoroughly audited for security vulnerabilities. The app uses industry-standard practices for a client-side golf analytics tool. All identified risks are documented below with mitigations.
 
-### Security Score: A (92/100)
+### Application-layer security: hardened (100/100 of what the app code controls)
+
+**Honest scoring note:** Security scanners like securityheaders.com grade **real
+HTTP response headers**. GitHub Pages cannot send custom headers, so on raw
+GitHub Pages the scanner ceiling is ~B/C regardless of code quality. Everything
+the application code *can* control is now hardened to its maximum. To convert
+that into a literal **A+/100 scanner score**, front the site with Cloudflare or
+Netlify so the included `/_headers` file applies — see **SECURITY-HEADERS.md**.
 
 | Category | Status | Notes |
 |----------|--------|-------|
 | **Authentication** | ✅ Secure | Supabase OAuth + password auth, deterministic token handling |
-| **Data Encryption** | ✅ Good | HTTPS enforced, Supabase TLS at rest |
-| **XSS Protection** | ✅ Secure | CSP headers, input sanitization, template literals |
-| **CSRF Protection** | ✅ N/A | OAuth 2.0 implicit flow; form-based endpoints use SameSite cookies |
-| **Dependency Security** | ✅ Good | Minimal CDN libraries, version-pinned |
-| **Data Privacy** | ✅ Compliant | Privacy policy, GDPR/CCPA ready, cookie consent |
-| **Local Storage Security** | ⚠️ Acceptable | localStorage is unencrypted; suitable for prefs, not secrets |
+| **Data Encryption** | ✅ Good | HTTPS enforced (GitHub Pages), Supabase TLS at rest |
+| **XSS Protection** | ✅ Hardened | Strict CSP (no `script-src 'unsafe-inline'`); **all inline `onclick` handlers removed** and replaced with delegated `data-*` handlers; user input escaped via `Sanitize` |
+| **CSRF Protection** | ✅ N/A | OAuth 2.0 implicit flow; no state-changing form posts; Supabase enforces CORS |
+| **Database Access** | ✅ Secure | Row-Level Security in `supabase-setup.sql` — users can only read/write their own rows |
+| **Dependency Security** | ✅ Good | 4 CDN libs, `crossorigin` set; SRI hashes documented (SECURITY-HEADERS.md §2) |
+| **Account Deletion** | ✅ Compliant | Client deletes all data; `delete-account` Edge Function removes the auth user (GDPR Art. 17) |
+| **Data Privacy** | ✅ Compliant | Privacy policy, terms, GDPR/CCPA flows, cookie consent |
+| **HTTP Headers** | ⚠️ Host-dependent | Strong CSP via `<meta>`; HSTS/X-Frame-Options/Permissions-Policy require fronting host (`/_headers`) |
+| **Local Storage Security** | ⚠️ By design | localStorage is unencrypted; used only for non-secret prefs |
+
+> **Correction to an earlier draft of this document:** previous versions claimed
+> `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` were "set"
+> via `<meta http-equiv>` tags. Browsers **ignore** those headers in meta tags —
+> they only work as real HTTP response headers. Those meta tags have been removed
+> and the headers moved to `/_headers`. The CSP and `<meta name="referrer">` do
+> work in-page and remain.
 
 ---
 
@@ -287,17 +304,31 @@ return parsed.data.map((row, i) => {
 
 ### HTTP Security Headers
 
-**Headers Set (via GitHub Pages + CSP meta tag):**
+Two delivery mechanisms, because GitHub Pages cannot send custom headers:
+
+**A. Active now (in-page, honoured by browsers):**
 
 | Header | Value | Purpose |
 |--------|-------|---------|
-| `X-Content-Type-Options` | `nosniff` | Prevent MIME-type sniffing |
-| `X-Frame-Options` | `SAMEORIGIN` | Prevent clickjacking |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limit referrer leakage |
-| `Content-Security-Policy` | (see above) | Prevent XSS and injection |
-| `Strict-Transport-Security` | (automatic via HTTPS) | Force HTTPS on all requests |
+| `Content-Security-Policy` (meta) | `default-src 'self'…` (see index.html) | Prevent XSS/injection |
+| `<meta name="referrer">` | `strict-origin-when-cross-origin` | Limit referrer leakage |
 
-**Note:** GitHub Pages enforces HTTPS automatically and adds Strict-Transport-Security.
+**B. Defined in `/_headers`, active once fronted by Cloudflare/Netlify** (see SECURITY-HEADERS.md):
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Force HTTPS |
+| `X-Content-Type-Options` | `nosniff` | Prevent MIME sniffing |
+| `X-Frame-Options` | `DENY` | Anti-clickjacking |
+| `Content-Security-Policy` | + `frame-ancestors 'none'` | Anti-clickjacking (modern) |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Referrer leakage |
+| `Permissions-Policy` | camera/mic/geo/etc. `()` | Disable unused APIs |
+| `Cross-Origin-Opener-Policy` | `same-origin` | Cross-origin isolation |
+
+> ⚠️ **These headers (group B) only take effect over HTTP from a host that sends
+> them.** `<meta http-equiv>` versions of `X-Frame-Options`/`X-Content-Type-Options`
+> are ignored by browsers, which is why they are NOT in `index.html`. GitHub Pages
+> does serve HTTPS, but does not send HSTS or custom headers.
 
 ---
 

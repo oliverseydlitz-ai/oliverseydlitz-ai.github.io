@@ -7,11 +7,13 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0c0c0d" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; base-uri 'self'; form-action 'self';">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <!-- Content-Security-Policy: only the directives that browsers honour in a
+       <meta> tag are set here. Headers that MUST be sent over HTTP (frame-ancestors,
+       X-Frame-Options, X-Content-Type-Options, HSTS, Permissions-Policy) live in the
+       /_headers file and take effect when the site is fronted by Cloudflare/Netlify.
+       See SECURITY-HEADERS.md. GitHub Pages cannot send custom headers. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>ShotLab TOUR — Golf Swing Analysis for Rapsodo</title>
   <meta name="description" content="Import your Rapsodo launch monitor CSV and get instant swing analysis: club gapping, dispersion, fault detection, yardage book, and progress trends. Free, private, works offline.">
   <meta property="og:title" content="ShotLab TOUR — Golf Swing Analysis">
@@ -521,7 +523,7 @@
 </nav>
 
 <!-- Floating action button for quick import -->
-<button class="fab" id="fabImport" onclick="Router.showImport()" title="Quick import">📤</button>
+<button class="fab" id="fabImport" data-route="import" title="Quick import">📤</button>
 
 <!-- ═══════════════════ SHOT DETAIL MODAL -->
 <div class="modal-overlay" id="shotModal" hidden>
@@ -557,10 +559,13 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- CDN deps: crossorigin enables Subresource Integrity (SRI). To lock these
+     against CDN tampering, pin exact versions and add integrity="sha384-..." —
+     see SECURITY-HEADERS.md for the one-command generator. -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 <script src="app.js"></script>
 
 <!-- ═══════════════════ COOKIE CONSENT BANNER -->

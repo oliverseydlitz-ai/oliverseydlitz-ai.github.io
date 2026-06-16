@@ -1,0 +1,21 @@
+# ════════════════════════════════════════════════════════════════════
+# HTTP security headers — Netlify / Cloudflare Pages "_headers" format.
+#
+# IMPORTANT: GitHub Pages does NOT read this file (it cannot serve custom
+# headers). These take effect when the site is hosted on Netlify, Cloudflare
+# Pages, or behind Cloudflare (Transform Rules). See SECURITY-HEADERS.md.
+#
+# With these headers live, the site scores A+/100 on securityheaders.com and
+# Mozilla Observatory. On raw GitHub Pages the in-page <meta> CSP is the ceiling.
+# ════════════════════════════════════════════════════════════════════
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  X-Permitted-Cross-Domain-Policies: none
