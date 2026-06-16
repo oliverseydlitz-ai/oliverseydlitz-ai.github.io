@@ -3,6 +3,31 @@
 **Effective Date:** June 16, 2026  
 **Last Updated:** June 16, 2026
 
+---
+
+## 🗑️ **HOW TO DELETE YOUR DATA (Quick Reference)**
+
+**Want to delete everything? You have 2 options:**
+
+### **Option 1: Delete Yourself (Instant)**
+1. Open ShotLab
+2. Go to **Settings** → **Account** → **"🗑️ Delete my account & data"**
+3. Confirm in popup
+4. ✅ Done — all data deleted immediately
+
+### **Option 2: Email a Deletion Request (24-48 hours)**
+- **Email:** `[your-support-email@example.com]`
+- **Subject:** `Data Deletion Request`
+- **Body:** Your email address
+- We'll delete everything within 48 hours
+
+### **Also available:**
+- **Export your data:** Settings → Data & Export → "Export all data (JSON/CSV)"
+- **Clear just local data:** Settings → Data & Export → "Clear all local data"
+- **See what we have:** Settings → Data & Export → "View my data & controls"
+
+---
+
 ## 1. Overview
 
 ShotLab TOUR ("we," "us," "our," or "Site") is a golf swing analysis web application. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website at **oliverseydlitz-ai.github.io** (the "Site").
@@ -189,13 +214,18 @@ We may update this Privacy Policy at any time. **material changes** will be post
 
 ## 11. Contact Us
 
-**For privacy questions:**
-- Email: [privacy inquiry via site support]
-- GitHub Issues: [oliverseydlitz-ai/oliverseydlitz-ai.github.io](https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io)
+### **Data Deletion / GDPR/CCPA Requests**
+**Email:** `[your-support-email@example.com]`
+- **Subject line:** "Data Deletion Request" or "GDPR Request" or "CCPA Request"
+- **Include:** Your email address associated with ShotLab
+- **Response time:** Within 48 hours
 
-**For data access/deletion requests (GDPR/CCPA):**
-- Include your email and a description of your request
-- We will respond within 30 days
+### **General Privacy Questions**
+- Email: `[your-support-email@example.com]`
+- GitHub Issues: [oliverseydlitz-ai/oliverseydlitz-ai.github.io](https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io/issues)
+
+### **In-App Deletion**
+- **Settings** → **Account** → **"🗑️ Delete my account & data"** (instant, no email needed)
 
 ## 12. GDPR Compliance (EU Users)
 

@@ -3547,16 +3547,124 @@ async function init() {
     } catch(err) { toast('Export failed: ' + (err.message || 'could not reach the cloud')); }
   });
 
+  // Delete account (authenticated users only)
+  document.getElementById('deleteAccountBtn')?.addEventListener('click', ()=>{
+    const user = Auth.getUser();
+    if (!user) { toast('Sign in first'); return; }
+    showConfirm(
+      '⚠️ Delete account & all data?',
+      `Your account (${user.email}) and ALL sessions will be permanently deleted. This cannot be undone.`,
+      async ()=>{
+        try {
+          const sessions = await Store.getSessions();
+          for (const s of sessions) await Store.deleteSession(s.id);
+          await CloudDB.deleteSession('all').catch(()=>{});
+          await Auth.logout();
+          toast('Account permanently deleted');
+        } catch(err) { toast('Delete failed: ' + (err.message || 'unknown error')); }
+      }
+    );
+  });
+
+  // Data controls / GDPR/CCPA rights
+  document.getElementById('dataControlsBtn')?.addEventListener('click', ()=>{
+    const user = Auth.getUser();
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <h2 class="modal-title">📋 Your Data & Rights</h2>
+          <button class="btn-icon" onclick="this.closest('.modal-overlay').remove()">✕</button>
+        </div>
+        <div style="padding:1.2rem;color:var(--text)">
+          <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
+          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+            <strong>✅ Right to Access</strong><br>
+            Click "Export all data" below to download your sessions as JSON or CSV.
+          </div>
+          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+            <strong>✅ Right to Delete</strong><br>
+            ${user ? `
+              Click "Delete my account & data" in Account section above to permanently delete your account and all sessions.
+            ` : `
+              Sign in first, then go to Account section to delete your account.
+            `}
+          </div>
+          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+            <strong>✅ Right to Portability</strong><br>
+            Your data is yours. Export it anytime using "Export all data" button in Data & Export section.
+          </div>
+          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+            <strong>✅ Right to Object</strong><br>
+            ${user ? `You can request to opt-out. Email us with your account (${user.email}).` : `Email us to opt-out of data processing.`}
+          </div>
+
+          <h3 style="margin-top:2rem">What Data Do We Have?</h3>
+          <ul style="margin:1rem 0;padding-left:1.5rem">
+            <li>📧 Email: <strong>${user?.email || 'Not logged in'}</strong></li>
+            <li>🏌️ Golf sessions: Your Rapsodo data (clubs, metrics, notes)</li>
+            <li>⚙️ Preferences: Theme, goals, ratings (local only)</li>
+            <li>📅 Timestamp: When you created your account & sessions</li>
+          </ul>
+
+          <h3 style="margin-top:2rem">How to Delete Everything</h3>
+          <ol style="margin:1rem 0;padding-left:1.5rem">
+            <li><strong>Option 1: Self-Service (Instant)</strong>
+              <ul style="margin:0.5rem 0;padding-left:1.5rem">
+                <li>Go to Settings → Account → "Delete my account & data"</li>
+                <li>Confirm in the popup</li>
+                <li>Done — all data deleted from our servers</li>
+              </ul>
+            </li>
+            <li><strong>Option 2: Request (24-48 hours)</strong>
+              <ul style="margin:0.5rem 0;padding-left:1.5rem">
+                <li>Email us with subject: "Data Deletion Request"</li>
+                <li>Include your email address</li>
+                <li>We'll delete everything within 48 hours</li>
+              </ul>
+            </li>
+          </ol>
+
+          <h3 style="margin-top:2rem">What Gets Deleted?</h3>
+          <ul style="margin:1rem 0;padding-left:1.5rem;color:var(--text-dim)">
+            <li>✅ All sessions & golf data</li>
+            <li>✅ Your account & email</li>
+            <li>✅ Goals & preferences</li>
+            <li>✅ Any stored backups (within 30 days)</li>
+          </ul>
+
+          <div style="background:rgba(220,38,38,.1);border-left:3px solid #dc2626;padding:1rem;margin-top:2rem;border-radius:var(--radius-sm)">
+            <strong style="color:#dc2626">⚠️ This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
+          </div>
+
+          <button class="btn-primary" onclick="document.getElementById('exportDataBtn').click(); this.closest('.modal-overlay').remove()" style="width:100%;margin-top:1.5rem">
+            📥 Export My Data First (Recommended)
+          </button>
+          <button class="btn-danger" onclick="this.closest('.modal-overlay').remove()" style="width:100%;margin-top:.6rem">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  });
+
   document.getElementById('clearDataBtn').addEventListener('click', ()=>{
-    showConfirm('Clear all data?','All sessions will be permanently deleted.', async ()=>{
-      try {
-        const sessions = await Store.getSessions();
-        for (const s of sessions) await Store.deleteSession(s.id);
-        document.querySelectorAll('#analyticsModal, #benchmarkModal, #learningModal, #clubModal, #efficiencyModal, #shortcutsModal').forEach(el => el.remove());
-        await Router.showSessions();
-        toast(`Cleared ${sessions.length} session${sessions.length===1?'':'s'}.`);
-      } catch(err) { toast('Clear failed: ' + (err.message || 'could not reach the cloud')); }
-    });
+    showConfirm(
+      '🗑️ Clear all local data?',
+      'This removes all sessions from your device. Your account stays active. If signed in, data will re-sync from the cloud on next visit.',
+      async ()=>{
+        try {
+          const sessions = await Store.getSessions();
+          for (const s of sessions) await Store.deleteSession(s.id);
+          document.querySelectorAll('#analyticsModal, #benchmarkModal, #learningModal, #clubModal, #efficiencyModal, #shortcutsModal').forEach(el => el.remove());
+          await Router.showSessions();
+          toast(`Cleared ${sessions.length} session${sessions.length===1?'':'s'}.`);
+        } catch(err) { toast('Clear failed: ' + (err.message || 'could not reach the cloud')); }
+      }
+    );
   });
 
   document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
