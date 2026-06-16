@@ -3458,16 +3458,50 @@ async function init() {
 
   // Privacy & Legal links in Settings
   try {
-    document.getElementById('privacyBtn')?.addEventListener('click', () => {
-      window.open('PRIVACY.md', '_blank');
+    const loadDocument = async (url, elementId) => {
+      try {
+        const response = await fetch(url);
+        const text = await response.text();
+        const el = document.getElementById(elementId);
+        el.innerHTML = Sanitize.text(text)
+          .split('\n')
+          .map(line => {
+            if (line.startsWith('# ')) return `<h1>${Sanitize.escape(line.slice(2))}</h1>`;
+            if (line.startsWith('## ')) return `<h2>${Sanitize.escape(line.slice(3))}</h2>`;
+            if (line.startsWith('### ')) return `<h3>${Sanitize.escape(line.slice(4))}</h3>`;
+            if (line.startsWith('- ')) return `<li>${Sanitize.escape(line.slice(2))}</li>`;
+            if (line.trim() === '') return '<p></p>';
+            return `<p>${Sanitize.escape(line)}</p>`;
+          })
+          .join('\n');
+      } catch (e) {
+        console.error(`Failed to load ${url}:`, e);
+        toast(`Could not load document`);
+      }
+    };
+
+    document.getElementById('privacyBtn')?.addEventListener('click', async () => {
+      await loadDocument('PRIVACY.md', 'privacyBody');
+      document.getElementById('privacyModal').hidden = false;
     });
-    document.getElementById('termsBtn')?.addEventListener('click', () => {
-      window.open('TERMS.md', '_blank');
+    document.getElementById('termsBtn')?.addEventListener('click', async () => {
+      await loadDocument('TERMS.md', 'termsBody');
+      document.getElementById('termsModal').hidden = false;
     });
     document.getElementById('cookiePrefsBtn')?.addEventListener('click', () => {
       CookieConsent.showBanner();
       toast('Cookie preferences shown');
     });
+
+    // Privacy & Terms modal close handlers
+    const privacyModal = document.getElementById('privacyModal');
+    const termsModal = document.getElementById('termsModal');
+
+    privacyModal?.addEventListener('click', e => { if (e.target === privacyModal) privacyModal.hidden = true; });
+    termsModal?.addEventListener('click', e => { if (e.target === termsModal) termsModal.hidden = true; });
+
+    document.getElementById('privacyModalClose')?.addEventListener('click', () => privacyModal.hidden = true);
+    document.getElementById('termsModalClose')?.addEventListener('click', () => termsModal.hidden = true);
   } catch (e) { console.error('legal buttons init failed:', e); }
 
   // Nav — use event delegation on document for maximum robustness
