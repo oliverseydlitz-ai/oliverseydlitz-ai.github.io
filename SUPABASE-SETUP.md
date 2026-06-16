@@ -110,7 +110,7 @@ Parameters:
 After all steps, confirm:
 
 - [ ] `sessions` table exists in public schema
-- [ ] `sessions.id` is primary key (text)
+- [ ] `sessions.id` is the SOLE primary key column (text), so `onConflict:'id'` upserts work
 - [ ] `sessions.user_id` is indexed and has foreign key to auth.users
 - [ ] RLS is enabled on `sessions` table
 - [ ] Four RLS policies exist (SELECT, INSERT, UPDATE, DELETE) all checking `auth.uid() = user_id`
@@ -150,19 +150,41 @@ Then verify via the Supabase dashboard:
 
 ## Current Status (2026-06-16)
 
-✅ **Setup Complete**
+✅ **Setup Complete & Verified Against Codebase**
 
-- `sessions` table: Created with optimized RLS policies
+- `sessions` table: single-column PK on `id`, optimized RLS policies
 - `delete-account` function: Deployed (v1, ACTIVE)
-- Performance advisors: All warnings resolved
-- Security advisors: Leaked password protection warning (optional enhancement)
+- Performance advisors: 0 warnings
+- Security advisors: only "Leaked Password Protection" (optional Auth dashboard toggle)
 
 ### What Changed
 
-1. **Duplicate policies removed** — Cleaned up 24 duplicate RLS policies that were created from multiple runs
-2. **RLS optimized** — Policies now use `SELECT auth.uid()` instead of direct calls for better performance
-3. **Unused indexes dropped** — Removed `idx_sessions_date` and `idx_sessions_created_at`
-4. **Edge function deployed** — `delete-account` is now live and callable
+1. **Primary key fixed (the important one)** — The live table had a COMPOSITE
+   PK `(user_id, id)`, but `app.js` (`CloudDB.saveSession`) upserts with
+   `onConflict: 'id'`, which needs a unique constraint on `id` **alone**. Every
+   authenticated save was failing with `42P10` and silently degrading to the
+   delete-then-insert failsafe. Switched to `PRIMARY KEY (id)` and verified an
+   `ON CONFLICT (id)` upsert round-trips cleanly. `supabase-setup.sql` is now
+   self-healing for this case.
+2. **Duplicate policies removed** — Cleaned up duplicate RLS policies left over
+   from multiple historical runs; 4 clean policies remain (SELECT/INSERT/UPDATE/DELETE).
+3. **RLS optimized** — Policies use `(SELECT auth.uid())` so the auth function
+   is evaluated once per query, not once per row.
+4. **Unused indexes dropped** — Removed `idx_sessions_date` and `idx_sessions_created_at`.
+5. **Edge function deployed** — `delete-account` is live and callable via
+   `sb.functions.invoke('delete-account')` (matches `app.js:3729`).
+
+### Codebase ↔ Database Alignment (verified)
+
+| Code (`app.js`) | Database | Status |
+|---|---|---|
+| `upsert(..., { onConflict: 'id' })` | PK `(id)` | ✅ works |
+| row: id/user_id/date/notes/conditions/shots/created_at | matching columns | ✅ |
+| `.eq('user_id', ...)` filters | `idx_sessions_user_id` + RLS | ✅ |
+| `sb.functions.invoke('delete-account')` | function ACTIVE, `verify_jwt: true` | ✅ |
+
+> Note: `id` is `TEXT` (client-generated UUID string), not a `uuid` column.
+> `updated_at` exists with a `now()` default but is not written by the app — harmless.
 
 ---
 
