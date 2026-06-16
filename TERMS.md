@@ -5,11 +5,11 @@
 > **⚠️ PLEASE READ CAREFULLY — THIS IS A BINDING LEGAL AGREEMENT.**
 > By clicking "I Agree," creating an account, or using ShotLab TOUR in any
 > way, you confirm that you have read, understood, and accept these Terms of
-> Service and the Privacy Policy in full. **These Terms include an assumption
-> of risk (Section 5A), a limitation of liability (Section 6), and an
-> indemnification clause (Section 12) that limit our liability and shift
-> certain risks to you.** If you do not agree to every part, do not use the
-> Service.
+> Service and the Privacy Policy in full. **These Terms describe what the
+> Service is (Section 5A), disclaim warranties (Section 5), and include a
+> limitation of liability (Section 6) and an indemnification clause
+> (Section 12) that limit our liability.** If you do not agree to every part,
+> do not use the Service.
 
 ## 1. Agreement to Terms
 
@@ -63,29 +63,22 @@ We have permission to:
 
 Code, design, documentation, and features are our property (MIT License applies to code on GitHub).
 
-## 5A. Assumption of Risk (Golf & Physical Activity)
+## 5A. Nature of the Service
 
-**Golf is a physical activity that carries inherent risks of injury.** ShotLab
-TOUR is an informational analytics tool only — it does not coach you, supervise
-you, or warm you up.
+**ShotLab TOUR is an informational data-analysis tool.** It imports launch
+monitor data (such as Rapsodo CSV exports), then displays statistics, charts,
+and automated insights about your golf shots. That is the entire product.
 
-By using the Service, **you knowingly and voluntarily assume all risks**
-associated with golf practice, swing changes, training, and any physical
-activity you undertake in connection with the Service, including but not
-limited to muscle strain, joint injury, or injury to yourself or others. You
-acknowledge that:
+It is **not**:
+- A coach, trainer, instructor, or supervisor
+- A source of medical, fitness, or professional advice
+- A provider of physical training programs
 
-- You are solely responsible for your physical condition, technique, equipment,
-  surroundings, and safety.
-- You should consult a qualified physician before beginning any new physical
-  activity and a PGA professional before making swing changes.
-- Metrics, fault detection, drills, and recommendations are automated estimates
-  that may be inaccurate or unsuitable for you, and you use them **entirely at
-  your own risk.**
-
-**To the fullest extent permitted by law, you release and waive any claim
-against us for any injury, loss, or damage arising from your golf activity or
-your reliance on the Service.**
+The metrics, fault detection, and "what to work on" insights are **automated
+estimates generated from the numbers you import.** They can be incomplete or
+inaccurate. **Any decisions you make based on the analysis — including how you
+practice or play golf — are entirely your own.** For instruction, verify
+anything important with a qualified golf professional.
 
 ## 5. Disclaimers
 
@@ -205,8 +198,7 @@ reasonable attorneys' fees) arising out of or relating to:**
 - Your golf data, content, or activities
 - Your account, including any activity under your credentials
 - Your violation of any law or the rights of any third party
-- Any injury, loss, or damage you or any third party suffers in connection with
-  your golf activity or reliance on the Service
+- Any loss or damage arising from your reliance on the Service or its analysis
 
 We reserve the right, at our own expense, to assume the exclusive defense and
 control of any matter otherwise subject to indemnification by you, and you agree
