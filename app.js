@@ -6,6 +6,60 @@
 'use strict';
 
 // ────────────────────────────────────────────────────────────────
+// Security utilities — XSS prevention
+// ────────────────────────────────────────────────────────────────
+const Sanitize = (() => {
+  const div = document.createElement('div');
+  // Escape HTML special characters to prevent XSS
+  function escape(text) {
+    if (!text) return '';
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  // Safe text node creation (no HTML parsing)
+  function text(str) {
+    const node = document.createTextNode(str || '');
+    return node;
+  }
+  return { escape, text };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// Cookie consent management
+// ────────────────────────────────────────────────────────────────
+const CookieConsent = (() => {
+  const CONSENT_KEY = 'slCookieConsent';
+  const CONSENT_VERSION = '1';
+
+  function hasConsent() {
+    try {
+      const saved = localStorage.getItem(CONSENT_KEY);
+      return saved === CONSENT_VERSION;
+    } catch (_) { return false; }
+  }
+
+  function setConsent() {
+    try {
+      localStorage.setItem(CONSENT_KEY, CONSENT_VERSION);
+    } catch (_) {}
+    hideBanner();
+  }
+
+  function showBanner() {
+    if (hasConsent()) return;
+    const banner = document.getElementById('cookieConsent');
+    if (banner) banner.hidden = false;
+  }
+
+  function hideBanner() {
+    const banner = document.getElementById('cookieConsent');
+    if (banner) banner.hidden = true;
+  }
+
+  return { hasConsent, setConsent, showBanner, hideBanner };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // Constants & utils
 // ────────────────────────────────────────────────────────────────
 const CLUB_ORDER = ['d','2w','3w','4w','5w','7w','2h','3h','4h','5h',
@@ -3386,6 +3440,29 @@ function showConfirm(title, body, onOk) {
 async function init() {
   // Reflect persisted theme on the Settings switch (class already set early)
   applyTheme(document.documentElement.classList.contains('dark'));
+
+  // Initialize cookie consent banner
+  try {
+    CookieConsent.showBanner();
+    document.getElementById('cookieAcceptBtn')?.addEventListener('click', () => CookieConsent.setConsent());
+    document.getElementById('cookieLearnBtn')?.addEventListener('click', () => {
+      window.open('PRIVACY.md', '_blank');
+    });
+  } catch (e) { console.error('cookie consent init failed:', e); }
+
+  // Privacy & Legal links in Settings
+  try {
+    document.getElementById('privacyBtn')?.addEventListener('click', () => {
+      window.open('PRIVACY.md', '_blank');
+    });
+    document.getElementById('termsBtn')?.addEventListener('click', () => {
+      window.open('TERMS.md', '_blank');
+    });
+    document.getElementById('cookiePrefsBtn')?.addEventListener('click', () => {
+      CookieConsent.showBanner();
+      toast('Cookie preferences shown');
+    });
+  } catch (e) { console.error('legal buttons init failed:', e); }
 
   // Nav — use event delegation on document for maximum robustness
   document.addEventListener('click', async e => {

@@ -7,7 +7,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0c0c0d" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; base-uri 'self'; form-action 'self';">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <title>ShotLab TOUR — Golf Swing Analysis for Rapsodo</title>
   <meta name="description" content="Import your Rapsodo launch monitor CSV and get instant swing analysis: club gapping, dispersion, fault detection, yardage book, and progress trends. Free, private, works offline.">
   <meta property="og:title" content="ShotLab TOUR — Golf Swing Analysis">
@@ -455,6 +459,21 @@
         <div class="settings-row static"><span>Data stored</span><span class="settings-value">Locally on device</span></div>
       </div>
       <div class="settings-section">
+        <h2 class="settings-section-title">Legal & Privacy</h2>
+        <button class="settings-row" id="privacyBtn">
+          <span>Privacy Policy</span>
+          <span class="settings-arrow">→</span>
+        </button>
+        <button class="settings-row" id="termsBtn">
+          <span>Terms of Service</span>
+          <span class="settings-arrow">→</span>
+        </button>
+        <button class="settings-row" id="cookiePrefsBtn">
+          <span>Cookie Preferences</span>
+          <span class="settings-arrow">→</span>
+        </button>
+      </div>
+      <div class="settings-section">
         <h2 class="settings-section-title">Fault Engine</h2>
         <div class="settings-row static"><span>Rules</span><span class="settings-value">20 fault rules</span></div>
         <div class="settings-row static"><span>Categories</span><span class="settings-value">Contact · Path · AoA · Launch · Spin · Consistency</span></div>
@@ -535,6 +554,20 @@
 <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
+
+<!-- ═══════════════════ COOKIE CONSENT BANNER -->
+<div id="cookieConsent" class="cookie-consent" hidden>
+  <div class="cookie-consent-content">
+    <div class="cookie-consent-text">
+      <strong>🍪 Cookie & Data Notice</strong>
+      <p>We use cookies and local storage to personalize your experience and sync your data. By continuing, you agree to our <a href="PRIVACY.md" target="_blank">Privacy Policy</a> and <a href="TERMS.md" target="_blank">Terms of Service</a>.</p>
+    </div>
+    <div class="cookie-consent-actions">
+      <button id="cookieAcceptBtn" class="btn-primary btn-sm">Accept</button>
+      <button id="cookieLearnBtn" class="btn-secondary btn-sm">Learn more</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════ AUTH MODAL -->
 <div class="modal-overlay" id="authModal" hidden>
