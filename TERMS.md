@@ -5,11 +5,11 @@
 > **⚠️ PLEASE READ CAREFULLY — THIS IS A BINDING LEGAL AGREEMENT.**
 > By clicking "I Agree," creating an account, or using ShotLab TOUR in any
 > way, you confirm that you have read, understood, and accept these Terms of
-> Service and the Privacy Policy in full. **These Terms describe what the
-> Service is (Section 5A), disclaim warranties (Section 5), and include a
-> limitation of liability (Section 6) and an indemnification clause
-> (Section 12) that limit our liability.** If you do not agree to every part,
-> do not use the Service.
+> Service and the Privacy Policy in full. **By using the Service, you agree that
+> you voluntarily choose to use it (Section 5A), assume responsibility for all
+> your own decisions and actions, accept our disclaimers (Section 5), and
+> accept a $100 cap on our liability (Section 6).** If you do not agree to
+> every part, do not use the Service.
 
 ## 1. Agreement to Terms
 
@@ -63,22 +63,29 @@ We have permission to:
 
 Code, design, documentation, and features are our property (MIT License applies to code on GitHub).
 
-## 5A. Nature of the Service
+## 5A. Voluntary Use & Your Responsibility
 
-**ShotLab TOUR is an informational data-analysis tool.** It imports launch
+**Using ShotLab TOUR is entirely voluntary. You choose to use it or not.**
+
+If you use it:
+- You are responsible for all your own decisions and actions based on any
+  information or analysis the app provides.
+- You are responsible for the safety, legality, and consequences of how you use
+  the app and any data you import into it.
+- You are responsible for your own golf practice, swing changes, equipment, and
+  any outcomes (good or bad) from your choices.
+
+**ShotLab TOUR is an informational data-analysis tool only.** It imports launch
 monitor data (such as Rapsodo CSV exports), then displays statistics, charts,
-and automated insights about your golf shots. That is the entire product.
+and automated insights. The metrics, fault detection, and "what to work on"
+insights are **automated estimates that may be incomplete or inaccurate.**
 
 It is **not**:
 - A coach, trainer, instructor, or supervisor
-- A source of medical, fitness, or professional advice
-- A provider of physical training programs
+- Medical, fitness, or professional advice
+- A provider of training programs or guaranteed results
 
-The metrics, fault detection, and "what to work on" insights are **automated
-estimates generated from the numbers you import.** They can be incomplete or
-inaccurate. **Any decisions you make based on the analysis — including how you
-practice or play golf — are entirely your own.** For instruction, verify
-anything important with a qualified golf professional.
+**You own the outcome of any choices you make.** We don't.
 
 ## 5. Disclaimers
 
@@ -133,9 +140,9 @@ THEORY, AND WHETHER OR NOT WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGES.**
 
 **OUR TOTAL CUMULATIVE LIABILITY FOR ALL CLAIMS ARISING OUT OF OR RELATING TO
-THE SERVICE OR THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNT
-YOU PAID US IN THE TWELVE (12) MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM
-(WHICH, FOR FREE ACCOUNTS, IS US $0.00), OR (B) US $100.00.**
+THE SERVICE OR THESE TERMS WILL NOT EXCEED US $100.00, REGARDLESS OF THE AMOUNT
+OF ACTUAL DAMAGES, LOSSES, OR COSTS YOU CLAIM.** For free accounts (which is
+most users), this cap means you can recover at most the cost of a coffee.
 
 This limitation applies to the fullest extent permitted by law and survives any
 termination of these Terms. Some jurisdictions do not allow the exclusion or
