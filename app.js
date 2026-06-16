@@ -2989,7 +2989,7 @@ const UI = (() => {
           const cons = b.stdCarry===0?'tight': b.stdCarry<6?'tight':b.stdCarry<12?'moderate':'wide';
           const drillInfo = drillTexts[cons];
           return `<div class="drill-card" onclick="Router.show('sessions')">
-            <div class="drill-icon">${clubColor(b.club)}</div>
+            <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(b.club)}"></div>
             <div class="drill-title">${clubLabel(b.club)} (${cons.toUpperCase()})</div>
             <div class="drill-desc">${drillInfo.desc}</div>
             <div class="drill-time">→ ${drillInfo.action}</div>
