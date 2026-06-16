@@ -590,6 +590,40 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
 <script src="app.js"></script>
 
+<!-- ═══════════════════ AGREEMENT GATE (blocking first-run consent) -->
+<div class="modal-overlay agreement-gate" id="agreementGate" hidden>
+  <div class="modal">
+    <h2 class="modal-title">Welcome to ShotLab TOUR</h2>
+    <div class="modal-body agreement-gate-body">
+      <p>Before you start, please review and accept our terms. ShotLab is a
+      golf analytics tool provided <strong>"as is"</strong> — it is not coaching,
+      medical, or professional advice.</p>
+      <ul class="agreement-gate-points">
+        <li>Golf is a physical activity. <strong>You use the app and act on its
+        insights entirely at your own risk.</strong></li>
+        <li>Metrics, fault detection, and recommendations are automated estimates
+        and may be inaccurate.</li>
+        <li>To the maximum extent permitted by law, we are <strong>not liable</strong>
+        for any loss, injury, or damages arising from your use of the app.</li>
+        <li>We store your account email and session data to provide the service
+        (see Privacy Policy).</li>
+      </ul>
+      <p>By clicking <strong>"I Agree &amp; Continue"</strong> you confirm you have
+      read and accept our
+      <button type="button" class="link-btn" id="gateTermsLink">Terms of Service</button>
+      and
+      <button type="button" class="link-btn" id="gatePrivacyLink">Privacy Policy</button>.</p>
+      <label class="agreement-gate-check">
+        <input type="checkbox" id="agreementCheckbox">
+        <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="agreementAcceptBtn" disabled>I Agree &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════ COOKIE CONSENT BANNER -->
 <div id="cookieConsent" class="cookie-consent" hidden>
   <div class="cookie-consent-content">

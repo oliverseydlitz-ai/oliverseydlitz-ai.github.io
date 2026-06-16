@@ -60,6 +60,46 @@ const CookieConsent = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Agreement gate — blocking clickwrap consent to Terms & Privacy.
+// Records the accepted version + timestamp so consent is provable and
+// re-prompts if the terms version changes.
+// ────────────────────────────────────────────────────────────────
+const Agreement = (() => {
+  const KEY = 'slTermsAccepted';
+  const VERSION = '2026-06-16';
+
+  function hasAccepted() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+      return saved && saved.version === VERSION;
+    } catch (_) { return false; }
+  }
+
+  function accept() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        version: VERSION,
+        acceptedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+    hideGate();
+  }
+
+  function showGate() {
+    if (hasAccepted()) return;
+    const gate = document.getElementById('agreementGate');
+    if (gate) gate.hidden = false;
+  }
+
+  function hideGate() {
+    const gate = document.getElementById('agreementGate');
+    if (gate) gate.hidden = true;
+  }
+
+  return { hasAccepted, accept, showGate, hideGate, VERSION };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // Constants & utils
 // ────────────────────────────────────────────────────────────────
 const CLUB_ORDER = ['d','2w','3w','4w','5w','7w','2h','3h','4h','5h',
@@ -3447,12 +3487,36 @@ async function init() {
   // Reflect persisted theme on the Settings switch (class already set early)
   applyTheme(document.documentElement.classList.contains('dark'));
 
-  // Initialize cookie consent banner
+  // Blocking agreement gate — must accept Terms & Privacy before using the app.
+  // Accepting also satisfies cookie consent, so the banner won't double-prompt.
   try {
-    CookieConsent.showBanner();
+    const checkbox = document.getElementById('agreementCheckbox');
+    const acceptBtn = document.getElementById('agreementAcceptBtn');
+
+    checkbox?.addEventListener('change', () => {
+      if (acceptBtn) acceptBtn.disabled = !checkbox.checked;
+    });
+
+    acceptBtn?.addEventListener('click', () => {
+      Agreement.accept();
+      CookieConsent.setConsent();
+    });
+
+    // Review the full docs from inside the gate (open above it).
+    document.getElementById('gateTermsLink')?.addEventListener('click', () =>
+      document.getElementById('termsBtn')?.click());
+    document.getElementById('gatePrivacyLink')?.addEventListener('click', () =>
+      document.getElementById('privacyBtn')?.click());
+
+    Agreement.showGate();
+  } catch (e) { console.error('agreement gate init failed:', e); }
+
+  // Initialize cookie consent banner (only if the gate was already accepted)
+  try {
+    if (Agreement.hasAccepted()) CookieConsent.showBanner();
     document.getElementById('cookieAcceptBtn')?.addEventListener('click', () => CookieConsent.setConsent());
     document.getElementById('cookieLearnBtn')?.addEventListener('click', () => {
-      window.open('PRIVACY.md', '_blank');
+      document.getElementById('privacyBtn')?.click();
     });
   } catch (e) { console.error('cookie consent init failed:', e); }
 
@@ -3463,15 +3527,19 @@ async function init() {
         const response = await fetch(url);
         const text = await response.text();
         const el = document.getElementById(elementId);
-        el.innerHTML = Sanitize.text(text)
+        // Render markdown line-by-line. Strip simple emphasis markers and
+        // always escape the text first (defense against any HTML in the docs).
+        const inline = (s) => Sanitize.escape(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        el.innerHTML = text
           .split('\n')
           .map(line => {
-            if (line.startsWith('# ')) return `<h1>${Sanitize.escape(line.slice(2))}</h1>`;
-            if (line.startsWith('## ')) return `<h2>${Sanitize.escape(line.slice(3))}</h2>`;
-            if (line.startsWith('### ')) return `<h3>${Sanitize.escape(line.slice(4))}</h3>`;
-            if (line.startsWith('- ')) return `<li>${Sanitize.escape(line.slice(2))}</li>`;
-            if (line.trim() === '') return '<p></p>';
-            return `<p>${Sanitize.escape(line)}</p>`;
+            if (line.startsWith('### ')) return `<h3>${inline(line.slice(4))}</h3>`;
+            if (line.startsWith('## ')) return `<h2>${inline(line.slice(3))}</h2>`;
+            if (line.startsWith('# ')) return `<h1>${inline(line.slice(2))}</h1>`;
+            if (line.startsWith('> ')) return `<blockquote>${inline(line.slice(2))}</blockquote>`;
+            if (line.startsWith('- ')) return `<li>${inline(line.slice(2))}</li>`;
+            if (line.trim() === '') return '';
+            return `<p>${inline(line)}</p>`;
           })
           .join('\n');
       } catch (e) {

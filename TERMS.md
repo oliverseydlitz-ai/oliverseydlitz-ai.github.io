@@ -2,9 +2,25 @@
 
 **Effective Date:** June 16, 2026
 
+> **⚠️ PLEASE READ CAREFULLY — THIS IS A BINDING LEGAL AGREEMENT.**
+> By clicking "I Agree," creating an account, or using ShotLab TOUR in any
+> way, you confirm that you have read, understood, and accept these Terms of
+> Service and the Privacy Policy in full. **These Terms include an assumption
+> of risk (Section 5A), a limitation of liability (Section 6), and an
+> indemnification clause (Section 12) that limit our liability and shift
+> certain risks to you.** If you do not agree to every part, do not use the
+> Service.
+
 ## 1. Agreement to Terms
 
-By accessing and using ShotLab TOUR ("Site," "Service," "we," "us"), you agree to be bound by these Terms of Service. If you disagree, do not use the Site.
+By accessing, browsing, clicking "I Agree," or otherwise using ShotLab TOUR
+("Site," "Service," "App," "we," "us," "our"), you agree to be legally bound by
+these Terms of Service ("Terms"). This is an enforceable contract between you
+and the operator of ShotLab TOUR. If you disagree with any part, you must not
+access or use the Service.
+
+If you are using the Service on behalf of an organization, you represent that
+you have authority to bind that organization to these Terms.
 
 ## 2. Use License
 
@@ -47,17 +63,51 @@ We have permission to:
 
 Code, design, documentation, and features are our property (MIT License applies to code on GitHub).
 
+## 5A. Assumption of Risk (Golf & Physical Activity)
+
+**Golf is a physical activity that carries inherent risks of injury.** ShotLab
+TOUR is an informational analytics tool only — it does not coach you, supervise
+you, or warm you up.
+
+By using the Service, **you knowingly and voluntarily assume all risks**
+associated with golf practice, swing changes, training, and any physical
+activity you undertake in connection with the Service, including but not
+limited to muscle strain, joint injury, or injury to yourself or others. You
+acknowledge that:
+
+- You are solely responsible for your physical condition, technique, equipment,
+  surroundings, and safety.
+- You should consult a qualified physician before beginning any new physical
+  activity and a PGA professional before making swing changes.
+- Metrics, fault detection, drills, and recommendations are automated estimates
+  that may be inaccurate or unsuitable for you, and you use them **entirely at
+  your own risk.**
+
+**To the fullest extent permitted by law, you release and waive any claim
+against us for any injury, loss, or damage arising from your golf activity or
+your reliance on the Service.**
+
 ## 5. Disclaimers
 
-### 5.1 "AS-IS" Service
+### 5.1 "AS-IS" / "AS-AVAILABLE" Service
 
-The Site is provided on an "as-is" basis. We make **no warranties** regarding:
-- Accuracy of fault detection
-- Golf swing recommendations
-- Uninterrupted availability
-- Freedom from errors or bugs
+THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITH ALL FAULTS AND WITHOUT
+WARRANTY OF ANY KIND. **TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WE
+EXPRESSLY DISCLAIM ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR
+OTHERWISE, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.**
 
-**You are responsible for** your own golf instruction and safety.
+We make **no warranty** that the Service will be accurate, reliable,
+uninterrupted, secure, error-free, or that defects will be corrected. This
+includes, without limitation:
+- Accuracy of fault detection, metrics, or distance/gap calculations
+- Golf swing recommendations, drills, or "what to work on" guidance
+- Uninterrupted or timely availability
+- Freedom from errors, bugs, or data loss
+
+**You are solely responsible for** your own golf instruction, decisions, and
+safety. No advice or information obtained from the Service creates any warranty
+not expressly stated here.
 
 ### 5.2 Data Loss
 
@@ -80,12 +130,26 @@ Consult a PGA professional for instruction.
 
 ## 6. Limitation of Liability
 
-**We are not liable for:**
-- Indirect, incidental, consequential damages
-- Loss of income, productivity, goodwill
-- Any damages exceeding the fees paid (none for free accounts)
+**TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT WILL WE (OR OUR
+OPERATORS, CONTRIBUTORS, OR AFFILIATES) BE LIABLE TO YOU FOR ANY INDIRECT,
+INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY
+LOSS OF PROFITS, REVENUE, DATA, GOODWILL, USE, OR OTHER INTANGIBLE LOSSES,
+ARISING OUT OF OR RELATING TO THE SERVICE OR THESE TERMS, WHETHER BASED ON
+CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER LEGAL
+THEORY, AND WHETHER OR NOT WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGES.**
 
-This applies even if we were advised of the possibility of such damages.
+**OUR TOTAL CUMULATIVE LIABILITY FOR ALL CLAIMS ARISING OUT OF OR RELATING TO
+THE SERVICE OR THESE TERMS WILL NOT EXCEED THE GREATER OF (A) THE TOTAL AMOUNT
+YOU PAID US IN THE TWELVE (12) MONTHS BEFORE THE EVENT GIVING RISE TO THE CLAIM
+(WHICH, FOR FREE ACCOUNTS, IS US $0.00), OR (B) US $100.00.**
+
+This limitation applies to the fullest extent permitted by law and survives any
+termination of these Terms. Some jurisdictions do not allow the exclusion or
+limitation of certain damages, so some of the above may not apply to you; in
+those jurisdictions our liability is limited to the smallest amount permitted by
+law. Nothing in these Terms limits liability that cannot be limited by law (such
+as for fraud or willful misconduct).
 
 ## 7. Modifications & Downtime
 
@@ -132,11 +196,21 @@ See our [Privacy Policy](./PRIVACY.md) for data handling, cookies, and your righ
 
 ## 12. Indemnification
 
-You agree to indemnify and hold harmless ShotLab from any claims arising from:
-- Your violation of these Terms
-- Your use of the Site
-- Your golf data or content
-- Your account activities
+**You agree to defend, indemnify, and hold harmless ShotLab TOUR and its
+operators, contributors, and affiliates from and against any and all claims,
+demands, liabilities, damages, losses, costs, and expenses (including
+reasonable attorneys' fees) arising out of or relating to:**
+- Your violation of these Terms or the Privacy Policy
+- Your access to or use of the Service
+- Your golf data, content, or activities
+- Your account, including any activity under your credentials
+- Your violation of any law or the rights of any third party
+- Any injury, loss, or damage you or any third party suffers in connection with
+  your golf activity or reliance on the Service
+
+We reserve the right, at our own expense, to assume the exclusive defense and
+control of any matter otherwise subject to indemnification by you, and you agree
+to cooperate with our defense of such claims.
 
 ## 13. Dispute Resolution
 

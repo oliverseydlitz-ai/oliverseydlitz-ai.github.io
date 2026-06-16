@@ -800,6 +800,25 @@ tr:hover td { background: var(--surface2); }
 }
 @keyframes overlayIn { from{opacity:0} to{opacity:1} }
 .modal-overlay[hidden] { display: none; }
+
+/* ── Agreement gate (blocking first-run consent) ───────── */
+.agreement-gate { z-index: 400; background: rgba(12,31,20,.7); }
+/* Terms/Privacy must open ABOVE the gate when reviewed from it */
+#privacyModal, #termsModal { z-index: 500; }
+.agreement-gate-body { max-height: 60vh; overflow-y: auto; }
+.agreement-gate-points { margin: .75rem 0; padding-left: 1.25rem; }
+.agreement-gate-points li { margin-bottom: .5rem; line-height: 1.5; }
+.agreement-gate-check {
+  display: flex; align-items: flex-start; gap: .6rem;
+  margin-top: 1rem; cursor: pointer; font-size: .85rem;
+}
+.agreement-gate-check input { margin-top: .2rem; flex: 0 0 auto; }
+.link-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent, #d11); text-decoration: underline;
+  font: inherit;
+}
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .modal {
   background: var(--surface);
   border: 1.5px solid var(--border);
@@ -821,6 +840,12 @@ tr:hover td { background: var(--surface2); }
 .modal-document h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem 0; font-weight: 600; }
 .modal-document p { margin: 0.5rem 0; }
 .modal-document li { margin-left: 1.5rem; margin-bottom: 0.25rem; }
+.modal-document blockquote {
+  margin: 0.75rem 0; padding: .65rem .9rem;
+  border-left: 3px solid var(--accent, #d11);
+  background: rgba(221,17,17,.06); border-radius: 4px;
+}
+.modal-document strong { font-weight: 600; }
 .modal-actions { display: flex; justify-content: flex-end; gap: .75rem; }
 
 /* ── Preview table ─────────────────────────────────────── */
