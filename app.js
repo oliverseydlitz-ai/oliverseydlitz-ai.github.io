@@ -221,7 +221,7 @@ const MemDB = (() => {
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_FK_S_xmH5hwC2r8Zm8rT2Q_dT8bLfKH';
 // Contact for privacy / data-deletion requests. EDIT THIS to your real address.
-const SUPPORT_EMAIL = 'your-support-email@example.com';
+const SUPPORT_EMAIL = 'shotlab_legal@oliverseydlitz.com';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     // Implicit flow (#access_token) — reliably logs users in without a stored

@@ -16,7 +16,7 @@
 4. ✅ Done — all data deleted immediately
 
 ### **Option 2: Email a Deletion Request (24-48 hours)**
-- **Email:** `[your-support-email@example.com]`
+- **Email:** `shotlab_legal@oliverseydlitz.com`
 - **Subject:** `Data Deletion Request`
 - **Body:** Your email address
 - We'll delete everything within 48 hours
@@ -215,13 +215,13 @@ We may update this Privacy Policy at any time. **material changes** will be post
 ## 11. Contact Us
 
 ### **Data Deletion / GDPR/CCPA Requests**
-**Email:** `[your-support-email@example.com]`
+**Email:** `shotlab_legal@oliverseydlitz.com`
 - **Subject line:** "Data Deletion Request" or "GDPR Request" or "CCPA Request"
 - **Include:** Your email address associated with ShotLab
 - **Response time:** Within 48 hours
 
 ### **General Privacy Questions**
-- Email: `[your-support-email@example.com]`
+- Email: `shotlab_legal@oliverseydlitz.com`
 - GitHub Issues: [oliverseydlitz-ai/oliverseydlitz-ai.github.io](https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io/issues)
 
 ### **In-App Deletion**

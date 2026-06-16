@@ -3,7 +3,7 @@
 #
 # EDIT the Contact line to a real address before relying on this.
 
-Contact: mailto:your-support-email@example.com
+Contact: mailto:shotlab_legal@oliverseydlitz.com
 Contact: https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io/issues
 Expires: 2027-06-16T00:00:00.000Z
 Preferred-Languages: en
