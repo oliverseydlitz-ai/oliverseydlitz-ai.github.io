@@ -297,6 +297,32 @@ function applyTheme(dark) {
   } catch(_) {}
 })();
 
+// Scroll lock — prevent the background page from scrolling while any modal is
+// open. iOS Safari ignores overflow:hidden on <body>; the only reliable fix is
+// position:fixed + top = saved scrollY (we restore it on close so the page
+// doesn't jump). Android gets overscroll-behavior:contain from CSS; both
+// mechanisms work together.
+(function initScrollLock() {
+  let _savedY = 0;
+  function sync() {
+    const open = !!document.querySelector('.modal-overlay:not([hidden])');
+    const locked = document.body.classList.contains('modal-open');
+    if (open && !locked) {
+      _savedY = window.scrollY;
+      document.documentElement.style.setProperty('--scroll-y', `-${_savedY}px`);
+      document.body.classList.add('modal-open');
+    } else if (!open && locked) {
+      document.body.classList.remove('modal-open');
+      document.documentElement.style.removeProperty('--scroll-y');
+      window.scrollTo(0, _savedY);
+    }
+  }
+  new MutationObserver(sync).observe(document.body, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ['hidden']
+  });
+})();
+
 // On-screen debug banner (tap to dismiss). Lets us see auth state on mobile
 // where the dev console isn't available.
 // Diagnostics now log quietly to the console instead of an on-screen banner
