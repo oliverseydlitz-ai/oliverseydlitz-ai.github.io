@@ -25,11 +25,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 ### Single-Page App (SPA)
-- **index.html** — Main structure; nav, views, modals, toast system
-- **app.js** (~2400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering
-- **style.css** (~1500 lines) — Design system; mobile-first, dark theme
+- **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
+- **app.js** (~6000 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, ~55 feature modules
+- **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
+
+The file is built from self-contained IIFE modules (`const X = (() => {...})()`),
+stacked in file order as features were added. Grouped by role:
 
 1. **Utilities & Club Data**
    - `CLUB_ORDER`, `CLUB_COLORS`, `CLUB_LABELS` — Golf equipment reference tables
@@ -37,30 +40,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Stats: `avg()`, `stdDev()`, `fmt()` for formatting numbers
    - Geometry: `facePath(shot)` calculates face-to-path angle (D-Plane concept)
 
-2. **DB Module** — IndexedDB via idb-keyval library
-   - Stores sessions (shots data) locally with timestamp sort
-   - Methods: `getSessions()`, `getSession(id)`, `saveSession()`, `deleteSession()`
-   - Guest sessions use ephemeral `MemDB` (cleared on page close)
+2. **Core infra** — `Sanitize`, `CookieConsent`, `Agreement`, `DB`, `MemDB`,
+   `_oauthTokens`, `Auth`, `CloudDB`, `Store`, `CSVParser`, `Router`,
+   `ImportFlow`, `UI`
+   - `DB` — IndexedDB via idb-keyval; `getSessions()`, `getSession(id)`,
+     `saveSession()`, `deleteSession()`. Guests use ephemeral `MemDB`
+     (cleared on page close).
+   - `Auth` — Supabase OAuth + password auth; `getUser()` is the
+     server-validated source of truth (see Auth & Cloud Sync below).
+   - `CSVParser` — Rapsodo format → normalized shot objects (club type,
+     ball speed, smash factor, launch angle, spin rate, carry, total, etc.)
+   - `Router` — views `sessions` (home), `yardages`, `progress`, `settings`;
+     `Router.showView()` toggles visibility; URL hash routing (`#sessions`).
 
-3. **Auth Module** — Supabase OAuth + password auth
-   - Handles sign-up, login, OAuth (Google/GitHub), logout
-   - Bridges guest→authenticated (sessions migrate on sign-in)
-   - `getUser()` returns current user or null
-   - URL hash/query parsing for auth redirects & error handling
+3. **Scoring / analysis engines** — `FaultEngine`, `ShotScorer`, `SwingDNA`,
+   `Benchmarks`, `Insights`, `Analytics`, `SwingAnalytics`, `InsightEngine`,
+   `Trajectory`, `ClubAnalyzer`, `GapAnalysis`, `FormQualityTimeline`
 
-4. **CSV Parser** — Rapsodo format
-   - Parses launch monitor data: club type, ball speed, smash factor, launch angle, spin rate, carry, total distance, offline distance, etc.
-   - Returns array of shot objects with normalized field names
+4. **Coaching / practice** — `PracticePlan`, `PracticePlans`, `CoachingMode`,
+   `PersonalCoach`, `DrillTracker`, `PracticeEfficiency`,
+   `SmartRecommendations`
 
-5. **Router** — Single-page navigation
-   - Views: `sessions` (home), `yardages` (club stats), `progress` (trends), `settings` (account)
-   - `Router.showView()` renders active view; toggles visibility
-   - URL hash routing (e.g., `#sessions`, `#yardages`)
+5. **Session tooling** — `SessionFeedback`, `SessionCategories`,
+   `SessionSnapshot`, `SessionSharing`, `SessionNotes`, `SessionComparison`,
+   `ClubComparison`
 
-6. **UI Rendering**
+6. **Dashboard / UX layer** — `QuickStats`, `Features` (see dedicated
+   section below), `ViewPrefs`, `UICustomizer`, `EnhancedMetricsWidget`,
+   `QuickActions`, `AdvancedFilters`, `ResponsiveEnhancements`,
+   `AccessibilityEnhancements`, `PerformanceOptimizations`
+
+7. **Insights / social / reporting** — `PerformanceGrade`,
+   `PerformanceAlerts`, `PerformanceTimeline`, `AnalyticsHub`,
+   `CommunityInsights`, `ContentLibrary`, `LearningPath`, `WeeklySummary`,
+   `NotificationCenter`, `Goals`, `DocumentationCenter`
+
+8. **UI Rendering** (`UI` module)
    - Dashboard cards (each session → card with summary stats)
    - Charts: distance distributions, consistency metrics, club heatmaps (Chart.js)
-   - Modals: import dialog, session detail, settings
+   - Modals: import dialog, session detail, settings, and the ~6 dynamically
+     injected modals (`analyticsModal`, `benchmarkModal`, `clubModal`,
+     `efficiencyModal`, `learningModal`, `shortcutsModal`) built via
+     `innerHTML` at runtime rather than living in `index.html`
 
 ### Key Data Shape
 
@@ -200,12 +221,18 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-Five self-contained, defensively-wrapped enhancements:
+`Features` is one module among the ~55 listed in Core Modules above — not the
+whole app's feature set, just its original five defensively-wrapped
+enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
 2. **achievements** — milestone badges (gamification), shown in `#achModal`
 3. **focus** — "what to work on" priority from aggregated recent faults
 4. **compare** — side-by-side session metric deltas (Progress view `#compareHost`)
 5. **searchSessions** — live filter of the session list by date/club/notes
+
+Everything added since (coaching engine, community insights, learning paths,
+weekly summaries, notification center, etc.) lives in its own top-level
+module — see the module map under Core Modules.
 
 Plus **dark mode** (`html.dark` token overrides; toggle in Settings, persisted
 to `localStorage.slTheme`) and a **global error boundary** (`showFatalError`)
@@ -216,4 +243,7 @@ to re-enable the on-screen banner.
 
 ---
 
-**Last updated:** May 2026 — ShotLab v3 (deterministic auth, cloud sync, 5 features, dark mode)
+**Last updated:** August 2026 — ShotLab v3 (deterministic auth, cloud sync,
+~55 modules across scoring/coaching/session/dashboard/reporting, dark mode).
+Repo audited end-to-end: no stray files, no non-golf content, only `main` +
+active branches exist.
