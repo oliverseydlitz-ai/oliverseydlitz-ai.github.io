@@ -730,6 +730,14 @@ const CSVParser = (() => {
     'apex','sideCarry','clubSpeed','smashFactor','descentAngle','attackAngle','clubPath',
     'clubDataEstType','spinRate','spinAxis']);
 
+  // A blank or unparseable numeric cell means "not measured", which is NOT
+  // the same as a measured 0. Rapsodo leaves club-path / attack-angle /
+  // spin-axis empty whenever the club data wasn't picked up, and coercing
+  // those to 0 made them indistinguishable from a genuine zero reading —
+  // ShotScorer then awarded them full marks for a "perfectly neutral" path
+  // and "zero" dispersion. null keeps the two cases apart.
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+
   function parse(csvText) {
     const result = Papa.parse(csvText, { header:true, skipEmptyLines:true, transformHeader:h=>h.trim() });
     if (!result.data?.length) throw new Error('No data found in CSV');
@@ -737,7 +745,7 @@ const CSVParser = (() => {
       const shot = {_row:i+2};
       for (const [col,field] of Object.entries(COLUMN_MAP)) {
         if (!(col in row)) continue;
-        shot[field] = NUM.has(field) ? parseFloat(row[col])||0 : row[col];
+        shot[field] = NUM.has(field) ? num(row[col]) : row[col];
       }
       return shot;
     });
@@ -1187,7 +1195,7 @@ const ShotScorer = (() => {
     let pts = 0, max = 0;
 
     // Smash factor (0–35 pts)
-    if (shot.smashFactor > 0) {
+    if (Number.isFinite(shot.smashFactor) && shot.smashFactor > 0) {
       const threshold = isWood(shot.clubType)||isHybrid(shot.clubType) ? 1.42 : 1.36;
       const elite     = isWood(shot.clubType)||isHybrid(shot.clubType) ? 1.48 : 1.41;
       const raw = Math.min(1, Math.max(0, (shot.smashFactor - 1.10) / (elite - 1.10)));
@@ -1195,25 +1203,25 @@ const ShotScorer = (() => {
     }
 
     // Side carry dispersion (0–25 pts)
-    if (typeof shot.sideCarry === 'number') {
+    if (Number.isFinite(shot.sideCarry)) {
       const abs = Math.abs(shot.sideCarry);
       pts += Math.max(0, 25 - abs * 1.2); max += 25;
     }
 
     // Attack angle vs optimal (0–20 pts)
-    if (shot.attackAngle !== 0) {
+    if (Number.isFinite(shot.attackAngle)) {
       let ideal = shot.clubType === 'd' ? 3 : isIron(shot.clubType) ? -3.5 : 1;
       const diff = Math.abs(shot.attackAngle - ideal);
       pts += Math.max(0, 20 - diff * 3); max += 20;
     }
 
     // Club path neutrality (0–10 pts)
-    if (typeof shot.clubPath === 'number') {
+    if (Number.isFinite(shot.clubPath)) {
       pts += Math.max(0, 10 - Math.abs(shot.clubPath) * 1); max += 10;
     }
 
     // Spin axis bonus/penalty when available (0–10 pts)
-    if (shot.spinAxis) {
+    if (Number.isFinite(shot.spinAxis)) {
       pts += Math.max(0, 10 - Math.abs(shot.spinAxis) * 0.4); max += 10;
     }
 
@@ -2484,7 +2492,7 @@ const UI = (() => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const sessionId = btn.dataset.share;
-        const session = await DB.getSession(sessionId);
+        const session = await Store.getSession(sessionId);
         if (session) {
           const text = SessionSharing.shareText(session);
           SessionSharing.copyToClipboard(text);
@@ -2496,7 +2504,7 @@ const UI = (() => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const sessionId = btn.dataset.export;
-        const session = await DB.getSession(sessionId);
+        const session = await Store.getSession(sessionId);
         if (session) {
           SessionSharing.exportAsJSON([session]);
         }

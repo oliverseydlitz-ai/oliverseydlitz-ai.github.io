@@ -43,6 +43,7 @@
 
   /* Layout */
   --radius:    10px;
+  --radius-md: 10px;   /* used by JS-built modals (app.js); matches --radius */
   --radius-sm: 6px;
   --nav-h:     60px;
   --bottom-nav-h: 68px;
