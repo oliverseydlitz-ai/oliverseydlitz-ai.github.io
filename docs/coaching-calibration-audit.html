@@ -97,6 +97,10 @@ em{font-style:italic}
 .tag.bad{color:var(--bad);background:var(--bad-soft)}
 .tag.warn{color:var(--warn);background:var(--warn-soft)}
 .tag.good{color:var(--good);background:var(--good-soft)}
+.tag.ship{color:var(--accent);background:var(--accent-soft)}
+.shipped{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--accent);white-space:nowrap}
+.act-b.done h4::after{content:" ✓";color:var(--good)}
 .rec-id{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3);letter-spacing:.04em}
 .rec h3{font-size:21px;font-weight:600;letter-spacing:-.012em;margin:0;flex:1 1 320px;line-height:1.25}
 
@@ -192,15 +196,15 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
   <p class="standfirst">ShotLab already gives golfers specific instruction: benchmark tables, fault thresholds, drills. This checks each of those claims against Trackman tour data, published D-plane physics, Rapsodo's own accuracy testing, and the motor-learning literature behind the practice plans.</p>
   <div class="meta">
     <span><b>Scope</b> FaultEngine · ShotScorer · Benchmarks · CoachingMode · PracticePlan</span>
-    <span><b>Code</b> main @ 2503479</span>
-    <span><b>Date</b> Aug 2026</span>
+    <span><b>Audited</b> main @ 2503479</span>
+    <span><b>Fixed in</b> main @ 5439a59</span>
   </div>
 </header>
 
 <div class="verdict">
-  <div class="vc"><div class="n bad">6</div><div class="t">Claims that are measurably wrong</div></div>
+  <div class="vc"><div class="n good">6/6</div><div class="t">Wrong claims found — and now corrected in <code>main</code></div></div>
   <div class="vc"><div class="n warn">1</div><div class="t">Practice premise the evidence contests</div></div>
-  <div class="vc"><div class="n acc">±1.2°</div><div class="t">Instrument error the thresholds ignore</div></div>
+  <div class="vc"><div class="n acc">±1.2°</div><div class="t">Instrument error the fault gates now respect</div></div>
   <div class="vc"><div class="n good">Sound</div><div class="t">Drill library and fault→cause logic</div></div>
 </div>
 
@@ -208,6 +212,10 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
   <h2>Verdict first</h2>
   <p class="sec-lede">The drills are good. The numbers they hang off are not, and one of them is backwards.</p>
   <p>The drill prescriptions in <code>FaultEngine</code> and <code>CoachingMode</code> hold up well — the fault-to-cause mappings match mainstream instruction, and the drills themselves are real, specific, and correctly matched to their faults. That's the expensive part to get right, and it's right.</p>
+  <p class="note" style="margin-top:0"><span class="lab">Status</span>All six corrections below are now
+  implemented and pushed to <code>main</code>. The register is kept as the sourcing for those values —
+  the numbers in the code came from here, so this is the document to re-read before changing any of
+  them. Each record carries what shipped.</p>
   <p>What doesn't hold up is the measurement layer underneath: the tour benchmark table has a sign error on the most-viewed metric in golf, the face-to-path calculation is missing a term from the D-plane model it cites, and every per-shot fault threshold is tighter than the launch monitor's own margin of error. Those are all narrow, fixable defects — but while they're in place the app is confidently reporting numbers that aren't true.</p>
 </section>
 
@@ -218,6 +226,7 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
   <article class="rec">
     <div class="rec-hd">
       <span class="tag bad">Wrong sign</span>
+      <span class="tag ship">Fixed</span>
       <span class="rec-id">BENCH-AOA</span>
       <h3>The app tells golfers PGA pros hit up on the driver. They hit down.</h3>
     </div>
@@ -232,6 +241,7 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
   <article class="rec">
     <div class="rec-hd">
       <span class="tag bad">Systematic</span>
+      <span class="tag ship">Fixed</span>
       <span class="rec-id">BENCH-DRIFT</span>
       <h3>Attack angles run shallow and smash factors run low across the whole table</h3>
     </div>
@@ -266,6 +276,7 @@ a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-of
   <article class="rec">
     <div class="rec-hd">
       <span class="tag bad">Math</span>
+      <span class="tag ship">Fixed</span>
       <span class="rec-id">MATH-F2P</span>
       <h3>face-to-path is under-reported by 15% on driver and 25% on irons</h3>
     </div>
@@ -296,6 +307,7 @@ app       = launchDir − path <span class="c">&nbsp;→ understates by exactly 
   <article class="rec">
     <div class="rec-hd">
       <span class="tag warn">Precision</span>
+      <span class="tag ship">Fixed</span>
       <span class="rec-id">THRESH-NOISE</span>
       <h3>Per-shot thresholds are finer than the launch monitor can resolve</h3>
     </div>
@@ -311,6 +323,7 @@ app       = launchDir − path <span class="c">&nbsp;→ understates by exactly 
   <article class="rec">
     <div class="rec-hd">
       <span class="tag warn">Gap</span>
+      <span class="tag ship">Fixed</span>
       <span class="rec-id">GAP-SPINLOFT</span>
       <h3>Spin loft is absent — the one number that explains strike quality</h3>
     </div>
@@ -397,36 +410,36 @@ app       = launchDir − path <span class="c">&nbsp;→ understates by exactly 
 </section>
 
 <section>
-  <h2>Recommended order of work</h2>
-  <p class="sec-lede">Ranked by how wrong the current behaviour is, not by effort.</p>
+  <h2>What shipped</h2>
+  <p class="sec-lede">All seven landed in one pass, ranked by how wrong the behaviour was rather than by effort.</p>
   <div class="act">
-    <div class="act-p">First</div>
-    <div class="act-b"><h4>Correct the driver attack-angle benchmark</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Correct the driver attack-angle benchmark</h4>
       <p>Change <code>d.pga.aa</code> from <code>3.0</code> to <code>-1.3</code>. Keep <code>+2°…+5°</code> as the stated <em>target</em>, relabelled so it no longer reads as a tour average. One value; removes the app's most visible false claim.</p></div>
 
-    <div class="act-p">Second</div>
-    <div class="act-b"><h4>Divide face-to-path by the D-plane weight</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Divide face-to-path by the D-plane weight</h4>
       <p><code>facePath()</code> returns <code>(launchDirection − clubPath) / k</code>, with <code>k = 0.85</code> for driver and <code>0.75</code> for irons. Fix the hardcoded "75%" in the slice text at the same time. Re-check the ±5° thresholds afterwards — they were tuned against the understated value.</p></div>
 
-    <div class="act-p">Third</div>
-    <div class="act-b"><h4>Give faults a noise floor and a minimum sample</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Give faults a noise floor and a minimum sample</h4>
       <p>Require threshold + instrument error (≈1.2°), and a minimum shot count per club, before a fault reports. Biggest single gain in trustworthiness — it stops the app calling radar noise a swing flaw.</p></div>
 
-    <div class="act-p">Fourth</div>
-    <div class="act-b"><h4>Rewrite CoachingMode tips as external cues</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Rewrite CoachingMode tips as external cues</h4>
       <p>The best-evidenced change in the document, and pure copywriting. "Keep your head still" → a cue about the ball or an object. Model it on the <code>FaultEngine</code> drills, which already do this well.</p></div>
 
-    <div class="act-p">Fifth</div>
-    <div class="act-b"><h4>Realign the rest of the benchmark table, add the 8 missing clubs</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Realign the rest of the benchmark table, add the 8 missing clubs</h4>
       <p>Attack angles and smash factors to Trackman values; rows for <code>1i 2i 3i 2h 3h 4w 5w 7w</code>.</p></div>
 
-    <div class="act-p">Sixth</div>
-    <div class="act-b"><h4>Weight practice time by club, and prescribe balls not just minutes</h4>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Weight practice time by club, and prescribe balls not just minutes</h4>
       <p>Scale session time by how much a club actually gets used and what it's for. Add ball counts, ≥20s spacing, and a ~70% success target to each block.</p></div>
 
-    <div class="act-p">Later</div>
-    <div class="act-b"><h4>Estimate spin loft</h4>
-      <p>Bound it from attack angle, launch angle and spin rate to separate off-centre strikes from added loft. Largest analytical gain, largest effort, and needs care given what Rapsodo exports.</p></div>
+    <div class="act-p">Done</div>
+    <div class="act-b done"><h4>Estimate spin loft</h4>
+      <p>Shipped as <code>spinLoft()</code> — <code>(launchAngle − attackAngle) / kv</code>, <code>kv</code> 0.83 woods / 0.75 irons. Those weights reproduce TrackMan's published tour spin lofts <em>exactly</em> (driver 14.7°, 6-iron 24.3°), which is now the regression check. Two new faults hang off it: <strong>Adding Loft Through Impact</strong> and <strong>Delofting Too Much (Irons)</strong>, each with drills and causes.</p></div>
   </div>
 </section>
 
