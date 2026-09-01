@@ -171,12 +171,57 @@ function sortedClubs(shots) {
   return getClubs(shots).sort((a,b) => clubOrder(a) - clubOrder(b));
 }
 
-// D-Plane: face angle ≈ launch direction (ball starts ~75% toward face)
-// face-to-path = launchDirection - clubPath
-// positive = face open to path = fade/slice
-// negative = face closed to path = draw/hook
+// Mean of a plain array of numbers (avg() above works on objects + a field name).
+function mean(values) {
+  const v = (values || []).filter(x => Number.isFinite(x));
+  if (!v.length) return null;
+  return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+// ── D-Plane geometry ────────────────────────────────────────────
+// Start direction is a WEIGHTED BLEND of face and path, not face alone:
+//     launchDirection = k·face + (1-k)·path
+// where k ≈ 0.85 for a driver and ≈ 0.75 for an iron (loft lowers the ratio).
+// Solving for face and subtracting path collapses to a clean form:
+//     face - path = (launchDirection - path) / k
+// The naive (launchDirection - path) omits the divisor and therefore UNDER-
+// states face-to-path by 15% on driver and 25% on irons — enough that a real
+// 5° open face reads as 3.75° on an iron and slips under the slice threshold.
+const FACE_RATIO_WOOD = 0.85;
+const FACE_RATIO_IRON = 0.75;
+const faceRatio = t => (isWood(t) || isHybrid(t)) ? FACE_RATIO_WOOD : FACE_RATIO_IRON;
+
+// Vertical analogue of the same law: launchAngle = kv·dynamicLoft + (1-kv)·AoA.
+// Rearranged, spin loft (dynamicLoft - AoA) = (launchAngle - AoA) / kv.
+// These kv values reproduce TrackMan's PUBLISHED tour spin lofts exactly:
+// driver 10.9°/-1.3° -> 14.7° (published 14.7), 6i 14.1°/-4.1° -> 24.3° (published 24.3).
+const LOFT_RATIO_WOOD = 0.83;
+const LOFT_RATIO_IRON = 0.75;
+const loftRatio = t => (isWood(t) || isHybrid(t)) ? LOFT_RATIO_WOOD : LOFT_RATIO_IRON;
+
+// Launch-monitor measurement error. Rapsodo MLM2PRO measured against a
+// Foresight GCQuad: MAE 1.05° attack angle, 1.19° club path. Fault thresholds
+// must clear this margin or they fire on instrument noise, not on the swing.
+const ANGLE_NOISE = 1.2;
+
+// Face-to-path in degrees. Positive = face open to path (fade/slice shape),
+// negative = face closed to path (draw/hook). null when either input is missing.
 function facePath(shot) {
-  return (shot.launchDirection || 0) - (shot.clubPath || 0);
+  const ld = shot.launchDirection, cp = shot.clubPath;
+  if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
+  return (ld - cp) / faceRatio(shot.clubType);
+}
+
+// Estimated spin loft in degrees — the angle between where the face points and
+// where the club is travelling. Primary driver of both spin rate and smash
+// factor, and the metric that separates "missed the middle" from "added loft
+// through impact". Rapsodo does not export dynamic loft, so this is derived
+// from launch angle and attack angle; treat it as an estimate, not a reading.
+function spinLoft(shot) {
+  const la = shot.launchAngle, aoa = shot.attackAngle;
+  if (!Number.isFinite(la) || !Number.isFinite(aoa)) return null;
+  const sl = (la - aoa) / loftRatio(shot.clubType);
+  return (sl > 0 && sl < 70) ? sl : null;   // outside this, the inputs are junk
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -808,7 +853,7 @@ const FaultEngine = (() => {
       id:'slice', name:'Slice / Open Face to Path', icon:'↪️', category:'Path & Face', severity:'high',
       test: s => facePath(s) > 5 && s.sideCarry > 12,
       description: shots => {
-        const afp = avg(shots.map(s=>facePath(s)).filter(v=>v>5).map((_,i)=>shots[i]), null) || avg(shots.map(facePath));
+        const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
         const sc = avg(shots,'sideCarry');
         return `Face is open to path by ~${fmt(afp,1)}° (D-Plane). Ball is starting toward the open face ` +
           `then curving further right due to clockwise spin axis. Average side carry: +${fmt(sc,1)} yds right. ` +
@@ -846,7 +891,8 @@ const FaultEngine = (() => {
 
     {
       id:'push-right', name:'Consistent Right Miss (Push)', icon:'→', category:'Path & Face', severity:'medium',
-      test: s => s.launchDirection > 5 && s.sideCarry > 8 && Math.abs(facePath(s)) < 4,
+      test: s => s.launchDirection > 5 && s.sideCarry > 8 &&
+        Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° right with neutral face-to-path. ` +
         `Ball is starting right and staying right — a push, not a slice. Face and path are both aimed right of target.`,
       causes:['Alignment problem — shoulders aimed right of target','Ball too far back in stance',
@@ -860,7 +906,8 @@ const FaultEngine = (() => {
 
     {
       id:'pull-left', name:'Consistent Left Miss (Pull)', icon:'←', category:'Path & Face', severity:'medium',
-      test: s => s.launchDirection < -5 && s.sideCarry < -8 && Math.abs(facePath(s)) < 4,
+      test: s => s.launchDirection < -5 && s.sideCarry < -8 &&
+        Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° left with neutral face-to-path. ` +
         `A pull — ball starting left and maintaining direction. Both face and path are aligned left of target.`,
       causes:['Alignment aimed left (common beginner overcompensation)',
@@ -996,6 +1043,70 @@ const FaultEngine = (() => {
         {name:'Low punch shots',desc:'Practice hitting intentional low "punch" drivers with a three-quarter swing and a forward ball position. This trains a neutral dynamic loft at impact.'},
       ],
       optimalRange: () => '2000–2800 rpm driver spin',
+    },
+
+    // ── SPIN LOFT (estimated) ──────────────────────────────────
+    // Spin loft = dynamic loft - attack angle: the angle between where the
+    // face points and where the club is travelling. It is the primary driver
+    // of BOTH spin rate and smash factor, which is why it disambiguates a
+    // fault that smash factor alone cannot: low smash from an off-centre
+    // strike needs a completely different fix from low smash caused by
+    // adding loft through impact. Estimated from launch and attack angle
+    // (Rapsodo does not export dynamic loft) — see spinLoft().
+    {
+      id:'high-spin-loft', name:'Adding Loft Through Impact', icon:'📐', category:'Spin Loft', severity:'high',
+      test: s => {
+        const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
+        return sl !== null && sl > band.hi + 3;
+      },
+      description: shots => {
+        const sl = mean(shots.map(spinLoft));
+        const band = Benchmarks.spinLoftBand(shots[0]?.clubType);
+        return `Estimated spin loft of ${fmt(sl,1)}° against a ${band.lo}–${band.hi}° window for this club ` +
+          `(PGA Tour reference ${fmt(band.tour,1)}°). You are presenting more loft at impact than the club is ` +
+          `travelling to deliver — the face is pointing well above the path. This costs ball speed and adds spin ` +
+          `at the same time, which is why it feels like "good contact that goes nowhere". ` +
+          `It is the single most common reason smash factor stays low even after strike location improves.`;
+      },
+      causes:['Casting / early release — the wrist angle unwinds before impact',
+        'Scooping: trying to lift the ball rather than compressing it',
+        'Cupped lead wrist at impact adding dynamic loft',
+        'Ball too far forward, catching it past the low point with the face already open upward',
+        'Hanging back on the trail foot so the shaft leans away from the target'],
+      drills:[
+        {name:'Punch-shot ladder',desc:'Hit 10 shots with a 7-iron trying to keep the ball under an imagined 10-foot bar 20 yards ahead. Finish with the hands low and the club no higher than your shoulder. The low finish is the constraint that removes added loft — you cannot flip and still keep it under the bar.'},
+        {name:'Towel-line compression drill',desc:'Lay a towel flat 4 inches BEHIND the ball. Hit shots that miss the towel entirely and take turf in FRONT of the ball. The towel gives instant external feedback on where the low point is, which is what spin loft is really measuring.'},
+        {name:'Trail-hand-only half swings',desc:'Hit 10 half shots with a 9-iron using only your trail hand on the club. It is almost impossible to cast one-handed without losing the club, so this trains retention of the wrist angle without any conscious "hold the lag" thought.'},
+        {name:'Feet-together compression',desc:'Feet touching, 8-iron, 60% speed, 15 balls. Removes lateral slide so the strike has to come from rotation. Watch the spin loft estimate fall as strikes centre up.'},
+      ],
+      optimalRange: t => { const b = Benchmarks.spinLoftBand(t); return `${b.lo}–${b.hi}° spin loft`; },
+    },
+
+    {
+      id:'low-spin-loft-iron', name:'Delofting Too Much (Irons)', icon:'🔻', category:'Spin Loft', severity:'medium',
+      test: s => {
+        if (!isIron(s.clubType)) return false;
+        const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
+        return sl !== null && sl < band.lo - 3;
+      },
+      description: shots => {
+        const sl = mean(shots.map(spinLoft));
+        const band = Benchmarks.spinLoftBand(shots[0]?.clubType);
+        return `Estimated spin loft of ${fmt(sl,1)}° sits below the ${band.lo}–${band.hi}° window for this club. ` +
+          `You are delivering the club with very little loft — shots will come out low and hot with too little ` +
+          `spin to hold a green. This is the opposite miss from casting and is usually over-correction: ` +
+          `strong shaft lean driven by the hands rather than by body rotation.`;
+      },
+      causes:['Excessive forward shaft lean driven by the hands',
+        'Ball too far back in the stance',
+        'Stalling body rotation and dragging the handle through impact',
+        'Over-coaching of "hit down on it" past the point of usefulness'],
+      drills:[
+        {name:'Ball-position reset',desc:'Alignment stick across the toes. Short irons one ball-width inside the lead heel, mid-irons two, long irons three. Most excessive deloft is simply a ball played too far back.'},
+        {name:'Height ladder',desc:'With one club, hit 3 low, 3 stock, 3 high, repeating. Deliberately varying delivered loft rebuilds the range you have lost — you cannot hit the high ones with the handle dragged forward.'},
+        {name:'Release-through-the-turf drill',desc:'Feel the clubhead pass the hands after impact into a full, high finish. Pair with a mirror or a phone camera: the lead arm should be extended and the club rising, not stalled low.'},
+      ],
+      optimalRange: t => { const b = Benchmarks.spinLoftBand(t); return `${b.lo}–${b.hi}° spin loft`; },
     },
 
     {
@@ -1150,23 +1261,59 @@ const FaultEngine = (() => {
     },
   ];
 
+  // ── Reporting gates ───────────────────────────────────────────
+  // The launch monitor's own error (MAE 1.05 deg attack angle, 1.19 deg club
+  // path on the MLM2PRO vs a GCQuad) is wider than several of the thresholds
+  // above. On any single shot that noise can push a good strike past a
+  // threshold, so a per-shot trip is not evidence of anything.
+  //
+  // Noise does not survive averaging, though: it shrinks with sample size
+  // while a real swing pattern does not. So rather than padding every
+  // threshold (which would suppress genuine faults), a fault reports only
+  // when it recurs at a rate noise alone would not produce, over a sample
+  // big enough to judge. A fault on 9 of 12 seven-irons is a pattern; the
+  // same fault on 2 of 12 is the radar.
+  const MIN_CLUB_SHOTS = 4;    // too few shots of a club to conclude anything
+  const MIN_AFFECTED   = 2;    // never report a fault off a single shot
+  const MIN_RATE       = 0.30; // share of that club's shots that must trip it
+  const FIRM_RATE      = 0.50; // below this, report but downgrade severity
+
+  const DOWNGRADE = { high: 'medium', medium: 'low', low: 'low' };
+
   function detectFaults(shots) {
     if (!shots.length) return [];
     const faults = [];
 
     for (const rule of PER_SHOT_RULES) {
       const affected = shots.filter(s => { try { return rule.test(s); } catch { return false; } });
-      if (affected.length === 0) continue;
+      if (affected.length < MIN_AFFECTED) continue;
+
+      // Judge the fault against the clubs it actually appeared on, not the
+      // whole session — a driver fault should be measured against drivers.
+      const clubs = new Set(affected.map(s => s.clubType));
+      const relevant = shots.filter(s => clubs.has(s.clubType));
+      if (relevant.length < MIN_CLUB_SHOTS) continue;
+
+      const rate = affected.length / relevant.length;
+      if (rate < MIN_RATE) continue;
+
+      const firm = rate >= FIRM_RATE;
       faults.push({
         ...rule,
+        severity: firm ? rule.severity : DOWNGRADE[rule.severity] || rule.severity,
         count: affected.length,
-        total: shots.length,
+        total: relevant.length,
+        rate,
+        confidence: firm ? 'confirmed' : 'tentative',
         description: typeof rule.description === 'function' ? rule.description(affected) : rule.description,
+        evidence: `${affected.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
+          (firm ? '' : ' — borderline, worth another session to confirm'),
         affectedShots: affected.map(s=>s._row),
       });
     }
 
     for (const rule of SESSION_RULES) {
+      if (shots.length < MIN_CLUB_SHOTS) break;   // too small a session to judge
       let passes = false;
       try { passes = rule.test(shots); } catch {}
       if (!passes) continue;
@@ -1254,7 +1401,7 @@ const SwingDNA = (() => {
 
     // Shot shape — based on avg side carry + D-plane
     const avgSC = avg(shots,'sideCarry');
-    const avgFP = shots.length ? shots.reduce((s,x)=>s+facePath(x),0)/shots.length : 0;
+    const avgFP = mean(shots.map(facePath));
     if (avgSC !== null) {
       const shape =
         avgSC < -15 ? {label:'Hooker',val:'Hook tendency',icon:'↩️',tone:'bad'} :
@@ -1324,14 +1471,15 @@ const SwingDNA = (() => {
 
     // Handedness of face-to-path
     if (shots.length >= 5) {
-      const fpVals = shots.map(facePath);
-      const avgFPa = fpVals.reduce((s,x)=>s+x,0)/fpVals.length;
+      const avgFPa = mean(shots.map(facePath));
+      if (avgFPa !== null) {
       const fp = avgFPa > 8  ? {val:`Open +${fmt(avgFPa,1)}° (fading)`,tone:'bad'} :
                  avgFPa > 3  ? {val:`Slightly open +${fmt(avgFPa,1)}°`,tone:'ok'} :
                  avgFPa < -8 ? {val:`Closed ${fmt(avgFPa,1)}° (drawing)`,tone:'ok'} :
                  avgFPa < -3 ? {val:`Slightly closed ${fmt(avgFPa,1)}°`,tone:'good'} :
                                {val:`Square ${fmt(avgFPa,1)}° ✓`,tone:'good'};
       pills.push({category:'Face to Path',icon:'🎰',value:fp.val,tone:fp.tone});
+      }
     }
 
     return pills;
@@ -1344,23 +1492,74 @@ const SwingDNA = (() => {
 // Benchmarks — PGA Tour + Amateur averages per club
 // ────────────────────────────────────────────────────────────────
 const Benchmarks = (() => {
+  // ── Tour reference data ───────────────────────────────────────
+  // `pga` rows marked [TM] are TrackMan's published PGA Tour averages.
+  // Rows marked [est] are interpolated across the TrackMan-anchored curve —
+  // TrackMan does not publish every club, so those are clearly-labelled
+  // estimates rather than sourced figures.
+  //
+  // The driver attack angle here was previously +3.0, which is NOT the PGA
+  // Tour average — it is the LPGA Tour average, and +2..+5 is the range the
+  // tour's LONGEST hitters use. The PGA Tour average is -1.3 (descending).
+  // That number is corrected below; the +2..+5 figure survives as OPTIMAL
+  // (see TARGET), because hitting up genuinely does add carry.
   const DATA = {
-    d:   {label:'Driver',  pga:{sf:1.48,carry:275,bs:167,la:10.9,aa:3.0}, am:{sf:1.41,carry:216,bs:133,la:12.6,aa:-0.5}},
-    '2w':{label:'2 Wood',  pga:{sf:1.45,carry:255,bs:162,la:9.5, aa:1.0}, am:{sf:1.38,carry:195,bs:120,la:11.0,aa:-1.0}},
-    '3w':{label:'3 Wood',  pga:{sf:1.44,carry:243,bs:158,la:9.2, aa:0.5}, am:{sf:1.38,carry:183,bs:116,la:11.2,aa:-1.5}},
-    '4h':{label:'4 Hybrid',pga:{sf:1.40,carry:225,bs:147,la:11.0,aa:-1.0},am:{sf:1.34,carry:170,bs:105,la:13.0,aa:-2.0}},
-    '5h':{label:'5 Hybrid',pga:{sf:1.39,carry:210,bs:138,la:12.5,aa:-1.5},am:{sf:1.33,carry:158,bs:100,la:14.0,aa:-2.5}},
-    '4i':{label:'4i',       pga:{sf:1.38,carry:210,bs:140,la:11.0,aa:-2.0},am:{sf:1.32,carry:154,bs:100,la:13.5,aa:-3.0}},
-    '5i':{label:'5i',       pga:{sf:1.37,carry:195,bs:132,la:13.0,aa:-2.5},am:{sf:1.32,carry:143,bs:93, la:15.0,aa:-3.5}},
-    '6i':{label:'6i',       pga:{sf:1.36,carry:183,bs:124,la:14.5,aa:-3.0},am:{sf:1.31,carry:133,bs:87, la:16.5,aa:-4.0}},
-    '7i':{label:'7i',       pga:{sf:1.35,carry:172,bs:116,la:16.3,aa:-3.5},am:{sf:1.30,carry:122,bs:80, la:18.0,aa:-4.0}},
-    '8i':{label:'8i',       pga:{sf:1.34,carry:160,bs:107,la:18.0,aa:-4.0},am:{sf:1.29,carry:110,bs:74, la:19.5,aa:-4.5}},
-    '9i':{label:'9i',       pga:{sf:1.33,carry:148,bs:98, la:20.4,aa:-4.5},am:{sf:1.28,carry:98, bs:69, la:21.5,aa:-5.0}},
-    pw:  {label:'PW',       pga:{sf:1.30,carry:136,bs:89, la:24.0,aa:-5.0},am:{sf:1.26,carry:87, bs:62, la:25.0,aa:-5.5}},
-    aw:  {label:'AW',       pga:{sf:1.28,carry:125,bs:82, la:27.0,aa:-5.5},am:{sf:1.24,carry:78, bs:57, la:28.0,aa:-6.0}},
-    sw:  {label:'SW',       pga:{sf:1.24,carry:110,bs:74, la:32.0,aa:-6.0},am:{sf:1.20,carry:68, bs:50, la:33.0,aa:-6.0}},
-    lw:  {label:'LW',       pga:{sf:1.20,carry:90, bs:62, la:38.0,aa:-5.0},am:{sf:1.16,carry:55, bs:42, la:40.0,aa:-5.0}},
+    d:   {label:'Driver',   pga:{sf:1.48,carry:275,bs:167,la:10.9,aa:-1.3}, am:{sf:1.42,carry:216,bs:133,la:12.6,aa:-1.6}}, // [TM]
+    '2w':{label:'2 Wood',   pga:{sf:1.48,carry:255,bs:162,la:9.4, aa:-2.5}, am:{sf:1.40,carry:195,bs:120,la:11.0,aa:-2.8}}, // [est]
+    '3w':{label:'3 Wood',   pga:{sf:1.48,carry:243,bs:158,la:9.2, aa:-2.9}, am:{sf:1.40,carry:183,bs:116,la:11.2,aa:-3.0}}, // [TM]
+    '4w':{label:'4 Wood',   pga:{sf:1.47,carry:236,bs:155,la:9.3, aa:-3.1}, am:{sf:1.39,carry:178,bs:113,la:11.5,aa:-3.2}}, // [est]
+    '5w':{label:'5 Wood',   pga:{sf:1.47,carry:230,bs:152,la:9.4, aa:-3.3}, am:{sf:1.39,carry:174,bs:110,la:11.8,aa:-3.4}}, // [TM]
+    '7w':{label:'7 Wood',   pga:{sf:1.46,carry:222,bs:148,la:9.8, aa:-3.4}, am:{sf:1.38,carry:168,bs:107,la:12.4,aa:-3.5}}, // [est]
+    '2h':{label:'2 Hybrid', pga:{sf:1.46,carry:232,bs:150,la:9.9, aa:-3.4}, am:{sf:1.38,carry:176,bs:109,la:12.4,aa:-3.5}}, // [est]
+    '3h':{label:'3 Hybrid', pga:{sf:1.46,carry:228,bs:148,la:10.0,aa:-3.5}, am:{sf:1.37,carry:173,bs:107,la:12.7,aa:-3.6}}, // [est]
+    '4h':{label:'4 Hybrid', pga:{sf:1.46,carry:225,bs:146,la:10.2,aa:-3.5}, am:{sf:1.37,carry:170,bs:105,la:13.0,aa:-3.6}}, // [TM]
+    '5h':{label:'5 Hybrid', pga:{sf:1.45,carry:215,bs:142,la:10.8,aa:-3.6}, am:{sf:1.36,carry:162,bs:102,la:13.6,aa:-3.7}}, // [est]
+    '1i':{label:'1i',       pga:{sf:1.46,carry:220,bs:145,la:9.8, aa:-2.8}, am:{sf:1.36,carry:165,bs:104,la:12.4,aa:-3.1}}, // [est]
+    '2i':{label:'2i',       pga:{sf:1.45,carry:216,bs:143,la:10.1,aa:-3.0}, am:{sf:1.35,carry:162,bs:102,la:12.8,aa:-3.3}}, // [est]
+    '3i':{label:'3i',       pga:{sf:1.45,carry:212,bs:142,la:10.4,aa:-3.1}, am:{sf:1.35,carry:159,bs:101,la:13.1,aa:-3.4}}, // [TM]
+    '4i':{label:'4i',       pga:{sf:1.43,carry:203,bs:137,la:11.0,aa:-3.4}, am:{sf:1.34,carry:154,bs:100,la:13.5,aa:-3.6}}, // [TM]
+    '5i':{label:'5i',       pga:{sf:1.41,carry:194,bs:132,la:12.1,aa:-3.7}, am:{sf:1.33,carry:143,bs:93, la:15.0,aa:-3.9}}, // [TM]
+    '6i':{label:'6i',       pga:{sf:1.38,carry:183,bs:127,la:14.1,aa:-4.1}, am:{sf:1.32,carry:133,bs:87, la:16.5,aa:-4.3}}, // [TM]
+    '7i':{label:'7i',       pga:{sf:1.36,carry:176,bs:120,la:16.3,aa:-4.3}, am:{sf:1.31,carry:122,bs:80, la:18.0,aa:-4.5}}, // [TM]
+    '8i':{label:'8i',       pga:{sf:1.34,carry:164,bs:112,la:18.1,aa:-4.5}, am:{sf:1.29,carry:110,bs:74, la:19.5,aa:-4.7}}, // [TM]
+    '9i':{label:'9i',       pga:{sf:1.32,carry:152,bs:103,la:20.4,aa:-4.7}, am:{sf:1.28,carry:98, bs:69, la:21.5,aa:-4.9}}, // [est]
+    pw:  {label:'PW',       pga:{sf:1.28,carry:142,bs:95, la:24.2,aa:-5.0}, am:{sf:1.26,carry:87, bs:62, la:25.0,aa:-5.2}}, // [TM]
+    aw:  {label:'AW',       pga:{sf:1.26,carry:128,bs:85, la:27.0,aa:-5.2}, am:{sf:1.24,carry:78, bs:57, la:28.0,aa:-5.4}}, // [est]
+    sw:  {label:'SW',       pga:{sf:1.24,carry:112,bs:76, la:31.5,aa:-5.5}, am:{sf:1.20,carry:68, bs:50, la:33.0,aa:-5.6}}, // [est]
+    lw:  {label:'LW',       pga:{sf:1.20,carry:92, bs:64, la:37.0,aa:-5.5}, am:{sf:1.16,carry:55, bs:42, la:40.0,aa:-5.5}}, // [est]
   };
+
+  // What a golfer should AIM at — deliberately separate from what the tour
+  // AVERAGES, because for attack angle those are different numbers and
+  // conflating them is what produced the original error.
+  const TARGET = {
+    driverAttackAngle: {lo: 2,  hi: 5,   label: '+2° to +5° (hit up)'},
+    ironAttackAngle:   {lo: -5, hi: -2,  label: '-2° to -5° (hit down)'},
+    driverSpin:        {lo: 2000, hi: 2800, label: '2000–2800 rpm'},
+    faceToPath:        {lo: -2, hi: 2,   label: 'within ±2°'},
+  };
+
+  // Estimated spin loft by club family. TrackMan publishes PGA driver 14.7°
+  // and 6-iron 24.3°; the most efficient drivers of the ball sit near 10–14°.
+  // Spin rises with spin loft only up to ~45°, past which the ball slides up
+  // the face, friction is lost and spin falls again.
+  const SPIN_LOFT = {
+    driver: {lo: 10, hi: 16, tour: 14.7},
+    wood:   {lo: 12, hi: 19, tour: 16.5},
+    hybrid: {lo: 15, hi: 22, tour: 19.0},
+    longIron:{lo: 16, hi: 23, tour: 20.0},
+    midIron: {lo: 20, hi: 28, tour: 24.3},
+    shortIron:{lo: 26, hi: 36, tour: 31.0},
+  };
+
+  function spinLoftBand(t) {
+    if (t === 'd') return SPIN_LOFT.driver;
+    if (isWood(t)) return SPIN_LOFT.wood;
+    if (isHybrid(t)) return SPIN_LOFT.hybrid;
+    if (isShort(t)) return SPIN_LOFT.shortIron;
+    if (isMid(t)) return SPIN_LOFT.midIron;
+    return SPIN_LOFT.longIron;
+  }
 
   function get(t) { return DATA[t] || null; }
 
@@ -1378,7 +1577,7 @@ const Benchmarks = (() => {
     }
   }
 
-  return { get, status };
+  return { get, status, TARGET, spinLoftBand };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1445,19 +1644,94 @@ const Insights = (() => {
 // Practice Plan — turn faults into a prioritised session
 // ────────────────────────────────────────────────────────────────
 const PracticePlan = (() => {
+  // ── Weighting practice time ───────────────────────────────────
+  // Severity alone is the wrong ranking. It is hardcoded per fault and
+  // identical for every golfer, so a session that happens to contain a lot of
+  // driver swings hands most of its time to the driver whether or not the
+  // driver is what is costing strokes.
+  //
+  // Strokes-gained work (Broadie) is clear that approach play explains the
+  // largest share of scoring differences between players, and that the long
+  // game — not putting — accounts for most of the amateur/professional gap.
+  // ShotLab cannot compute true strokes gained: it sees range shots, not
+  // rounds, and has no putting or short-game data. What it CAN do is stop
+  // pretending every club matters equally. Scoring clubs — the irons and
+  // wedges you hit into greens — get weighted up; a 3-wood most golfers hit
+  // twice a round gets weighted down. Frequency within the session is folded
+  // in too, because a fault on a club you actually hit matters more.
+  function scoringWeight(clubType) {
+    if (!clubType) return 1;
+    if (clubType === 'd') return 1.15;      // driving distance is a real lever
+    if (isWood(clubType)) return 0.7;       // few swings per round
+    if (isHybrid(clubType)) return 0.9;
+    if (isShort(clubType)) return 1.35;     // scoring clubs — approach play
+    if (isMid(clubType)) return 1.3;        // approach play
+    return 1.0;                             // long irons
+  }
+
+  // Which clubs a fault actually showed up on, from its affected shot rows.
+  function faultClubs(fault, shots) {
+    const rows = new Set(fault.affectedShots || []);
+    const hit = shots.filter(s => rows.has(s._row));
+    return hit.length ? hit : shots;
+  }
+
   function generate(shots, totalMin = 45) {
     const faults = FaultEngine.detectFaults(shots).filter(f => f.drills && f.drills.length);
     if (!faults.length) return null;
-    const top = faults.slice(0,3);
-    const weights = top.map(f => f.severity==='high'?3 : f.severity==='medium'?2 : 1);
-    const totalW = weights.reduce((a,b)=>a+b,0);
-    return top.map((f,i) => ({
-      name: f.name, icon: f.icon, severity: f.severity,
-      minutes: Math.max(5, Math.round(totalMin * weights[i]/totalW)),
-      drill: f.drills[0],
-    }));
+
+    const scored = faults.map(f => {
+      const clubs = faultClubs(f, shots);
+      const sev = f.severity === 'high' ? 3 : f.severity === 'medium' ? 2 : 1;
+      // average scoring weight across the clubs this fault appeared on
+      const sw = mean(clubs.map(s => scoringWeight(s.clubType))) || 1;
+      // how much of the session was those clubs — a fault on 2 shots out of 60
+      // is worth less time than the same fault on 25 of them
+      const share = clubs.length / shots.length;
+      // tentative faults (borderline rate) earn less time than confirmed ones
+      const conf = f.confidence === 'tentative' ? 0.6 : 1;
+      return { f, weight: sev * sw * (0.5 + share) * conf };
+    }).sort((a, b) => b.weight - a.weight);
+
+    const top = scored.slice(0, 3);
+    const totalW = top.reduce((a, b) => a + b.weight, 0) || 1;
+
+    return top.map(({ f, weight }) => {
+      const minutes = Math.max(5, Math.round(totalMin * weight / totalW));
+      return {
+        name: f.name, icon: f.icon, severity: f.severity,
+        confidence: f.confidence, evidence: f.evidence,
+        minutes,
+        // Minutes alone let a golfer rake 120 balls in 20 minutes, which the
+        // evidence says is exercise rather than practice. Ball count and
+        // spacing are the part that actually constrains the session.
+        balls: Math.max(10, Math.round(minutes * 1.5)),
+        drill: f.drills[0],
+        alternates: f.drills.slice(1, 3),
+      };
+    });
   }
-  return { generate };
+
+  // A block that belongs in every session regardless of fault, because the
+  // thing range practice most reliably fails to train is the shot you
+  // actually have to play: one ball, a new target, and no do-over.
+  function transferBlock(totalMin = 45) {
+    return {
+      name: 'Play the course',
+      icon: '⛳',
+      minutes: Math.max(5, Math.round(totalMin * 0.25)),
+      balls: 12,
+      drill: {
+        name: 'One ball, one target, full routine',
+        desc: 'Play 9 imaginary holes. Change club and target every single ball, run your full pre-shot ' +
+          'routine each time, and score each shot hit-or-miss against a target width you set in advance. ' +
+          'No mulligans and no repeat shots. This is the closest a range gets to the thing you are actually ' +
+          'practising for, and it is the block most golfers skip.',
+      },
+    };
+  }
+
+  return { generate, transferBlock, scoringWeight };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2613,17 +2887,24 @@ const UI = (() => {
     if (!el) return;
     const plan = PracticePlan.generate(shots);
     if (!plan) { el.innerHTML = `<div class="no-faults">✅ No faults to drill — keep grooving your swing!</div>`; return; }
-    const total = plan.reduce((a,b)=>a+b.minutes,0);
+    const transfer = PracticePlan.transferBlock();
+    const blocks = [...plan, transfer];
+    const total = blocks.reduce((a,b)=>a+b.minutes,0);
+    const balls = blocks.reduce((a,b)=>a+(b.balls||0),0);
     el.innerHTML = `
-      <div class="plan-intro">A ${total}-minute session targeting your top ${plan.length} fault${plan.length>1?'s':''}, time-weighted by severity:</div>
-      ${plan.map((p,i)=>`
-        <div class="plan-item severity-${p.severity}">
+      <div class="plan-intro">A ${total}-minute, ${balls}-ball session, weighted by how much each fault is
+        likely costing you — severity, how often it recurred, and how much the clubs it appeared on matter
+        to scoring. Leave 20s between shots.</div>
+      ${blocks.map((p,i)=>`
+        <div class="plan-item severity-${p.severity||'low'}">
           <div class="plan-num">${i+1}</div>
           <div class="plan-body">
-            <div class="plan-head"><span>${p.icon} ${p.name}</span><span class="plan-min">${p.minutes} min</span></div>
-            <div class="plan-drill"><strong>${p.drill.name}:</strong> ${p.drill.desc}</div>
+            <div class="plan-head"><span>${p.icon} ${Sanitize.escape(p.name)}</span><span class="plan-min">${p.minutes} min · ${p.balls} balls</span></div>
+            <div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>
+            ${p.evidence ? `<div class="plan-evidence">${Sanitize.escape(p.evidence)}</div>` : ''}
           </div>
-        </div>`).join('')}`;
+        </div>`).join('')}
+      <div class="plan-note">${Sanitize.escape(CoachingMode.PROTOCOL.note)}</div>`;
     applyPaywall(el, "Sign in to unlock your personalised practice plan");
   }
 
@@ -4558,53 +4839,105 @@ const InsightEngine = (() => {
 // CoachingMode — Interactive guidance system
 // ════════════════════════════════════════════════════════════════
 const CoachingMode = (() => {
+  // ── Cues are written to an EXTERNAL focus, deliberately ────────
+  // The best-supported finding in the motor-learning literature for golf is
+  // that WHERE attention points changes performance. Internal cues — ones
+  // about your own body parts ("keep your wrists straight", "keep your head
+  // still") — interfere with automatic movement control and measurably
+  // degrade accuracy. External cues — about the club, the ball, the turf, a
+  // physical object, the target — improve consistency and reduce movement
+  // variability. There is also a distance effect: a cue about ball flight
+  // and landing point beats one about the clubhead.
+  //
+  // Every cue below therefore names something OUTSIDE the body. Where a fault
+  // genuinely is about a body part, the cue is re-expressed as an object to
+  // act on: not "shift your weight" but "press the lead heel into the ground".
+  // (Recent reviews find the external-focus advantage less universal than
+  // early summaries claimed, but it is consistent in direction and costs
+  // nothing to apply.)
   const TIPS = {
     'Slice': [
-      '🎯 Grip: Check your grip pressure - aim for 6/10 tightness',
-      '📐 Path: Feel like you\'re swinging from inside-to-out',
-      '🔄 Rotation: Ensure full shoulder turn on backswing',
-      '📍 Alignment: Check your shoulders point slightly left of target',
+      '⛳ Start line: pick a target 20 yards out and try to start the ball just right of it — let the curve bring it back',
+      '🕳️ Headcover gate: put a headcover a foot outside the ball and swing so the club misses it coming down',
+      '🎯 Toe-over-heel: feel the toe of the club pass the heel through the ball, like closing a door',
+      '🪵 Trail elbow: let the club drop toward your trail hip pocket before it moves toward the ball',
     ],
     'Hook': [
-      '📍 Alignment: Try opening your stance slightly',
-      '🎯 Grip: Check for over-strong grip',
-      '📐 Path: Focus on outside-to-in path feels',
-      '🔄 Rotation: Practice 3/4 swing to feel the path',
+      '⛳ Start line: aim to start the ball left of target and hold the face there through the finish',
+      '🖐️ Grip check: at address, count 2 knuckles on the lead hand — not 3',
+      '🏌️ Finish tall: swing to a full high finish with the club pointing at the sky behind you',
+      '🎯 Chest to target: turn the shirt logo to face the target at the finish rather than letting the hands roll',
     ],
     'Thin': [
-      '📍 Ball Position: Move ball forward in stance',
-      '🧍 Posture: Maintain spine angle through impact',
-      '👀 Eye Focus: Keep your eyes on the back of the ball',
-      '🔄 Low Point: Practice hitting divots 2 inches AFTER the ball',
+      '🪙 Coin drill: put a coin 3 inches in front of the ball and try to take turf where the coin is',
+      '🧺 Towel behind: lay a towel 4 inches behind the ball and miss it on the way down',
+      '⛳ Low point: try to bruise the grass in FRONT of the ball, not under it',
+      '🎈 Trail shoulder: let the trail shoulder work down and under, so the club reaches the turf past the ball',
     ],
     'Fat': [
-      '⚖️ Weight Transfer: Shift weight to front foot during downswing',
-      '🧍 Posture: Keep your head still until after impact',
-      '📍 Ball Position: Try moving ball back in stance',
-      '🔄 Practice: Hit tees in the ground - swing over them',
+      '🦶 Lead heel: press the lead heel into the ground as the club starts down',
+      '🧺 Towel behind: same towel 4 inches behind the ball — hitting it is the fault, missing it is the fix',
+      '⛳ Turf mark: hit 10 shots and look only at where the turf is scuffed; aim to move that mark forward each time',
+      '🚶 Step-through: after impact, walk through toward the target so the finish is on the lead side',
+    ],
+    'Adding Loft Through Impact': [
+      '🚧 Under the bar: keep the ball under an imagined bar 10 feet high, 20 yards ahead',
+      '✋ Low finish: finish with the hands no higher than the trail shoulder',
+      '🧺 Towel behind: miss a towel 4 inches behind the ball and take turf in front of it',
+      '⛳ Flight window: pick a lower window than feels natural and try to fly the ball through it',
+    ],
+    'Delofting Too Much (Irons)': [
+      '🎈 High window: pick a target window twice as high as normal and fly the ball through it',
+      '⛳ Ladder: hit 3 low, 3 stock, 3 high with the same club, repeating',
+      '🏌️ Club passes hands: feel the clubhead overtake the hands after the ball, into a full finish',
+      '📍 Ball forward: move the ball one ball-width forward and note the flight change',
     ],
   };
 
-  function getTips(faultName) {
-    return TIPS[faultName] || [
-      '🎯 Focus on your fundamentals',
-      '📊 Record your swing on video',
-      '🔄 Practice with purpose, not just volume',
-      '💪 Work on one thing at a time',
-    ];
-  }
+  const GENERIC = [
+    '⛳ Pick a specific target for every ball — a flag, a post, a distinct patch of grass',
+    '🎬 Film one swing per session from down the line, phone on the ground behind the ball',
+    '⏱️ Leave 20+ seconds between shots — faster than that is exercise, not practice',
+    '1️⃣ One cue per session. A second cue halves the value of the first',
+  ];
 
-  function generateSession(fault) {
+  function getTips(faultName) { return TIPS[faultName] || GENERIC; }
+
+  // ── Practice-session dosage ────────────────────────────────────
+  // The most consistent guidance across the literature, and the part the app
+  // previously left out entirely by prescribing minutes alone:
+  //   · three focused ~50-ball sessions beat one 150-ball session
+  //   · faster than one shot per 20 seconds is exercise, not practice
+  //   · calibrate difficulty so the golfer succeeds ~70% of the time
+  //   · warm up wedges first, 4-5 balls per club, before anything full power
+  //   · deliberate practice accounted for ~30% of improvement in one golf
+  //     study — a third of the process, not all of it
+  const PROTOCOL = {
+    ballsPerSession: 50,
+    sessionsPerWeek: 3,
+    minSecondsBetweenShots: 20,
+    targetSuccessRate: 0.70,
+    warmup: 'Wedges first: 4–5 balls per club, half speed, working up. No full-power swings until the body is warm.',
+    note: 'Three focused 50-ball sessions beat one 150-ball marathon. Volume past attention is just exercise.',
+  };
+
+  function generateSession(fault, minutes = 30) {
+    const balls = Math.min(PROTOCOL.ballsPerSession, Math.round(minutes * 1.5));
     return {
-      warmup: '5 min light stretching & 10 swings to loosen up',
-      focus: `Work on ${fault || 'consistency'}`,
+      warmup: PROTOCOL.warmup,
+      focus: fault ? `One cue only: ${fault}` : 'One cue only: centred contact',
       drills: getTips(fault),
-      cooldown: 'Review what worked and what didn\'t',
-      duration: 30,
+      balls,
+      spacing: `Leave ${PROTOCOL.minSecondsBetweenShots}s between shots`,
+      successTarget: `Aim to succeed on about ${Math.round(PROTOCOL.targetSuccessRate * 100)}% of attempts — ` +
+        `if you are hitting it every time the task is too easy to teach you anything, and if you are missing ` +
+        `nearly every time it is too hard to build anything.`,
+      cooldown: 'Last 10 balls: one ball per club, full pre-shot routine, different target every time.',
+      duration: minutes,
     };
   }
 
-  return { getTips, generateSession };
+  return { getTips, generateSession, PROTOCOL };
 })();
 
 // ════════════════════════════════════════════════════════════════

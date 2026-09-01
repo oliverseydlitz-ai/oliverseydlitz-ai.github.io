@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Audit of every swing-mechanics claim in ShotLab's coaching content against Trackman tour data, D-plane physics, Rapsodo accuracy testing, and the motor-learning literature.">
+<meta name="robots" content="noindex">
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>ShotLab Coaching Calibration</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F6F7F4; --panel:#FFFFFF; --sunk:#EDEFEA;
+  --ink:#171D1B; --ink-2:#414B48; --ink-3:#6B7671;
+  --rule:#D8DCD5; --rule-hi:#BEC5BC;
+  --accent:#0B5D6B; --accent-soft:#E2EEF0;
+  --bad:#B3341F; --bad-soft:#F6E4E0;
+  --warn:#8A5E10; --warn-soft:#F6EDDC;
+  --good:#2F6B3F; --good-soft:#E3EEE5;
+  --measure:66ch;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#121716; --panel:#191F1E; --sunk:#0D1211;
+    --ink:#E8EDEA; --ink-2:#B2BCB8; --ink-3:#828D89;
+    --rule:#2A3231; --rule-hi:#3D4746;
+    --accent:#5FB8C4; --accent-soft:#12302F;
+    --bad:#E0765E; --bad-soft:#301A16;
+    --warn:#D2A044; --warn-soft:#2B2113;
+    --good:#7FBB8B; --good-soft:#16281B;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#121716; --panel:#191F1E; --sunk:#0D1211;
+  --ink:#E8EDEA; --ink-2:#B2BCB8; --ink-3:#828D89;
+  --rule:#2A3231; --rule-hi:#3D4746;
+  --accent:#5FB8C4; --accent-soft:#12302F;
+  --bad:#E0765E; --bad-soft:#301A16;
+  --warn:#D2A044; --warn-soft:#2B2113;
+  --good:#7FBB8B; --good-soft:#16281B;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px 96px}
+.col{max-width:var(--measure)}
+h1,h2,h3,h4,.lab,.tag,th{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+h2,h3,h4{text-wrap:balance}
+code,.num,.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* masthead */
+header{border-bottom:2px solid var(--ink);padding:44px 0 20px;margin-bottom:8px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-size:clamp(34px,5.4vw,52px);line-height:1.04;font-weight:700;letter-spacing:-.021em;margin:0 0 16px}
+.standfirst{font-size:19px;color:var(--ink-2);margin:0;max-width:60ch}
+.meta{display:flex;flex-wrap:wrap;gap:26px;margin-top:26px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-3)}
+.meta b{color:var(--ink-2);font-weight:500}
+
+/* verdict strip */
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+  gap:0;border-bottom:1px solid var(--rule);margin-bottom:56px}
+.vc{padding:22px 22px 24px 0;border-right:1px solid var(--rule)}
+.vc:last-child{border-right:0}
+.vc .n{font-family:"IBM Plex Mono",monospace;font-size:31px;font-weight:600;
+  line-height:1;letter-spacing:-.02em}
+.vc .t{font-family:Archivo,sans-serif;font-size:12.5px;line-height:1.35;
+  color:var(--ink-2);margin-top:9px}
+.n.bad{color:var(--bad)} .n.warn{color:var(--warn)} .n.good{color:var(--good)} .n.acc{color:var(--accent)}
+
+section{margin:0 0 64px}
+h2{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin:0 0 8px;padding-bottom:9px;border-bottom:1px solid var(--rule-hi)}
+.sec-lede{font-size:20px;line-height:1.45;color:var(--ink);margin:16px 0 26px;
+  max-width:58ch;font-weight:400}
+p{margin:0 0 15px;max-width:var(--measure)}
+ul{margin:0 0 15px;padding-left:20px;max-width:var(--measure)}
+li{margin-bottom:7px}
+strong{font-weight:600}
+em{font-style:italic}
+
+/* finding record */
+.rec{border-top:1px solid var(--rule);padding:24px 0 4px}
+.rec-hd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:11px}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;padding:3px 7px;border:1px solid currentColor;white-space:nowrap}
+.tag.bad{color:var(--bad);background:var(--bad-soft)}
+.tag.warn{color:var(--warn);background:var(--warn-soft)}
+.tag.good{color:var(--good);background:var(--good-soft)}
+.rec-id{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+.rec h3{font-size:21px;font-weight:600;letter-spacing:-.012em;margin:0;flex:1 1 320px;line-height:1.25}
+
+/* deviation bar */
+.dev{margin:18px 0 8px;max-width:640px}
+.dev-row{display:grid;grid-template-columns:104px 1fr 108px;gap:14px;align-items:center;
+  padding:7px 0;border-bottom:1px dotted var(--rule)}
+.dev-row:last-child{border-bottom:0}
+.dev-lab{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2)}
+.dev-track{position:relative;height:22px;background:var(--sunk)}
+.dev-zero{position:absolute;top:0;bottom:0;width:1px;background:var(--rule-hi)}
+.dev-fill{position:absolute;top:5px;height:12px;background:var(--bad);opacity:.85}
+.dev-fill.ok{background:var(--good)}
+.dev-val{font-family:"IBM Plex Mono",monospace;font-size:12.5px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.dev-val .d{color:var(--bad);font-weight:500}
+.dev-cap{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);
+  margin-top:10px;letter-spacing:.03em}
+
+/* tables */
+.tw{overflow-x:auto;margin:20px 0 8px;border-top:1px solid var(--rule-hi)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;text-align:left;padding:10px 14px 10px 0;border-bottom:1px solid var(--rule)}
+td{padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top;color:var(--ink-2)}
+td:first-child{color:var(--ink);font-weight:600}
+td.n,th.n{text-align:right;font-family:"IBM Plex Mono",monospace;
+  font-variant-numeric:tabular-nums;padding-right:20px}
+.hit{color:var(--bad);font-weight:600}
+.miss{color:var(--good)}
+
+/* derivation block */
+.deriv{background:var(--sunk);border-left:2px solid var(--accent);
+  padding:18px 22px;margin:20px 0;font-family:"IBM Plex Mono",monospace;
+  font-size:13.5px;line-height:1.95;overflow-x:auto;color:var(--ink-2)}
+.deriv b{color:var(--ink);font-weight:600}
+.deriv .c{color:var(--ink-3)}
+
+/* evidence grading */
+.ev{border-top:1px solid var(--rule);padding:20px 0}
+.ev-hd{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;margin-bottom:8px}
+.ev h4{font-size:17.5px;font-weight:600;margin:0;flex:1 1 260px}
+.grade{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;padding:3px 8px;white-space:nowrap;border:1px solid currentColor}
+.g-strong{color:var(--good);background:var(--good-soft)}
+.g-mixed{color:var(--warn);background:var(--warn-soft)}
+.g-weak{color:var(--bad);background:var(--bad-soft)}
+.ev p{font-size:16px;margin-bottom:0;color:var(--ink-2)}
+.ev p+p{margin-top:11px}
+.verdict-line{margin-top:11px;padding-left:15px;border-left:2px solid var(--accent);
+  font-size:15.5px;color:var(--ink)}
+
+/* callout */
+.note{background:var(--accent-soft);padding:20px 24px;margin:24px 0;max-width:var(--measure)}
+.note p:last-child{margin-bottom:0}
+.note .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;display:block;margin-bottom:8px}
+
+/* action list */
+.act{display:grid;grid-template-columns:auto 1fr;gap:0 20px;margin-top:8px}
+.act-p{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;padding:15px 0 0;color:var(--ink-3);white-space:nowrap}
+.act-b{padding:14px 0;border-bottom:1px solid var(--rule)}
+.act-b h4{font-size:17px;margin:0 0 5px;font-weight:600}
+.act-b p{font-size:15.5px;margin:0;color:var(--ink-2)}
+.act-b code{font-size:13px;background:var(--sunk);padding:1px 5px}
+
+footer{border-top:2px solid var(--ink);padding-top:24px;margin-top:12px}
+footer h2{border:0;padding:0}
+.src{font-size:14px;color:var(--ink-2);columns:2;column-gap:36px;margin-top:14px}
+.src a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--rule-hi)}
+.src a:hover,.src a:focus{border-bottom-color:var(--accent)}
+.src div{break-inside:avoid;margin-bottom:9px;padding-left:15px;text-indent:-15px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:640px){
+  body{font-size:16px} .wrap{padding:0 18px 64px}
+  .dev-row{grid-template-columns:88px 1fr;row-gap:2px}
+  .dev-val{grid-column:2;text-align:left}
+  .src{columns:1}
+  .act{grid-template-columns:1fr;gap:0}
+  .act-p{padding:14px 0 0}
+  .act-b{padding-top:4px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Coaching-content audit · ShotLab TOUR</p>
+  <h1>Every mechanical claim the app makes, checked against the source data</h1>
+  <p class="standfirst">ShotLab already gives golfers specific instruction: benchmark tables, fault thresholds, drills. This checks each of those claims against Trackman tour data, published D-plane physics, Rapsodo's own accuracy testing, and the motor-learning literature behind the practice plans.</p>
+  <div class="meta">
+    <span><b>Scope</b> FaultEngine · ShotScorer · Benchmarks · CoachingMode · PracticePlan</span>
+    <span><b>Code</b> main @ 2503479</span>
+    <span><b>Date</b> Aug 2026</span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div class="vc"><div class="n bad">6</div><div class="t">Claims that are measurably wrong</div></div>
+  <div class="vc"><div class="n warn">1</div><div class="t">Practice premise the evidence contests</div></div>
+  <div class="vc"><div class="n acc">±1.2°</div><div class="t">Instrument error the thresholds ignore</div></div>
+  <div class="vc"><div class="n good">Sound</div><div class="t">Drill library and fault→cause logic</div></div>
+</div>
+
+<section>
+  <h2>Verdict first</h2>
+  <p class="sec-lede">The drills are good. The numbers they hang off are not, and one of them is backwards.</p>
+  <p>The drill prescriptions in <code>FaultEngine</code> and <code>CoachingMode</code> hold up well — the fault-to-cause mappings match mainstream instruction, and the drills themselves are real, specific, and correctly matched to their faults. That's the expensive part to get right, and it's right.</p>
+  <p>What doesn't hold up is the measurement layer underneath: the tour benchmark table has a sign error on the most-viewed metric in golf, the face-to-path calculation is missing a term from the D-plane model it cites, and every per-shot fault threshold is tighter than the launch monitor's own margin of error. Those are all narrow, fixable defects — but while they're in place the app is confidently reporting numbers that aren't true.</p>
+</section>
+
+<section>
+  <h2>Register of corrections</h2>
+  <p class="sec-lede">Six findings, each traced to the line of code that carries it.</p>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag bad">Wrong sign</span>
+      <span class="rec-id">BENCH-AOA</span>
+      <h3>The app tells golfers PGA pros hit up on the driver. They hit down.</h3>
+    </div>
+    <p><code>Benchmarks.DATA</code> lists the PGA Tour driver attack angle as <code>aa:3.0</code>. The Trackman tour average is <strong>−1.3°</strong> — descending. The app is off by 4.3° <em>and</em> in the wrong direction, on the single metric golfers check most.</p>
+    <p>The likely origin: <strong>+3.0° is the LPGA Tour average</strong>, and <strong>+2° to +5°</strong> is the range the PGA Tour's <em>longest</em> hitters use. Two true facts, attached to the wrong row.</p>
+    <div class="note">
+      <span class="lab">Do not "fix" the drill</span>
+      <p>The coaching advice built on this is <em>correct</em>: a positive attack angle really does produce more carry. Trackman's own optimizer shows a 90 mph swing going from −5° to +5° gains roughly <strong>30 yards</strong> of carry (launch 10°→16°, spin 3,100→2,200 rpm), and −2°→+3° is worth about <strong>12 yards</strong>. So <code>driver-negative-aa</code> and its drills stay. Only the benchmark label is wrong — and the fix is to stop calling <code>+3.0</code> the tour average and start calling it the target.</p>
+    </div>
+  </article>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag bad">Systematic</span>
+      <span class="rec-id">BENCH-DRIFT</span>
+      <h3>Attack angles run shallow and smash factors run low across the whole table</h3>
+    </div>
+    <p>The driver row isn't isolated. Every club in the table reports a shallower attack angle than the tour average, and every smash factor sits low — so a golfer comparing themselves to "PGA" is measured against a softer standard than the real one.</p>
+    <div class="dev">
+      <div class="dev-row"><span class="dev-lab">Driver AoA</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:22%;width:43%"></i></span>
+        <span class="dev-val">−1.3 → <b>+3.0</b> <span class="d">+4.3°</span></span></div>
+      <div class="dev-row"><span class="dev-lab">3-wood AoA</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:22%;width:34%"></i></span>
+        <span class="dev-val">−2.9 → <b>+0.5</b> <span class="d">+3.4°</span></span></div>
+      <div class="dev-row"><span class="dev-lab">4-hybrid AoA</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:22%;width:25%"></i></span>
+        <span class="dev-val">−3.5 → <b>−1.0</b> <span class="d">+2.5°</span></span></div>
+      <div class="dev-row"><span class="dev-lab">4-iron AoA</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:22%;width:14%"></i></span>
+        <span class="dev-val">−3.4 → <b>−2.0</b> <span class="d">+1.4°</span></span></div>
+      <div class="dev-row"><span class="dev-lab">6-iron AoA</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:22%;width:11%"></i></span>
+        <span class="dev-val">−4.1 → <b>−3.0</b> <span class="d">+1.1°</span></span></div>
+      <div class="dev-row"><span class="dev-lab">4-hyb smash</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:16%;width:6%"></i></span>
+        <span class="dev-val">1.46 → <b>1.40</b> <span class="d">−0.06</span></span></div>
+      <div class="dev-row"><span class="dev-lab">4-iron smash</span>
+        <span class="dev-track"><i class="dev-zero" style="left:22%"></i><i class="dev-fill" style="left:17%;width:5%"></i></span>
+        <span class="dev-val">1.43 → <b>1.38</b> <span class="d">−0.05</span></span></div>
+      <div class="dev-cap">Reference → app value. Bar length ∝ deviation; centre line = agreement.</div>
+    </div>
+    <p>Eight clubs in <code>CLUB_ORDER</code> have no benchmark row at all — <code>1i 2i 3i 2h 3h 4w 5w 7w</code> — so <code>Benchmarks.get()</code> returns <code>null</code> and those clubs silently show no comparison.</p>
+  </article>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag bad">Math</span>
+      <span class="rec-id">MATH-F2P</span>
+      <h3>face-to-path is under-reported by 15% on driver and 25% on irons</h3>
+    </div>
+    <p><code>facePath()</code> computes <code>launchDirection − clubPath</code>. But the app's own slice description cites the D-plane rule that start direction is mostly face — and that rule is exactly what makes the subtraction incomplete. Start direction is a <em>weighted blend</em> of face and path, so recovering face-to-path means dividing the weight back out:</p>
+    <div class="deriv">
+<span class="c">// D-plane: launch direction is a weighted blend of face and path</span><br>
+launchDir = k·face + (1−k)·path <span class="c">&nbsp; k = 0.85 driver, 0.75 iron</span><br><br>
+<span class="c">// solve for face, then subtract path</span><br>
+face      = (launchDir − (1−k)·path) / k<br>
+<b>face−path = (launchDir − path) / k</b><br><br>
+<span class="c">// the app omits the divisor entirely</span><br>
+app       = launchDir − path <span class="c">&nbsp;→ understates by exactly k</span>
+    </div>
+    <p>The consequence is a systematic blind spot at the threshold. <code>slice</code> fires at <code>facePath(s) &gt; 5</code>, so:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Club</th><th class="n">True face-to-path</th><th class="n">App reads</th><th>Slice rule</th></tr></thead>
+      <tbody>
+        <tr><td>Driver</td><td class="n">5.0°</td><td class="n">4.25°</td><td class="miss">misses it</td></tr>
+        <tr><td>Iron</td><td class="n">5.0°</td><td class="n">3.75°</td><td class="miss">misses it</td></tr>
+        <tr><td>Driver</td><td class="n">7.1°</td><td class="n">6.0°</td><td class="hit">fires</td></tr>
+        <tr><td>Iron</td><td class="n">8.0°</td><td class="n">6.0°</td><td class="hit">fires</td></tr>
+      </tbody>
+    </table></div>
+    <p>A golfer with a genuine 5° open face — a real, visible slice — is told their face-to-path is fine. And because <code>k</code> differs by club, the same error is 10 percentage points worse on irons than on driver, so the app is <em>least</em> accurate on the clubs hit most.</p>
+    <p>Two lines nearby need the same correction: the slice description hardcodes "<strong>~75%</strong> of starting direction is determined by face angle" as a universal figure. It's 75% for irons and <strong>85%</strong> for driver — loft is what moves the ratio.</p>
+  </article>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag warn">Precision</span>
+      <span class="rec-id">THRESH-NOISE</span>
+      <h3>Per-shot thresholds are finer than the launch monitor can resolve</h3>
+    </div>
+    <p>Good news first: the MLM2PRO <strong>measures</strong> club path and attack angle with radar and dual cameras rather than inferring them from ball flight, so the fault rules rest on real data. Independent comparison against a Foresight GCQuad puts the mean absolute error at <strong>1.05° for attack angle</strong> and <strong>1.19° for club path</strong>.</p>
+    <p>That number is larger than several thresholds it feeds. <code>iron-shallow-aa</code> fires on any single shot with <code>attackAngle &gt; −0.5</code>. A shot genuinely struck at −1.5° sits inside the instrument's error band for that verdict — so the fault fires on measurement noise, on individual shots, with no aggregation.</p>
+    <p>Every rule in <code>PER_SHOT_RULES</code> evaluates shots one at a time and reports any that trip. With ±1.2° of noise on a 20-shot session, a handful of false positives per session is the expected outcome, not the exception.</p>
+    <div class="note">
+      <span class="lab">The fix is statistical, not cosmetic</span>
+      <p>Require a fault to clear the threshold <em>by more than the instrument error</em>, and require it across a minimum sample — a mean over ≥5 shots of that club, or a count of affected shots above what noise alone would produce. A fault that appears on 9 of 12 seven-irons is a swing pattern; the same fault on 2 of 12 is the radar.</p>
+    </div>
+  </article>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag warn">Gap</span>
+      <span class="rec-id">GAP-SPINLOFT</span>
+      <h3>Spin loft is absent — the one number that explains strike quality</h3>
+    </div>
+    <p>Spin loft is <strong>dynamic loft minus attack angle</strong>: the angle between where the face points and where the club is travelling. It is the primary driver of both spin and smash factor, and the app models neither it nor anything equivalent.</p>
+    <p>This matters because it resolves an ambiguity the app currently can't. When <code>poor-contact</code> fires on low smash, the cause is either off-centre strike <em>or</em> excessive spin loft — mechanically different faults needing opposite drills. Without spin loft the app guesses, and its <code>causes</code> list for that fault names only strike-location issues.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Reference</th><th class="n">Driver</th><th class="n">6-iron</th></tr></thead>
+      <tbody>
+        <tr><td>PGA Tour spin loft</td><td class="n">14.7°</td><td class="n">24.3°</td></tr>
+        <tr><td>LPGA Tour spin loft</td><td class="n">15.0°</td><td class="n">25.9°</td></tr>
+        <tr><td>Most efficient drivers of the ball</td><td class="n">6–10°</td><td class="n">—</td></tr>
+      </tbody>
+    </table></div>
+    <p>Spin rises with spin loft only up to about <strong>45°</strong>; past that the ball slides up the face, friction is lost and spin falls again. Rapsodo doesn't export dynamic loft, so spin loft can't be computed exactly — but attack angle plus spin rate and launch angle bound it well enough to separate "you missed the middle" from "you're adding loft through impact."</p>
+  </article>
+
+  <article class="rec">
+    <div class="rec-hd">
+      <span class="tag good">Verified</span>
+      <span class="rec-id">OK-DRILLS</span>
+      <h3>What checks out</h3>
+    </div>
+    <p>Worth stating plainly, because most of the coaching content survives scrutiny:</p>
+    <ul>
+      <li><strong>Driver benchmarks other than AoA</strong> — 1.48 smash, 167 mph ball, 10.9° launch, 275 yd carry all match Trackman exactly.</li>
+      <li><strong>Driver spin threshold</strong> — the 3,500 rpm trigger and the 2,686 rpm tour average cited in the fault text are both correct.</li>
+      <li><strong>Fault → cause mappings</strong> — over-the-top for slice, strong grip for hook, early extension for thin contact: all standard and correctly assigned.</li>
+      <li><strong>The drills themselves</strong> — tee gate, feet-together, headcover-behind-ball, towel-under-arm, divot-after-the-ball. Real drills, correctly matched, well described.</li>
+      <li><strong>Attack-angle targets</strong> — +2° to +5° driver, −2° to −5° irons. Sound as <em>targets</em>, whatever the benchmark table says about tour averages.</li>
+      <li><strong>Smash ceiling</strong> — 1.50 is the COR-limited maximum; the app never claims above it.</li>
+    </ul>
+  </article>
+</section>
+
+<section>
+  <h2>The practice science</h2>
+  <p class="sec-lede">The app's practice plans rest on a claim the research does not support as strongly as golf coaching believes it does.</p>
+  <p><code>PracticePlan.generate()</code> allocates minutes by fault severity, and the surrounding copy echoes the standard modern-coaching line: blocked practice is the enemy, random practice transfers. That line is far shakier than its confidence suggests, and getting this right changes what the app should tell people to do.</p>
+
+  <div class="ev">
+    <div class="ev-hd"><h4>Random vs. blocked practice (contextual interference)</h4><span class="grade g-mixed">Contested</span></div>
+    <p>The textbook claim — random practice hurts acquisition but helps retention and transfer — is <strong>robust in laboratory settings and close to absent in applied sport settings</strong>. A systematic review and meta-analysis of sports practice found no statistically significant difference between blocked and random at post-acquisition (<span class="mono">d = 0.1</span>), retention (<span class="mono">d = −0.159</span>) or transfer (<span class="mono">d = −0.243</span>). Only <strong>25 of 75</strong> pooled outcomes favoured random practice; twice as many contradicted it. Across 183 outcomes, just <strong>20%</strong> agreed with the predicted effect.</p>
+    <p>This is genuinely disputed rather than settled: a 2024 meta-analysis in <em>Scientific Reports</em> reaches the opposite conclusion, that high contextual interference does improve retention. Effects also appear larger in older adults than younger ones.</p>
+    <p class="verdict-line">Golf-specific putting studies do favour random practice, and it plausibly helps. But "blocked practice is the #1 transfer killer" is a coaching slogan, not a finding. Don't build the product's central practice claim on it.</p>
+  </div>
+
+  <div class="ev">
+    <div class="ev-hd"><h4>External focus of attention</h4><span class="grade g-strong">Well supported</span></div>
+    <p>The most actionable finding here, and the cheapest to apply: <strong>cue wording changes performance</strong>. Internal cues ("keep your wrists straight") interfere with automaticity and degrade accuracy; external cues ("swing toward the target line") improve consistency and reduce movement variability. There's a <em>distance effect</em> too — focusing on ball flight and landing point beats focusing on the club.</p>
+    <p>Recent reviews question whether the advantage is as universal as early summaries implied, so it isn't absolute. But the direction is consistent and the cost of applying it is zero.</p>
+    <p class="verdict-line">This is a direct problem for the current drill text. <code>CoachingMode.TIPS</code> is almost entirely internal: "keep your head still", "maintain spine angle", "check for over-strong grip". The drills in <code>FaultEngine</code> are noticeably better — "avoid hitting the towel", "swing without clipping the tee" are external by construction.</p>
+  </div>
+
+  <div class="ev">
+    <div class="ev-hd"><h4>Differential learning</h4><span class="grade g-mixed">Promising</span></div>
+    <p>Deliberately varying the movement itself — different stances, tempos, ball positions, never repeating the same swing — rather than varying only the club or target. In golf putting it produced a more structured mental representation than either random or blocked schedules. In comparable studies blocked practice won during acquisition while differential groups transferred better and reported higher motivation.</p>
+    <p class="verdict-line">Fits a launch-monitor app unusually well: the monitor supplies the feedback that makes exploratory variation interpretable instead of merely random.</p>
+  </div>
+
+  <div class="ev">
+    <div class="ev-hd"><h4>Feedback frequency</h4><span class="grade g-weak">Little evidence</span></div>
+    <p>The intuition that constant feedback creates dependence, and that reducing it forces error-estimation, is widespread. A meta-analysis found <strong>substantial heterogeneity and no significant effect of reduced feedback frequency at any time point</strong>, concluding robust evidence is lacking. Self-controlled feedback — letting the learner choose when to see it — shows an advantage more often, attributed to autonomy and error-estimation, but not reliably.</p>
+    <p class="verdict-line">Relevant because a launch monitor is a maximum-frequency feedback device. There's no good evidence that hiding numbers helps — but letting the golfer choose when to look is the better-supported design, and it's a UI decision the app already controls.</p>
+  </div>
+
+  <div class="ev">
+    <div class="ev-hd"><h4>Practice dosage and difficulty</h4><span class="grade g-strong">Consistent</span></div>
+    <p>The most consistent practical guidance across sources: <strong>three focused sessions of ~50 balls beat one session of 150.</strong> Faster than one shot per 20 seconds is exercise, not practice. Tasks should be calibrated so the golfer succeeds around <strong>70%</strong> of the time — hard enough to demand adjustment, easy enough to sustain. Warm-up runs wedges first, 4–5 balls per club, before anything full-power. And deliberate practice accounted for roughly <strong>30%</strong> of improvement in one golf study — a third of the process, not all of it.</p>
+    <p class="verdict-line">Directly usable: <code>PracticePlan</code> currently outputs minutes only. Ball counts, shot spacing and a success-rate target are all cheap to add and better supported than the schedule ordering it already emphasises.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What to practise, not just how</h2>
+  <p class="sec-lede">Fault severity is the wrong ranking. Scoring impact is the right one.</p>
+  <p><code>PracticePlan</code> weights time by <code>severity: high|medium|low</code> — a property hardcoded per fault, identical for every golfer. So a session dominated by driver faults allocates most of its time to the driver regardless of whether the driver is actually costing that golfer strokes.</p>
+  <p>Mark Broadie's strokes-gained work gives the missing weighting. <strong>Approach shots explain the largest share of scoring differences</strong> between players, and the long game — not putting — accounts for most of the gap between amateurs and professionals. Higher handicaps lose <strong>2–4 shots per round from driving distance alone</strong>. The popular intuition that putting is where amateurs bleed strokes is the thing the data most clearly refutes.</p>
+  <p>ShotLab can't compute true strokes gained: it sees range shots, not rounds, and has no putting or short-game data. But it can stop pretending all faults cost the same. A face-to-path fault on a 7-iron — an approach club — deserves more session time than the same fault on a 3-wood most golfers hit twice a round. Club frequency and club category are both already in the shot data.</p>
+  <div class="note">
+    <span class="lab">Calibration reference</span>
+    <p>For context when interpreting a user's numbers: the average male amateur drives <strong>224 yards total</strong>, a 10-handicap <strong>226.6</strong>, scratch to 4.9 handicap <strong>244</strong>. Roughly <strong>70%</strong> of amateurs average under 250 off the tee. Drawn from Arccos data across ~5M rounds and Shot Scope's user base — on-course totals, not launch-monitor carry, so they are not directly comparable to a range session's carry numbers.</p>
+  </div>
+  <p>On gapping, the app's yardage book should target <strong>10–15 yards between clubs</strong>, built from about <strong>10 shots per club with outliers removed</strong> — which is a stricter sample requirement than the current yardage view enforces.</p>
+</section>
+
+<section>
+  <h2>Recommended order of work</h2>
+  <p class="sec-lede">Ranked by how wrong the current behaviour is, not by effort.</p>
+  <div class="act">
+    <div class="act-p">First</div>
+    <div class="act-b"><h4>Correct the driver attack-angle benchmark</h4>
+      <p>Change <code>d.pga.aa</code> from <code>3.0</code> to <code>-1.3</code>. Keep <code>+2°…+5°</code> as the stated <em>target</em>, relabelled so it no longer reads as a tour average. One value; removes the app's most visible false claim.</p></div>
+
+    <div class="act-p">Second</div>
+    <div class="act-b"><h4>Divide face-to-path by the D-plane weight</h4>
+      <p><code>facePath()</code> returns <code>(launchDirection − clubPath) / k</code>, with <code>k = 0.85</code> for driver and <code>0.75</code> for irons. Fix the hardcoded "75%" in the slice text at the same time. Re-check the ±5° thresholds afterwards — they were tuned against the understated value.</p></div>
+
+    <div class="act-p">Third</div>
+    <div class="act-b"><h4>Give faults a noise floor and a minimum sample</h4>
+      <p>Require threshold + instrument error (≈1.2°), and a minimum shot count per club, before a fault reports. Biggest single gain in trustworthiness — it stops the app calling radar noise a swing flaw.</p></div>
+
+    <div class="act-p">Fourth</div>
+    <div class="act-b"><h4>Rewrite CoachingMode tips as external cues</h4>
+      <p>The best-evidenced change in the document, and pure copywriting. "Keep your head still" → a cue about the ball or an object. Model it on the <code>FaultEngine</code> drills, which already do this well.</p></div>
+
+    <div class="act-p">Fifth</div>
+    <div class="act-b"><h4>Realign the rest of the benchmark table, add the 8 missing clubs</h4>
+      <p>Attack angles and smash factors to Trackman values; rows for <code>1i 2i 3i 2h 3h 4w 5w 7w</code>.</p></div>
+
+    <div class="act-p">Sixth</div>
+    <div class="act-b"><h4>Weight practice time by club, and prescribe balls not just minutes</h4>
+      <p>Scale session time by how much a club actually gets used and what it's for. Add ball counts, ≥20s spacing, and a ~70% success target to each block.</p></div>
+
+    <div class="act-p">Later</div>
+    <div class="act-b"><h4>Estimate spin loft</h4>
+      <p>Bound it from attack angle, launch angle and spin rate to separate off-centre strikes from added loft. Largest analytical gain, largest effort, and needs care given what Rapsodo exports.</p></div>
+  </div>
+</section>
+
+<footer>
+  <h2>Sources</h2>
+  <div class="src">
+    <div><a href="https://www.trackman.com/blog/the-ultimate-guide-to-understanding-trackman">Trackman — Ultimate Guide to Understanding Trackman</a> (tour averages by club)</div>
+    <div><a href="https://www.trackman.com/blog/face-to-path">Trackman — What is Face-to-Path?</a></div>
+    <div><a href="https://golfdecode.com/pga-tour-average-swing-speed-ball-speed/">Tour Pro Swing &amp; Ball Speed Averages: Full Chart by Club</a></div>
+    <div><a href="https://golfwrx.com/251459/use-the-new-ball-flight-laws-to-understand-your-tendencies/">GolfWRX — Use the new ball flight laws</a> (85% / 75% face ratio)</div>
+    <div><a href="https://www.titleist.com/learning-lab/performance/ball-flight-laws">Titleist — Ball Flight Laws and the Clubface/Path Relationship</a></div>
+    <div><a href="https://rapsodo.com/blogs/golf/mlm2pro-vs-foresight-gcquad-clubdata">Rapsodo — MLM2PRO vs Foresight GCQuad club data</a> (MAE 1.05° / 1.19°)</div>
+    <div><a href="https://golficity.com/measured-club-data-now-on-the-rapsodo-mlm2pro-and-its-shockingly-accurate/">Golficity — MLM2PRO measured club data accuracy</a></div>
+    <div><a href="https://www.trackman.com/blog/spin-loft">Trackman — What is Spin Loft?</a></div>
+    <div><a href="https://www.adamyounggolf.com/spin-loft/">Adam Young — Hit the ball farther by improving spin loft</a></div>
+    <div><a href="https://collegeofgolf.keiseruniversity.edu/angle-attacks-role-far-hit-driver/">Keiser College of Golf — Angle of attack's role in driver distance</a></div>
+    <div><a href="https://mygolfspy.com/news-opinion/instruction/optimal-launch-and-spin-chart-for-drivers-are-you-in-the-right-range/">MyGolfSpy — Optimal launch and spin chart for drivers</a></div>
+    <div><a href="https://www.sciencedirect.com/science/article/abs/pii/S1747938X23000301">The myth of contextual interference learning benefit in sports practice</a> — systematic review &amp; meta-analysis</div>
+    <div><a href="https://www.nature.com/articles/s41598-024-65753-3">High contextual interference improves retention in motor learning</a> — <em>Scientific Reports</em> (contrary finding)</div>
+    <div><a href="https://www.frontiersin.org/journals/sports-and-active-living/articles/10.3389/fspor.2024.1324615/full">Motor learning in golf — a systematic review</a></div>
+    <div><a href="https://gwulf.faculty.unlv.edu/wp-content/uploads/2014/05/Wulf_Su_2007.pdf">Wulf &amp; Su — An external focus of attention enhances golf shot accuracy</a></div>
+    <div><a href="https://gwulf.faculty.unlv.edu/wp-content/uploads/2018/11/Wulf_AF_review_2013.pdf">Wulf — Attentional focus and motor learning: a review of 15 years</a></div>
+    <div><a href="https://www.sciencedirect.com/science/article/abs/pii/S0167945719305743">Autonomy support and reduced feedback frequency have trivial effects on golf putting</a></div>
+    <div><a href="https://www.ovid.com/journals/ejoss/fulltext/10.1002/ejsc.12079~effects-of-contextual-interference-and-differential-learning">Contextual interference and differential learning in a golf putting task</a></div>
+    <div><a href="http://everyshotcounts.com/248-2/">Mark Broadie — <em>Every Shot Counts</em></a> (strokes gained)</div>
+    <div><a href="https://practical-golf.com/pros-vs-joes">Practical Golf — Pros vs. Joes: strokes gained analysis</a></div>
+    <div><a href="https://mygolfspy.com/news-opinion/6-insights-from-the-2026-arccos-driving-distance-report/">Arccos 2026 driving distance report</a></div>
+    <div><a href="https://troon.com/shot-scope/articles/do-you-hit-it-further-than-average-for-your-handicap-shot-scope">Shot Scope — distance by handicap</a></div>
+    <div><a href="https://flightscope.com/blogs/blogs/master-the-carry-distance-gapping-between-your-clubs">FlightScope — Master carry distance gapping</a></div>
+    <div><a href="https://golf.com/instruction/10-proven-ways-make-range-practice-stick/">Golf.com — 10 research-driven tips to improve range practice</a></div>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

@@ -185,6 +185,48 @@ const SUPABASE_KEY = '...';  // publishable key (safe to expose)
 - **Session Data** → Console: `await DB.getSessions()` lists all stored sessions
 - **Supabase Logs** → Supabase Dashboard > Logs for real-time events
 
+## Swing-mechanics constants (do not change casually)
+
+Several numbers in `app.js` are sourced, not guessed. `docs/coaching-calibration-audit.html`
+is the working — read the relevant section before touching any of these.
+
+- **`facePath(shot)`** — face-to-path is `(launchDirection - clubPath) / k`,
+  with `k = 0.85` woods / `0.75` irons. Start direction is a *weighted blend*
+  of face and path, so the naive subtraction under-reports by 15%/25% and
+  misses real slices. Returns `null` when either input is missing.
+- **`spinLoft(shot)`** — estimated `(launchAngle - attackAngle) / kv`,
+  `kv = 0.83` woods / `0.75` irons. These reproduce TrackMan's published tour
+  spin lofts exactly (driver 14.7°, 6-iron 24.3°) — that is the regression
+  check. Rapsodo does not export dynamic loft, so this is an estimate.
+- **`ANGLE_NOISE = 1.2`** — Rapsodo MLM2PRO measurement error (MAE 1.05°
+  attack angle, 1.19° club path vs a Foresight GCQuad). Fault thresholds sit
+  inside this band, which is why `FaultEngine` gates on *recurrence* rather
+  than padding thresholds.
+- **`Benchmarks.DATA`** — rows tagged `[TM]` are TrackMan-published; `[est]`
+  are interpolated. **`Benchmarks.TARGET` is separate on purpose**: what to aim
+  at is not what the tour averages. The PGA driver attack angle is **-1.3°**
+  (descending); **+2..+5°** is the optimal target and **+3.0°** is the *LPGA*
+  average. Conflating those was the original bug.
+- **`CoachingMode.TIPS`** — deliberately written to an *external* focus of
+  attention (club, ball, turf, target), never the golfer's own body parts.
+  This is the best-evidenced item in the audit; don't rewrite cues inward.
+
+### Fault reporting gates (`FaultEngine`)
+
+A fault reports only when it recurs at a rate measurement noise would not
+produce: `MIN_CLUB_SHOTS = 4` of that club, `MIN_AFFECTED = 2` shots,
+`MIN_RATE = 0.30`. Below `FIRM_RATE = 0.50` it reports as `tentative` with
+severity downgraded one level. The denominator is the *clubs the fault appeared
+on*, not the whole session, so a driver fault is judged against drivers.
+
+### Practice plans (`PracticePlan`)
+
+Time is weighted by severity × scoring weight × session share × confidence,
+not severity alone — approach clubs outrank fairway woods because that is
+where strokes-gained says scoring differences live. Every block prescribes
+**balls as well as minutes** (volume past attention is exercise, not practice),
+and `transferBlock()` is appended to every plan.
+
 ## Code Style & Patterns
 
 - **No build/transpile** — vanilla JS ES6+ (arrow functions, destructuring, async/await supported)
@@ -243,7 +285,7 @@ to re-enable the on-screen banner.
 
 ---
 
-**Last updated:** August 2026 — ShotLab v3 (deterministic auth, cloud sync,
+**Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
 ~55 modules across scoring/coaching/session/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.
