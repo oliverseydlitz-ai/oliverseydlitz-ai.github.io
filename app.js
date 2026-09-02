@@ -2335,6 +2335,278 @@ const QuietEye = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// DrillLibrary — 104 drills, and the gate on each one
+// ────────────────────────────────────────────────────────────────
+// The list is the least interesting part. Any coaching app can hold a hundred
+// drills; the research base's own framing is that the v1 library "optimised
+// the wrong axis" by generating drill CONTENT when what decides whether
+// practice transfers is drill STRUCTURE — when the numbers are shown, how the
+// blocks are ordered, and whether the measurement behind the prescription is
+// admissible at all.
+//
+// So every drill here carries its section's measurement gate as data, and
+// `admissible()` answers a single question: given what this golfer actually
+// hit, on what ball, off what surface, is this drill's precondition met? A
+// drill that fails is not hidden — it is returned WITH the reason, because
+// "hit 30 of these on your own ball and this unlocks" is a more useful thing
+// to read than a drill list that quietly omits half of itself.
+//
+// The wrappers in section I are not drills and are not chosen instead of one.
+// They are the Tier-A rules from the motor-learning evidence made operational,
+// and they apply OVER whatever drill is running — which is why the spec says
+// they matter more than which drill they wrap.
+const DrillLibrary = (() => {
+  // Section gates. `shots` is per club unless noted; `ball` and `surface` name
+  // conditions that change what the numbers mean rather than how noisy they are.
+  const SECTIONS = {
+    A: { id: 'A', name: 'Strike quality', count: 18,
+         why: 'The average male amateur has LPGA club speed and 1.430 smash against the tour 1.478. ' +
+              'Tier-1 measurement, weeks not months, roughly 0.8–1.3 strokes a round available.',
+         gate: { shots: 10, metric: 'smashFactor' },
+         structure: 'Errorless progression. Bandwidth feedback: silence inside ±0.03 of target.' },
+    B: { id: 'B', name: 'Dispersion tails', count: 14,
+         why: 'Fairways hit is flat across handicaps, 50% to 46%. Penalties vary eightfold. ' +
+              'Broadie & Ko: −2° of directional spread is −2.6 strokes for a 100-golfer, and the ' +
+              'mechanism is catastrophe avoidance rather than fairways.',
+         gate: { shots: 30, ball: 'premium', metric: 'sideCarry' },
+         structure: 'Track p90 and p95 absolute offline, never SD alone. Blocked → serial → random.' },
+    C: { id: 'C', name: 'Start-line control', count: 10,
+         why: 'Face contributes 76–84% of start direction with a driver, falling to about 71% for a wedge.',
+         gate: { shots: 15, metric: 'launchDirection', alignment: true },
+         structure: 'Bandwidth feedback at ±2° tolerance.' },
+    D: { id: 'D', name: 'Face-to-path control', count: 10,
+         why: 'Face-to-path is derived here, not measured, and carries about ±1.8° of single-shot noise.',
+         gate: { shots: 15, preferred: 20, metric: 'clubPath' },
+         structure: 'Multi-shot mean with an interval, always. Never a single-shot value, never a ' +
+                    'diagnosis from one ball. If the interval spans zero the honest output is ' +
+                    '"no consistent tendency", not a drill.' },
+    E: { id: 'E', name: 'Low point and strike height', count: 12,
+         why: 'Attack angle is tier 2 — consumer-radar reliability for irons runs as low as 0.01–0.06 — ' +
+              'and mats hide the fat strikes a low-point drill exists to catch.',
+         gate: { shots: 15, metric: 'attackAngle', surface: 'grass' },
+         structure: 'Prefer turf. A mat session is flagged, not refused: the shape is still real.' },
+    F: { id: 'F', name: 'Distance control and gapping', count: 12,
+         why: 'Carry is a model output with a 13-yard minimum detectable change at ten shots, and ' +
+              'range balls destroy gapping outright — a wedge can fly further on half the spin.',
+         gate: { shots: 10, ball: 'premium', metric: 'carryDistance' },
+         structure: 'Premium balls only. Ten shots per club, and gapping is never read off range balls.' },
+    G: { id: 'G', name: 'Speed development', count: 10,
+         why: 'Strength and power first, overspeed as an adjunct. Expect +2–4 mph over 8–12 weeks, ' +
+              'not +8, and never read a response off one before-and-after pair.',
+         gate: { shots: 10, metric: 'clubSpeed' },
+         structure: 'Trend across eight or more sessions with a band. Every speed block pairs with a ' +
+                    'smash check, because speed bought out of strike quality is a net loss.' },
+    H: { id: 'H', name: 'Quiet eye and putting', count: 8,
+         why: 'The best-evidenced intervention in golf: d ≈ 0.69 after bias correction, −1.92 putts ' +
+              'per round in competition.',
+         gate: { none: true },
+         structure: 'Runs on video and outcome scoring. The launch monitor measures none of it.' },
+    I: { id: 'I', name: 'Practice-structure wrappers', count: 10,
+         why: 'The Tier-A motor-learning rules made operational. These matter more than which drill ' +
+              'they wrap.',
+         gate: { none: true }, wrapper: true,
+         structure: 'Applied over any drill above, never instead of one.' },
+  };
+
+  // n = the number in the research base, kept so a drill can be traced back.
+  const D = (n, section, name, desc, extra = {}) => ({ n, section, name, desc, ...extra,
+    id: section.toLowerCase() + n });
+
+  const ALL = [
+    // ── A. Strike quality (18) ──
+    D(1,'A','Smash Baseline Audit','20 shots, log the mean AND the spread. A measurement session, not a training one — nothing later can claim a change without it.'),
+    D(2,'A','Face-tape strike map','Impact tape or foot spray, 10 shots, photograph the pattern. The only direct strike-location data the MLM2PRO cannot give you.',{noDevice:true}),
+    D(3,'A','Centre-strike block, tee height fixed','Remove tee-height variance before blaming the swing for strike scatter.'),
+    D(4,'A','Errorless distance ladder','Start at 40% effort where centre contact is near-guaranteed; add 10% per successful block of five.'),
+    D(5,'A','Toe-bias / heel-bias alternation','Deliberately strike toe, then heel, then centre. Builds strike-location control rather than avoidance.'),
+    D(6,'A','High-face / low-face alternation','Same on the vertical axis. Vertical gear effect runs about 1.5–2× the horizontal.'),
+    D(7,'A','Setup-distance calibration','An alignment stick as a fixed reference; re-measure smash after standardising distance from the ball.'),
+    D(8,'A','Posture-hold block','Hold spine angle through impact — a common toe-strike cause. Compare smash before and after.'),
+    D(9,'A','Connection-strap block','Arms-body connector. Log smash SPREAD, not the mean.'),
+    D(10,'A','Half-speed proprioception reps','Ten swings at 50%, predicting the strike location before the reveal.',{prediction:true}),
+    D(11,'A','Eyes-closed strike feel','Five shots, call the strike location before looking. Error estimation.',{prediction:true}),
+    D(12,'A','Progressive difficulty ladder','Tee → mat → tight lie. Strike quality that only survives an easy lie is not strike quality.'),
+    D(13,'A','Club-by-club smash audit','Ten shots each across the bag. Strike quality is rarely uniform; find the weak link.'),
+    D(14,'A','Smash-vs-speed scatter session','Vary effort 60/80/100% and plot smash against club speed. Finds the personal speed at which strike degrades.',{shots:15}),
+    D(15,'A','One-club fatigue probe','Smash in the first ten against the last ten of a long block.',{shots:15}),
+    D(16,'A','Ball-position sweep','Three positions, ten shots each, smash logged per position.'),
+    D(17,'A','Strike-first-then-speed sequencing','Ten strike-focused, then ten speed-focused. Tests whether speed intent costs strike.'),
+    D(18,'A','Weekly smash trend review','Trend across five or more sessions with a band — never a paired comparison.',{sessions:5}),
+
+    // ── B. Dispersion tails (14) ──
+    D(19,'B','Tail Audit','30+ shots; compute p90 and p95 absolute offline. The single most diagnostic session in the app.'),
+    D(20,'B','Two-sided miss census','Classify every miss left or right. A two-way miss is a different problem needing different work.'),
+    D(21,'B','Worst-shot scoring game','Score the session on its worst three shots only. Trains the tail directly.'),
+    D(22,'B','Penalty-simulation block','Define out-of-bounds corridors and count violations. Converts dispersion into the currency that costs strokes.'),
+    D(23,'B','Committed-shape block','One shape, every ball. Two-way misses usually come from indecision, not mechanics.'),
+    D(24,'B','Narrow-corridor progression','Start at a corridor you hit 90% of the time; narrow 10% per successful block.'),
+    D(25,'B','Pre-shot routine enforcement','Same routine every ball; log p95 with and without.'),
+    D(26,'B','Random-club tail probe','Never the same club twice in a row, 30 shots, log the tail. Range-only consistency does not transfer.'),
+    D(27,'B','Fatigue tail probe','First 15 against last 15 of a long session.'),
+    D(28,'B','First-ball-of-the-day protocol','Log the first shot of each session separately over ten sessions. The cold-start miss is a real, separate skill.',{sessions:10}),
+    D(29,'B','Pressure tail block','A consequence attached — restart the count on a tail miss.'),
+    D(30,'B','Target-change block','A new target every three balls.'),
+    D(31,'B','Wind-visualisation block','Nominate an imagined crosswind, adjust the shape, log the offline.'),
+    D(32,'B','Tail trend review','p95 across five or more sessions with a confidence band.',{sessions:5}),
+
+    // ── C. Start-line control (10) ──
+    D(33,'C','Start-line gate','Alignment sticks forming a gate 3–4 m ahead. Physical feedback beats numeric feedback here.'),
+    D(34,'C','Alignment audit','Sticks on stance and target line. Rule out setup before diagnosing the swing.'),
+    D(35,'C','Blind alignment probe','Set up, close your eyes, then look at the actual launch direction. Separates aim error from delivery error.'),
+    D(36,'C','Gate progression','Start at a gate width you pass 90% of the time and narrow it. Errorless.'),
+    D(37,'C','Two-target alternation','Alternate targets 20° apart every ball.'),
+    D(38,'C','Start-line prediction reps','Call the start direction before the readout appears.',{prediction:true}),
+    D(39,'C','Club-varied start-line block','Same drill across driver, 7-iron and wedge. The face contribution changes with loft, so the feel required genuinely differs — this is physics, not variety for its own sake.'),
+    D(40,'C','Routine-consistency block','Log launch-direction spread with and without a fixed routine.'),
+    D(41,'C','Narrow-fairway simulation','Start line and shape target combined.'),
+    D(42,'C','Start-line trend review','Spread across sessions with a band.',{sessions:5}),
+
+    // ── D. Face-to-path control (10) ──
+    D(43,'D','Face-to-path baseline','20 shots, mean with an interval. If the interval spans zero the answer is "no consistent tendency", not a drill.',{shots:20}),
+    D(44,'D','True-zero calibration','Bracket deliberately closed and open to find your personal neutral. Required before any shaping work.',{shots:20}),
+    D(45,'D','Draw-bias bracket','Target −2° face-to-path, 15 shots.'),
+    D(46,'D','Fade-bias bracket','Target +2° face-to-path, 15 shots.'),
+    D(47,'D','Shape alternation ladder','Alternate draw and fade every three balls. Builds command rather than a single default.'),
+    D(48,'D','Small-curve precision','Hold spin axis inside 3° for approach shots.'),
+    D(49,'D','Big-curve command','8–12° for shaping around trouble. A course-management skill, not a fault fix.'),
+    D(50,'D','Strike-location cross-check','Before blaming the face for a spin-axis change, check the strike map — gear effect produces the same change with a perfect face.'),
+    D(51,'D','Club-contrast block','Same face-to-path on driver and 6-iron. The driver punishes it about 1.7× harder, which is why the same small error costs more.'),
+    D(52,'D','Face-to-path trend review','Mean and interval across five or more sessions.',{sessions:5}),
+
+    // ── E. Low point and strike height (12) ──
+    D(53,'E','Divot-line drill','A line just ahead of the ball; the divot must start past it. Physical feedback where the metric is unreliable.'),
+    D(54,'E','Towel behind the ball','Penalty feedback for a low point too far back.'),
+    D(55,'E','Attack-angle baseline by club','15 shots each with driver, 7-iron and wedge. Confirms club-appropriate delivery.'),
+    D(56,'E','Tee-height ladder (driver)','Attack angle logged per height to find your personal window.'),
+    D(57,'E','Ball-position sweep (irons)','Three positions; attack angle and strike quality at each.'),
+    D(58,'E','Weight-forward block','75% on the lead side at impact; attack angle and smash read together.'),
+    D(59,'E','Errorless low-point ladder','Half swings where the strike is near-guaranteed, lengthening progressively.'),
+    D(60,'E','Turf-versus-mat comparison','The same drill on both surfaces on the same day. Quantifies YOUR mat bias — no published number for it exists.'),
+    D(61,'E','Lie-variation block','Fairway, light rough, tight lie, upslope.'),
+    D(62,'E','Speed-ladder low point','50/75/100% effort; low-point consistency at each.'),
+    D(63,'E','Kneeling strike drill','Removes leg drive to isolate hand and arm control of the low point.'),
+    D(64,'E','Low-point trend review','Attack-angle spread across sessions.',{sessions:5}),
+
+    // ── F. Distance control and gapping (12) ──
+    D(65,'F','Full-bag gapping matrix','Ten shots per club on premium balls; log mean and spread. The output is your real yardage chart.'),
+    D(66,'F','Overlap detection','Flag clubs whose carry distributions overlap by more than half. That is a gapping problem, not a swing problem.'),
+    D(67,'F','Wedge matrix','Three wedges × three swing lengths × eight shots. Your personal wedge chart.'),
+    D(68,'F','Three-quarter ladder','Carry per swing length, one club.'),
+    D(69,'F','Clock-face wedge system','9, 10 and 11 o\'clock backswing lengths; carry logged per position.'),
+    D(70,'F','Landing-window drill','Nominate a carry window and score in or out. Bandwidth feedback.'),
+    D(71,'F','Descending-target ladder','60, 70, 80, 90 yards in sequence. The hardest distance-control test in golf.'),
+    D(72,'F','Random-distance call','A random carry number called out, which you then have to produce.'),
+    D(73,'F','Groove-condition check','A sudden unexplained spin drop: rule out equipment. Worn grooves cost up to 47% of spin and triple the shot-to-shot spin spread.'),
+    D(74,'F','Uphill/downhill adjustment','If you are outdoors with slopes available.'),
+    D(75,'F','Fatigue distance probe','Carry spread in the first ten against the last ten.',{shots:20}),
+    D(76,'F','Gapping trend review','Re-run the matrix quarterly. Equipment and technique both drift.',{sessions:3}),
+
+    // ── G. Speed development (10) ──
+    D(77,'G','Speed baseline','Ten max-effort swings, mean and spread. Establishes your personal noise floor.'),
+    D(78,'G','Jump-impulse assessment','The strongest physical correlate of club speed, around r = 0.68. Track it alongside.',{noDevice:true}),
+    D(79,'G','Med-ball rotational throw block','Explosive strength — the second-strongest correlate.',{noDevice:true}),
+    D(80,'G','Lower-body force block','Squat, deadlift and jump progression, two or three times a week.',{noDevice:true}),
+    D(81,'G','Upper-body explosive block','The r = 0.58 correlate.',{noDevice:true}),
+    D(82,'G','Overspeed block, ~30 swings','An implement within 10–12% of your driver. Volume plateaus early — 100-swing protocols are not supported.',{noDevice:true}),
+    D(83,'G','Bodyweight plyometric block','The active comparator that matched speed sticks exactly. Free, and equally supported.',{noDevice:true}),
+    D(84,'G','Speed-with-smash guard','Pair every speed session with a smash check. Going 100 to 105 mph gained only 2 yards because spin rose — speed bought out of strike is a net loss.'),
+    D(85,'G','12-week trend block','A regression slope with a band across eight or more sessions. The only honest way to detect a speed change.',{sessions:8}),
+    D(86,'G','Junior swing-volume monitor','Cap and log maximal-effort swings per week. For a growing spine the load that matters is rotational swing volume, not barbell load.',{noDevice:true}),
+
+    // ── H. Quiet eye and putting (8) ──
+    D(87,'H','Quiet-eye baseline (video)','Record gaze and head stability over 20 putts.',{noDevice:true}),
+    D(88,'H','Quiet-eye training protocol','Fixate the back of the ball 2–3 s before the stroke; hold the gaze 200–300 ms after impact. A single 20-putt session produced the published result.',{noDevice:true}),
+    D(89,'H','Quiet eye under pressure','The same protocol with a consequence. Untrained golfers collapse from 2,794 ms of quiet eye to 1,405 ms under pressure.',{noDevice:true}),
+    D(90,'H','Errorless putting ladder','Three feet outward, expanding only after near-total success.',{noDevice:true}),
+    D(91,'H','6–10 ft focus block','The range where the training produced its +5%.',{noDevice:true}),
+    D(92,'H','Three-putt-avoidance lag block','From 30 ft and beyond, scored on proximity rather than on holing.',{noDevice:true}),
+    D(93,'H','Routine-consistency putting block','A fixed routine, logged.',{noDevice:true}),
+    D(94,'H','Competitive putts-per-round tracking','The outcome measure the study actually moved.',{noDevice:true}),
+
+    // ── I. Practice-structure wrappers (10) ──
+    D(95,'I','Faded-feedback session','Numbers on for the first third, then half the shots, then off. The default session type.'),
+    D(96,'I','Bandwidth session','Silence inside tolerance; feedback only outside it. Silence works as implicit positive feedback and self-reduces as you improve.'),
+    D(97,'I','Prediction session','Call the number before every reveal.',{prediction:true}),
+    D(98,'I','Self-selected feedback session','Tap to see the numbers, and log how often you do.'),
+    D(99,'I','Next-day retention probe','Ten shots with NO feedback at all, 24 hours later. This is the efficacy metric, not within-session change.'),
+    D(100,'I','Blocked → serial → random','Three-stage session structure. Increasing interference beat both extremes.'),
+    D(101,'I','Distributed-volume plan','4 × 60 balls rather than 1 × 240.'),
+    D(102,'I','Differential-learning block','Vary grip pressure, stance width, tempo and ball position every rep, never repeating. Optional and advanced — the evidence is promising and heterogeneous.',{optional:true}),
+    D(103,'I','Representative-constraint wrapper','A nominated target and shape before every ball, a scoring consequence, an enforced routine, and no two identical consecutive shots.'),
+    D(104,'I','Session-noise report','Every session ends with your own typical error per metric, so you learn what size of change is real.'),
+  ];
+
+  const byId = id => ALL.find(d => d.id === id) || null;
+  const bySection = s => ALL.filter(d => d.section === s);
+  const wrappers = () => bySection('I');
+
+  // Faults name a mechanism; sections name a measurement. This is the join,
+  // and it is deliberately many-to-one: several faults land on strike quality
+  // because that is where the evidence says the strokes are.
+  const FAULT_SECTION = {
+    'poor-contact': 'A', 'thin-strike': 'A', 'low-smash': 'A', 'strike-scatter': 'A',
+    'two-way-miss': 'B', 'wide-dispersion': 'B', 'penalty-prone': 'B',
+    'start-line': 'C', 'aim': 'C',
+    'open-face': 'D', 'closed-face': 'D', 'over-the-top': 'D', 'in-to-out': 'D', 'slice': 'D', 'hook': 'D',
+    'steep-aoa': 'E', 'shallow-aoa': 'E', 'fat-strike': 'E', 'low-point': 'E',
+    'gapping': 'F', 'distance-control': 'F', 'spin-loft': 'F',
+    'speed': 'G',
+  };
+  const sectionForFault = fid => FAULT_SECTION[fid] || null;
+
+  // ── The gate ──────────────────────────────────────────────────
+  // ctx: { shots: [...], clubType, sessions }  — shots already stamped by
+  // Store.stamp(), so ball, surface and alignment travel with them.
+  //
+  // A failing gate returns its reasons rather than hiding the drill. "Hit 30
+  // of these on your own ball and this unlocks" tells a golfer what to do
+  // next; a list that quietly omits half of itself tells them nothing.
+  function admissible(drill, ctx = {}) {
+    const sec = SECTIONS[drill.section];
+    const gate = { ...(sec.gate || {}), ...(drill.shots ? { shots: drill.shots } : {}) };
+    const reasons = [];
+    if (drill.noDevice || gate.none) return { ok: true, reasons, section: sec, offDevice: true };
+
+    const all = (ctx.shots || []);
+    const set = ctx.clubType ? all.filter(s => s.clubType === ctx.clubType) : all;
+
+    const needShots = drill.shots || gate.shots;
+    if (needShots && set.length < needShots) {
+      reasons.push(`Needs ${needShots} shots${ctx.clubType ? ' of ' + clubLabel(ctx.clubType) : ''} and you have ${set.length}.`);
+    }
+    if (gate.ball === 'premium' && set.length && !set.every(s => s._ball === 'premium' || s._ball === 'rpt')) {
+      reasons.push('Needs your own premium or RPT ball. Range-ball spread is 2–4× wider and gapping off them is not comparable.');
+    }
+    if (gate.alignment && set.length && !set.every(s => s._aligned === true)) {
+      reasons.push('Needs a confirmed Impact Vision alignment, because an aiming error becomes a constant offset on every start line and averaging will not remove it.');
+    }
+    if (gate.surface === 'grass' && set.length && set.every(s => s._surface === 'mat')) {
+      // Flagged, not refused — the spec is explicit that a mat session still
+      // shows the shape, it just hides the fat strikes.
+      reasons.push('MAT: a strike several centimetres behind the ball still reads near-normal off a mat, so this drill can show you the pattern but not the fat strikes it exists to catch.');
+    }
+    if (drill.sessions && (ctx.sessions || 0) < drill.sessions) {
+      reasons.push(`Needs ${drill.sessions} qualifying sessions and you have ${ctx.sessions || 0}. A trend is not a before-and-after.`);
+    }
+    // A mat note alone does not block: it qualifies.
+    const blocking = reasons.filter(r => !r.startsWith('MAT:'));
+    return { ok: blocking.length === 0, reasons: reasons.map(r => r.replace(/^MAT: /, '')),
+             section: sec, flaggedOnly: blocking.length === 0 && reasons.length > 0 };
+  }
+
+  // Everything in a section, each with its verdict — the whole point being
+  // that the locked ones stay visible with the reason attached.
+  function forSection(s, ctx) {
+    return bySection(s).map(d => ({ drill: d, ...admissible(d, ctx) }));
+  }
+
+  const count = () => ALL.length;
+
+  return { SECTIONS, ALL, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
+           admissible, forSection, count };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -5913,6 +6185,7 @@ const UI = (() => {
     // not a session has ever been imported — turning the empty state from a
     // dead end into the one thing a new user can actually do today.
     try { renderQuietEye(); } catch (e) { console.error('quiet eye', e); }
+    try { renderDrills(sessions); } catch (e) { console.error('drills', e); }
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
@@ -5929,6 +6202,61 @@ const UI = (() => {
         <button class="btn-primary" data-start-plan="${Sanitize.escape(p.name)}" style="width:100%;margin-top:.6rem;padding:.4rem;font-size:.75rem">Start</button>
       </div>`
     ).join('');
+  }
+
+  // ── Drill library ─────────────────────────────────────────────
+  // Locked drills stay on screen with their reason attached. A list that
+  // quietly omits half of itself tells a golfer nothing; "hit 30 of these on
+  // your own ball and this unlocks" tells them what to do next. That is the
+  // whole argument for showing a gate rather than filtering on it.
+  let _drillSection = 'A';
+  function renderDrills(sessions) {
+    const el = document.getElementById('drillHost');
+    if (!el) return;
+    const esc = t => Sanitize.escape(t);
+    const list = sessions || [];
+    const latest = list[0];
+    const shots = latest ? (latest.shots || []) : [];
+    // Gate against the club with the most shots in the latest session — the
+    // one the golfer actually worked on — rather than the whole bag pooled.
+    const counts = {};
+    shots.forEach(s => { if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+    const ctx = { shots, clubType: club, sessions: list.length };
+
+    const secs = Object.values(DrillLibrary.SECTIONS);
+    const tabs = secs.map(sc => `<button class="drill-tab${sc.id === _drillSection ? ' on' : ''}"
+        data-drill-sec="${sc.id}">${sc.id} · ${esc(sc.name)}</button>`).join('');
+
+    const sc = DrillLibrary.SECTIONS[_drillSection];
+    const rows = DrillLibrary.forSection(_drillSection, ctx);
+    const openN = rows.filter(r => r.ok).length;
+
+    el.innerHTML = `
+      <div class="drill-tabs">${tabs}</div>
+      <div class="tail-block">
+        <div class="tail-head">${esc(sc.name)}
+          <span class="tail-n">${openN} of ${rows.length} open${club && !sc.gate.none ? ' · judged on ' + esc(clubLabel(club)) : ''}</span></div>
+        <div class="tail-item">${esc(sc.why)}</div>
+        <div class="tail-note"><strong>How this section is run.</strong> ${esc(sc.structure)}</div>
+      </div>
+      ${rows.map(r => `
+        <div class="drill-row${r.ok ? '' : ' locked'}${r.flaggedOnly ? ' flagged' : ''}">
+          <div class="drill-row-head">
+            <span class="drill-row-name">${r.drill.n}. ${esc(r.drill.name)}</span>
+            <span class="drill-row-state">${r.offDevice ? 'no device needed' : r.ok ? (r.flaggedOnly ? 'open · flagged' : 'open') : 'locked'}</span>
+          </div>
+          <div class="drill-row-desc">${esc(r.drill.desc)}</div>
+          ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
+        </div>`).join('')}
+      ${_drillSection === 'I' ? '' : `<div class="tail-note" style="margin-top:.6rem">Whichever of these you
+        pick, the wrappers in section I decide how much of it transfers — when the numbers appear, how the
+        blocks are ordered, and whether anything checks a day later. Those matter more than the choice above.</div>`}`;
+
+    el.querySelectorAll('[data-drill-sec]').forEach(b => b.addEventListener('click', () => {
+      _drillSection = b.dataset.drillSec;
+      renderDrills(sessions);
+    }));
   }
 
   // ── Quiet eye ─────────────────────────────────────────────────
@@ -6013,7 +6341,7 @@ const UI = (() => {
   }
 
   return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
-           renderQuietEye };
+           renderQuietEye, renderDrills };
 })();
 
 // ────────────────────────────────────────────────────────────────
