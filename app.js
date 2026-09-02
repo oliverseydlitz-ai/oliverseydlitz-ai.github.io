@@ -7211,9 +7211,10 @@ async function init() {
       t.closest('.modal-overlay')?.remove();
       return;
     }
-    // Export data, then close the surrounding modal
+    // Export data, then close the surrounding modal. The GDPR panel's own
+    // export button routes here rather than duplicating the download logic.
     if (t.hasAttribute('data-export-close')) {
-      document.getElementById('exportDataBtn')?.click();
+      document.getElementById('exportCsvBtn')?.click();
       t.closest('.modal-overlay')?.remove();
       return;
     }
@@ -7284,29 +7285,22 @@ async function init() {
   });
 
   // Settings
-  document.getElementById('exportDataBtn').addEventListener('click', async ()=>{
+  // Two buttons rather than one. This was a single row that asked the format
+  // with confirm('JSON (OK) or CSV (Cancel)?') — a native dialog using OK and
+  // Cancel to mean two different formats, which nobody can read correctly the
+  // first time and which some browsers suppress entirely. It also carried its
+  // own inline CSV writer, a second one with a different column order from
+  // SessionSharing's, and neither escaped anything.
+  const exportAs = fmt => async () => {
     try {
       const data = await Store.getSessions();
-      // Create CSV export
-      let csv = 'Date,Club,Carry,Total,Ball Speed,Smash,Launch,Spin,Notes\n';
-      data.forEach(s => {
-        s.shots.forEach(shot => {
-          csv += `${s.date},${shot.clubType},${shot.carryDistance||''},${shot.totalDistance||''},${shot.ballSpeed||''},${shot.smashFactor||''},${shot.launchAngle||''},${shot.spinRate||''},"${s.notes||''}"\n`;
-        });
-      });
-      // Offer both formats
-      const format = confirm('JSON (OK) or CSV (Cancel)?') ? 'json' : 'csv';
-      const blob = format === 'json'
-        ? new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
-        : new Blob([csv],{type:'text/csv'});
-      const a = Object.assign(document.createElement('a'),{
-        href: URL.createObjectURL(blob),
-        download: `shotlab-${new Date().toISOString().slice(0,10)}.${format}`,
-      });
-      a.click();
-      toast(`Exported ${data.length} sessions as ${format.toUpperCase()}`);
-    } catch(err) { toast('Export failed: ' + (err.message || 'could not reach the cloud')); }
-  });
+      if (!data.length) { toast('Nothing to export yet.'); return; }
+      if (fmt === 'csv') SessionSharing.exportAsCSV(data);
+      else SessionSharing.exportAsJSON(data);
+    } catch (err) { toast('Export failed: ' + (err.message || 'could not reach the cloud')); }
+  };
+  document.getElementById('exportCsvBtn')?.addEventListener('click', exportAs('csv'));
+  document.getElementById('exportJsonBtn')?.addEventListener('click', exportAs('json'));
 
   // Delete account (authenticated users only)
   document.getElementById('deleteAccountBtn')?.addEventListener('click', ()=>{
@@ -8356,23 +8350,50 @@ const SessionSharing = (() => {
     toast('📥 Downloaded backup!');
   }
 
-  function exportAsCSV(sessions) {
-    let csv = 'Date,Club,Ball Speed,Smash,Launch,Spin,Carry,Total,Notes\n';
-    sessions.forEach(s => {
-      s.shots.forEach(sh => {
-        csv += `"${formatDate(s.date)}","${clubLabel(sh.clubType)}",${sh.ballSpeed||''},${sh.smashFactor||''},${sh.launchAngle||''},${sh.spinRate||''},${sh.carryDistance||''},${sh.totalDistance||''},"${s.notes||''}"\n`;
-      });
+  // RFC 4180 quoting. Session notes are free text, and neither of the two CSV
+  // writers this app had escaped them: a note containing a comma silently
+  // shifted every later column by one, and a note containing a double quote
+  // broke the row outright. An export is the one artefact a golfer takes
+  // somewhere else, so a corrupted one is worse than no export.
+  const csvCell = v => {
+    if (v === null || v === undefined || v === '') return '';
+    const t = String(v);
+    return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  };
+  const csvRow = cells => cells.map(csvCell).join(',');
+
+  function toCSV(sessions) {
+    const head = ['Date','Club','Ball speed (mph)','Club speed (mph)','Smash','Launch (deg)',
+                  'Attack angle (deg)','Club path (deg)','Carry (yds)','Total (yds)',
+                  'Side carry (yds)','Spin (rpm)','Ball','Surface','Notes'];
+    const lines = [csvRow(head)];
+    (sessions || []).forEach(s => {
+      const ball = Conditions.ball(s), surface = Conditions.surface(s);
+      // Spin is not a reading without an RPT ball. Exporting the figure anyway
+      // would put a number the device never measured into a file the golfer
+      // takes away, where none of this app's caveats travel with it.
+      const spinReal = Spin.measured(s);
+      (s.shots || []).forEach(sh => lines.push(csvRow([
+        s.date, clubLabel(sh.clubType), sh.ballSpeed, sh.clubSpeed, sh.smashFactor, sh.launchAngle,
+        sh.attackAngle, sh.clubPath, sh.carryDistance, sh.totalDistance, sh.sideCarry,
+        spinReal ? sh.spinRate : '', ball.label, surface.label, s.notes,
+      ])));
     });
-    const blob = new Blob([csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `shotlab-data-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    return lines.join('\n') + '\n';
+  }
+
+  function download(text, mime, ext, n) {
+    const url = URL.createObjectURL(new Blob([text], { type: mime }));
+    const a = Object.assign(document.createElement('a'), {
+      href: url, download: `shotlab-${new Date().toISOString().slice(0,10)}.${ext}`,
+    });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast('📊 Exported to CSV!');
+    toast(`Exported ${n} session${n === 1 ? '' : 's'} as ${ext.toUpperCase()}`);
+  }
+
+  function exportAsCSV(sessions) {
+    download(toCSV(sessions), 'text/csv', 'csv', (sessions || []).length);
   }
 
   function createShareLink(session) {
@@ -8381,7 +8402,7 @@ const SessionSharing = (() => {
     return `${window.location.origin}?shared=${encoded}`;
   }
 
-  return { shareText, copyToClipboard, exportAsJSON, exportAsCSV, createShareLink };
+  return { shareText, copyToClipboard, exportAsJSON, exportAsCSV, createShareLink, toCSV, csvCell };
 })();
 
 // ════════════════════════════════════════════════════════════════

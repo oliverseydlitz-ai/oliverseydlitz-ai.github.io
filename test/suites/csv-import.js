@@ -48,5 +48,37 @@ ok(g[0].clubPath === null && g[0].attackAngle === null,
    'missing club data stays null, so nothing downstream scores it as a perfect zero');
 ok(g[1].clubPath === -0.8, 'while a recorded value comes through');
 
+console.log('— and the CSV the app writes back out —');
+// There were two CSV writers with different column orders, one inline in the
+// export button and one in SessionSharing, and NEITHER escaped anything. Notes
+// are free text: a comma silently shifted every later column by one, and a
+// double quote broke the row outright. An export is the one artefact a golfer
+// takes somewhere else, so a corrupt one is worse than none.
+const { SessionSharing: SS, Store } = M;
+ok(SS.csvCell('plain') === 'plain', 'an ordinary value is not quoted');
+ok(SS.csvCell('a,b') === '"a,b"', 'a comma forces quoting');
+ok(SS.csvCell('say "hi"') === '"say ""hi"""', 'a double quote is doubled and the cell quoted');
+ok(SS.csvCell('two\nlines') === '"two\nlines"', 'so is a newline');
+ok(SS.csvCell(null) === '' && SS.csvCell(undefined) === '', 'null and undefined write an empty cell, not "null"');
+ok(SS.csvCell(0) === '0', 'and a real zero survives');
+
+const sess = (notes, ball) => Store.stamp({
+  id: 'x', date: '2026-05-01', notes, conditions: { ball, surface: 'grass' },
+  shots: [{ clubType: '7i', ballSpeed: 80, clubSpeed: 60, smashFactor: 1.33,
+            launchAngle: 18, attackAngle: -4, clubPath: -1, carryDistance: 150,
+            totalDistance: 158, sideCarry: 3, spinRate: 6200 }],
+});
+const nasty = SS.toCSV([sess('Windy, gusty — said "keep it low"', 'premium')]);
+const lines = nasty.trim().split('\n');
+ok(lines.length === 2, 'one header and one row');
+ok(/""keep it low""/.test(nasty), 'the embedded quotes are escaped, not passed through');
+ok(/"Windy, gusty/.test(nasty), 'and the comma is inside a quoted cell rather than adding a column');
+
+console.log('— spin does not leave the app without an RPT ball —');
+ok(!/6200/.test(SS.toCSV([sess('n', 'premium')])),
+   'a premium-ball session exports no spin figure: the device never measured it');
+ok(/6200/.test(SS.toCSV([sess('n', 'rpt')])), 'an RPT session does');
+ok(/Ball,Surface,Notes/.test(SS.toCSV([sess('n','rpt')])),
+   'and the conditions travel with the file, since none of the app caveats do');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
-process.exit(fail?1:0);
