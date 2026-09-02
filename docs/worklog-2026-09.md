@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `d588e94`;
-21 files, +4,998 / −862; `app.js` 5,964 → 7,155 lines.
+next, including future me. Commits run `2503479` → `8a787f8`; `app.js` 5,964 → 6,605 lines
+(+1,300 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
