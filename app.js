@@ -143,6 +143,20 @@ function stdDev(values) {
   return Math.sqrt(v.map(x => (x-mean)**2).reduce((a,b) => a+b,0) / v.length);
 }
 
+// A 0-100 consistency score. The old form was `100 - stdDev(carries)`, which
+// goes NEGATIVE for any realistic dispersion (a 25-yard SD scored 75, a
+// 120-yard spread across clubs scored -20) and treated an absolute yard figure
+// as if it were a percentage. This uses the coefficient of variation, so it is
+// scale-free: a driver and a wedge with the same relative spread score alike.
+function consistencyScore(values) {
+  const v = (values || []).filter(x => Number.isFinite(x) && x > 0);
+  if (v.length < 2) return null;
+  const m = v.reduce((a, b) => a + b, 0) / v.length;
+  if (m <= 0) return null;
+  const cv = stdDev(v) / m;                 // 0 = identical, 0.15 = loose
+  return Math.max(0, Math.min(100, Math.round(100 - cv * 400)));
+}
+
 function fmt(val, decimals=1) {
   if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '—';
   return Number(val).toFixed(decimals);
@@ -1358,6 +1372,128 @@ const MeasurementReference = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// RetentionProbe — the app's primary efficacy metric
+// ────────────────────────────────────────────────────────────────
+// Everything else in this app measures a session. This measures whether a
+// session CHANGED ANYTHING, which is a different and much harder question.
+//
+// Winstein & Schmidt is unambiguous about why it has to work this way: across
+// three experiments (n=240), constant and faded feedback were indistinguishable
+// during acquisition AND at 5-10 minutes, and only separated at 24 hours,
+// where the faded group had 35% less error. Every within-session signal was
+// blind to a real 35% difference in what was actually learned.
+//
+// So an app that grades a drill on whether the numbers improved during the
+// session is measuring the one window the evidence says is uninformative — and
+// it will report success while doing harm. The probe is the correction: the
+// same club, roughly the same shot count, at least a day later, with feedback
+// OFF, compared against the session that prescribed the work.
+const RetentionProbe = (() => {
+  const KEY = 'slProbes';
+  const MIN_GAP_HOURS = 20;     // "next day" with slack for an evening session
+  const MAX_GAP_DAYS  = 10;     // beyond this, too much else has happened
+  const MIN_SHOTS     = 8;      // fewer than this and the comparison is noise
+
+  function all() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(-100))); } catch (_) {}
+  }
+
+  // Open a probe when a session prescribes work: record the baseline so the
+  // follow-up has something to be compared against.
+  function open(session, fault) {
+    if (!session || !fault) return null;
+    const shots = (session.shots || []).filter(s => s.clubType === fault.clubType);
+    if (shots.length < MIN_SHOTS) return null;
+    const probe = {
+      id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+      openedAt: new Date(session.date || Date.now()).getTime(),
+      sessionId: session.id,
+      clubType: fault.clubType,
+      faultId: fault.id,
+      faultName: fault.name,
+      metric: fault.metric || 'smashFactor',
+      baseline: baselineFor(shots, fault.metric || 'smashFactor'),
+      status: 'open',
+    };
+    if (!probe.baseline) return null;
+    const list = all().filter(p => !(p.faultId === probe.faultId && p.clubType === probe.clubType && p.status === 'open'));
+    list.push(probe); save(list);
+    return probe;
+  }
+
+  function baselineFor(shots, metric) {
+    const iv = Metrics.interval(shots.map(s => s[metric]), '', 2);
+    return iv ? { mean: iv.mean, ci: iv.ci, n: iv.n, spread: stdDev(shots.map(s => s[metric]).filter(Number.isFinite)) } : null;
+  }
+
+  // Which probes is this new session eligible to answer?
+  function due(session, now = Date.now()) {
+    const t = new Date(session?.date || now).getTime();
+    return all().filter(p => {
+      if (p.status !== 'open') return false;
+      const gapH = (t - p.openedAt) / 36e5;
+      if (gapH < MIN_GAP_HOURS || gapH > MAX_GAP_DAYS * 24) return false;
+      return (session.shots || []).filter(s => s.clubType === p.clubType).length >= MIN_SHOTS;
+    });
+  }
+
+  // Settle a probe against a later session. The verdict is deliberately
+  // three-valued: a change smaller than this golfer's own noise is "no
+  // detectable change", never "no improvement" — the app cannot tell those
+  // apart and should not pretend otherwise.
+  function settle(probe, session, history) {
+    const shots = (session.shots || []).filter(s => s.clubType === probe.clubType);
+    const after = baselineFor(shots, probe.metric);
+    if (!after) return null;
+    const delta = after.mean - probe.baseline.mean;
+    const verdict = Metrics.changeIsReal(probe.metric, delta, after.n, history || [], probe.clubType);
+    const gapDays = Math.round((new Date(session.date).getTime() - probe.openedAt) / 864e5);
+
+    const settled = {
+      ...probe, status: 'settled', settledAt: Date.now(), probeSessionId: session.id,
+      after, delta, gapDays,
+      outcome: verdict.real === null ? 'unknown' : verdict.real ? (delta > 0 ? 'retained' : 'regressed') : 'no-change',
+      threshold: verdict.threshold, source: verdict.source, note: verdict.note,
+    };
+    save(all().map(p => (p.id === probe.id ? settled : p)));
+    return settled;
+  }
+
+  // Plain-language result. No cheerleading: the honest outcomes here are
+  // mostly "cannot tell yet", and saying so is the point of the feature.
+  function describe(r) {
+    if (!r) return null;
+    const club = clubLabel(r.clubType);
+    const d = `${r.delta > 0 ? '+' : ''}${fmt(r.delta, 2)}`;
+    switch (r.outcome) {
+      case 'retained':
+        return `${club} ${r.metric}: ${d} vs ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} ago, and the change is ` +
+               `bigger than your own shot-to-shot variation. That is a real retained change — the strongest ` +
+               `evidence this app can produce that something worked.`;
+      case 'regressed':
+        return `${club} ${r.metric}: ${d} vs ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} ago, beyond your own ` +
+               `variation. It did not hold. That is worth knowing — within-session numbers would have hidden it.`;
+      case 'no-change':
+        return `${club} ${r.metric}: ${d} over ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} — smaller than your ` +
+               `own shot-to-shot variation, so no detectable change. Not the same as "no improvement": the ` +
+               `change, if any, is below what this data can resolve.`;
+      default:
+        return `${club}: not enough history yet to say whether this held. ${r.note || ''}`.trim();
+    }
+  }
+
+  function openProbes() { return all().filter(p => p.status === 'open'); }
+  function settled()    { return all().filter(p => p.status === 'settled'); }
+  function clear()      { save([]); }
+
+  return { open, due, settle, describe, openProbes, settled, all, clear,
+           MIN_GAP_HOURS, MAX_GAP_DAYS, MIN_SHOTS };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // SetupGuide — getting the device honest before it gets read
 // ────────────────────────────────────────────────────────────────
 // Every angular prescription this app makes is downstream of how the unit was
@@ -1701,7 +1837,8 @@ const FaultEngine = (() => {
     {
       minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
       id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'↗️', category:'Attack Angle', severity:'medium',
-      test: s => isIron(s.clubType) && !isShort(s.clubType) && s.attackAngle > -0.5,
+      test: s => isIron(s.clubType) && !isShort(s.clubType) &&
+        Number.isFinite(s.attackAngle) && s.attackAngle > -0.5,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° — too shallow for irons. ` +
         `Irons are designed to compress the ball with a downward strike. Shallow attack produces thin contact, ` +
         `lower compression, and inconsistent distance. You should be taking a small divot after the ball.`,
@@ -1736,7 +1873,7 @@ const FaultEngine = (() => {
     // ── LAUNCH CONDITIONS ──────────────────────────────────────
     {
       id:'driver-low-launch', name:'Low Launch on Driver', icon:'🚀', category:'Launch', severity:'medium',
-      test: s => s.clubType === 'd' && s.launchAngle < 9,
+      test: s => s.clubType === 'd' && Number.isFinite(s.launchAngle) && s.launchAngle < 9,
       description: shots => {
         const la = avg(shots,'launchAngle');
         const cs = avg(shots,'clubSpeed');
@@ -1894,7 +2031,8 @@ const FaultEngine = (() => {
     // ── SHORT GAME ────────────────────────────────────────────
     {
       id:'wedge-thin', name:'Thin Wedge Strikes', icon:'⚡', category:'Wedge', severity:'medium',
-      test: s => isShort(s.clubType) && s.smashFactor < 1.20 && s.launchAngle > 35,
+      test: s => isShort(s.clubType) && Number.isFinite(s.smashFactor) && s.smashFactor < 1.20 &&
+        Number.isFinite(s.launchAngle) && s.launchAngle > 35,
       description: shots => `Smash factor ${fmt(avg(shots,'smashFactor'),2)} on wedges combined with high launch angle — classic thin/bladed wedge. ` +
         `Blade contact sends the ball low and hot rather than high and soft.`,
       causes:['Scooping motion — flipping at impact','Not maintaining posture through impact',
@@ -2048,6 +2186,9 @@ const FaultEngine = (() => {
           (firm ? '' : ' — borderline, worth another session to confirm'),
         minShots: floor,
         affectedShots: affected.map(s=>s._row),
+        // for RetentionProbe: which club, and which tier-1 metric to re-measure
+        clubType: [...clubs][0],
+        metric: rule.probeMetric || 'smashFactor',
       });
     }
 
@@ -2534,7 +2675,7 @@ const QuickStats = (() => {
     })();
     const bestCarry = Math.max(0, ...all.map(s => s.carryDistance || 0));
     const avgCarry = Math.round(avg(all, 'carryDistance') || 0);
-    const consistency = Math.round(100 - stdDev(all.map(s => s.carryDistance || 0)));
+    const consistency = consistencyScore(all.map(s => s.carryDistance));
 
     host.innerHTML = `
       <div class="quick-stat">
@@ -2653,7 +2794,7 @@ const ClubComparison = (() => {
         avgBallSpeed: fmt(avg(shots1,'ballSpeed'),1),
         avgSmash: fmt(avg(shots1,'smashFactor'),2),
         shots: shots1.length,
-        consistency: Math.round(100 - stdDev(shots1.map(s=>s.carryDistance||0))),
+        consistency: consistencyScore(shots1.map(s=>s.carryDistance)),
       },
       club2: {
         name: clubLabel(club2),
@@ -2661,7 +2802,7 @@ const ClubComparison = (() => {
         avgBallSpeed: fmt(avg(shots2,'ballSpeed'),1),
         avgSmash: fmt(avg(shots2,'smashFactor'),2),
         shots: shots2.length,
-        consistency: Math.round(100 - stdDev(shots2.map(s=>s.carryDistance||0))),
+        consistency: consistencyScore(shots2.map(s=>s.carryDistance)),
       }
     };
   }
@@ -3539,6 +3680,14 @@ const UI = (() => {
     _session = session;
     _clubFilter = 'all';
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
+    renderRetention(session).catch(e => console.error('retention', e));
+    // Opening a probe on the top fault is what makes the NEXT session able to
+    // answer whether this one changed anything.
+    try {
+      const top = FaultEngine.detectFaults(session.shots, session)
+        .filter(f => f.drills && f.drills.length)[0];
+      if (top) RetentionProbe.open(session, top);
+    } catch(e) { console.error('probe open', e); }
     document.getElementById('detailTitle').textContent = formatDate(session.date);
     document.getElementById('detailNotes').textContent = session.notes
       ? session.notes + (session.conditions ? ` · ${[session.conditions.wind,session.conditions.temp].filter(Boolean).join(', ')}` : '')
@@ -3578,6 +3727,35 @@ const UI = (() => {
   // ── Insights (coach's notes) ──────────────────────────────────
   // Measurement caveats come FIRST, above any prescription, because they
   // change whether the prescription is admissible at all.
+  // Probe results come first: whether the last thing you were told to work on
+  // actually held is more important than what today's numbers say.
+  async function renderRetention(session) {
+    const el = document.getElementById('retentionHost');
+    if (!el) return;
+    let history = [];
+    try { history = await Store.getSessions(); } catch (_) {}
+    const results = RetentionProbe.due(session)
+      .map(p => RetentionProbe.settle(p, session, history))
+      .filter(Boolean);
+    if (!results.length) {
+      const open = RetentionProbe.openProbes();
+      el.innerHTML = open.length
+        ? `<div class="probe-block pending"><div class="probe-head">Retention check pending</div>
+             <div class="probe-item">Come back at least a day later and hit
+             ${open.map(p => `${RetentionProbe.MIN_SHOTS}+ ${Sanitize.escape(clubLabel(p.clubType))}`).join(' and ')}
+             to find out whether ${open.length === 1 ? 'it' : 'they'} held. Within-session numbers cannot tell you.</div></div>`
+        : '';
+      el.hidden = !open.length;
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = `<div class="probe-block">
+        <div class="probe-head">Did it hold?</div>
+        ${results.map(r => `<div class="probe-item outcome-${r.outcome}">
+            <span class="probe-dot"></span>${Sanitize.escape(RetentionProbe.describe(r))}</div>`).join('')}
+      </div>`;
+  }
+
   function renderConditionCaveats(session) {
     const el = document.getElementById('conditionCaveats');
     if (!el) return;
@@ -5596,7 +5774,7 @@ const SwingAnalytics = (() => {
     const ballSpeeds = shots.map(s => s.ballSpeed || 0).filter(b => b > 0);
 
     const pattern = {
-      consistency: Math.round(100 - stdDev(carries)),
+      consistency: consistencyScore(carries),
       avgCarry: Math.round(avg(shots, 'carryDistance') || 0),
       bestCarry: Math.max(...carries),
       worstCarry: Math.min(...carries),
@@ -6710,7 +6888,7 @@ const ClubAnalyzer = (() => {
       bestCarry: Math.max(...carries, 0),
       worstCarry: Math.min(...carries, 1000),
       carryRange: Math.max(...carries, 0) - Math.min(...carries, 1000),
-      consistency: Math.round(100 - stdDev(carries)),
+      consistency: consistencyScore(carries),
       avgBallSpeed: ballSpeeds.length ? fmt(ballSpeeds.reduce((a,b)=>a+b,0)/ballSpeeds.length, 1) : '—',
       maxBallSpeed: Math.max(...ballSpeeds, 0),
       gapToNext: null, // filled in by Gap Engine
@@ -6897,7 +7075,7 @@ const SessionComparison = (() => {
         formScore: Math.round(avgScore),
         grade: ShotScorer.grade(avgScore).letter,
         avgCarry: Math.round(avg(s.shots, 'carryDistance') || 0),
-        consistency: Math.round(100 - stdDev(carries)),
+        consistency: consistencyScore(carries),
         avgBallSpeed: fmt(avg(s.shots, 'ballSpeed'), 1),
         faultCount: FaultEngine.detectFaults(s.shots).length,
       };
