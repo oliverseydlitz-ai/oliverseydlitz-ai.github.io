@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 17 suites, 641 assertions. Must be green.
+npm test             # load gate + 18 suites, 703 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v82` — increment it.
+   Currently `shotlab-v84` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 56 modules, ~9,990 lines in `app.js`, 641 assertions.
+`main` is green. 56 modules, ~10,200 lines in `app.js`, 703 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -293,29 +293,36 @@ unchecked — `Spin.summary`, `SessionSharing.exportAsCSV`, `ClubAnalyzer.analyz
 
 ### The three off-device modules
 
-`QuietEye`, `ShortGame` and `Rounds` touch no launch-monitor data, so they work
-on a brand-new account. `Rounds` is the newest and the most consequential: it is
-the only place the app can say where a golfer's strokes actually go, and it does
-it by placing each stat on Shot Scope's table separately and reading the spread
-between the implied handicaps. **Do not add a strokes-gained figure to it** —
-the app keeps one strokes number, in `Dispersion`, and the spread-between-
-categories method deliberately needs none.
+`QuietEye`, `ShortGame` and `Rounds` touch **no launch-monitor data at all**,
+so they render on a brand-new account with nothing imported. That makes them
+the only part of the app a first-time user can use on day one — worth
+remembering when weighing where to add next, and the reason `getNextStep`
+sends a golfer with zero sessions to the short game rather than to the import
+screen.
 
-### The two range-independent practice modules
+`Rounds` is the newest and the most consequential: it is the only place the
+app can say where a golfer's strokes actually go, rather than reasoning about
+it from range shots. It places each stat on Shot Scope's table separately and
+reads the **spread between the implied handicaps**. **Do not add a
+strokes-gained figure to it** — the app keeps one strokes number, in
+`Dispersion`, and the spread-between-categories method deliberately needs none.
 
-`QuietEye` and `ShortGame` touch **no launch-monitor data at all**, so they
-render on a brand-new account with nothing imported. That makes them the only
-part of the app a first-time user can actually use on day one — worth
-remembering when weighing where to add next.
+`Rounds` closes its own loop: `prescribe()` turns the worst category into the
+practice work for it, and `trend()` tracks that category across rounds. Note
+`trend()`'s `flat` flag — a golfer whose baseline has zero variance would
+otherwise be told "no detectable change" after a large real move, because the
+significance test divides by a spread of zero. Any non-zero delta off a flat
+baseline is reported as real, with the warning that a short identical run
+flatters itself.
 
-Their evidence is a different literature from the rest of the app and it is
-written up in `docs/short-game-evidence.md`. The short version: a 2024
-systematic review of 52 RCTs named errorless learning, contextual interference
-and external focus superior within their strategies — **and stated that over
-half those trials were underpowered and most used novices on simple putting
-tasks.** That limitation travels with the finding everywhere it is shown.
-Drill tiers (`strong` / `moderate` / `weak`) encode it per drill. Do not level
-them up without a citation.
+The `ShortGame` / `QuietEye` evidence is a different literature from the rest
+of the app, and it is written up in `docs/short-game-evidence.md`. The short
+version: a 2024 systematic review of 52 RCTs named errorless learning,
+contextual interference and external focus superior within their strategies —
+**and stated that over half those trials were underpowered and most used
+novices on simple putting tasks.** That limitation travels with the finding
+everywhere it is shown. Drill tiers (`strong` / `moderate` / `weak`) encode it
+per drill. Do not level them up without a citation.
 
 **Also worth knowing:** `FaultEngine`'s drill cues still use internal focus
 ("hold your wrist angle"), which `CoachingMode.TIPS` deliberately avoids. The

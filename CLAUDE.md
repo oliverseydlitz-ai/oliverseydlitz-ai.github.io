@@ -355,6 +355,12 @@ are my strokes going" rather than reasoning about it from range shots.
   **side by side, explicitly not correlated.** A few rounds cannot establish
   that, and an r printed on it would be invented.
 - Nine-hole rounds are doubled, flagged `scaled`, and the assumption is stated.
+- **It closes its own loop.** `prescribe()` turns the worst category into the
+  practice work for it; `trend()` tracks that category across rounds. `trend()`
+  carries a `flat` flag because the significance test divides by the baseline
+  spread — a golfer with an identical run of rounds would otherwise be told "no
+  detectable change" after a large real move. Any non-zero delta off a flat
+  baseline is real, with the warning that a short identical run flatters itself.
 
 ### Short game (`ShortGame`) — see `docs/short-game-evidence.md`
 
@@ -407,6 +413,29 @@ Below `FIRM_RATE = 0.50` it reports as `tentative` with severity downgraded one
 level. The denominator is the *clubs the fault appeared on*, not the whole
 session, so a driver fault is judged against drivers. The suite pins all four
 numbers, so this paragraph cannot drift from the code again.
+
+### The one recommendation (`SmartRecommendations.getNextStep`)
+
+The home view already renders seven insight surfaces. This is the only one
+that *ranks*, and there is deliberately one card: rule 9 of the research base
+is one cue and never a checklist. The order is an argument, so every branch
+returns a `why` that is rendered under it.
+
+1. **A due retention probe** — it expires (1–10 days), and whether the last
+   change held is the only efficacy evidence this app can produce.
+2. **Nothing imported** → the short game. The three off-device modules work on
+   a brand-new account; "go get range time" is not a day-one answer.
+3. **An out-of-line on-course category** (`Rounds.profile()`). Outcome data
+   outranks anything inferred from a range. A *level* profile falls through
+   rather than manufacturing a weakness.
+4. **The top recurring fault** — but only after `PracticePlan.libraryDrill()`
+   confirms the drill is admissible on what that session measured. A locked
+   drill renders its reason.
+5. **Otherwise the transfer block**, framed as the result it is. Nothing
+   recurring is an answer, not an empty state.
+
+Do not rank by session count — the version this replaced did, and said "build
+your baseline" for five sessions whatever the data showed.
 
 ### Practice plans (`PracticePlan`)
 

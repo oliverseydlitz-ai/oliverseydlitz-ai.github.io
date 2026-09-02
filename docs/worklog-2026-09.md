@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 17 suites, 641 assertions.
+  jsdom) then 18 suites, 703 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -26,6 +26,10 @@ layer underneath rather than adding features on top of it.
 - **There is exactly one strokes figure in the app**, it comes from measured
   directional spread through Broadie & Ko's published curves, and it refuses
   outside the band those curves were calibrated on.
+- **The home view makes one recommendation, and it ranks.** A due retention
+  probe first, then off-device work, then an out-of-line on-course category,
+  then a gated drill for the top recurring fault. Every branch says why it sits
+  where it does.
 
 If you change any sourced constant, read the section that cites it first. They
 are not guesses and the reasoning is why they hold.
@@ -749,6 +753,75 @@ penalties; it keys off the scratch row either way now.
 
 ---
 
+## 13. Closing the loops `15f42ff` `ac7b249`
+
+Two features that were each correct on their own and joined to nothing.
+
+### 13.1 A diagnosis that led nowhere `15f42ff`
+
+`Rounds` could tell a golfer their penalties play like a 25-handicap and their
+greens like a 15, and then stopped. The most specific thing the app knew about
+where a golfer's strokes go had no route to the thing the app does about it.
+
+`prescribe()` turns the worst category into the practice work for it, and
+`trend()` tracks that one category across rounds so the prescription can be
+judged. Both stay inside the module's existing rule: no strokes-gained figure
+is invented, because the spread-between-implied-handicaps method needs none.
+
+**A zero-variance baseline broke the significance test.** `trend()` asked
+whether a change was larger than the noise, which divides by the baseline
+spread — so a golfer with an identical run of rounds (four rounds of 31 putts,
+say) had a spread of exactly zero and was told "no detectable change" after
+moving to 26. The bug is not the arithmetic, it is that a flat run looks like
+perfect precision and is usually a small sample. It now sets a `flat` flag: any
+non-zero delta off a flat baseline is reported as real, **with the warning that
+a short identical run flatters itself.**
+
+### 13.2 The one card that ranks `ac7b249`
+
+The home view renders seven insight surfaces. The obvious move was an eighth;
+the right move was to fix the one that already claims to prioritise.
+
+`SmartRecommendations.getNextStep` was wired and was the weakest logic in the
+app. It ranked by **session count** — under five sessions it said "build your
+baseline" whatever the data showed. It set `desc` to the same fault name it had
+already used as the title, so the card said one thing twice. And it knew
+nothing about three things the app had since built: the retention probe, which
+is its own stated efficacy metric; the on-course profile, which is outcome
+data; and whether the drill it named could be run at all on the balls that
+session used.
+
+The order is now an argument, and every branch carries the reason it sits where
+it does, rendered under the card:
+
+1. **A due retention probe.** It expires. Whether the last change held is the
+   only efficacy evidence this app can produce.
+2. **Nothing imported → the short game.** The three off-device modules work on
+   a brand-new account; "go get range time" is not a day-one answer.
+3. **An out-of-line on-course category.** A range fault is a hypothesis about
+   your scoring; a category gap is your scoring. A *level* profile falls
+   through rather than manufacturing a weakness.
+4. **The top recurring fault** — after `PracticePlan.libraryDrill()` confirms
+   the drill is admissible on what that session measured.
+5. **Otherwise the transfer block.** Nothing recurring is a result, not an
+   empty state.
+
+**Still one card, deliberately.** Rule 9 of the research base is one cue and
+never a checklist, and a home screen with seven ranked priorities is a
+checklist with better manners.
+
+**A harness bug worth recording.** The browser check reported the *old* card
+text after the rewrite and there was nothing wrong with the code: the local
+server serves a mirrored copy of the site (the CDN script tags are rewritten to
+vendored files, because the route-blocker aborts every non-localhost request),
+and the mirror had gone stale. An unvendored tag is a silently missing library
+rather than an error, which is why the copy is now a script — `browser/sync.sh`
+— that refuses to finish if a CDN tag survives the rewrite. A verification step
+that can quietly test the wrong build is worse than no verification step.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -859,6 +932,28 @@ away upward — but the fixture was also wrong: 15° misses on a 6.5° spread ar
 detector that invents tails. When a measurement disagrees with the fixture,
 the fixture is a hypothesis too.
 
+**A verification harness can quietly test the wrong build.** After rewriting
+the home card, the browser check printed the *old* text and there was nothing
+wrong with the code — the local server serves a mirrored copy of the site with
+the CDN tags rewritten to vendored files, and the mirror had gone stale. Same
+class as the stale test harness below: a check that cannot tell you it is
+checking the wrong thing reports green for the wrong reason. It is a script now
+(`browser/sync.sh`) that fails if any tag survives the rewrite.
+
+**The obvious feature was the wrong feature.** The home view renders seven
+insight surfaces, so an eighth was the easy add. The one that already claimed
+to prioritise was ranking by session count and repeating its own title into its
+description. Fixing the surface that overpromises beats adding one that
+does not exist yet — and the research base's own rule is one cue, never a
+checklist.
+
+**A zero-variance baseline is not precision.** `Rounds.trend()` divided by the
+baseline spread to ask whether a change beat the noise, so a golfer with four
+identical rounds had a spread of zero and was told nothing had changed after a
+large real move. A flat short run looks like a perfect measurement and is
+usually just a small sample. Any test of the form "is this bigger than the
+spread" needs an answer for a spread of zero.
+
 **I let a stale harness report green four times** — `Conditions` missing, `Spin`
 missing, a renamed constant, a removed field — and treated each as a one-off
 patch rather than a signal the harness was structurally wrong. It was, and
@@ -920,6 +1015,9 @@ Every commit in the session, and the section that explains it.
 | `e763446` | 12.1/12.2 | Show the spin reading when it is one, and correct a fault gate the docs invented |
 | `e157ce4` | 12.1 | Offer to back up device-only sessions when a guest signs in |
 | `9a19ad6` | 12.3 | Add round logging — the on-course data the app kept saying it did not have |
+| `dfbf36d` | — | docs: record the on-course work and two lessons about verification |
+| `15f42ff` | 13.1 | Close the loop from round diagnosis to practice, and trend a category over time |
+| `ac7b249` | 13.2 | Make the home screen's one recommendation actually rank things |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty
