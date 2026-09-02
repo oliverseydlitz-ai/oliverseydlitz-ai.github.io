@@ -4651,10 +4651,23 @@ const ShotScorer = (() => {
       pts += raw * 45; max += 45;
     }
 
-    // Attack angle vs optimal (0-25) — tier 2
+    // Attack angle vs its TARGET BAND (0-25) — tier 2.
+    //
+    // This was scored against a single ideal POINT, and the points were a
+    // fourth private copy of the target bands: driver 3 (the LPGA average, not
+    // a target), other clubs +1 (the real band is 0 to -2, so the sign was
+    // wrong). Two consequences, both wrong in the same direction: a driver
+    // delivered at +5°, which is the top of the target band and an excellent
+    // number, was docked 7 of 25 points for not being +3.
+    //
+    // Scored off the band with a miss-distance taper now — the same shape the
+    // spin-loft component below already used. Anywhere inside the band is full
+    // marks, because that is what a target band means.
     if (Number.isFinite(shot.attackAngle)) {
-      const ideal = shot.clubType === 'd' ? 3 : isIron(shot.clubType) ? -3.5 : 1;
-      pts += Math.max(0, 25 - Math.abs(shot.attackAngle - ideal) * 3.5); max += 25;
+      const band = Benchmarks.targetsFor(shot.clubType).attack;
+      const miss = shot.attackAngle < band.lo ? band.lo - shot.attackAngle
+                 : shot.attackAngle > band.hi ? shot.attackAngle - band.hi : 0;
+      pts += Math.max(0, 25 - miss * 3.5); max += 25;
     }
 
     // Club path neutrality (0-15) — tier 2
@@ -5244,20 +5257,76 @@ const Analytics = (() => {
 // QuickStats — always-visible KPI dashboard + smart recommendations
 // ════════════════════════════════════════════════════════════════
 const QuickStats = (() => {
+  // The four tiles at the top of the home screen — the most-looked-at numbers
+  // in the app, and three of the four were bag-mix artifacts.
+  //
+  // "Avg" was the mean carry of every shot ever hit, pooled across the bag: a
+  // driver, a 7-iron and a wedge averaged together. It describes nothing, and
+  // it MOVES WITH WHICH CLUBS YOU HAPPENED TO HIT — a wedge session drags it
+  // down and reads as regression. "Consistency" was the same pooled spread,
+  // which is the driver-to-wedge gap rather than anything about repeatability;
+  // CLAUDE.md already says this in as many words about the feedback band:
+  // "Pooled across a bag it measures the driver-to-wedge gap." "Best" was an
+  // unscreened maximum across every ball type.
+  //
+  // They are anchored on ONE club now — the one with the most shots in the
+  // recent comparable sessions, which is the club the golfer is actually
+  // working on — and the row says which club it is, so the numbers mean
+  // something. Form stays pooled: it is a per-shot score that is already
+  // club-aware inside `ShotScorer`, so averaging it across a bag is legitimate.
+  // Anchored on the MOST RECENT session's conditions, not on the largest group
+  // of them. That is a deliberate difference from the yardage book, which uses
+  // the biggest comparable sample because it is a reference table you club off.
+  // This row answers "how am I hitting it now", so it follows the equipment
+  // the golfer is on — the same anchor the Progress trend uses.
+  function pick(sessions) {
+    const list = sessions || [];
+    const anchor = list[0];
+    if (!anchor) return { used: [], shots: [], club: null, n: 0, ball: null };
+    const used = list.filter(s => Conditions.comparable(s, anchor)).slice(0, 10);
+    const shots = used.flatMap(s => s.shots);
+    const counts = {};
+    shots.forEach(s => { if (s.clubType && s.carryDistance > 0) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+    return { used, shots, club, n: club ? counts[club] : 0, ball: Conditions.ball(anchor) };
+  }
+
   function renderStats(sessions) {
     const host = document.getElementById('quickStatsHost');
     if (!host) return;
     if (!sessions.length) { host.innerHTML = ''; return; }
 
-    const all = sessions.flatMap(s => s.shots);
-    const recent10 = sessions.slice(0, 10);
+    const { used, shots, club, n, ball } = pick(sessions);
     const avgScore = (() => {
-      const scores = recent10.flatMap(s => s.shots.map(ShotScorer.score)).filter(x=>x!==null);
+      const scores = shots.map(ShotScorer.score).filter(x => x !== null);
       return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     })();
-    const bestCarry = Math.max(0, ...all.map(s => s.carryDistance || 0));
-    const avgCarry = Math.round(avg(all, 'carryDistance') || 0);
-    const consistency = consistencyScore(all.map(s => s.carryDistance));
+
+    const label = document.getElementById('quickStatsLabel');
+    if (label) label.textContent = club && n >= Metrics.MIN_SHOTS_REPORT
+      ? `${clubLabel(club)} · ${n} shots${ball ? ' · ' + ball.label.toLowerCase() : ''}`
+      : '';
+
+    // Below the floor there is no club number worth printing, so the row says
+    // what it is waiting for rather than falling back to the pooled figure.
+    if (!club || n < Metrics.MIN_SHOTS_REPORT) {
+      host.innerHTML = `
+        <div class="quick-stat">
+          <div class="quick-stat-value">${avgScore}</div>
+          <div class="quick-stat-label">Form</div>
+        </div>
+        <div class="quick-stat quick-stat-wide">
+          <div class="quick-stat-note">No club has ${Metrics.MIN_SHOTS_REPORT} shots in your recent sessions
+          yet. Carry numbers pooled across a bag measure which clubs you hit, not how you hit them.</div>
+        </div>`;
+      return;
+    }
+
+    const carries = shots.filter(s => s.clubType === club).map(s => s.carryDistance).filter(v => v > 0);
+    const iv = Metrics.interval(carries, '', 0);
+    const cap = Metrics.CEILING.carryDistance ?? Infinity;
+    const best = Math.max(...carries.filter(v => v <= cap));
+    const cons = consistencyScore(carries);
 
     host.innerHTML = `
       <div class="quick-stat">
@@ -5265,20 +5334,20 @@ const QuickStats = (() => {
         <div class="quick-stat-label">Form</div>
       </div>
       <div class="quick-stat">
-        <div class="quick-stat-value">${bestCarry}</div>
+        <div class="quick-stat-value">${Math.round(best)}</div>
         <div class="quick-stat-label">Best</div>
       </div>
       <div class="quick-stat">
-        <div class="quick-stat-value">${avgCarry}</div>
-        <div class="quick-stat-label">Avg</div>
+        <div class="quick-stat-value">${iv ? fmt(iv.mean, 0) : '—'}</div>
+        <div class="quick-stat-label">Carry${iv ? ` ±${fmt(iv.ci, 0)}` : ''}</div>
       </div>
       <div class="quick-stat">
-        <div class="quick-stat-value">${consistency}%</div>
+        <div class="quick-stat-value">${cons === null ? '—' : cons + '%'}</div>
         <div class="quick-stat-label">Consistency</div>
       </div>`;
   }
 
-  return { renderStats };
+  return { renderStats, pick };
 })();
 
 // ════════════════════════════════════════════════════════════════
