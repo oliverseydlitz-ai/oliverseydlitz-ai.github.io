@@ -402,6 +402,37 @@ a many-to-one outcome and cannot be inverted to a wrist angle — there is no
 published regression for it. A bulk test asserts no body-position string is
 ever classified as measured, so a new cause cannot land on the wrong side.
 
+### Prescribing across the boundary (`FaultEngine.splitDrills`)
+
+`splitCauses` splits what the monitor measured from what it cannot see. The
+drills sat below that split and ignored it — "the app cannot see your hips",
+then "initiate the downswing by rotating the hips". Every drill now declares
+where its instruction lives:
+
+- **`external`** — the club, ball, turf, tee, a gate or the target gives the
+  feedback. The drill checks itself.
+- **`setup`** — a body position at **address**. Static, self-verifiable in a
+  mirror before the swing. Counted as checkable.
+- **`feel`** — a body position **during** the swing. Neither the app nor the
+  golfer can confirm it happened.
+
+`feel` drills are **kept, not deleted** — several are the only drill their
+fault has — and render under their own heading with `FEEL_CAVEAT`, exactly as
+body causes render under `BODY_CAVEAT`. An unlabelled drill defaults to `feel`:
+the cautious side, never the flattering one.
+
+**Anything that picks a drill must order checkable-first.** `PracticePlan` and
+`getNextStep` both used `drills[0]`, which for five faults is a feel — and for
+two of those a checkable drill was sitting second in the same list. A block
+where *every* drill is a feel sets `drillIsFeel` and says so.
+
+Three surfaces, one rule, all guarded by `test/suites/drill-focus.js`: **53**
+fault drills (each labelled), **104** library drills (external by default, the
+one exception declares `feel:true`), **24** coaching tips. Two library drills
+trip the word list innocently — a junior's "growing spine", a putting "lag
+block" — and are exempted **by name with the reason**, never by weakening the
+regex.
+
 ### Fault reporting gates (`FaultEngine`)
 
 A fault reports only when it recurs at a rate measurement noise would not

@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 18 suites, 703 assertions.
+  jsdom) then 19 suites, 727 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -822,6 +822,72 @@ that can quietly test the wrong build is worse than no verification step.
 
 ---
 
+## 14. Prescribing across the boundary `6147e8b` `25bf347`
+
+The app's clearest single idea is that the launch monitor sees the ball and
+the club head, not you — `splitCauses` renders a fault's causes in two groups
+and puts a caveat under the second saying exactly that. Directly beneath it,
+the drill list said "Initiate the downswing by rotating the hips."
+
+**22 of 53 fault drills named a body position.** Not all of them wrongly: an
+address position is static and a golfer can check it in a mirror. So the
+distinction that matters is not internal-versus-external focus — that is a
+Tier C finding, g = 0.15 — but **whether the instruction can be verified at
+all.** Three labels: `external` (24), `setup` (15), `feel` (14). `splitDrills`
+mirrors `splitCauses`, feels render under their own heading with
+`FEEL_CAVEAT`, and an unlabelled drill defaults to `feel`.
+
+**The bug that made it concrete.** `PracticePlan` used `f.drills[0]`. For Low
+Ball Speed that is "Lag preservation: hold your wrist angle as long as
+possible" — while "Towel swings", where an audible whoosh tells you where the
+speed arrived, sat second in the same array. The app was choosing the
+unverifiable one by accident, in the block it prints biggest. Same in
+`getNextStep`, on the one card on the home screen. Both order checkable-first
+now; the three faults that have nothing but feels say so instead of hiding it.
+
+**The library was in far better shape, which is a result about where drills
+come from.** One in 104 asks for a body position mid-swing, because those were
+written from the research base rather than from general golf instruction. So
+that set defaults to external and declares its single exception, instead of
+labelling 104 drills by hand.
+
+### 14.1 The count was wrong and the test agreed with it
+
+`{name:'([^']*)'` stops at a backslash. `Swing to 3 o\'clock` therefore never
+matched — **the labelling script skipped it and the suite's own count skipped
+it too**, and both confidently reported 52 drills, all labelled. There are 53.
+
+This is the same failure as the stale served mirror in §13.2 and the stale
+test harness in §7, and it is worth naming as one thing: **a check that shares
+a blind spot with the thing it checks reports green for the wrong reason.**
+The blind spot does not have to be subtle — this one was a character class.
+The suite now parses both fields escape-aware, and asserts the *total* it
+read out of the source separately from how many carry a label, so the two
+numbers have to agree out loud.
+
+### 14.2 A doc claim that was never true
+
+CLAUDE.md said `CoachingMode.TIPS` was written to an external focus "never the
+golfer's own body parts". Four of the 24 were in-swing body instructions: a
+trail elbow dropping to a hip pocket, a trail shoulder working down and under,
+a lead heel pressing into the ground, and a finish measured by where the hands
+ended up. All four are rewritten onto the club, the ball or the turf.
+
+The doc now says what is actually enforced — a body word may be a landmark or
+a static setup check, never an in-swing position to hold — and a test holds it
+there. Second instance of this after `MIN_CLUB_SHOTS` (§12.2), and the same
+lesson: **a documented absolute that the code does not meet is worse than a
+documented tendency, because it stops anyone looking.**
+
+One drill description was making a claim of the same kind: "Swing a damp towel
+— if it whooshes early, you're casting." The whoosh is observable; "you're
+casting" is precisely the inference the app spends the rest of its code
+refusing. It now says the speed is arriving too early, which is what the
+whoosh actually tells you.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -1018,6 +1084,9 @@ Every commit in the session, and the section that explains it.
 | `dfbf36d` | — | docs: record the on-course work and two lessons about verification |
 | `15f42ff` | 13.1 | Close the loop from round diagnosis to practice, and trend a category over time |
 | `ac7b249` | 13.2 | Make the home screen's one recommendation actually rank things |
+| `2547b02` | — | docs: record the two loop-closing passes, and three lessons from them |
+| `6147e8b` | 14 | Stop prescribing across the inference boundary the app draws two lines above |
+| `25bf347` | 14.1 | Hold the drill library and the coaching tips to the same boundary |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

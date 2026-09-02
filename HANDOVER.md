@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 18 suites, 703 assertions. Must be green.
+npm test             # load gate + 19 suites, 727 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v84` — increment it.
+   Currently `shotlab-v86` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 56 modules, ~10,200 lines in `app.js`, 703 assertions.
+`main` is green. 56 modules, ~10,280 lines in `app.js`, 727 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -324,11 +324,22 @@ novices on simple putting tasks.** That limitation travels with the finding
 everywhere it is shown. Drill tiers (`strong` / `moderate` / `weak`) encode it
 per drill. Do not level them up without a citation.
 
-**Also worth knowing:** `FaultEngine`'s drill cues still use internal focus
-("hold your wrist angle"), which `CoachingMode.TIPS` deliberately avoids. The
-evidence for external cueing is Tier C (g = 0.15 after bias correction), so
-this is a consistency issue rather than an efficacy one — worth fixing, not
-worth prioritising.
+**This one is now done, and it was bigger than the previous handover thought.**
+`FaultEngine`'s drill cues used internal focus ("hold your wrist angle") while
+`CoachingMode.TIPS` avoided it — filed here as a consistency issue, Tier C
+evidence, not worth prioritising. That framing missed the real problem. The app
+splits a fault's *causes* at the inference boundary and puts a caveat under the
+half it cannot see, and then prescribed straight across that split three lines
+lower. Worse, `PracticePlan` picked `drills[0]` blind, so for Low Ball Speed it
+led with "hold your wrist angle" while a purely external drill sat second in
+the same array.
+
+Every drill now declares `external` / `setup` / `feel`, feels render under
+`FEEL_CAVEAT` exactly as body causes do, and anything picking a drill orders
+checkable-first. See CLAUDE.md → "Prescribing across the boundary". The rule is
+guarded across all three prescription surfaces by
+`test/suites/drill-focus.js` — **if you add a drill or a tip, that suite is
+what tells you which side of the line it landed on.**
 
 ### Superseded
 
