@@ -4991,21 +4991,39 @@ const Insights = (() => {
     if (cq.length && cq[0].score >= 68)
       strengths.push(`Your <strong>${clubLabel(cq[0].club)}</strong> was your most reliable club today (${Math.round(cq[0].score)}/100 quality).`);
 
-    const avgSmash = avg(shots,'smashFactor');
-    const allIron = shots.every(s=>isIron(s.clubType));
-    const benchSmash = allIron ? 1.35 : 1.43;
-    if (avgSmash && avgSmash >= benchSmash)
-      strengths.push(`Strike quality is excellent — average smash factor of <strong>${fmt(avgSmash,2)}</strong> meets tour-amateur benchmarks.`);
+    // Per club, against the published row for THAT club. This read
+    // `allIron ? 1.35 : 1.43` — a private copy of the smash benchmarks applied
+    // to the whole session, so one wedge in the bag graded the wedges against
+    // the driver figure and one driver graded the irons against it too.
+    const byClub = {};
+    shots.forEach(s => { if (s.clubType) (byClub[s.clubType] = byClub[s.clubType] || []).push(s); });
+    Object.entries(byClub).forEach(([c, cs]) => {
+      if (cs.length < Metrics.MIN_SHOTS_REPORT) return;
+      const b = Benchmarks.get(c);
+      const m = avg(cs, 'smashFactor');
+      if (b && m && m >= b.am.sf)
+        strengths.push(`Strike quality on the <strong>${clubLabel(c)}</strong> — smash factor of ` +
+          `<strong>${fmt(m,2)}</strong> over ${cs.length} shots, past the amateur average of ${fmt(b.am.sf,2)}.`);
+    });
 
-    const sideStd = stdDev(shots.map(s=>s.sideCarry));
-    if (sideStd > 0 && sideStd < 12)
-      strengths.push(`Tight dispersion — most shots land within a <strong>${fmt(sideStd*2,0)}-yard</strong> window left-to-right.`);
+    // Side carry is tier 3 — a modelled output — so it describes rather than
+    // congratulates, and it needs the same floor as anything else.
+    const sideVals = shots.map(s => s.sideCarry).filter(Number.isFinite);
+    const sideStd = stdDev(sideVals);
+    if (sideVals.length >= Metrics.MIN_SHOTS_REPORT && sideStd > 0 && sideStd < 12)
+      strengths.push(`Most shots finished within a <strong>${fmt(sideStd*2,0)}-yard</strong> window ` +
+        `left-to-right — a modelled figure rather than a measurement.`);
 
+    // This praised "hitting up on the driver" at +1° off TWO SHOTS. The target
+    // band is +2 to +5 and lives in `Benchmarks.TARGET`; this was the ninth
+    // private copy of it in the file.
     const driverShots = shots.filter(s=>s.clubType==='d');
-    if (driverShots.length >= 2) {
+    if (driverShots.length >= Metrics.MIN_SHOTS_DELIVERY) {
       const aa = avg(driverShots,'attackAngle');
-      if (aa !== null && aa >= 1)
-        strengths.push(`You're hitting <strong>up</strong> on the driver (+${fmt(aa,1)}°) — maximising carry efficiency.`);
+      const band = Benchmarks.targetsFor('d').attack;
+      if (Number.isFinite(aa) && aa >= band.lo && aa <= band.hi)
+        strengths.push(`Driver attack angle of <strong>+${fmt(aa,1)}°</strong> over ${driverShots.length} shots ` +
+          `sits inside the ${Sanitize.escape(band.label)} target.`);
     }
 
     if (highFaults.length)

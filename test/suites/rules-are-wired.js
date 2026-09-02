@@ -157,6 +157,40 @@ console.log('— and no replaced formula is still in use anywhere —');
      'plus the raw counts, so a message can say "N of M" instead of a bare percentage');
 }
 
+console.log('— and no module keeps its own copy of a launch-metric threshold —');
+// The target bands were copied NINE times before this check existed: the
+// launch-window table, the benchmark table, ShotScorer, SwingDNA (twice — the
+// attack target and the spin window), Insights (twice — the attack target and
+// the smash benchmarks), and the two found by the wiring audit. Every copy
+// disagreed with `Benchmarks.TARGET`, and several disagreed in the direction
+// that flatters the golfer.
+//
+// `Benchmarks` owns the bands. `FaultEngine` owns the fault triggers, which
+// are a separate and deliberately buffered concept — `faults-vs-targets.js`
+// guards the one relationship between them. NOBODY ELSE compares a launch
+// metric against a number.
+{
+  const strip = (name, s2) => {
+    const i = s2.indexOf('const ' + name);
+    if (i < 0) return s2;
+    const j = s2.indexOf('\n})();', i);
+    return s2.slice(0, i) + '\n'.repeat(s2.slice(i, j).split('\n').length) + s2.slice(j);
+  };
+  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const rest = strip('FaultEngine', strip('Benchmarks', bare));
+  // `x > 0` and `x !== 0` are sign and presence checks, not thresholds, so the
+  // pattern requires a non-zero literal. Narrowing it here rather than letting
+  // it cry wolf is the point: a check that fires on `spinRate > 0` gets
+  // deleted by the next person.
+  const PAT = /\b(attackAngle|launchAngle|spinRate|clubPath|aa|uAA|uLA)\s*[<>]=?\s*-?(?!0\b)\d+(?:\.\d+)?/g;
+  const found = [...rest.matchAll(PAT)].map(m => `${m[0]} (line ${rest.slice(0, m.index).split('\n').length})`);
+  ok(found.length === 0,
+     `no launch-metric threshold outside Benchmarks/FaultEngine${found.length ? ': ' + found.join(', ') : ''}`);
+  // And the smash benchmarks, copied twice as `allIron ? 1.35 : 1.43`.
+  ok(!/1\.35\s*:\s*1\.43|1\.43\s*:\s*1\.35/.test(bare),
+     'and no private copy of the amateur smash rows — Benchmarks.get(club).am.sf has them per club');
+}
+
 // A check that cannot fail proves nothing, and this one is a string search —
 // exactly the shape that quietly stops discriminating. `ViewPrefs.setPref` is
 // confirmed dead and deliberately left in place (HANDOVER lists it), so it is
