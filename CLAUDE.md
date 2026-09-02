@@ -374,10 +374,19 @@ ever classified as measured, so a new cause cannot land on the wrong side.
 ### Fault reporting gates (`FaultEngine`)
 
 A fault reports only when it recurs at a rate measurement noise would not
-produce: `MIN_CLUB_SHOTS = 4` of that club, `MIN_AFFECTED = 2` shots,
-`MIN_RATE = 0.30`. Below `FIRM_RATE = 0.50` it reports as `tentative` with
-severity downgraded one level. The denominator is the *clubs the fault appeared
-on*, not the whole session, so a driver fault is judged against drivers.
+produce. Three gates, and the constants are exactly these — there is no
+`MIN_CLUB_SHOTS`, which an earlier version of this file invented:
+
+- **`MIN_AFFECTED = 2`** — never off a single shot.
+- **A per-club sample floor**, defaulting to `Metrics.MIN_SHOTS_REPORT` (**10**).
+  A rule raises it with `minShots: 15` (club-delivery metrics, tier 2) or
+  `minShotsFor: Conditions.startLineFloor` (10 aligned, 30 not).
+- **`MIN_RATE = 0.30`** of that club's shots.
+
+Below `FIRM_RATE = 0.50` it reports as `tentative` with severity downgraded one
+level. The denominator is the *clubs the fault appeared on*, not the whole
+session, so a driver fault is judged against drivers. The suite pins all four
+numbers, so this paragraph cannot drift from the code again.
 
 ### Practice plans (`PracticePlan`)
 

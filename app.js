@@ -5800,7 +5800,20 @@ const UI = (() => {
     // Spin gets its own line either way: named as measured when an RPT ball
     // was used, named as absent when it was not. Silence would read as "no
     // spin problem" rather than "no spin data".
-    notes.unshift(Spin.measured(session) ? Spin.CHANGE_CAVEAT : Spin.NOT_MEASURED + ' ' + Spin.ALTERNATIVE);
+    // When spin IS a reading, show the reading. The app was telling RPT users
+    // "spin is measured here because you used an RPT ball" and then never
+    // showing them a session figure — the caveat without the number it
+    // qualifies. Spin.summary() existed for this and nothing called it.
+    //
+    // It stays an interval from the golfer's own shots with the change caveat
+    // attached, because the reason spin is tier 3 is that it does not track
+    // BETWEEN sessions, not that today's reading is unreadable.
+    const spinIv = (() => { try { return Spin.summary(session); } catch (_) { return null; } })();
+    notes.unshift(Spin.measured(session)
+      ? (spinIv
+          ? `Spin this session: ${spinIv.text}. ${Spin.CHANGE_CAVEAT}`
+          : Spin.CHANGE_CAVEAT)
+      : Spin.NOT_MEASURED + ' ' + Spin.ALTERNATIVE);
     const vol = FeedbackEngine.volumeAdvice((session.shots || []).length);
     if (vol) notes.push(vol);
     if (!notes.length) { el.innerHTML = ''; el.hidden = true; return; }

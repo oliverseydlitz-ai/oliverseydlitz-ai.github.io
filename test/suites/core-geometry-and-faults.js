@@ -151,5 +151,28 @@ ok(leaked.length === 0,
 const bodyCount = all.filter(c => !FE.causeIsObservable(c)).length;
 ok(bodyCount >= 15, `${bodyCount} of them are correctly held behind the caveat`);
 
+console.log('— the fault gates, pinned so the docs cannot drift from them —');
+// CLAUDE.md described a `MIN_CLUB_SHOTS = 4` that does not exist and never
+// did, and put the per-club floor at 4 when it is 10. A wrong constant in the
+// docs is worse than none: it cost a load-gate failure this session when it was
+// exported as real. These assertions are the numbers, so the prose has to match.
+ok(FE.MIN_AFFECTED === 2, 'MIN_AFFECTED is 2 — never a fault off one shot');
+ok(FE.MIN_RATE === 0.30, 'MIN_RATE is 0.30 of that club\'s shots');
+ok(FE.FIRM_RATE === 0.50, 'FIRM_RATE is 0.50, below which a fault is tentative');
+ok(FE.MIN_CLUB_SHOTS === undefined, 'and there is no MIN_CLUB_SHOTS, whatever the docs once said');
+ok(M.Metrics.MIN_SHOTS_REPORT === 10, 'the default per-club floor is Metrics.MIN_SHOTS_REPORT = 10');
+
+// The gate actually bites: the same fault rate passes at 10 shots and not at 6.
+const mk = (n, bad) => Array.from({ length: n }, (_, i) => ({
+  _row: i + 2, clubType: '7i', ballSpeed: 80, clubSpeed: 62,
+  smashFactor: i < bad ? 1.05 : 1.33, launchAngle: 18, attackAngle: -4, clubPath: -1,
+  carryDistance: 150, sideCarry: 2,
+}));
+const few = FE.detectFaults(mk(6, 3));
+const many = FE.detectFaults(mk(12, 6));
+ok(few.length === 0, 'a 50% fault rate over 6 shots of a club reports nothing');
+ok(many.length > 0, 'the same rate over 12 does');
+ok(many.every(f => f.total >= 10), 'and every reported fault was judged against 10+ shots of its club');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

@@ -38,5 +38,18 @@ ok(!fA.some(x=>x.id==='high-spin-axis'), 'spin-AXIS fault suppressed without an 
 ok(fB.some(x=>x.id==='high-spin-axis'), 'spin-axis fault allowed once the ball makes it a reading');
 ok(fA.some(x=>x.id==='high-spin-loft'), 'spin LOFT still fires regardless — derived from tier-2 metrics');
 ok(M.Metrics.tier('spinRate')===3, 'spin stays tier 3 even with RPT — between-session ICC 0.02');
+// Spin.summary was thoroughly tested above and called by NOTHING. The app told
+// RPT users "spin is measured here because you used an RPT ball" and then never
+// showed a session figure anywhere — the caveat without the number it
+// qualifies. It renders in the caveat block now.
+console.log('— and the reading is actually shown when it is one —');
+ok(/varies more/.test(M.Spin.CHANGE_CAVEAT),
+   'the sentence that must travel with any spin figure says it does not track between sessions');
+const shown = M.Spin.summary(sess('rpt'));
+ok(shown.enoughForMean === true, `a 12-shot RPT session clears the ${M.Metrics.MIN_SHOTS_REPORT}-shot floor`);
+ok(M.Spin.summary(sess('rpt', 5)).enoughForMean === false,
+   'five shots gives an interval but is flagged as under the floor for a mean');
+ok(/rpm/.test(shown.text), 'and the text carries its unit, so it can be dropped straight into the caveat line');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
