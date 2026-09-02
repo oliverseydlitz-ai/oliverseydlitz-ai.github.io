@@ -8977,44 +8977,50 @@ async function init() {
     document.getElementById('benchmarkModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions to compare'); return; }
-    const comparison = CommunityInsights.compareToommunity(sessions);
-    if (!comparison) { toast('Unable to generate comparison'); return; }
+    const esc = t => Sanitize.escape(String(t));
+    const pub = CommunityInsights.published(sessions);
+    const course = CommunityInsights.onCourse();
+
+    const rowHtml = r => `
+      <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+        <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">${esc(r.label)}</div>
+        <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+          <div><span style="color:var(--text-dim)">You:</span>
+            <strong>${fmt(r.you.mean, r.dec)}</strong>
+            <small>± ${fmt(r.you.ci, r.dec === 2 ? 3 : r.dec)}${esc(r.unit)}</small></div>
+          <div><span style="color:var(--text-dim)">Amateur:</span> <strong>${fmt(r.am, r.dec)}${esc(r.unit)}</strong></div>
+          <div><span style="color:var(--text-dim)">Tour:</span> <strong>${fmt(r.pga, r.dec)}${esc(r.unit)}</strong></div>
+        </div>
+      </div>`;
 
     const html = `
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
-            🏆 Community Comparison
+            📊 Where you sit
             <button data-close="benchmarkModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
-          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">vs ${comparison.skillLevel.toUpperCase()} golfers</div>
+          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
+            ${pub.ok ? `Your ${esc(clubLabel(pub.club))} over ${pub.n} shots, against TrackMan's published rows`
+                     : 'Against published data — no invented averages'}
+          </div>
           <div style="display:grid;gap:1rem">
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Carry Distance</div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
-                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.carry.user} yds</strong></div>
-                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.carry.community} yds</strong></div>
-              </div>
-              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.carry.percentile}</div>
-            </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Consistency</div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
-                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.consistency.user === null ? '—' : comparison.consistency.user + '%'}</strong></div>
-                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.consistency.community}%</strong></div>
-              </div>
-              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.consistency.percentile}</div>
-            </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Form Score</div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
-                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.formScore.user}/100</strong></div>
-                <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.formScore.community}/100</strong></div>
-              </div>
-              <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.formScore.percentile}</div>
-            </div>
-            <div style="background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);padding:1rem;border-radius:var(--radius-sm);margin-top:.5rem">
-              <div style="font-size:.95rem;color:#4ade80"><strong>💡 Tip:</strong> Benchmarks are simulated. Real community data will be available soon!</div>
+            ${pub.ok
+              ? pub.rows.map(rowHtml).join('')
+              : `<div class="tail-note">${pub.noBenchmark
+                  ? `No published row exists for your ${esc(clubLabel(pub.club))}.`
+                  : `${pub.need} more shot${pub.need === 1 ? '' : 's'} of your most-hit club before a
+                     comparison means anything — a mean off a handful is not a number to measure yourself by.`}</div>`}
+            ${course ? `
+              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">On the course</div>
+                <div style="font-size:.9rem;line-height:1.5">${esc(course.note || '')}</div>
+              </div>` : ''}
+            <div class="tail-note">
+              <strong>These are published figures, not other users.</strong> The amateur and tour rows are
+              TrackMan's; the on-course comparison, when there is one, is Shot Scope's normative table off
+              90 million shots. This app stores every session privately and aggregates nobody — so it will
+              never show you a "community average", because it does not have one.
             </div>
           </div>
         </div>
@@ -10182,18 +10188,33 @@ const ContentLibrary = (() => {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// CommunityInsights — Simulated community benchmarking
+// CommunityInsights — where you sit against PUBLISHED data (there is no community)
 // ════════════════════════════════════════════════════════════════
 const CommunityInsights = (() => {
-  // Simulated benchmark data (would be real in production)
-  const benchmarks = {
-    avgCarry: { all: 160, bySkill: { beginner: 140, intermediate: 165, advanced: 180 } },
-    consistency: { all: 72, bySkill: { beginner: 65, intermediate: 75, advanced: 85 } },
-    formScore: { all: 68, bySkill: { beginner: 60, intermediate: 70, advanced: 80 } },
-  };
-
+  // There is no community, and there was never going to be one.
+  //
+  // This module shipped with `// Simulated benchmark data (would be real in
+  // production)` and three invented rows — avgCarry 160, consistency 72, form
+  // 68 — rendered as "Avg" beside the golfer's own number with a green
+  // "↑ Above average" verdict on each. A disclaimer sat at the BOTTOM of the
+  // modal saying real data was coming soon. It is not: sessions are stored per
+  // user behind row-level security, there is no aggregation anywhere, and
+  // building one would mean pooling other people's rounds.
+  //
+  // The comparison was also circular — `estimateSkillLevel` derived
+  // beginner/intermediate/advanced from the same grade being compared, so
+  // scoring better moved the bar up with you — and the consistency row was on
+  // the old `100 - stdDev` scale, which no longer exists.
+  //
+  // What replaces it uses only data this app can cite. `Benchmarks.DATA` is
+  // TrackMan-published amateur and tour figures per club; `Rounds.NORMS` is
+  // Shot Scope's normative table off 90M+ shots. Both are already in here,
+  // both are real, and the second is on-course, which nothing else compares
+  // against outside the Rounds view.
   function estimateSkillLevel(sessions) {
-    if (!sessions.length) return 'beginner';
+    // Kept because callers use it, but it is a description of THIS app's form
+    // score and says so — it is not a handicap and never was.
+    if (!sessions || !sessions.length) return 'beginner';
     const grade = PerformanceGrade.calculateFullGrade(sessions);
     if (!grade) return 'beginner';
     if (grade.overall >= 80) return 'advanced';
@@ -10201,38 +10222,41 @@ const CommunityInsights = (() => {
     return 'beginner';
   }
 
-  function compareToommunity(sessions) {
-    const skillLevel = estimateSkillLevel(sessions);
-    const metrics = AnalyticsHub.generateMetricsDashboard(sessions);
-
-    if (!metrics) return null;
-
-    const userCarry = parseInt(metrics.avgCarry);
-    const userConsistency = metrics.carryConsistency;
-    const userForm = PerformanceGrade.calculateFullGrade(sessions)?.overall || 0;
-
-    return {
-      skillLevel,
-      carry: {
-        user: userCarry,
-        community: benchmarks.avgCarry.bySkill[skillLevel],
-        percentile: userCarry > benchmarks.avgCarry.bySkill[skillLevel] ? '↑ Above average' : '← Below average',
-      },
-      consistency: {
-        user: userConsistency,
-        community: benchmarks.consistency.bySkill[skillLevel],
-        percentile: userConsistency === null ? 'not enough shots yet'
-          : userConsistency > benchmarks.consistency.bySkill[skillLevel] ? '↑ More consistent' : '← Work on it',
-      },
-      formScore: {
-        user: userForm,
-        community: benchmarks.formScore.bySkill[skillLevel],
-        percentile: userForm > benchmarks.formScore.bySkill[skillLevel] ? '↑ Better form' : '← Keep practicing',
-      },
+  // Where the golfer's most-hit club sits against the published rows. Per club,
+  // above the sample floor, as an interval — the same rules as everywhere else.
+  function published(sessions) {
+    const { club, n, shots } = QuickStats.pick(sessions || []);
+    if (!club || n < Metrics.MIN_SHOTS_REPORT) {
+      return { ok: false, need: Metrics.MIN_SHOTS_REPORT - (n || 0), club };
+    }
+    const b = Benchmarks.get(club);
+    if (!b) return { ok: false, club, noBenchmark: true };
+    const cs = shots.filter(s => s.clubType === club);
+    const row = (field, key, unit, dec) => {
+      // Smash moves in hundredths and its interval in thousandths, so a
+      // two-decimal ci prints "± 0.00", which reads as "no uncertainty".
+      const iv = Metrics.interval(cs.map(s => s[field]).filter(v => v > 0), '', dec === 2 ? 3 : dec);
+      if (!iv) return null;
+      return { label: key === 'carry' ? 'Carry' : key === 'bs' ? 'Ball speed' : 'Smash factor',
+               unit, dec, you: iv, am: b.am[key], pga: b.pga[key] };
     };
+    return { ok: true, club, n,
+             rows: [row('carryDistance','carry',' yds',0),
+                    row('ballSpeed','bs',' mph',0),
+                    row('smashFactor','sf','',2)].filter(Boolean) };
   }
 
-  return { compareToommunity, estimateSkillLevel };
+  // And the on-course side, when there is one. This is the only comparison in
+  // the app made against a published sample of real golfers rather than tour
+  // averages, which is a different and more useful question for most people.
+  function onCourse() {
+    try {
+      const p = Rounds.profile();
+      return p && p.ok ? p : null;
+    } catch (_) { return null; }
+  }
+
+  return { published, onCourse, estimateSkillLevel };
 })();
 
 // ════════════════════════════════════════════════════════════════
