@@ -9566,53 +9566,89 @@ document.addEventListener('DOMContentLoaded', () => {
 // InsightEngine — Generate actionable insights
 // ════════════════════════════════════════════════════════════════
 const InsightEngine = (() => {
+  // The home-screen insight box. What was here did not survive reading:
+  //
+  //   · `const consistency = 100 - stdDev(carries)` — a standard deviation in
+  //     YARDS subtracted from 100 and printed as a percentage. Pooled across
+  //     the bag it was dominated by the driver-to-wedge gap, so the message
+  //     "your swing is very consistent (92%)" fired on how many clubs you hit.
+  //     `consistencyScore()` — a proper coefficient of variation — was already
+  //     in the file and unused here.
+  //   · "You're improving! +N pts vs last week" off sessions 0–2 against 3–5,
+  //     which are not weeks, with an unsourced ±5 threshold, no significance
+  //     test and no conditions gate. The Progress view now answers exactly
+  //     this question properly; a worse copy on the home screen is noise.
+  //   · "Long session! Make sure to rest between rounds" from a shot count
+  //     compared against an average that included itself. There is a real
+  //     fatigue rule in FaultEngine (first-half vs second-half ball speed) and
+  //     this was not it.
+  //
+  // What is left says things no other surface on this screen says.
   function generateInsights(sessions) {
-    const insights = [];
+    const out = [];
+    if (!sessions || !sessions.length) return out;
+    const latest = sessions[0];
 
-    if (!sessions.length) return insights;
+    // 1. The conditions changed. This is the most useful thing the box can
+    //    say and nothing else on the home view says it: every carry, gap and
+    //    spread figure below is only comparable to sessions on the same ball.
+    const prior = sessions[1];
+    if (prior && !Conditions.comparable(latest, prior)) {
+      // "range balls on not recorded" reads as broken text rather than as a
+      // missing field, so an unrecorded surface drops out of the phrase.
+      const where = sn => {
+        const ball = Conditions.ball(sn).label.toLowerCase();
+        const surf = Conditions.surface(sn);
+        return surf.id === 'unknown' ? ball : `${ball} off ${surf.label.toLowerCase()}`;
+      };
+      out.push({ icon: '🔄', type: 'info',
+        text: `This session was ${where(latest)}, your last was ${where(prior)} — ` +
+              `distances and spread do not compare across that.` });
+    }
 
-    const recent5 = sessions.slice(0, 5);
-    const scores = recent5.flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
-    const recent_avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    // 2. Consistency, for ONE club, from the real coefficient of variation,
+    //    and only when there are enough shots to say anything.
+    try {
+      const { club, n, shots } = QuickStats.pick(sessions);
+      if (club && n >= Metrics.MIN_SHOTS_REPORT) {
+        const carries = shots.filter(s => s.clubType === club).map(s => s.carryDistance);
+        const cs = consistencyScore(carries);
+        if (cs !== null && cs >= 90) {
+          out.push({ icon: '🎯', type: 'positive',
+            text: `Your ${clubLabel(club)} is repeating well — ${cs}% over ${n} shots. That is a distance you can club off.` });
+        } else if (cs !== null && cs <= 65) {
+          out.push({ icon: '📏', type: 'warning',
+            text: `Your ${clubLabel(club)} carry is spread wide over ${n} shots (${cs}%). ` +
+                  `Strike quality is the usual reason, and it is the one thing here the device measures directly.` });
+        }
+      }
+    } catch (_) {}
 
-    // Insight 1: Form trend
-    if (sessions.length >= 3) {
-      const recent3_scores = sessions.slice(0, 3).flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
-      const prev3_scores = sessions.slice(3, 6).flatMap(s => s.shots.map(ShotScorer.score)).filter(x => x !== null);
-      const recent3_avg = recent3_scores.length ? Math.round(recent3_scores.reduce((a,b)=>a+b,0)/recent3_scores.length) : 0;
-      const prev3_avg = prev3_scores.length ? Math.round(prev3_scores.reduce((a,b)=>a+b,0)/prev3_scores.length) : 0;
+    // 3. Practice streak. A habit count, not a measurement — no claim about
+    //    the swing, so no gate needed.
+    try {
+      const st = Features.streak(sessions);
+      if (st.current >= 3) {
+        out.push({ icon: '🔥', type: 'positive',
+          text: `${st.current} days in a row${st.best > st.current ? ` — your best is ${st.best}` : ', which is your best run yet'}.` });
+      }
+    } catch (_) {}
 
-      if (recent3_avg > prev3_avg + 5) {
-        insights.push({ icon: '📈', text: `You're improving! +${recent3_avg - prev3_avg} pts vs last week`, type: 'positive' });
-      } else if (recent3_avg < prev3_avg - 5) {
-        insights.push({ icon: '⚠️', text: `Form dipped slightly. Focus on ${FaultEngine.detectFaults(sessions[0].shots)[0]?.name || 'basics'}`, type: 'warning' });
+    // 4. Session volume, stated rather than advised. The old version told
+    //    people to rest; the app has no idea whether they are tired. It knows
+    //    how many balls they hit, so it says that, and only when the number is
+    //    genuinely unlike their own recent sessions.
+    const others = sessions.slice(1, 6).map(s => s.shots.length).filter(n => n > 0);
+    if (others.length >= 2) {
+      const usual = others.reduce((a, b) => a + b, 0) / others.length;
+      if (latest.shots.length > usual * 1.4) {
+        out.push({ icon: '🧺', type: 'info',
+          text: `${latest.shots.length} shots this session against your usual ${Math.round(usual)}. ` +
+                `Worth knowing when you read the numbers below — a long session is a different sample, not a better one.` });
       }
     }
 
-    // Insight 2: Consistency
-    const allShots = sessions.flatMap(s => s.shots);
-    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const consistency = 100 - stdDev(carries);
-    if (consistency > 85) {
-      insights.push({ icon: '🎯', text: `Your swing is very consistent (${Math.round(consistency)}%)`, type: 'positive' });
-    }
-
-    // Insight 3: Practice frequency
-    const st = Features.streak(sessions);
-    if (st.current >= 3 && st.current <= 7) {
-      insights.push({ icon: '🔥', text: `Nice ${st.current}-day streak! Keep it going`, type: 'positive' });
-    }
-
-    // Insight 4: Fatigue detection
-    if (sessions.length >= 2) {
-      const shot_counts = sessions.slice(0, 3).map(s => s.shots.length);
-      const avg_shots = shot_counts.reduce((a,b)=>a+b,0) / shot_counts.length;
-      if (shot_counts[0] > avg_shots * 1.3) {
-        insights.push({ icon: '😴', text: `Long session! Make sure to rest between rounds`, type: 'info' });
-      }
-    }
-
-    return insights;
+    return out;
   }
 
   return { generateInsights };
