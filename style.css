@@ -827,6 +827,20 @@ body.modal-open { overflow: hidden; }
 .import-error{margin:.75rem 0 .25rem;padding:.7rem .85rem;font-size:.83rem;line-height:1.55;
   color:var(--text);background:var(--surface2);border-left:3px solid var(--red);
   border-radius:var(--radius-sm);text-wrap:pretty}
+/* Feedback schedule. A hidden number has to look deliberate, not broken —
+   hence a visible placeholder and a caption saying what is happening. */
+.fb-hidden{color:var(--text-muted);opacity:.45;text-align:center;letter-spacing:.2em}
+.fb-row-hidden{cursor:pointer}
+.fb-row-hidden:hover td{background:var(--surface2)}
+.fb-caption{text-align:left;padding:.6rem .8rem .7rem;margin:0 0 .6rem;
+  font-size:.75rem;line-height:1.5;color:var(--text-muted);background:var(--surface2);
+  border-left:3px solid var(--pine);border-radius:var(--radius-sm)}
+.fb-caption-head{display:block;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;
+  font-weight:700;color:var(--text-dim);margin-bottom:.3rem}
+.fb-caption-btn{margin-top:.45rem;padding:.3rem .65rem;font-size:.72rem;font-weight:600;
+  cursor:pointer;background:var(--surface);color:var(--text);border:1.5px solid var(--border);
+  border-radius:var(--radius-sm)}
+.fb-caption-btn:hover{border-color:var(--pine)}
 .drill-tabs{display:flex;gap:.35rem;overflow-x:auto;padding-bottom:.4rem;margin-bottom:.6rem;
   scrollbar-width:none}
 .drill-tabs::-webkit-scrollbar{display:none}

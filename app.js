@@ -1289,6 +1289,25 @@ const FeedbackEngine = (() => {
     return Math.max(0.2, 1 - p * 1.1);
   }
 
+  // WHICH shots the faded schedule reveals, and it has to be deterministic.
+  // The first version drew Math.random() per shot, which is defensible as a
+  // sampling scheme and wrong as a UI: the shot table re-renders on every sort,
+  // so the same shot would hide and reveal itself as the golfer clicked column
+  // headers. A schedule that changes when you look at it is not a schedule.
+  //
+  // Fixed quarters instead of a random draw — 100% over the first fifth, then
+  // every second shot, then every third, then every fifth. That lands in the
+  // 33–50% average band the retention studies used, fades monotonically, and
+  // is explainable in one sentence to the golfer, which a random draw is not.
+  function fadedReveal(idx, total) {
+    if (!total || total < 5) return true;
+    const p = idx / total;
+    if (p < 0.2) return true;
+    if (p < 0.5) return idx % 2 === 0;
+    if (p < 0.8) return idx % 3 === 0;
+    return idx % 5 === 0;
+  }
+
   // Is this shot inside the golfer's own tolerance band? Bandwidth feedback
   // stays silent when it is. Tolerance is the golfer's own typical error, not
   // a population constant — so the band tightens as they get more consistent.
@@ -1303,9 +1322,9 @@ const FeedbackEngine = (() => {
     const { index = 0, total = 0, mode = getMode(), outsideBand = false } = ctx || {};
     switch (mode) {
       case 'always':    return { reveal: true,  reason: 'every shot' };
-      case 'faded':     return { reveal: Math.random() < fadedFrequency(index, total),
-                                 reason: `faded (${Math.round(fadedFrequency(index, total) * 100)}%)` };
-      case 'bandwidth': return { reveal: outsideBand, reason: outsideBand ? 'outside tolerance' : 'inside tolerance — silence is the feedback' };
+      case 'faded':     return { reveal: fadedReveal(index, total),
+                                 reason: `faded (${Math.round(fadedFrequency(index, total) * 100)}% here)` };
+      case 'bandwidth': return { reveal: outsideBand, reason: outsideBand ? 'outside your band' : 'inside your band — the silence is the feedback' };
       default:          return { reveal: false, reason: 'tap to reveal' };
     }
   }
@@ -1313,6 +1332,94 @@ const FeedbackEngine = (() => {
   // Error estimation preserves the intrinsic error-detection process that
   // constant feedback displaces. Ask before showing, on a sample of shots.
   function shouldAskPrediction(index) { return index > 0 && index % 5 === 0; }
+
+  // The tolerance band for bandwidth feedback, from THIS golfer's own spread —
+  // never a published figure. A band borrowed from other people would go quiet
+  // on shots that are unusual for this golfer and shout about shots that are
+  // not, which is the opposite of what bandwidth feedback is for. It also
+  // tightens on its own as they get more consistent, which is the property that
+  // makes the mode self-reducing.
+  // 1.5 rather than 1 standard deviation, and the reason is arithmetic. One SD
+  // puts about a third of a normal distribution outside it BY CONSTRUCTION, so
+  // a band at 1 SD breaks silence on one shot in three no matter how well the
+  // golfer is striking it. That is not a miss, that is ordinary variation with
+  // an alarm on it, and it would train someone to ignore the alarm. At 1.5 SD
+  // roughly one shot in eight is reported, which is a miss.
+  const BAND_K = 1.5;
+  function tolerance(shots, metric, clubType) {
+    const sd = Metrics.shotSpread(shots, metric, clubType);
+    return Number.isFinite(sd) && sd > 0 ? BAND_K * sd : null;
+  }
+
+  // The whole schedule for a set of shots, in the order they were hit.
+  //
+  // WHAT THIS DOES AND DOES NOT CLAIM. The guidance hypothesis is about
+  // knowledge of results during acquisition — the number that appears after
+  // each swing. This app cannot control that: the golfer was looking at a
+  // Rapsodo screen at the time, and by the time a CSV is imported the session
+  // is over. What it controls is its OWN per-shot surface, which for anyone
+  // reviewing mid-session is the same loop, and whether it asks for an error
+  // estimate before it reveals anything.
+  //
+  // Session AGGREGATES are deliberately never faded. A mean with an interval
+  // is not per-trial feedback, it is the summary the retention literature
+  // actively wants a learner to have. Hiding it would be copying the shape of
+  // the finding rather than the finding.
+  function plan(shots, opts = {}) {
+    const list = shots || [];
+    const mode = opts.mode || getMode();
+    const metric = opts.metric || 'smashFactor';
+
+    // The band is computed PER CLUB. Pooled across a mixed session it measures
+    // the gap between a driver and a wedge rather than anything about the
+    // strike: tour smash runs 1.48 at driver and 1.20 at lob wedge, so a
+    // single band over both leaves most shots "outside" it and the mode
+    // degrades into showing almost everything. On a real 74-shot two-club
+    // session that was 53% reported, which is not bandwidth feedback.
+    const bands = new Map();
+    const bandFor = club => {
+      if (bands.has(club)) return bands.get(club);
+      const vals = list.filter(s => s.clubType === club).map(s => s[metric]);
+      const { kept } = Metrics.trimOutliers(vals);
+      const band = { centre: kept.length ? mean(kept) : null,
+                     tol: opts.tolerance ?? tolerance(list, metric, club) };
+      bands.set(club, band);
+      return band;
+    };
+
+    return list.map((shot, index) => {
+      const { centre, tol } = opts.clubType || opts.target !== undefined
+        ? { centre: opts.target ?? bandFor(shot.clubType).centre, tol: opts.tolerance ?? bandFor(shot.clubType).tol }
+        : bandFor(shot.clubType);
+      const outsideBand = (tol === null || centre === null)
+        ? true                       // no band yet: cannot stay silent about a shot it cannot judge
+        : !insideBand(shot, metric, centre, tol);
+      const d = shouldReveal({ index, total: list.length, mode, outsideBand });
+      return { index, shot, ...d, predict: shouldAskPrediction(index), outsideBand };
+    });
+  }
+
+  // One line explaining what the golfer is looking at, because a table full of
+  // hidden numbers with no explanation reads as a broken app rather than as a
+  // deliberate schedule.
+  function explain(mode = getMode(), n = 0) {
+    switch (mode) {
+      case 'always':
+        return 'Every number shown, which is what every other launch monitor does. It feels better now and ' +
+               'measurably costs you next-day retention — the setting to change it is in Settings.';
+      case 'faded':
+        return `Numbers fade across the ${n} shots: all of them early, then every second, third and fifth as ` +
+               'you go. This is the schedule from the retention studies, not a sample — the same shot always ' +
+               'shows the same way.';
+      case 'bandwidth':
+        return 'Only shots outside your own tolerance band are shown, and the band is worked out separately ' +
+               'for each club from your own shot-to-shot spread. It tightens as you get more consistent, and ' +
+               'the silence on everything else is the feedback.';
+      default:
+        return 'Numbers are hidden until you tap a row. Looking less often is the part of this the evidence ' +
+               'supports, and you keep the choice of when.';
+    }
+  }
 
   // Volume distribution: 4 x 60 beats 1 x 240. Warn on marathons.
   function volumeAdvice(shotCount) {
@@ -1324,8 +1431,8 @@ const FeedbackEngine = (() => {
     return null;
   }
 
-  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction,
-           insideBand, fadedFrequency, volumeAdvice };
+  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction, BAND_K,
+           insideBand, fadedFrequency, fadedReveal, tolerance, plan, explain, volumeAdvice };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -4998,6 +5105,7 @@ const UI = (() => {
   function renderDetail(session) {
     _session = session;
     _clubFilter = 'all';
+    _revealed = new Set();
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
     renderRetention(session).catch(e => console.error('retention', e));
     // Opening a probe on the top fault is what makes the NEXT session able to
@@ -5715,6 +5823,11 @@ const UI = (() => {
   // ── Shot log (sortable, colour-coded) ─────────────────────────
   let _sortField=null, _sortDir=1;
 
+  // Rows the golfer has chosen to open, by the index the shot was HIT at.
+  // Cleared when a different session is opened — a reveal is a choice about
+  // these shots, not a global preference.
+  let _revealed = new Set();
+
   function renderShotTable(shots, sortField, sortDir) {
     if (sortField!==undefined) { _sortField=sortField; _sortDir=sortDir; }
     const sorted = [...shots];
@@ -5744,13 +5857,64 @@ const UI = (() => {
       return `<th ${c.field?`data-field="${c.field}"`:''}>${c.label}${arrow}</th>`;
     }).join('');
 
+    // The feedback schedule, applied to the one surface in this app that is
+    // per-shot knowledge of results. It is keyed on the order the shots were
+    // HIT, not the order they are currently sorted in — a faded schedule that
+    // re-decided itself when you clicked a column header would not be a
+    // schedule. `_revealed` carries the rows the golfer has chosen to open,
+    // and survives sorting for the same reason.
+    const order = new Map(shots.map((s, i) => [s, i]));
+    const decisions = new Map();
+    FeedbackEngine.plan(shots).forEach(d => decisions.set(d.shot, d));
+
     const body = sorted.map((s,i) => {
-      const sc = ShotScorer.score(s);
+      const hit = order.get(s) ?? i;
+      const d = decisions.get(s);
+      const open = !d || d.reveal || _revealed.has(hit);
+      // The green/amber/red edge is a VERDICT on the shot, so it is feedback
+      // just as much as the numbers are. Leaving it on a hidden row meant the
+      // schedule hid the figures and told the golfer whether the shot was good
+      // anyway — which is the whole thing it exists to prevent. It comes off
+      // with them, and comes back when the row is opened.
+      const sc = open ? ShotScorer.score(s) : null;
       const rowCls = sc===null?'': sc>=75?'row-good': sc>=50?'row-ok':'row-bad';
-      return `<tr class="${rowCls} shot-row" data-idx="${i}">${COLS.map(c=>`<td>${c.render(s,i)}</td>`).join('')}</tr>`;
+      const cells = COLS.map(c => {
+        // The index column and the club stay visible whatever the schedule
+        // says: knowing WHICH shot you are looking at is not feedback about it.
+        if (open || c.field === null && c.label === '#') return `<td>${c.render(s,i)}</td>`;
+        if (c.field === 'clubType') return `<td>${c.render(s,i)}</td>`;
+        return `<td class="fb-hidden">·</td>`;
+      }).join('');
+      return `<tr class="${rowCls} shot-row${open ? '' : ' fb-row-hidden'}" data-idx="${i}" data-hit="${hit}">${cells}</tr>`;
     }).join('');
 
+    const mode = FeedbackEngine.getMode();
+    const shown = sorted.filter(s => { const d = decisions.get(s); return !d || d.reveal || _revealed.has(order.get(s)); }).length;
+    // Rendered ABOVE the table rather than as a <caption>. A caption is as wide
+    // as the table it belongs to, and this table scrolls horizontally inside
+    // .table-wrap — so the explanation for why the numbers are hidden was
+    // itself hidden off the right edge on a phone.
+    const noteHost = document.getElementById('shotFeedbackNote');
+    if (noteHost) {
+      noteHost.innerHTML = mode === 'always' ? '' : `<div class="fb-caption">
+          <span class="fb-caption-head">${shown} of ${sorted.length} shown · ${Sanitize.escape(FeedbackEngine.MODES[mode].label)}</span>
+          ${Sanitize.escape(FeedbackEngine.explain(mode, sorted.length))}
+          ${shown < sorted.length ? '<button class="fb-caption-btn" id="fbRevealAll">Show them all</button>' : ''}</div>`;
+    }
+
     el.innerHTML=`<thead><tr>${heads}</tr></thead><tbody>${body}</tbody>`;
+    // Tapping a hidden row opens that shot only. That is the whole of
+    // self-selected feedback: the golfer keeps the choice, and choosing costs
+    // them a deliberate action rather than happening by default.
+    el.querySelectorAll('tr.fb-row-hidden').forEach(tr => tr.addEventListener('click', e => {
+      e.stopPropagation();
+      _revealed.add(Number(tr.dataset.hit));
+      renderShotTable(shots);
+    }, { capture: true }));
+    document.getElementById('fbRevealAll')?.addEventListener('click', () => {
+      shots.forEach((_, i) => _revealed.add(i));
+      renderShotTable(shots);
+    });
     el.querySelectorAll('th[data-field]').forEach(th=>{
       th.addEventListener('click',()=>{
         const f=th.dataset.field;
