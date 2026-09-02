@@ -526,8 +526,23 @@ const Metrics = (() => {
                note: `Needs ${Math.max(1, 3 - te.n)} more session${3 - te.n === 1 ? '' : 's'} ` +
                      `before a change in this can be called real or not.` };
     }
+    // A typical error of zero is not precision. It means every session in the
+    // history has an identical spread of zero for this metric — degenerate or
+    // heavily rounded data, not a golfer who repeats perfectly — and dividing
+    // by it made ANY delta "real", including a delta of exactly nothing, since
+    // `0 >= 0`. `Rounds.trend()` had the same hole and treats a flat baseline
+    // as real-with-a-warning, which is right THERE: those are round-level
+    // numbers a golfer genuinely can repeat. Here the floor is built from
+    // within-session shot scatter, so a zero is a data problem and the honest
+    // answer is that it cannot be judged.
+    if (!(te.value > 0)) {
+      return { real: null, threshold: null, source: 'flat-history', need: 0,
+               note: 'Every session in this history has the same reading for this metric shot after shot, ' +
+                     'so there is no spread to measure a change against.' };
+    }
     const threshold = 2.77 * te.value / Math.sqrt(Math.max(1, n));
-    return { real: Math.abs(delta) >= threshold, threshold, source: 'personal' };
+    // A delta of nothing is never a change, whatever the threshold says.
+    return { real: delta !== 0 && Math.abs(delta) >= threshold, threshold, source: 'personal' };
   }
 
   // Format a mean the honest way: an interval, never a bare point estimate.
@@ -4823,6 +4838,19 @@ const Benchmarks = (() => {
     return { launch, attack, spin };
   }
 
+  // Did a tier-2 angle move toward its target band or away from it? There is
+  // no fixed direction for launch or attack angle — "higher is better" is true
+  // of a driver and is a thin strike with a 7-iron — so the only defensible
+  // verdict reads off the band. Inside the band already and still inside is
+  // not a regression, whichever way the number went.
+  function movedToward(band, from, to) {
+    if (!band || !Number.isFinite(from) || !Number.isFinite(to)) return null;
+    const dist = v => v < band.lo ? band.lo - v : v > band.hi ? v - band.hi : 0;
+    const d0 = dist(from), d1 = dist(to);
+    if (d0 === 0 && d1 === 0) return 'inside';
+    return d1 < d0 ? 'toward' : d1 > d0 ? 'away' : 'level';
+  }
+
   // Estimated spin loft by club family. TrackMan publishes PGA driver 14.7°
   // and 6-iron 24.3°; the most efficient drivers of the ball sit near 10–14°.
   // Spin rises with spin loft only up to ~45°, past which the ball slides up
@@ -4861,7 +4889,7 @@ const Benchmarks = (() => {
     }
   }
 
-  return { get, status, TARGET, targetsFor, spinLoftBand };
+  return { movedToward, get, status, TARGET, targetsFor, spinLoftBand };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -7778,36 +7806,99 @@ const UI = (() => {
       if (canvas) _charts[id] = new Chart(canvas, mkCfg(data,color,yLabel));
     });
 
-    // render trend summary
+    // ── Trend summary ─────────────────────────────────────────
+    // This is the app's headline "am I getting better" surface and it had the
+    // three problems the rest of the app exists to avoid:
+    //
+    //   1. It pooled across conditions. Switching from range balls to your own
+    //      ball adds yards to every carry, and the box reported that as
+    //      "↑ Carry distance +15 yds (9%)".
+    //   2. It had no significance test. `Metrics.changeIsReal` exists for
+    //      exactly this question and was used only by the retention probe, so
+    //      any 1% move got an arrow and a colour.
+    //   3. It graded tier-2 angles on a fixed direction across the whole bag —
+    //      "attack angle: higher is better" is true for a driver and is a thin
+    //      strike with a 7-iron, and "launch angle: lower is better" is not
+    //      true of anything.
     const trendEl = document.getElementById('progressTrend');
     if (!trendEl) return;
-    const recent = sessions.slice(0,3);
-    const older  = sessions.slice(3,6);
-    if (recent.length<2||older.length<1) { trendEl.innerHTML=''; return; }
 
-    const compare = (field,label,higherBetter=true) => {
-      const r = avg(recent.flatMap(s=>s.shots),field);
-      const o = avg(older.flatMap(s=>s.shots),field);
-      if (!r||!o) return '';
-      const diff = r-o, pct = Math.abs(diff/o*100);
-      const better = higherBetter ? diff>0 : diff<0;
-      const icon = pct<1?'→': better?'↑':'↓';
-      const cls = pct<1?'neutral': better?'positive':'negative';
+    // Same conditions only. Sessions are newest-first, so the run is anchored
+    // on the most recent session's ball and surface — the equipment the golfer
+    // is on now is the one worth trending.
+    const anchor = sessions[0];
+    const same = sessions.filter(s => Conditions.comparable(s, anchor));
+    const skipped = sessions.length - same.length;
+    const recent = same.slice(0,3);
+    const older  = same.slice(3,6);
+    if (recent.length<2||older.length<1) {
+      trendEl.innerHTML = skipped
+        ? `<div class="trend-box"><div class="trend-heading">Not enough comparable sessions yet</div>
+           <div class="tail-note">${skipped} of your ${sessions.length} sessions used a different ball or
+           surface, and those do not trend against each other — a ball change moves every carry at once.
+           Log ${Math.max(0, 3 - same.length)} more on ${Sanitize.escape(Conditions.ball(anchor).label.toLowerCase())}
+           and this fills in.</div></div>`
+        : '';
+      return;
+    }
+
+    const compare = (field, label, higherBetter) => {
+      const rShots = recent.flatMap(s=>s.shots), oShots = older.flatMap(s=>s.shots);
+      const r = avg(rShots, field), o = avg(oShots, field);
+      if (!r || !o) return '';
+      const diff = r - o;
+      const unit = field==='launchAngle'||field==='attackAngle' ? '°'
+                 : field==='ballSpeed' ? ' mph'
+                 : field==='smashFactor' ? '' : ' yds';
+      // Smash moves in hundredths and its threshold in thousandths, so two
+      // decimals printed "needs 0.00", which reads as "any change counts".
+      const dec  = field==='smashFactor' ? 2 : field==='carryDistance' ? 0 : 1;
+      const tdec = field==='smashFactor' ? 3 : dec;
+      const n = rShots.filter(s => Number.isFinite(s[field])).length;
+
+      // Is this bigger than your own session-to-session variation? Below the
+      // threshold there is no direction to report, so there is no arrow and no
+      // colour — a neutral row that says what it would take to be sure.
+      const v = Metrics.changeIsReal(field, diff, n, same, clubFilter==='all'?null:clubFilter);
+      if (v.real === null) return `<div class="trend-row trend-neutral">
+        <span class="trend-icon">·</span><span class="trend-label">${label}</span>
+        <span class="trend-val">${fmt(diff,dec)}${unit} — ${Sanitize.escape(v.note || 'not enough history to judge')}</span></div>`;
+      if (!v.real) return `<div class="trend-row trend-neutral">
+        <span class="trend-icon">→</span><span class="trend-label">${label}</span>
+        <span class="trend-val">${diff>0?'+':''}${fmt(diff,dec)}${unit} — inside your own spread (needs ${fmt(v.threshold,tdec)}${unit})</span></div>`;
+
+      // Real move. A verdict only where one is defensible: tier 1 has a
+      // direction, tier 2 angles do not without a club and its target band.
+      let icon = diff>0?'↑':'↓', cls = 'neutral', suffix = '';
+      if (higherBetter !== null) { cls = (higherBetter === diff>0) ? 'positive':'negative'; }
+      else if (clubFilter !== 'all') {
+        const band = Benchmarks.targetsFor(clubFilter)[field==='launchAngle'?'launch':'attack'];
+        const moved = Benchmarks.movedToward(band, o, r);
+        if (moved === 'toward')      { cls = 'positive'; suffix = ` — toward ${band.label}`; }
+        else if (moved === 'away')   { cls = 'negative'; suffix = ` — away from ${band.label}`; }
+        else if (moved === 'inside') { cls = 'neutral'; icon = '→'; suffix = ` — still inside ${band.label}`; }
+      } else {
+        suffix = ' — no direction across a whole bag; pick one club';
+      }
       return `<div class="trend-row trend-${cls}">
-        <span class="trend-icon">${icon}</span>
-        <span class="trend-label">${label}</span>
-        <span class="trend-val">${better?'+':''}${fmt(diff, field==='smashFactor'?2:0)}${field==='launchAngle'||field==='attackAngle'?'°': field==='smashFactor'?'':' yds'} (${fmt(pct,0)}%)</span>
-      </div>`;
+        <span class="trend-icon">${icon}</span><span class="trend-label">${label}</span>
+        <span class="trend-val">${diff>0?'+':''}${fmt(diff,dec)}${unit}${suffix}</span></div>`;
     };
 
     trendEl.innerHTML = `
       <div class="trend-box">
-        <div class="trend-heading">Last 3 sessions vs previous 3</div>
-        ${compare('carryDistance','Carry distance')}
-        ${compare('ballSpeed','Ball speed')}
-        ${compare('smashFactor','Smash factor')}
-        ${compare('launchAngle','Launch angle',false)}
-        ${compare('attackAngle','Attack angle (driver benefit when > 0)',true)}
+        <div class="trend-heading">Last ${recent.length} sessions vs previous ${older.length}${
+          clubFilter==='all' ? '' : ' · ' + Sanitize.escape(clubLabel(clubFilter))}</div>
+        ${compare('carryDistance','Carry distance', true)}
+        ${compare('ballSpeed','Ball speed', true)}
+        ${compare('smashFactor','Smash factor', true)}
+        ${compare('launchAngle','Launch angle', null)}
+        ${compare('attackAngle','Attack angle', null)}
+        <div class="tail-note">On ${Sanitize.escape(Conditions.ball(anchor).label.toLowerCase())}${
+          skipped ? `, ${skipped} session${skipped>1?'s':''} on other conditions left out` : ''}.
+          A move is only called a move when it is larger than your own session-to-session variation.
+          Launch and attack angle are shown without a verdict${clubFilter==='all'
+            ? ' because a bag has no single right answer for either' : ''} — they are display-only metrics.</div>
       </div>`;
   }
 

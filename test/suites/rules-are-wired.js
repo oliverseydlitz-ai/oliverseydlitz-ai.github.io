@@ -47,6 +47,8 @@ const WIRED = [
   ['MIN_SHOTS_DELIVERY','Metrics',      'the four tier-2 fault rules keep their own copy of the 15-shot floor'],
   ['BALLS',           'Conditions',     'the import menu becomes a second hand-maintained copy of the ball list'],
   ['SURFACES',        'Conditions',     'the same, for the surface list'],
+  ['movedToward',     'Benchmarks',     'the progress trend grades an angle on a fixed sign again'],
+  ['changeIsReal',    'Metrics',        'a 1% move gets an arrow and a colour'],
 ];
 
 console.log('— every gate the app defines is read by something outside its module —');
