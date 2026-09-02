@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="How a shot becomes a drill in ShotLab: the seven gates it passes, the invariants that hold everywhere, and the module map.">
+<meta name="robots" content="noindex">
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>ShotLab Decision Pipeline</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F6F7F4; --sunk:#EDEFEA; --panel:#FFFFFF;
+  --ink:#171D1B; --ink-2:#414B48; --ink-3:#6B7671;
+  --rule:#D8DCD5; --rule-hi:#BEC5BC;
+  --accent:#0B5D6B; --accent-soft:#E2EEF0;
+  --pass:#2F6B3F; --pass-soft:#E3EEE5;
+  --block:#B3341F; --block-soft:#F6E4E0;
+  --hold:#8A5E10; --hold-soft:#F6EDDC;
+  --measure:66ch;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#121716; --sunk:#0D1211; --panel:#191F1E;
+  --ink:#E8EDEA; --ink-2:#B2BCB8; --ink-3:#828D89;
+  --rule:#2A3231; --rule-hi:#3D4746;
+  --accent:#5FB8C4; --accent-soft:#12302F;
+  --pass:#7FBB8B; --pass-soft:#16281B;
+  --block:#E0765E; --block-soft:#301A16;
+  --hold:#D2A044; --hold-soft:#2B2113;
+}}
+:root[data-theme="dark"]{
+  --ground:#121716; --sunk:#0D1211; --panel:#191F1E;
+  --ink:#E8EDEA; --ink-2:#B2BCB8; --ink-3:#828D89;
+  --rule:#2A3231; --rule-hi:#3D4746;
+  --accent:#5FB8C4; --accent-soft:#12302F;
+  --pass:#7FBB8B; --pass-soft:#16281B;
+  --block:#E0765E; --block-soft:#301A16;
+  --hold:#D2A044; --hold-soft:#2B2113;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);margin:0;
+  font-family:"Source Serif 4",Georgia,serif;font-size:17px;line-height:1.62;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1020px;margin:0 auto;padding:0 28px 96px}
+h1,h2,h3,h4,th,.lab{font-family:Archivo,"Helvetica Neue",Arial,sans-serif}
+h1,h2,h3{text-wrap:balance}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+code{font-size:.88em;background:var(--sunk);padding:1px 5px;border-radius:2px}
+
+header{border-bottom:2px solid var(--ink);padding:44px 0 22px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+h1{font-size:clamp(32px,5vw,48px);line-height:1.05;font-weight:700;
+  letter-spacing:-.02em;margin:0 0 16px}
+.standfirst{font-size:19px;color:var(--ink-2);margin:0;max-width:58ch}
+.meta{display:flex;flex-wrap:wrap;gap:24px;margin-top:24px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--ink-3)}
+.meta b{color:var(--ink-2);font-weight:500}
+
+section{margin:56px 0 0}
+h2{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin:0 0 10px;padding-bottom:9px;border-bottom:1px solid var(--rule-hi)}
+.lede{font-size:20px;line-height:1.45;margin:16px 0 26px;max-width:56ch}
+p{margin:0 0 15px;max-width:var(--measure)}
+ul{margin:0 0 15px;padding-left:20px;max-width:var(--measure)}
+li{margin-bottom:6px}
+
+/* pipeline */
+.pipe{display:grid;gap:0;margin:26px 0 8px}
+.stage{display:grid;grid-template-columns:132px 1fr;gap:20px;
+  padding:16px 0;border-top:1px solid var(--rule);align-items:start}
+.stage:first-child{border-top:1px solid var(--rule-hi)}
+.stage-k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink-3);padding-top:3px}
+.stage-t{font-family:Archivo,sans-serif;font-weight:650;font-size:16.5px;
+  margin-bottom:5px;line-height:1.3}
+.stage-d{font-size:15px;line-height:1.55;color:var(--ink-2);max-width:60ch}
+.gate{display:inline-flex;align-items:baseline;gap:8px;margin-top:9px;
+  padding:5px 10px;background:var(--sunk);border-left:3px solid var(--block);
+  font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-2)}
+.gate b{color:var(--block);font-weight:600}
+.gate.hold{border-left-color:var(--hold)} .gate.hold b{color:var(--hold)}
+.gate.pass{border-left-color:var(--pass)} .gate.pass b{color:var(--pass)}
+.out{margin-top:9px;padding:9px 12px;background:var(--pass-soft);
+  border-left:3px solid var(--pass);font-size:14.5px;color:var(--ink)}
+
+/* module table */
+.tw{overflow-x:auto;margin:18px 0 8px;border-top:1px solid var(--rule-hi)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:560px}
+th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;text-align:left;padding:10px 16px 10px 0;border-bottom:1px solid var(--rule)}
+td{padding:10px 16px 10px 0;border-bottom:1px solid var(--rule);
+  vertical-align:top;color:var(--ink-2)}
+td:first-child{white-space:nowrap}
+td code{background:none;padding:0;color:var(--ink);font-weight:500}
+.grp td{background:var(--sunk);font-family:Archivo,sans-serif;font-weight:650;
+  color:var(--ink);font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  padding:8px 16px 8px 10px}
+
+/* callout */
+.note{background:var(--accent-soft);padding:18px 22px;margin:22px 0;max-width:var(--measure)}
+.note p:last-child{margin-bottom:0}
+.note .lab{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;display:block;margin-bottom:7px}
+
+/* invariants */
+.inv{display:grid;gap:0;margin-top:6px}
+.inv-row{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:12px 0;
+  border-top:1px solid var(--rule);align-items:baseline}
+.inv-row:first-child{border-top:0}
+.inv-m{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--pass);white-space:nowrap;
+  padding:2px 7px;background:var(--pass-soft);border:1px solid currentColor}
+.inv-t{font-size:15.5px;line-height:1.5;color:var(--ink-2)}
+.inv-t b{color:var(--ink);font-weight:600}
+
+footer{border-top:2px solid var(--ink);margin-top:64px;padding-top:22px;
+  font-size:14.5px;color:var(--ink-2)}
+footer a{color:var(--accent)}
+@media (max-width:640px){
+  body{font-size:16px}.wrap{padding:0 18px 64px}
+  .stage{grid-template-columns:1fr;gap:6px}
+  .stage-k{padding-top:0}
+  .inv-row{grid-template-columns:1fr;gap:6px}
+  .inv-m{justify-self:start}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Architecture reference · ShotLab TOUR</p>
+  <h1>What has to be true before the app tells a golfer anything</h1>
+  <p class="standfirst">Most of this system is refusals. A shot arrives from a Rapsodo CSV and passes seven gates before it can become a drill — and at every one, the honest output is often silence. This is what each gate checks and why it exists.</p>
+  <div class="meta">
+    <span><b>Entry</b> Rapsodo MLM2PRO CSV</span>
+    <span><b>Modules</b> 50 in app.js</span>
+    <span><b>Tests</b> load gate + 8 suites</span>
+  </div>
+</header>
+
+<section>
+  <h2>The decision pipeline</h2>
+  <p class="lede">Read top to bottom. Anything stopped at a gate produces an explanation, never a number with a confidence it hasn't earned.</p>
+
+  <div class="pipe">
+    <div class="stage">
+      <div class="stage-k">1 · Parse</div>
+      <div>
+        <div class="stage-t">CSV → shot objects</div>
+        <div class="stage-d"><code>CSVParser</code> maps Rapsodo's 18 columns. A blank or unparseable numeric cell becomes <code>null</code>, never <code>0</code> — Rapsodo leaves club data empty when it isn't picked up, and coercing that to zero is what once scored a shot with no measurements as a perfect strike.</div>
+        <div class="gate"><b>drops</b> nothing — but marks what was never measured</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">2 · Stamp</div>
+      <div>
+        <div class="stage-t">Attach the measurement context</div>
+        <div class="stage-d"><code>Store.stamp()</code> writes ball type, surface and alignment state onto every shot, at both entry points — loading and fresh import. Downstream gates work on flattened shot lists, so no call site has to thread session context, and none can forget to.</div>
+        <div class="gate hold"><b>holds</b> ball ≠ RPT · surface unknown · alignment unconfirmed</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">3 · Tier</div>
+      <div>
+        <div class="stage-t">Is this metric allowed to prescribe?</div>
+        <div class="stage-d"><code>Metrics.TIER</code>. Tier 1 prescribes freely (club speed, ball speed, smash, carry). Tier 2 displays only (launch angle, attack angle, club path). Tier 3 never prescribes — spin, spin axis, launch direction, and every modelled output.</div>
+        <div class="gate"><b>blocks</b> tier 3 from every prescription path, on any ball</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">4 · Sample</div>
+      <div>
+        <div class="stage-t">Are there enough shots to say anything?</div>
+        <div class="stage-d">10 shots of a club before any mean is reported. 15 before a club-path or attack-angle claim. 30 for dispersion tails — dropping to 10 when alignment is confirmed, because that gate removes bias rather than noise.</div>
+        <div class="gate"><b>blocks</b> below <code>Metrics.MIN_SHOTS_REPORT</code>, or a rule's own <code>minShots</code></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">5 · Recur</div>
+      <div>
+        <div class="stage-t">Is this a pattern or is it the radar?</div>
+        <div class="stage-d"><code>FaultEngine</code> reports a fault only when it recurs at a rate noise would not produce: 2+ affected shots, 30%+ of that club's shots, judged against the clubs it appeared on rather than the whole session. Below 50% it reports as tentative with severity downgraded.</div>
+        <div class="gate"><b>blocks</b> 1-of-12 · <span style="color:var(--hold)">flags</span> 5-of-12 · passes 9-of-12</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">6 · Weight</div>
+      <div>
+        <div class="stage-t">How much practice time does it earn?</div>
+        <div class="stage-d"><code>PracticePlan</code> scales by severity × scoring weight × session share × confidence. Approach clubs outrank a 3-wood hit twice a round, because that is where strokes-gained puts scoring differences. Every block prescribes balls as well as minutes.</div>
+        <div class="out">Output: a drill, with an external-focus cue, a ball count and a ~70% success target.</div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-k">7 · Retain</div>
+      <div>
+        <div class="stage-t">Did it actually work?</div>
+        <div class="stage-d"><code>RetentionProbe</code> opens on the prescription and settles against a session 20 hours to 10 days later. This is the efficacy metric — not within-session change, which the evidence says is the one window that cannot see learning.</div>
+        <div class="gate pass"><b>verdict</b> retained · regressed · no detectable change · unknown</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <span class="lab">The gate that cannot be averaged away</span>
+    <p>Six of these gates handle <em>noise</em>, which shrinks as √n. Alignment handles <em>bias</em>, which does not shrink at all. A unit aimed 2° right makes a straight swing read 2.4° open once face-to-path amplifies it by 1/R — identically at 10 shots and at 30, while every other gate grows more confident. That asymmetry is why setup is a checklist rather than a tolerance.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Invariants</h2>
+  <p class="lede">Properties that hold everywhere. Each has a test that fails if it stops holding.</p>
+
+  <div class="inv">
+    <div class="inv-row"><span class="inv-m">intervals</span><span class="inv-t">Every <b>±</b> is computed from the golfer's own shots. No population constant reaches a displayed number; <code>Metrics.mdc()</code> is reachable only from the Settings reference document.</span></div>
+    <div class="inv-row"><span class="inv-m">device error</span><span class="inv-t">Treated as <b>zero</b> — not because it is, but because an observed spread already contains it, and adding a constant on top counts the same error twice.</span></div>
+    <div class="inv-row"><span class="inv-m">spin</span><span class="inv-t">Never drives a drill, on any ball. With an RPT ball it <b>describes a session</b>; without one every spin figure is suppressed and replaced with why.</span></div>
+    <div class="inv-row"><span class="inv-m">face angle</span><span class="inv-t">Derived, never presented as a measurement. A suspected off-centre strike <b>invalidates it for that shot</b> rather than quietly widening it.</span></div>
+    <div class="inv-row"><span class="inv-m">cues</span><span class="inv-t">External focus only — club, ball, turf, target. A test fails if a cue naming the golfer's own body parts is added.</span></div>
+    <div class="inv-row"><span class="inv-m">verdicts</span><span class="inv-t">Three-valued. A change smaller than the golfer's variation is <b>"no detectable change"</b>, never "no improvement" — the app cannot tell those apart and says so.</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Module map</h2>
+  <p class="lede">50 IIFE modules in <code>app.js</code>, in file order. The ones that gate are listed first because everything else depends on them.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr class="grp"><td colspan="2">Measurement — everything downstream depends on these</td></tr>
+      <tr><td><code>Metrics</code></td><td>Trust tiers, sample floors, MDC reference table, outlier trimming, per-user typical error, interval formatting</td></tr>
+      <tr><td><code>Conditions</code></td><td>Ball type, surface, alignment state; the caveats that render above any prescription</td></tr>
+      <tr><td><code>Spin</code></td><td>RPT-only gating, and the two caveats for measured vs not measured</td></tr>
+      <tr><td><code>MeasurementReference</code></td><td>Published device error rates, marked with which were never measured. Reference only — never enters a ±</td></tr>
+
+      <tr class="grp"><td colspan="2">Geometry — top-level functions, not modules</td></tr>
+      <tr><td><code>facePath()</code></td><td><code>(launchDir − clubPath) / R</code>. Derived; null when either input is missing</td></tr>
+      <tr><td><code>faceAngle()</code></td><td><code>(launchDir − (1−R)·clubPath) / R</code>. Consistent with facePath by construction</td></tr>
+      <tr><td><code>faceRatio()</code></td><td>R, interpolated piecewise through the measured anchors at each club's tour spin loft</td></tr>
+      <tr><td><code>spinLoft()</code></td><td><code>(launchAngle − AoA) / kv</code>. Reproduces TrackMan's published tour spin lofts exactly</td></tr>
+      <tr><td><code>gearEffectSuspected()</code></td><td>Compares predicted spin axis to measured; a large residual marks a toe or heel strike</td></tr>
+
+      <tr class="grp"><td colspan="2">Analysis</td></tr>
+      <tr><td><code>FaultEngine</code></td><td>Per-shot and session rules, plus the recurrence gates that decide what is reportable</td></tr>
+      <tr><td><code>ShotScorer</code></td><td>0–100 from tier 1 and 2 metrics only — smash 45, attack angle 25, club path 15, spin loft 15</td></tr>
+      <tr><td><code>Benchmarks</code></td><td>Tour averages tagged <code>[TM]</code> or <code>[est]</code>, targets held separately, spin-loft bands</td></tr>
+      <tr><td><code>SwingDNA</code>, <code>Insights</code>, <code>Analytics</code></td><td>Session tendencies, coach's notes, yardage book and personal bests</td></tr>
+
+      <tr class="grp"><td colspan="2">Coaching</td></tr>
+      <tr><td><code>PracticePlan</code></td><td>Time weighting, ball counts, the transfer block appended to every plan</td></tr>
+      <tr><td><code>CoachingMode</code></td><td>External-focus cues and the session dosage protocol</td></tr>
+      <tr><td><code>FeedbackEngine</code></td><td>Four feedback schedules, defaulting to tap-to-reveal</td></tr>
+      <tr><td><code>RetentionProbe</code></td><td>Opens on a prescription, settles a day or more later. The efficacy metric</td></tr>
+      <tr><td><code>SetupGuide</code></td><td>The six alignment steps, and what each metric needs to be trustworthy</td></tr>
+
+      <tr class="grp"><td colspan="2">Infrastructure</td></tr>
+      <tr><td><code>Store</code></td><td>Local-first with cloud merged on top; stamps measurement context on every shot</td></tr>
+      <tr><td><code>Auth</code>, <code>CloudDB</code></td><td>Supabase implicit-flow OAuth with deterministic session install; per-user rows behind RLS</td></tr>
+      <tr><td><code>Router</code>, <code>UI</code>, <code>ImportFlow</code></td><td>View switching with render errors isolated, all rendering, CSV import</td></tr>
+      <tr><td><code>Sanitize</code>, <code>Agreement</code>, <code>CookieConsent</code></td><td>XSS escaping, blocking clickwrap consent, cookie banner</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Working on it</h2>
+  <p><code>npm test</code> runs a load gate — <code>app.js</code> executed whole in jsdom against the real <code>index.html</code>, then a reachability probe for late declarations — before any suite. A top-level throw leaves every later <code>const</code> in the temporal dead zone, so the app is dead while <code>node --check</code> still passes. That is not hypothetical: it shipped, and survived four commits behind a harness that regex-extracted modules and never ran the file.</p>
+  <p>If the gate fails, the suites do not run. They would be meaningless.</p>
+  <div class="note">
+    <span class="lab">Before changing a sourced constant</span>
+    <p>The face ratios, spin-loft weights, tier assignments and sample floors are not guesses. Each is cited in <code>docs/research-base-v2.md</code> or <code>docs/coaching-calibration-audit.html</code>, and <code>CLAUDE.md</code> lists which section covers which. The reasoning is why they hold — read it before moving a number.</p>
+  </div>
+</section>
+
+<footer>
+  <p><strong>Companion documents</strong> — <code>docs/research-base-v2.md</code> is the engineering spec this is built against; <code>coaching-calibration-audit.html</code> is the audit that corrected the benchmarks; <code>worklog-2026-09.md</code> records what changed and why, with a commit index.</p>
+</footer>
+
+</div>
+</body>
+</html>
