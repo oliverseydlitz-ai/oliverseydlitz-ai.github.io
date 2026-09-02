@@ -4732,92 +4732,100 @@ const ShotScorer = (() => {
 // Swing DNA — tendencies summary
 // ────────────────────────────────────────────────────────────────
 const SwingDNA = (() => {
-  function analyze(shots) {
+  // A pre-research-base module that never got revisited, and by some distance
+  // the largest concentration of the things this app forbids:
+  //
+  //   · It labelled a golfer "Hooker" or "Slicer", tone `bad`, from a mean
+  //     SIDE CARRY — a tier-3 modelled ball-flight output — with no sample
+  //     floor and pooled across every club in the session.
+  //   · `benchSmash = shots.every(isIron) ? 1.35 : 1.43` — a private copy of
+  //     the smash benchmarks, applied to a whole mixed session, so a bag with
+  //     one wedge in it graded every shot against the driver row.
+  //   · `aa >= 1 ? 'Hitting up ✓'` — a SEVENTH copy of the driver attack
+  //     target, disagreeing with the +2..+5° in `Benchmarks.TARGET`.
+  //   · Driver spin bands 2500/3200/3800 with a ✓ and a ✗ — a copy of the
+  //     spin target that disagrees with the published 2000–2800, on a metric
+  //     the research base says must never drive a judgement at all.
+  //   · A face-to-path verdict off a five-shot mean, on a figure the app
+  //     derives rather than measures and elsewhere refuses to state.
+  //
+  // Rewritten to the same rules as everything else: one named club, sample
+  // floors, bands read from `Benchmarks`, and a good/bad tone ONLY on tier-1
+  // metrics. Tier 2 and 3 are described, never graded.
+  const NEUTRAL = 'ok';
+
+  function analyze(shots, session) {
     const pills = [];
+    const list = (shots || []).filter(Boolean);
+    if (!list.length) return pills;
 
-    // Shot shape — based on avg side carry + D-plane
-    const avgSC = avg(shots,'sideCarry');
-    const avgFP = mean(shots.map(facePath));
-    if (avgSC !== null) {
-      const shape =
-        avgSC < -15 ? {label:'Hooker',val:'Hook tendency',icon:'↩️',tone:'bad'} :
-        avgSC < -7  ? {label:'Draw',val:'Draw shape',icon:'↩️',tone:'good'} :
-        avgSC > 15  ? {label:'Slicer',val:'Slice tendency',icon:'↪️',tone:'bad'} :
-        avgSC > 7   ? {label:'Fade',val:'Fade shape',icon:'↪️',tone:'ok'} :
-                      {label:'Straight',val:'Straight',icon:'↑',tone:'good'};
-      pills.push({category:'Shot Shape',icon:shape.icon,value:shape.val,tone:shape.tone});
+    // Anchor on the most-hit club. Every pooled figure this module produced
+    // measured the club mix rather than the swing.
+    const counts = {};
+    list.forEach(s => { if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    const cs = list.filter(s => s.clubType === club);
+    const n = cs.length;
+    if (!club || n < Metrics.MIN_SHOTS_REPORT) {
+      return [{ category: 'Not yet', icon: '⏳', tone: NEUTRAL,
+        value: `${Metrics.MIN_SHOTS_REPORT - n} more shots of one club` }];
+    }
+    pills.push({ category: 'Read on', icon: '🏌️', tone: NEUTRAL, value: `${clubLabel(club)} · ${n} shots` });
+
+    // ── Tier 1: strike. The only place a verdict is earned. ──────────
+    const smashVals = cs.map(s => s.smashFactor).filter(v => v > 0);
+    const sd = stdDev(smashVals);
+    const avgSmash = avg(cs, 'smashFactor');
+    if (smashVals.length >= Metrics.MIN_SHOTS_REPORT && Number.isFinite(sd)) {
+      // Judged against what the DEVICE can resolve over this many shots rather
+      // than against invented 0.04 / 0.07 / 0.10 bands.
+      const floor = Metrics.mdc('smashFactor', smashVals.length);
+      const q = floor && sd <= floor ? { val: 'Repeating below what the device resolves', tone: 'good' }
+              : floor && sd <= floor * 2 ? { val: 'Repeating well', tone: 'good' }
+              : { val: 'Spread wide', tone: 'bad' };
+      pills.push({ category: 'Strike repeatability', icon: '🎯', tone: q.tone,
+        value: `${q.val} (σ ${fmt(sd, 3)})` });
+    }
+    const b = Benchmarks.get(club);
+    if (b && Number.isFinite(avgSmash)) {
+      const tone = avgSmash >= b.pga.sf * 0.99 ? 'good' : avgSmash >= b.am.sf ? 'ok' : 'bad';
+      pills.push({ category: 'Smash factor', icon: '💥', tone,
+        value: `${fmt(avgSmash, 2)} · amateur ${fmt(b.am.sf, 2)}, tour ${fmt(b.pga.sf, 2)}` });
     }
 
-    // Contact quality
-    const smashVals = shots.map(s=>s.smashFactor).filter(v=>v>0);
-    const avgSmash = avg(shots,'smashFactor');
-    const sdSmash = stdDev(smashVals);
-    if (avgSmash) {
-      const q = sdSmash < 0.04 ? {val:'Elite',tone:'good'} :
-                sdSmash < 0.07 ? {val:'Consistent',tone:'good'} :
-                sdSmash < 0.10 ? {val:'Inconsistent',tone:'ok'} :
-                                  {val:'Very Inconsistent',tone:'bad'};
-      pills.push({category:'Contact',icon:'🎯',value:q.val + ` (${fmt(sdSmash,3)} σ)`,tone:q.tone});
+    // ── Tier 2: club delivery. Described against the band, not graded. ──
+    const inBand = (v, band) => Number.isFinite(v) && band && v >= band.lo && v <= band.hi;
+    const tgt = Benchmarks.targetsFor(club);
+    const aa = avg(cs, 'attackAngle');
+    if (Number.isFinite(aa) && n >= Metrics.MIN_SHOTS_DELIVERY) {
+      pills.push({ category: 'Attack angle', icon: '📐', tone: NEUTRAL,
+        value: `${aa > 0 ? '+' : ''}${fmt(aa, 1)}° · target ${tgt.attack.label}` +
+               (inBand(aa, tgt.attack) ? ' — inside it' : '') });
+    }
+    const path = avg(cs, 'clubPath');
+    if (Number.isFinite(path) && n >= Metrics.MIN_SHOTS_DELIVERY) {
+      pills.push({ category: 'Club path', icon: '↗️', tone: NEUTRAL,
+        value: `${path > 0 ? '+' : ''}${fmt(path, 1)}° ${path > 0.5 ? 'in-to-out' : path < -0.5 ? 'out-to-in' : 'neutral'}` });
     }
 
-    // Average smash vs benchmark
-    if (avgSmash) {
-      const benchSmash = shots.every(s=>isIron(s.clubType)) ? 1.35 : 1.43;
-      const relative = avgSmash >= benchSmash * 0.99 ? {val:`${fmt(avgSmash,2)} ✓`,tone:'good'} :
-                       avgSmash >= benchSmash * 0.96 ? {val:`${fmt(avgSmash,2)} (near avg)`,tone:'ok'} :
-                                                        {val:`${fmt(avgSmash,2)} (below avg)`,tone:'bad'};
-      pills.push({category:'Smash Factor',icon:'💥',value:relative.val,tone:relative.tone});
+    // ── Tier 3: modelled and never prescribed from. Described only. ─────
+    const spinShots = cs.filter(s => s.spinRate && Spin.measured(s));
+    if (spinShots.length >= Metrics.MIN_SHOTS_REPORT) {
+      const ds = avg(spinShots, 'spinRate');
+      pills.push({ category: 'Spin', icon: '🌀', tone: NEUTRAL,
+        value: `${fmt(ds, 0)} rpm · published window ${tgt.spin.label} — measured, but never a prescription` });
+    }
+    const avgSC = avg(cs, 'sideCarry');
+    if (Number.isFinite(avgSC)) {
+      const dir = avgSC < -3 ? 'left of target' : avgSC > 3 ? 'right of target' : 'straight';
+      pills.push({ category: 'Where it finishes', icon: '↔️', tone: NEUTRAL,
+        value: `${fmt(Math.abs(avgSC), 0)} yds ${dir} on average — a modelled figure, not a measurement` });
     }
 
-    // Path tendency
-    const avgPath = avg(shots,'clubPath');
-    if (avgPath !== null) {
-      const p = avgPath > 3  ? {val:`In-to-out +${fmt(avgPath,1)}°`,tone:'ok'} :
-                avgPath < -3 ? {val:`Out-to-in ${fmt(avgPath,1)}°`,tone:'bad'} :
-                               {val:`Neutral ${fmt(avgPath,1)}°`,tone:'good'};
-      pills.push({category:'Club Path',icon:'📐',value:p.val,tone:p.tone});
-    }
-
-    // Attack angle on driver shots
-    const driverShots = shots.filter(s=>s.clubType==='d');
-    if (driverShots.length) {
-      const aa = avg(driverShots,'attackAngle');
-      if (aa !== null) {
-        const a = aa >= 1  ? {val:`+${fmt(aa,1)}° (Hitting up ✓)`,tone:'good'} :
-                  aa >= -1 ? {val:`${fmt(aa,1)}° (Near neutral)`,tone:'ok'} :
-                             {val:`${fmt(aa,1)}° (Hitting down ✗)`,tone:'bad'};
-        pills.push({category:'Driver AoA',icon:'📐',value:a.val,tone:a.tone});
-      }
-    }
-
-    // Spin — a reading only with an RPT ball, otherwise suppressed entirely
-    const spinShots = shots.filter(s => s.spinRate && Spin.measured(s));
-    if (spinShots.length) {
-      const avgSpin = avg(spinShots,'spinRate');
-      const driverSpin = spinShots.filter(s=>s.clubType==='d');
-      if (driverSpin.length) {
-        const ds = avg(driverSpin,'spinRate');
-        const s = ds < 2500 ? {val:`${fmt(ds,0)} rpm (Low ✓)`,tone:'good'} :
-                  ds < 3200 ? {val:`${fmt(ds,0)} rpm (Optimal ✓)`,tone:'good'} :
-                  ds < 3800 ? {val:`${fmt(ds,0)} rpm (High)`,tone:'ok'} :
-                              {val:`${fmt(ds,0)} rpm (Excessive ✗)`,tone:'bad'};
-        pills.push({category:'Driver Spin',icon:'🌀',value:s.val,tone:s.tone});
-      }
-    }
-
-    // Handedness of face-to-path
-    if (shots.length >= 5) {
-      const avgFPa = mean(shots.map(facePath));
-      if (avgFPa !== null) {
-      const fp = avgFPa > 8  ? {val:`Open +${fmt(avgFPa,1)}° (fading)`,tone:'bad'} :
-                 avgFPa > 3  ? {val:`Slightly open +${fmt(avgFPa,1)}°`,tone:'ok'} :
-                 avgFPa < -8 ? {val:`Closed ${fmt(avgFPa,1)}° (drawing)`,tone:'ok'} :
-                 avgFPa < -3 ? {val:`Slightly closed ${fmt(avgFPa,1)}°`,tone:'good'} :
-                               {val:`Square ${fmt(avgFPa,1)}° ✓`,tone:'good'};
-      pills.push({category:'Face to Path',icon:'🎰',value:fp.val,tone:fp.tone});
-      }
-    }
-
+    // Face-to-path deliberately has no pill. It is derived rather than
+    // measured, error-amplified, and the session detail already reports it
+    // properly with the golfer's own spread and an interval. A five-shot mean
+    // with an "Open (fading) ✗" beside it was the worst claim in the module.
     return pills;
   }
 
@@ -6845,7 +6853,7 @@ const UI = (() => {
 
   // ── Swing DNA ─────────────────────────────────────────────────
   function renderSwingDNA(shots) {
-    const pills = SwingDNA.analyze(shots);
+    const pills = SwingDNA.analyze(shots, _session);
     const el = document.getElementById('swingDna');
     el.innerHTML = pills.map(p => `
       <div class="dna-pill tone-${p.tone}">
