@@ -836,6 +836,10 @@ body.modal-open { overflow: hidden; }
 /* Drills that are body feels get the same visual demotion the body causes get:
    still there, plainly less load-bearing than the ones the ball checks. */
 .fault-drills-feel .drill-card{opacity:.82;border-left:2px solid var(--yellow)}
+/* A club under the sample floor keeps its row — it is still in the bag — but
+   prints what it needs instead of a number that would read like a yardage. */
+.yard-thin td{color:var(--text-muted);font-style:italic}
+.yard-thin td strong{font-style:normal}
 .fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;

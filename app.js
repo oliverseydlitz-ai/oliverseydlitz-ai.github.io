@@ -5092,13 +5092,46 @@ const PracticePlan = (() => {
 // Analytics — cross-session yardage book + personal bests
 // ────────────────────────────────────────────────────────────────
 const Analytics = (() => {
+  // The yardage book is the screen a golfer stands over a shot with, and it
+  // was the one screen enforcing none of the app's own rules: it pooled every
+  // session regardless of ball and surface, printed a stock number off any
+  // number of shots including two, and presented a modelled carry in bold as
+  // though the device had measured it.
+  //
+  // Ball type changes what a carry MEANS — a range ball flies shorter and gaps
+  // differently, and the app refuses gapping conclusions off them everywhere
+  // else. A book pooled across ball types is a yardage for a bag nobody owns.
+  // So: group sessions by their condition signature and build the book on one
+  // group, saying which.
+  function conditionGroups(sessions) {
+    const groups = new Map();
+    (sessions || []).forEach(s => {
+      const key = Conditions.ball(s).id + '|' + Conditions.surface(s).id;
+      if (!groups.has(key)) groups.set(key,
+        { key, ball: Conditions.ball(s), surface: Conditions.surface(s), sessions: [] });
+      groups.get(key).sessions.push(s);
+    });
+    return [...groups.values()].sort((a, b) =>
+      b.sessions.reduce((n,s)=>n+s.shots.length,0) - a.sessions.reduce((n,s)=>n+s.shots.length,0));
+  }
+
   function yardageBook(sessions) {
-    const all = sessions.flatMap(s=>s.shots);
+    const all = (sessions || []).flatMap(s=>s.shots);
     return sortedClubs(all).map(c => {
       const cs = all.filter(s=>s.clubType===c);
       const carries = cs.map(s=>s.carryDistance).filter(v=>v>0).sort((a,b)=>a-b);
+      // Ten shots before any club mean — the same floor the fault engine, the
+      // strike track and the tail engine all sit behind.
+      const iv = Metrics.interval(carries, '', 0);
+      const enough = cs.length >= Metrics.MIN_SHOTS_REPORT && !!iv;
+      const m = iv ? iv.mean : avg(cs,'carryDistance');
       return {
         club:c, count:cs.length,
+        enough, need: Math.max(0, Metrics.MIN_SHOTS_REPORT - cs.length),
+        carry: enough ? iv : null,       // null below the floor
+        // Relative spread, so a 10-yard SD reads differently on a driver than
+        // on a wedge.
+        cv: enough && m > 0 ? stdDev(carries) / m : null,
         avgCarry: avg(cs,'carryDistance'),
         minCarry: carries.length?carries[0]:null,
         maxCarry: carries.length?carries[carries.length-1]:null,
@@ -5127,7 +5160,7 @@ const Analytics = (() => {
       top('apex','Highest Apex','ft'),
     ].filter(Boolean);
   }
-  return { yardageBook, personalBests };
+  return { yardageBook, conditionGroups, personalBests };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -7203,48 +7236,100 @@ const UI = (() => {
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
-    const book = Analytics.yardageBook(sessions);
-    const totalShots = sessions.reduce((a,s)=>a+s.shots.length,0);
+    // Build the book on ONE set of conditions. Pooling a premium-ball session
+    // with a range-ball one produces a stock yardage for a bag nobody owns —
+    // the app refuses that comparison everywhere else and made it here.
+    const groups = Analytics.conditionGroups(sessions);
+    const main = groups[0];
+    const used = main ? main.sessions : sessions;
+    const excluded = sessions.length - used.length;
+    const book = Analytics.yardageBook(used);
+    const totalShots = used.reduce((a,s)=>a+s.shots.length,0);
     document.getElementById('yardageMeta').textContent =
-      `${book.length} clubs · ${totalShots} shots · ${sessions.length} session${sessions.length>1?'s':''}`;
+      `${book.filter(b=>b.enough).length} of ${book.length} clubs · ${totalShots} shots · ` +
+      `${used.length} session${used.length>1?'s':''}`;
 
-    // Add drill finder for weakest clubs
+    const condHost = document.getElementById('yardageConditions');
+    if (condHost) {
+      const label = !main ? 'conditions not recorded'
+        : main.surface.id === 'unknown' ? `${main.ball.label}, surface not recorded`
+        : `${main.ball.label}, ${main.surface.label.toLowerCase()}`;
+      condHost.innerHTML = `
+        <div class="tail-note"><strong>Built from ${used.length} session${used.length>1?'s':''} on
+        ${Sanitize.escape(label)}.</strong>
+        ${excluded ? ` ${excluded} other session${excluded>1?'s':''} used different conditions and ${excluded>1?'are':'is'}
+          not pooled in — ball type changes what a carry number means, so a book averaged across them is a
+          yardage for a bag you do not have.` : ''}
+        ${main && !main.ball.dispersionValid
+          ? ' These are not your own ball, so read the order of the clubs as real and the distances as indicative.'
+          : ''}
+        Carry is <strong>modelled</strong> by the monitor from launch conditions, not measured, and no club
+        shows a mean until it has ${Metrics.MIN_SHOTS_REPORT} shots.</div>`;
+    }
+
+    // Drill focus, built from the gated library rather than three hardcoded
+    // sentences. The old block fired at 5 shots — half the app's own floor —
+    // and offered "focus on setup" and "Maintain rhythm", which are neither
+    // drills nor checkable, then routed to the session list.
     try {
       const drillHost = document.getElementById('drillFinderHost');
       if (drillHost) {
-        const weakest = book.filter(b=>b.count>=5).sort((a,b)=>b.stdCarry-a.stdCarry).slice(0,2);
-        const drillTexts = {
-          'tight': { desc: 'Your distance is tight but repeatable', action: 'Maintain rhythm' },
-          'moderate': { desc: 'Working on consistency — build confidence', action: 'Target practice' },
-          'wide': { desc: 'Distance varies — focus on setup', action: 'Setup drill' }
-        };
-        drillHost.innerHTML = '<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill Focus</h3>' + weakest.map(b => {
-          const cons = b.stdCarry===0?'tight': b.stdCarry<6?'tight':b.stdCarry<12?'moderate':'wide';
-          const drillInfo = drillTexts[cons];
-          return `<div class="drill-card" data-route="sessions">
-            <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(b.club)}"></div>
-            <div class="drill-title">${clubLabel(b.club)} (${cons.toUpperCase()})</div>
-            <div class="drill-desc">${drillInfo.desc}</div>
-            <div class="drill-time">→ ${drillInfo.action}</div>
-          </div>`;
-        }).join('');
+        const widest = book.filter(b => b.enough && b.cv != null).sort((a,b) => b.cv - a.cv)[0];
+        if (!widest) {
+          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill focus</h3>
+            <div class="tail-note">No club has reached ${Metrics.MIN_SHOTS_REPORT} shots in these conditions
+            yet, so nothing here is your widest. That is the answer rather than a gap in the app.</div>`;
+        } else {
+          const clubShots = used.flatMap(s => s.shots).filter(s => s.clubType === widest.club);
+          const rows = DrillLibrary.forSection('A',
+            { shots: clubShots, clubType: widest.club, sessions: used.length });
+          const pick = rows.filter(r => r.ok)[0];
+          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill focus</h3>
+            <div class="drill-card" data-route="practice">
+              <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(widest.club)}"></div>
+              <div class="drill-title">${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
+              <div class="drill-desc">${fmt(widest.carry.mean,0)} ± ${fmt(widest.carry.ci,0)} yds over
+                ${widest.carry.n} shots. The spread is ${fmt(widest.cv*100,0)}% of the carry, the widest in
+                the bag relative to how far the club goes.</div>
+              ${pick
+                ? `<div class="drill-desc"><strong>${Sanitize.escape(pick.drill.name)}:</strong>
+                     ${Sanitize.escape(pick.drill.desc)}</div>`
+                : `<div class="drill-desc">Nothing in strike quality can be run on what these sessions
+                     measured. ${Sanitize.escape((rows[0] && rows[0].reasons[0]) || '')}</div>`}
+              <div class="drill-time">→ Practice</div>
+            </div>`;
+        }
       }
     } catch(e){ console.error('drillFinder',e); }
 
     document.getElementById('yardageTable').innerHTML = `
-      <thead><tr><th>Club</th><th>Stock Carry</th><th>Range</th><th>Consistency</th><th>Avg Total</th><th>Shots</th></tr></thead>
+      <thead><tr><th>Club</th><th>Stock carry</th><th>Range</th><th>Spread</th><th>Total</th><th>Shots</th></tr></thead>
       <tbody>${book.map(b=>{
-        const cons = b.stdCarry===0?'—': b.stdCarry<6?'Tight':b.stdCarry<12?'Moderate':'Wide';
-        const consC = b.stdCarry<6?'#22c55e':b.stdCarry<12?'#eab308':'#ef4444';
-        return `<tr>
+        if (!b.enough) return `<tr class="yard-thin">
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td><strong style="font-size:1.05rem">${fmt(b.avgCarry,0)}</strong> yds</td>
-          <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
-          <td><span style="color:${consC};font-weight:600">${cons}</span> <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)}</small></td>
-          <td>${fmt(b.avgTotal,0)} yds</td>
+          <td colspan="4">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
           <td>${b.count}</td>
         </tr>`;
+        // Colour off the RELATIVE spread. The old bands were fixed yardages, so
+        // a wedge and a driver were judged on the same ±6 — which flatters the
+        // wedge and condemns the driver for the same quality of striking.
+        const consC = b.cv < 0.035 ? '#22c55e' : b.cv < 0.07 ? '#eab308' : '#ef4444';
+        return `<tr>
+          <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
+          <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
+          <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
+          <td><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>
+              <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)} yds</small></td>
+          <td style="color:var(--text-dim)">${fmt(b.avgTotal,0)} yds</td>
+          <td>${b.count}${b.carry.dropped ? `<small style="color:var(--text-muted)"> −${b.carry.dropped}</small>` : ''}</td>
+        </tr>`;
       }).join('')}</tbody>`;
+
+    const legend = document.getElementById('yardageLegend');
+    if (legend) legend.innerHTML = `<div class="tail-note">Spread is the shot-to-shot standard deviation as a
+      percentage of the club's own carry, so a driver and a wedge are judged on the same footing; the colour
+      bands are a reading convenience, not a measured standard. Total distance is a roll-out model — shown
+      for reference, never used to prescribe anything.</div>`;
 
     const bests = Analytics.personalBests(sessions);
     document.getElementById('recordsGrid').innerHTML = bests.map(b=>`
