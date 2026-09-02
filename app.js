@@ -275,7 +275,11 @@ const Metrics = (() => {
   const tier = m => TIER[m] || 3;
   const canPrescribe = m => tier(m) === 1;
 
-  // Minimum detectable change at 95%, comparing two session means of n shots.
+  // REFERENCE ONLY — never used to compute a +/- shown to the golfer.
+  // These are published population figures. They are surfaced in Settings so
+  // the numbers behind the app are inspectable, but every interval and every
+  // change verdict comes from the golfer's own shots. A population constant
+  // describes a sample of other people; it says nothing about this swing.
   // MDC95 = 2.77 x SD_total / sqrt(n), Hopkins' typical-error framework.
   const MDC_N10 = {
     ballSpeed: 4.0, clubSpeed: 2.0, carryDistance: 13, spinRate: 500,
@@ -351,13 +355,21 @@ const Metrics = (() => {
   }
 
   // Is a change between two session means real, or inside the noise floor?
+  // Is a change real? Judged ONLY against this golfer's own typical error.
+  // With too little history the honest answer is "cannot say yet", not a
+  // population substitute — borrowing someone else's variability to rule on
+  // this golfer's progress is exactly the kind of confident wrong answer the
+  // rest of this module exists to prevent.
   function changeIsReal(metric, delta, n, sessions, clubType) {
     const te = typicalError(sessions, metric, clubType);
-    const threshold = te.value !== null
-      ? 2.77 * te.value / Math.sqrt(Math.max(1, n))
-      : mdc(metric, n);
-    if (threshold === null) return { real: false, threshold: null, source: 'unknown' };
-    return { real: Math.abs(delta) >= threshold, threshold, source: te.source };
+    if (te.value === null) {
+      return { real: null, threshold: null, source: 'insufficient-history',
+               need: Math.max(0, 3 - te.n),
+               note: `Needs ${Math.max(1, 3 - te.n)} more session${3 - te.n === 1 ? '' : 's'} ` +
+                     `before a change in this can be called real or not.` };
+    }
+    const threshold = 2.77 * te.value / Math.sqrt(Math.max(1, n));
+    return { real: Math.abs(delta) >= threshold, threshold, source: 'personal' };
   }
 
   // Format a mean the honest way: an interval, never a bare point estimate.
@@ -1162,6 +1174,92 @@ const Spin = (() => {
     'stable enough to prescribe from. That is what the fault engine uses.';
 
   return { measured, summary, CHANGE_CAVEAT, NOT_MEASURED, ALTERNATIVE };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// MeasurementReference — the published error rates, kept out of the maths
+// ────────────────────────────────────────────────────────────────
+// Every +/- the app shows is computed from the golfer's own shots. These
+// figures are what is known about the DEVICE, and they are deliberately not
+// mixed into that: an observed spread already contains device error, so adding
+// these on top would count it twice. They live here so the numbers behind the
+// app are inspectable rather than hidden — and so it is obvious which ones
+// nobody has ever actually measured.
+const MeasurementReference = (() => {
+  const ROWS = [
+    { metric: 'Club path', mae: '1.19°', rmse: '1.46°', r: '0.86', bias: '+0.33°',
+      source: 'Rapsodo, 1,021 shots vs Foresight GCQuad', measured: true },
+    { metric: 'Angle of attack', mae: '1.05°', rmse: '1.42°', r: '0.92', bias: '+0.13°',
+      source: 'Rapsodo, 1,021 shots vs Foresight GCQuad', measured: true },
+    { metric: 'Launch direction', mae: '—', rmse: '—', r: '—', bias: '—',
+      source: 'No error data exists, from any source', measured: false },
+    { metric: 'Ball speed, club speed, launch angle, smash', mae: '—', rmse: '—', r: '—', bias: '—',
+      source: 'No MLM2PRO-specific error data published', measured: false },
+    { metric: 'Spin rate (consumer radar, general)', mae: '—', rmse: '—', r: '—',
+      bias: '±2,600 to +5,100 rpm limits of agreement',
+      source: 'Brennan et al. 2024, Mevo+ vs TrackMan 4', measured: true },
+  ];
+
+  const BIOLOGY = [
+    { metric: 'Club head speed', icc: '0.99', sem: '1.64–1.67 mph' },
+    { metric: 'Ball speed', icc: '0.97–0.99', sem: '2.46–4.42 mph' },
+    { metric: 'Carry distance', icc: '0.91–0.97', sem: '7.80–14.21 yd' },
+    { metric: 'Spin rate', icc: '0.02–0.60', sem: '241–455 rpm' },
+  ];
+
+  const POLICY =
+    'ShotLab treats device error as zero when computing intervals. That is a modelling ' +
+    'choice, not a claim the device is perfect. Two reasons: half the published single-shot ' +
+    'figure for face-to-path was never measured by anyone, and the shot-to-shot spread of ' +
+    'your own swing already contains whatever device error there is — adding a constant on ' +
+    'top would count the same error twice. So every ± you see in this app is your swing.';
+
+  const ALIGNMENT =
+    'The one error this cannot absorb is alignment. A misaligned unit does not scatter your ' +
+    'numbers, it shifts all of them the same way, and averaging cannot remove a constant. ' +
+    'That is why setup is a separate checklist rather than a tolerance.';
+
+  function show() {
+    document.getElementById('measRefModal')?.remove();
+    const m = document.createElement('div');
+    m.className = 'modal-overlay';
+    m.id = 'measRefModal';
+    m.innerHTML = `
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <h2 class="modal-title">Measurement reference</h2>
+          <button class="btn-icon" data-close-modal aria-label="Close">✕</button>
+        </div>
+        <div class="modal-scroll">
+          <p class="setup-summary">${Sanitize.escape(POLICY)}</p>
+
+          <h3 class="setup-h">Device error, where anyone has measured it</h3>
+          <div class="tbl-wrap"><table class="ref-tbl">
+            <thead><tr><th>Metric</th><th>MAE</th><th>RMSE</th><th>Bias</th></tr></thead>
+            <tbody>${ROWS.map(r => `<tr class="${r.measured ? '' : 'unmeasured'}">
+              <td>${Sanitize.escape(r.metric)}<div class="ref-src">${Sanitize.escape(r.source)}</div></td>
+              <td>${r.mae}</td><td>${r.rmse}</td><td>${Sanitize.escape(r.bias)}</td></tr>`).join('')}</tbody>
+          </table></div>
+
+          <h3 class="setup-h">Your own variability, session to session</h3>
+          <p class="ref-note">From TrackMan — a reference device where error is negligible, so these
+            are approximately the golfer, not the machine. Note the last row: spin is the least
+            stable thing a golfer does, which is why this app never prescribes from it.</p>
+          <div class="tbl-wrap"><table class="ref-tbl">
+            <thead><tr><th>Metric</th><th>ICC</th><th>Typical error</th></tr></thead>
+            <tbody>${BIOLOGY.map(r => `<tr><td>${Sanitize.escape(r.metric)}</td>
+              <td>${r.icc}</td><td>${Sanitize.escape(r.sem)}</td></tr>`).join('')}</tbody>
+          </table></div>
+
+          <h3 class="setup-h">The exception</h3>
+          <p class="ref-note">${Sanitize.escape(ALIGNMENT)}</p>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  }
+
+  return { ROWS, BIOLOGY, POLICY, ALIGNMENT, show };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5226,6 +5324,7 @@ async function init() {
   document.getElementById('setupGuideBtn')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink2')?.addEventListener('click', () => SetupGuide.show());
+  document.getElementById('measRefBtn')?.addEventListener('click', () => MeasurementReference.show());
 
   // Feedback-schedule picker — the app's most consequential setting.
   const renderFeedbackModes = () => {
