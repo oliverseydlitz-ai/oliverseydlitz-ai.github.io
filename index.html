@@ -493,6 +493,11 @@
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">Data & Export</h2>
+        <button class="settings-row" id="keepLocalBtn">
+          <span>Keep sessions on this device</span>
+          <span class="pref-toggle" id="keepLocalToggle"></span>
+        </button>
+        <p class="form-hint" id="keepLocalNote" style="padding:0 .85rem"></p>
         <button class="settings-row" id="dataControlsBtn">
           <span>📋 View my data & controls (GDPR/CCPA)</span>
           <span class="settings-arrow">→</span>
@@ -751,7 +756,9 @@
     <p id="authError" class="auth-error"></p>
     <div id="authGuestWrap" class="auth-guest" hidden>
       <button id="authGuestBtn" class="btn-secondary" style="width:100%">Continue as guest</button>
-      <p class="auth-guest-note">Your data stays on this device only and won't sync.</p>
+      <p class="auth-guest-note" id="authGuestNote">Sessions are held in memory only and are lost when you
+        close the tab. Nothing is written to this device and nothing syncs. You can turn on device storage
+        in Settings, or sign in to keep them.</p>
     </div>
   </div>
 </div>

@@ -96,6 +96,8 @@ We use collected information for:
 | `slSessionFeedback` | localStorage | Session ratings | Manual clear |
 | `slSessionCategories` | localStorage | Session tags | Manual clear |
 | `slViewPrefs` | localStorage | Dashboard visibility settings | Manual clear |
+| `slKeepLocal` | localStorage | Whether you turned on "Keep sessions on this device" | Manual clear |
+| `slGuestChosen` | localStorage | That you chose to continue as a guest, so you are not asked again | Manual clear |
 | `slDebug` | localStorage | Debug mode (development only) | Manual clear |
 
 ### 4.2 Your Control
@@ -104,6 +106,30 @@ We use collected information for:
 - Delete cookies in your browser settings
 - Use private/incognito mode to avoid persistent storage
 - Clear localStorage via DevTools Console: `await DB.clearAll()`
+
+### 4.3 Keeping sessions on this device
+
+Settings → Data & Export has a **"Keep sessions on this device"** switch. It is
+**off by default**, and while it is off nothing you import is written to your
+device at all — sessions are held in memory and disappear when you close the
+tab.
+
+Turning it on stores your sessions in this browser's IndexedDB, so they are
+still there when you come back. Specifically:
+
+- It applies to sessions you have **already** imported in this visit, not only
+  to future ones.
+- Turning it **off erases the stored copy immediately**, not just from that
+  point onward.
+- Deleting a session, or using Clear All Data, removes the stored copy too.
+- The stored data is **not encrypted**, and clearing your browser data removes
+  it. It is a convenience, not a backup.
+- If your browser refuses to store data — private browsing, a full disk, or a
+  locked-down configuration — the switch will not turn on, and the app says so
+  rather than leaving it looking enabled.
+
+Signing in is separate: it syncs your sessions to the cloud (§5) and does not
+depend on this setting.
 
 **localStorage Note:**
 Browser localStorage is **not encrypted**. We recommend:
@@ -156,7 +182,7 @@ If you use Google Sign-In:
 - **HTTPS only** — All traffic is encrypted in transit
 - **Supabase encryption** — Data at rest uses TLS
 - **No local transmission** — OAuth tokens never leave your browser
-- **Session isolation** — Guest data cleared on page close
+- **Session isolation** — Guest sessions are held in memory only and cleared on page close, unless you turn on "Keep sessions on this device" (§4.3)
 
 ### 6.2 What We Cannot Guarantee
 
@@ -189,7 +215,9 @@ This removes data from:
 - All service worker caches
 
 **Guest sessions:**
-- Automatically deleted when you close the page
+- Held in memory and automatically deleted when you close the page
+- Unless "Keep sessions on this device" is on (§4.3), in which case they are
+  stored in this browser until you delete them or turn the setting off
 
 ### 7.3 Rectification
 

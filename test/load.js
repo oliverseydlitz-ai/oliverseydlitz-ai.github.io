@@ -24,8 +24,21 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
     const hdr = rows[0].map(h => h.trim());
     return { data: rows.slice(1).map(r => Object.fromEntries(hdr.map((h, i) => [h, (r[i] ?? '').trim()]))) };
   }};
-  w.idbKeyval = { createStore: () => ({}), get: async () => undefined, set: async () => {},
-                  del: async () => {}, clear: async () => {}, keys: async () => [] };
+  // A real in-memory IndexedDB stand-in, not a no-op. LocalDB's whole job is
+  // round-tripping sessions through this, and a stub that always returns
+  // undefined would let a broken persistence path report green.
+  const _idb = new Map();
+  w.__idbStore = _idb;
+  w.__idbFail = null;                      // set to a message to make every call throw
+  const _fail = () => { if (w.__idbFail) throw new Error(w.__idbFail); };
+  w.idbKeyval = {
+    createStore: () => ({}),
+    get:   async k => { _fail(); return _idb.get(k); },
+    set:   async (k, v) => { _fail(); _idb.set(k, v); },
+    del:   async k => { _fail(); _idb.delete(k); },
+    clear: async () => { _fail(); _idb.clear(); },
+    keys:  async () => { _fail(); return [..._idb.keys()]; },
+  };
   w.supabase = { createClient: () => ({
     auth: { onAuthStateChange(){}, getUser: async () => ({ data: { user: null }, error: null }),
             setSession: async () => ({ error: null }), signOut: async () => ({}),
@@ -49,7 +62,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   // throws at load the shim never runs and __app stays undefined, which is
   // exactly the signal we want.
   const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser',
-    'FeedbackEngine','Conditions','Spin','Dispersion','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
+    'FeedbackEngine','Conditions','Spin','Dispersion','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
     'ImportFlow','Goals','SessionSharing','RetentionProbe','consistencyScore','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
     'curveYards','gearEffectSuspected','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',

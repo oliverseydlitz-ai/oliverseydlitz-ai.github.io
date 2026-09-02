@@ -131,7 +131,11 @@ const clubColor = t => CLUB_COLORS[t] || '#8891aa';
 const clubOrder = t => { const i = CLUB_ORDER.indexOf(t); return i === -1 ? 99 : i; };
 
 function avg(arr, field) {
-  const vals = arr.map(s => s[field]).filter(v => typeof v === 'number' && !isNaN(v) && v !== 0);
+  // `s?.[field]` rather than `s[field]`: several call sites pass an array of
+  // computed values where an element can legitimately be null (ShotScorer
+  // returns null for a shot with nothing scorable on it), and reading a
+  // property off that threw and took the whole render down.
+  const vals = (arr || []).map(s => s?.[field]).filter(v => typeof v === 'number' && !isNaN(v) && v !== 0);
   if (!vals.length) return null;
   return vals.reduce((a,b) => a+b, 0) / vals.length;
 }
@@ -533,6 +537,123 @@ const MemDB = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// LocalDB — whether a session survives closing the tab, and saying so
+// ────────────────────────────────────────────────────────────────
+// `DB` above has always been a complete IndexedDB store, and nothing has ever
+// called it. Everything local went to `MemDB`, a plain array, so a guest who
+// imported ninety shots and hit refresh lost all of it with no warning — while
+// the button they clicked to get there said "your data stays on this device".
+// It stayed nowhere. That was the only outright false statement in an app whose
+// entire argument is that it does not tell you things it cannot support.
+//
+// The fix is not to turn persistence on for everyone. Storing a golfer's
+// session history on a device without asking is its own broken promise, and
+// the privacy policy correctly documented the ephemeral behaviour. So it is a
+// choice, made explicitly, defaulting to off — and the guest button now
+// describes what actually happens either way.
+//
+// The design keeps the blast radius to two lines in `Store`. On boot, if
+// device storage is on, IndexedDB is read once into `MemDB`; from then on
+// `MemDB` stays the single read path — synchronous, and unchanged for every
+// call site — while writes fan out to IndexedDB as well. If IndexedDB is
+// unavailable (private browsing, a full quota, a locked-down browser) the app
+// keeps working from memory and SAYS the setting did not take, rather than
+// leaving a switch on that quietly does nothing.
+const LocalDB = (() => {
+  const KEY = 'slKeepLocal';
+  let _on = false;          // resolved from storage at hydrate()
+  let _broken = null;       // the reason IndexedDB refused, if it did
+
+  const readFlag = () => {
+    try { return localStorage.getItem(KEY) === '1'; } catch (_) { return false; }
+  };
+  const writeFlag = on => {
+    try { on ? localStorage.setItem(KEY, '1') : localStorage.removeItem(KEY); } catch (_) {}
+  };
+
+  const enabled = () => _on && !_broken;
+  const unavailable = () => _broken;
+
+  // Every IndexedDB call goes through here. A rejected write must never take
+  // the import down with it: the session is already in memory and usable, and
+  // the honest response is to fall back to ephemeral and tell the user once.
+  async function guard(fn, what) {
+    try { return await fn(); }
+    catch (e) {
+      console.error('LocalDB ' + what + ' failed:', e);
+      if (!_broken) {
+        _broken = e?.message || 'this browser refused to store data';
+        try {
+          toast('Device storage is unavailable — this session is kept in memory only.');
+        } catch (_) {}
+      }
+      return null;
+    }
+  }
+
+  // Read the device store into MemDB once, at startup. After this the rest of
+  // the app never needs to know which store a session came from.
+  async function hydrate() {
+    _on = readFlag();
+    if (!_on) return { restored: 0 };
+    const rows = await guard(() => DB.getSessions(), 'read');
+    if (!rows) return { restored: 0 };
+    rows.forEach(s => MemDB.saveSession(s));
+    return { restored: rows.length };
+  }
+
+  const persist = s => (enabled() && s ? guard(() => DB.saveSession(s), 'write') : Promise.resolve(null));
+  const forget  = id => (enabled() ? guard(() => DB.deleteSession(id), 'delete') : Promise.resolve(null));
+
+  // Turning it ON writes everything already in memory, so the switch applies to
+  // the session you just imported and not only to future ones — a setting that
+  // silently starts from now is the kind of surprise this module exists to
+  // remove. Turning it OFF erases the device copy immediately; leaving it
+  // behind would make "off" mean "off from now on", which is not what it says.
+  async function setEnabled(on) {
+    if (on) {
+      // The FLAG is written first, and rolled back on failure, rather than
+      // last. `hydrate()` re-reads the flag into `_on`, and both it and this
+      // yield at every await — so a boot still in flight when the switch is
+      // flipped used to land in between and reset `_on` to a flag that had not
+      // been written yet, leaving a switch that read "on", stored nothing, and
+      // gave no reason. Flag first means every reader agrees at every await.
+      _broken = null; writeFlag(true); _on = true;
+      const rollback = reason => { writeFlag(false); _on = false; return { on: false, reason }; };
+      // Probe before promising. A first-time guest has nothing saved yet, so
+      // writing "everything already in memory" writes nothing, and the switch
+      // would flip on cleanly in a browser that is going to refuse the very
+      // first real import. A round trip through the store is the only way to
+      // find that out now rather than at the moment the data matters.
+      const probe = { id: '__probe__', date: new Date(0).toISOString(), shots: [] };
+      await guard(async () => { await DB.saveSession(probe); await DB.deleteSession(probe.id); }, 'probe');
+      if (_broken) return rollback(_broken);
+      const existing = MemDB.getSessions();
+      for (const s of existing) await persist(s);
+      if (_broken) return rollback(_broken);
+      return { on: true, saved: existing.length };
+    }
+    const had = await guard(() => DB.getSessions(), 'read');
+    await guard(() => DB.clearAll(), 'clear');
+    _on = false; writeFlag(false);
+    return { on: false, erased: had ? had.length : 0 };
+  }
+
+  // What to tell the golfer, in the two states. Deliberately concrete about
+  // the failure mode rather than reassuring about the success one.
+  const describe = () => _broken
+    ? `This browser will not let the app store data — private browsing and a full disk both do this. ` +
+      `Sessions stay in memory and are lost when you close the tab.`
+    : enabled()
+      ? 'Sessions are kept on this device and will still be here when you come back. Clearing your ' +
+        'browser data removes them, and they are not encrypted — this is a convenience, not a backup.'
+      : 'Sessions are held in memory only and are lost when you close the tab. Nothing is written to ' +
+        'this device. Turn this on to keep them, or sign in to sync them to the cloud.';
+
+  return { hydrate, persist, forget, setEnabled, enabled, unavailable, describe, KEY };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // Supabase Auth & Cloud DB
 // ────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://jdmahrrxtxqrcpcwmwvx.supabase.co';
@@ -872,7 +993,18 @@ const Auth = (() => {
     }
   }
 
-  function setGuest() { _guest = true; updateUI(); }
+  function setGuest() {
+    _guest = true;
+    // Remembered so a returning guest is not made to wait out the sign-in
+    // nudge again — see showAuth(). Someone who has already declined once,
+    // and may have sessions stored on this device, should not have to sit
+    // through a five-second countdown to reach them on every visit.
+    try { localStorage.setItem('slGuestChosen', '1'); } catch (_) {}
+    updateUI();
+  }
+  const choseGuestBefore = () => {
+    try { return localStorage.getItem('slGuestChosen') === '1'; } catch (_) { return false; }
+  };
 
   // mandatory=true: guest option hidden until 5s pass; false: guest shown right away
   function showAuth(mandatory = false) {
@@ -881,7 +1013,11 @@ const Auth = (() => {
     modal.hidden = false;
     switchToLogin();
     clearTimeout(_guestTimer);
-    if (mandatory) {
+    // The five-second delay is a nudge towards signing in, and it is worth
+    // having exactly once. Making a returning guest sit through it every load —
+    // especially one whose sessions are stored on this device and are sitting
+    // right behind the modal — is friction with no argument behind it.
+    if (mandatory && !choseGuestBefore() && !LocalDB.enabled()) {
       guest.hidden = true;
       _guestTimer = setTimeout(() => { guest.hidden = false; }, 5000);
     } else {
@@ -1035,10 +1171,12 @@ const Store = (() => {
   }
   async function saveSession(s) {
     MemDB.saveSession(s);               // local first — instant, always works
+    await LocalDB.persist(s);           // and to the device, if that is switched on
     if (cloud()) await CloudDB.saveSession(s);
   }
   async function deleteSession(id) {
     MemDB.deleteSession(id);
+    await LocalDB.forget(id);
     if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
   }
   return { getSessions, getSession, saveSession, deleteSession, stamp };
@@ -5869,7 +6007,7 @@ async function init() {
     label.textContent = 'Syncing…';
     btn.disabled = true;
     try {
-      const local = MemDB.getSessions();
+      const local = MemDB.getSessions();   // hydrated from the device store at boot
       let pushed = 0;
       for (const s of local) { await CloudDB.saveSession(s); pushed++; }
       const rows = await CloudDB.getSessions(Auth.getUser().id);
@@ -5966,6 +6104,38 @@ async function init() {
     }
   });
 
+  // Device storage — off by default, and the note under it always says what
+  // the current state actually means rather than what the switch is called.
+  const keepBtn = document.getElementById('keepLocalBtn');
+  const keepTog = document.getElementById('keepLocalToggle');
+  const keepNote = document.getElementById('keepLocalNote');
+  function paintKeepLocal() {
+    if (!keepTog) return;
+    const on = LocalDB.enabled();
+    keepTog.textContent = on ? '✓' : '';
+    keepTog.style.color = on ? 'var(--pine)' : 'var(--text-dim)';
+    if (keepNote) keepNote.textContent = LocalDB.describe();
+    const guestNote = document.getElementById('authGuestNote');
+    if (guestNote) guestNote.textContent = LocalDB.describe();
+    if (keepBtn) keepBtn.disabled = !!LocalDB.unavailable();
+  }
+  keepBtn?.addEventListener('click', async () => {
+    const turningOn = !LocalDB.enabled();
+    if (!turningOn) {
+      const n = MemDB.getSessions().length;
+      if (!confirm(`Turn off device storage?\n\nThe ${n} session${n === 1 ? '' : 's'} saved on this ` +
+                   `device will be erased now, not just from here on. Anything synced to the cloud is untouched.`)) return;
+    }
+    keepBtn.disabled = true;
+    const r = await LocalDB.setEnabled(turningOn);
+    keepBtn.disabled = false;
+    paintKeepLocal();
+    if (r.on) toast(r.saved ? `Kept on this device (${r.saved} session${r.saved === 1 ? '' : 's'})` : 'Kept on this device');
+    else if (r.reason) toast('Could not turn that on: ' + r.reason);
+    else toast(r.erased ? `Erased ${r.erased} session${r.erased === 1 ? '' : 's'} from this device` : 'Device storage off');
+  });
+  paintKeepLocal();
+
   // Launch-monitor setup guide
   document.getElementById('setupGuideBtn')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
@@ -6026,6 +6196,14 @@ async function init() {
   });
 
   await renderGoals();
+
+  // Restore anything kept on this device BEFORE the first render, so a
+  // returning guest sees their sessions rather than an empty dashboard that
+  // fills in a moment later.
+  try {
+    const { restored } = await LocalDB.hydrate();
+    if (restored) showDebug(`LOCAL RESTORE: ${restored} session(s) from this device`);
+  } catch (e) { console.error('local restore', e); }
 
   // Auth — all UI handlers above are wired up first, so a slow network here
   // can never leave Sign Out / Clear Data unresponsive
@@ -6449,14 +6627,23 @@ const PersonalCoach = (() => {
   }
 
   function generateAssessment(recentSessions) {
-    const shots = recentSessions.flatMap(s => s.shots);
-    const consistency = Math.round(100 - stdDev(shots.map(s => s.carryDistance || 0)));
-    const formScore = Math.round(avg(shots.map(ShotScorer.score), undefined) || 0);
-
-    if (consistency > 85) return '🌟 Excellent consistency! Your repeatable swing is a strength.';
-    if (consistency > 70) return '✅ Good consistency. One or two small tweaks could make a big difference.';
-    if (consistency > 50) return '📊 Moderate. Focus on one fundamental at a time for breakthrough improvement.';
-    return '🔧 High variability. Video your swing and identify one key pattern to fix.';
+    const shots = recentSessions.flatMap(s => s.shots || []);
+    // This used to be `100 - stdDev(carry)`, which is not a score: a standard
+    // deviation in yards has no upper bound, so a scattered session produced a
+    // negative number and a tight one produced ~99 regardless of the golfer.
+    // `consistencyScore()` is the corrected version already used elsewhere —
+    // a coefficient of variation, which is unit-free and bounded 0-100. It was
+    // fixed in one place and this second copy was missed.
+    //
+    // Carry is pooled across clubs here, so this describes how varied the
+    // SESSION was, not how repeatable the swing is: a bag-wide session is
+    // meant to be spread out. Hence "varied", not "inconsistent".
+    const consistency = consistencyScore(shots.map(s => s.carryDistance));
+    if (consistency === null) return 'Not enough carry data yet to say anything about your spread.';
+    if (consistency > 85) return '🌟 Very tight distance grouping across these sessions.';
+    if (consistency > 70) return '✅ Reasonably tight grouping. Worth checking club by club.';
+    if (consistency > 50) return '📊 A varied set of sessions — expected if you worked through the bag.';
+    return '🔧 Widely varied distances. Look club by club before reading anything into it.';
   }
 
   function generateDrillRecommendation(fault, sessions) {
