@@ -2206,7 +2206,22 @@ const RetentionProbe = (() => {
   // three-valued: a change smaller than this golfer's own noise is "no
   // detectable change", never "no improvement" — the app cannot tell those
   // apart and should not pretend otherwise.
-  function settle(probe, session, history) {
+  //
+  // `practised` is the missing half, and without it this feature was quietly
+  // making the strongest claim in the app out of nothing. A probe settles
+  // against whatever session happens to come next, so a golfer who never went
+  // near the drill still got "that is a real retained change — the strongest
+  // evidence this app can produce that something worked." Nothing worked;
+  // nothing was done. The measurement was fine and the attribution was
+  // invented, which is the same failure as reading a strokes figure off a face
+  // angle, one layer up.
+  //
+  // So the change and the credit for it are now separate. The number is
+  // reported either way, because a change is worth knowing about regardless.
+  // Only a probe the golfer confirms they practised is allowed to be evidence
+  // that the drill did anything, and an unanswered probe says so rather than
+  // assuming either way.
+  function settle(probe, session, history, practised = null) {
     const shots = (session.shots || []).filter(s => s.clubType === probe.clubType);
     const after = baselineFor(shots, probe.metric);
     if (!after) return null;
@@ -2216,7 +2231,10 @@ const RetentionProbe = (() => {
 
     const settled = {
       ...probe, status: 'settled', settledAt: Date.now(), probeSessionId: session.id,
-      after, delta, gapDays,
+      after, delta, gapDays, practised,
+      // Whether the drill may be credited with the change. Not the same
+      // question as whether the change is real, and kept apart from it.
+      attributable: practised === true,
       outcome: verdict.real === null ? 'unknown' : verdict.real ? (delta > 0 ? 'retained' : 'regressed') : 'no-change',
       threshold: verdict.threshold, source: verdict.source, note: verdict.note,
     };
@@ -2226,25 +2244,59 @@ const RetentionProbe = (() => {
 
   // Plain-language result. No cheerleading: the honest outcomes here are
   // mostly "cannot tell yet", and saying so is the point of the feature.
+  //
+  // The measurement sentence and the attribution sentence are built
+  // separately, because they answer different questions and only one of them
+  // depends on whether the golfer actually did the work.
+  // The raw field name used to reach the golfer verbatim — "7i smashFactor:
+  // +0.08" — which is a camelCase key, not English.
+  const METRIC_LABEL = {
+    smashFactor: 'smash factor', ballSpeed: 'ball speed', clubSpeed: 'club speed',
+    carryDistance: 'carry', launchAngle: 'launch angle', attackAngle: 'attack angle',
+    clubPath: 'club path', spinRate: 'spin rate',
+  };
+  const metricLabel = m => METRIC_LABEL[m] || String(m || '').replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
   function describe(r) {
     if (!r) return null;
     const club = clubLabel(r.clubType);
+    const metric = metricLabel(r.metric);
     const d = `${r.delta > 0 ? '+' : ''}${fmt(r.delta, 2)}`;
+    const days = `${r.gapDays} day${r.gapDays === 1 ? '' : 's'}`;
+    let measured;
     switch (r.outcome) {
       case 'retained':
-        return `${club} ${r.metric}: ${d} vs ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} ago, and the change is ` +
-               `bigger than your own shot-to-shot variation. That is a real retained change — the strongest ` +
-               `evidence this app can produce that something worked.`;
+        measured = `${club} ${metric}: ${d} vs ${days} ago, bigger than your own shot-to-shot variation. ` +
+                   `That is a real change, and it held over a day — which is the only window that shows learning.`;
+        break;
       case 'regressed':
-        return `${club} ${r.metric}: ${d} vs ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} ago, beyond your own ` +
-               `variation. It did not hold. That is worth knowing — within-session numbers would have hidden it.`;
+        measured = `${club} ${metric}: ${d} vs ${days} ago, beyond your own variation. It did not hold. ` +
+                   `That is worth knowing — within-session numbers would have hidden it.`;
+        break;
       case 'no-change':
-        return `${club} ${r.metric}: ${d} over ${r.gapDays} day${r.gapDays === 1 ? '' : 's'} — smaller than your ` +
-               `own shot-to-shot variation, so no detectable change. Not the same as "no improvement": the ` +
-               `change, if any, is below what this data can resolve.`;
+        measured = `${club} ${metric}: ${d} over ${days} — smaller than your own shot-to-shot variation, ` +
+                   `so no detectable change. Not the same as "no improvement": the change, if any, is below ` +
+                   `what this data can resolve.`;
+        break;
       default:
         return `${club}: not enough history yet to say whether this held. ${r.note || ''}`.trim();
     }
+    if (r.practised === true) {
+      return r.outcome === 'retained'
+        ? `${measured} You practised it, so this is the strongest evidence this app can produce that ` +
+          `something worked.`
+        : `${measured} You practised it, so this is about the drill rather than about the week.`;
+    }
+    if (r.practised === false) {
+      return `${measured} You did not work on this in between, so it is not a verdict on the drill — ` +
+             (r.outcome === 'no-change'
+               ? `it is a look at how steady this is when you leave it alone, which is the baseline any ` +
+                 `future change has to beat.`
+               : `it is your own week-to-week movement without any practice behind it. Useful to know: ` +
+                 `changes this size can happen on their own.`);
+    }
+    return `${measured} Whether the drill did it is unknown — nothing recorded that you worked on it, and ` +
+           `crediting practice that may not have happened is how a measurement turns into a story.`;
   }
 
   function openProbes() { return all().filter(p => p.status === 'open'); }
@@ -4410,9 +4462,38 @@ const UI = (() => {
     if (!el) return;
     let history = [];
     try { history = await Store.getSessions(); } catch (_) {}
-    const results = RetentionProbe.due(session)
-      .map(p => RetentionProbe.settle(p, session, history))
-      .filter(Boolean);
+    // Ask before settling. The probe cannot tell whether the drill was done,
+    // and settling silently is what let it credit practice that never happened.
+    const pending = RetentionProbe.due(session);
+    if (pending.length) {
+      el.hidden = false;
+      el.innerHTML = `<div class="probe-block pending">
+          <div class="probe-head">Before the verdict</div>
+          ${pending.map(p => `<div class="probe-ask" data-probe="${Sanitize.escape(p.id)}">
+              <div class="probe-item">Did you work on ${Sanitize.escape(p.faultName || 'it')}
+                (${Sanitize.escape(clubLabel(p.clubType))}) since that session?</div>
+              <div class="probe-btns">
+                <button class="probe-btn" data-answer="yes">Yes</button>
+                <button class="probe-btn" data-answer="no">No</button>
+                <button class="probe-btn ghost" data-answer="unknown">Can't remember</button>
+              </div>
+            </div>`).join('')}
+          <div class="tail-note">The change gets measured either way. This only decides whether the drill
+            can be credited with it — a number the app cannot attribute is a number it should not attribute.</div>
+        </div>`;
+      el.querySelectorAll('.probe-ask').forEach(row => {
+        row.querySelectorAll('.probe-btn').forEach(btn => btn.addEventListener('click', () => {
+          const probe = pending.find(p => p.id === row.dataset.probe);
+          const a = btn.dataset.answer;
+          RetentionProbe.settle(probe, session, history, a === 'yes' ? true : a === 'no' ? false : null);
+          renderRetention(session).catch(e => console.error('retention', e));
+        }));
+      });
+      return;
+    }
+
+    const results = RetentionProbe.settled()
+      .filter(r => r.probeSessionId === session.id);
     if (!results.length) {
       const open = RetentionProbe.openProbes();
       el.innerHTML = open.length
