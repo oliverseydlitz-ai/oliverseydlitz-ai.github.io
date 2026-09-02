@@ -6333,10 +6333,68 @@ const UI = (() => {
     const clubSel = document.getElementById('progressClub');
     clubSel.innerHTML = ['all',...allClubs].map(c=>
       `<option value="${c}">${c==='all'?'All clubs':clubLabel(c)}</option>`).join('');
-    clubSel.onchange = () => { renderProgressCharts(sessions, clubSel.value); renderTailTrend(sessions, clubSel.value); };
+    clubSel.onchange = () => {
+      renderProgressCharts(sessions, clubSel.value);
+      renderTailTrend(sessions, clubSel.value);
+      renderStrikeTrend(sessions, clubSel.value);
+    };
     renderProgressCharts(sessions,'all');
     try { renderTailTrend(sessions, 'all'); } catch(e){ console.error('tail trend',e); }
+    try { renderStrikeTrend(sessions, 'all'); } catch(e){ console.error('strike trend',e); }
     try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
+  }
+
+  // ── Strike quality across sessions ────────────────────────────
+  // Drill A18, and the same shape as the tail trend deliberately: a sparkline
+  // for the shape and a sentence for the verdict, judged against this golfer's
+  // own session-to-session variation. Never a paired before-and-after — two
+  // sessions cannot separate a change from an ordinary week, and the module
+  // refuses under three.
+  //
+  // Defaults to the club with the most shots across the history rather than to
+  // the driver. Smash is the one metric where the weak link is usually NOT the
+  // driver, which is the whole finding behind the strike track.
+  function renderStrikeTrend(sessions, club) {
+    const el = document.getElementById('strikeTrendHost');
+    if (!el) return;
+    const list = sessions || [];
+    let target = club && club !== 'all' ? club : null;
+    if (!target) {
+      const counts = {};
+      list.forEach(sn => (sn.shots || []).forEach(s => {
+        if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1;
+      }));
+      target = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+    }
+    if (!target) { el.innerHTML = ''; return; }
+
+    const t = Strike.trend(list, target);
+    const name = Sanitize.escape(clubLabel(target));
+    const head = `<div class="tail-head">${name} — strike quality over time` +
+      (club === 'all' || !club ? ` <span class="tail-n">your most-hit club</span>` : '') + `</div>`;
+    if (!t.ok) {
+      el.innerHTML = `<div class="tail-block pending">${head}
+          <div class="tail-note">${Sanitize.escape(t.note)}</div></div>`;
+      return;
+    }
+    const last = t.points[t.points.length - 1];
+    const ref = Strike.reference(target);
+    el.innerHTML = `<div class="tail-block">${head}
+        ${sparkline(t.points.map(p => p.mean))}
+        <div class="tail-spark-key">oldest → newest · higher is better</div>
+        <div class="tail-stats">
+          <div class="disp-stat"><div class="disp-stat-val">${fmt(last.mean, 3)}</div>
+            <div class="disp-stat-label">Latest smash</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${t.delta > 0 ? '+' : ''}${fmt(t.delta, 3)}</div>
+            <div class="disp-stat-label">Change</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${ref === null ? '—' : fmt(ref, 2)}</div>
+            <div class="disp-stat-label">Tour reference</div></div>
+        </div>
+        <div class="tail-item${t.real ? '' : ' heavy'}">${Sanitize.escape(t.note)}</div>
+        <div class="tail-note">Sessions with fewer than ${Metrics.MIN_SHOTS_REPORT} shots of this club are left
+          out. Smash is tier 1 on this device — no derivation and no model output — which is why it is the one
+          thing here you can track without a caveat about what the number is.</div>
+      </div>`;
   }
 
   // ── Dispersion tail across sessions ───────────────────────────
