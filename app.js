@@ -844,7 +844,8 @@ const Store = (() => {
     if (!sn || !Array.isArray(sn.shots)) return sn;
     const ball = sn.conditions?.ball || 'unknown';
     const surface = sn.conditions?.surface || 'unknown';
-    sn.shots.forEach(s => { s._ball = ball; s._surface = surface; });
+    const aligned = sn.conditions?.alignment === 'confirmed';
+    sn.shots.forEach(s => { s._ball = ball; s._surface = surface; s._aligned = aligned; });
     return sn;
   }
 
@@ -1020,6 +1021,27 @@ const Conditions = (() => {
   const ball = sn => BALLS[sn?.conditions?.ball] || BALLS.unknown;
   const surface = sn => SURFACES[sn?.conditions?.surface] || SURFACES.unknown;
 
+  // Alignment is a genuinely different kind of error from the rest of this
+  // module. Ball type and surface change the NOISE; alignment changes the
+  // BIAS. A unit aimed 2 degrees right does not scatter the readings, it
+  // shifts every one of them by the same amount, so averaging cannot remove it
+  // and more shots only make the app more confident in the wrong answer.
+  //
+  // That cuts both ways. Once alignment IS confirmed, launch direction becomes
+  // meaningful in absolute terms — aimed at a known target rather than at
+  // wherever the unit happened to point — and the prescriptions that depend on
+  // absolute start line become admissible at the normal sample floor instead
+  // of being held back to a 30-shot aggregate.
+  function aligned(x) {
+    if (!x) return false;
+    if (Array.isArray(x)) return x.length > 0 && x.every(s => s._aligned === true);
+    if (typeof x._aligned === 'boolean') return x._aligned;
+    return x?.conditions?.alignment === 'confirmed';
+  }
+
+  // The sample floor for a launch-direction-derived claim, given alignment.
+  const startLineFloor = x => aligned(x) ? Metrics.MIN_SHOTS_REPORT : Metrics.MIN_SHOTS_TAIL;
+
   // Reasons to withhold a prescription, in plain language.
   function caveats(sn) {
     const out = [];
@@ -1028,6 +1050,12 @@ const Conditions = (() => {
       out.push(b.id === 'range'
         ? 'Range balls: dispersion here is 2–4× wider than your own ball would give, and gapping is unreliable — a wedge can fly further on half the spin. Treat the shape as real and the spread as not.'
         : 'Ball type not recorded, so dispersion and gapping figures are not comparable between sessions.');
+    }
+    if (!aligned(sn)) {
+      out.push('Alignment not confirmed for this session. Launch direction is measured against wherever ' +
+        'the unit was pointing, so any aiming error becomes a constant offset on every shot — and unlike ' +
+        'random error, averaging more shots will not remove it. Start-line and face-to-path readings are ' +
+        'held to a larger sample until you confirm the Impact Vision alignment.');
     }
     if (sf.masksFatStrikes) {
       out.push(sf.id === 'mat'
@@ -1042,7 +1070,7 @@ const Conditions = (() => {
     return ball(a).id === ball(b2).id && surface(a).id === surface(b2).id;
   }
 
-  return { BALLS, SURFACES, ball, surface, caveats, comparable };
+  return { BALLS, SURFACES, ball, surface, aligned, startLineFloor, caveats, comparable };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1377,7 +1405,7 @@ const FaultEngine = (() => {
 
     {
       id:'push-right', name:'Consistent Right Miss (Push)', icon:'→', category:'Path & Face', severity:'medium',
-      minShots: 30,   // launch direction is only trustworthy as a 30+ shot aggregate
+      minShotsFor: Conditions.startLineFloor,   // 10 when aligned, 30 when not
       test: s => s.launchDirection > 5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° right with neutral face-to-path. ` +
@@ -1393,7 +1421,7 @@ const FaultEngine = (() => {
 
     {
       id:'pull-left', name:'Consistent Left Miss (Pull)', icon:'←', category:'Path & Face', severity:'medium',
-      minShots: 30,   // launch direction is only trustworthy as a 30+ shot aggregate
+      minShotsFor: Conditions.startLineFloor,   // 10 when aligned, 30 when not
       test: s => s.launchDirection < -5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° left with neutral face-to-path. ` +
@@ -1767,7 +1795,7 @@ const FaultEngine = (() => {
 
   const DOWNGRADE = { high: 'medium', medium: 'low', low: 'low' };
 
-  function detectFaults(shots) {
+  function detectFaults(shots, session) {
     if (!shots.length) return [];
     const faults = [];
 
@@ -1779,7 +1807,9 @@ const FaultEngine = (() => {
       // whole session — a driver fault should be measured against drivers.
       const clubs = new Set(affected.map(s => s.clubType));
       const relevant = shots.filter(s => clubs.has(s.clubType));
-      if (relevant.length < (rule.minShots || Metrics.MIN_SHOTS_REPORT)) continue;
+      const floor = rule.minShotsFor ? rule.minShotsFor(relevant.length ? relevant : session)
+                  : (rule.minShots || Metrics.MIN_SHOTS_REPORT);
+      if (relevant.length < floor) continue;
 
       const rate = affected.length / relevant.length;
       if (rate < MIN_RATE) continue;
@@ -1795,7 +1825,7 @@ const FaultEngine = (() => {
         description: typeof rule.description === 'function' ? rule.description(affected) : rule.description,
         evidence: `${affected.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
           (firm ? '' : ' — borderline, worth another session to confirm'),
-        minShots: rule.minShots || Metrics.MIN_SHOTS_REPORT,
+        minShots: floor,
         affectedShots: affected.map(s=>s._row),
       });
     }
@@ -2166,8 +2196,8 @@ const PracticePlan = (() => {
     return hit.length ? hit : shots;
   }
 
-  function generate(shots, totalMin = 45) {
-    const faults = FaultEngine.detectFaults(shots).filter(f => f.drills && f.drills.length);
+  function generate(shots, totalMin = 45, session = null) {
+    const faults = FaultEngine.detectFaults(shots, session).filter(f => f.drills && f.drills.length);
     if (!faults.length) return null;
 
     const scored = faults.map(f => {
@@ -3870,10 +3900,16 @@ const UI = (() => {
       .map(facePath).filter(Number.isFinite);
     let f2pClub = '<span class="sm-note">derived, not measured</span>';
     if (clubF2P.length >= Metrics.MIN_SHOTS_REPORT) {
-      const m = mean(clubF2P);
-      const ci = Metrics.SINGLE_SHOT_F2P_SD / Math.sqrt(clubF2P.length);
-      f2pClub = `<span class="sm-cmp ${Math.abs(m) < 2 ? 'up' : 'down'}">` +
-        `${clubLabel(shot.clubType)} avg ${fmt(m,1)}° ± ${fmt(ci,1)} (${clubF2P.length})</span>`;
+      // The interval must come from YOUR shots, not from a population constant.
+      // The observed spread already contains both your swing variability and
+      // the device error, so the standard error computed from it is the honest
+      // uncertainty in the average. Dividing a fixed 1.8° by sqrt(n) instead
+      // gave every golfer the same +/- regardless of how consistent they are.
+      const iv = Metrics.interval(clubF2P, '', 1);
+      const spread = stdDev(clubF2P);
+      f2pClub = `<span class="sm-cmp ${Math.abs(iv.mean) < 2 ? 'up' : 'down'}">` +
+        `${clubLabel(shot.clubType)} avg ${fmt(iv.mean,1)}° ± ${fmt(iv.ci,1)} ` +
+        `<span class="sm-note">(${iv.n} shots, spread ±${fmt(spread,1)}°)</span></span>`;
     } else if (clubF2P.length) {
       f2pClub = `<span class="sm-note">${clubF2P.length}/${Metrics.MIN_SHOTS_REPORT} shots — not enough to read yet</span>`;
     }
@@ -4295,9 +4331,10 @@ const ImportFlow = (() => {
     const temp  = document.getElementById('metaTemp').value.trim();
     const ball    = document.getElementById('metaBall')?.value || 'unknown';
     const surface = document.getElementById('metaSurface')?.value || 'unknown';
+    const alignment = document.getElementById('metaAligned')?.checked ? 'confirmed' : 'unknown';
     const session = {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
-      notes, conditions:{wind,temp,ball,surface}, shots:_shots, createdAt:Date.now(),
+      notes, conditions:{wind,temp,ball,surface,alignment}, shots:_shots, createdAt:Date.now(),
     };
     // Stamp measurement context before anything renders. The import path
     // bypasses Store.getSessions(), so without this a just-imported session
@@ -5157,6 +5194,7 @@ async function init() {
   // Launch-monitor setup guide
   document.getElementById('setupGuideBtn')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
+  document.getElementById('setupGuideLink2')?.addEventListener('click', () => SetupGuide.show());
 
   // Feedback-schedule picker — the app's most consequential setting.
   const renderFeedbackModes = () => {

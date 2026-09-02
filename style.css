@@ -793,6 +793,9 @@ tr:hover td { background: var(--surface2); }
 .sm-pm{color:var(--text-muted); font-size:.78em; font-variant-numeric:tabular-nums}
 .sm-note{color:var(--text-muted); font-size:.72rem; font-style:italic}
 
+.check-row{display:flex;align-items:flex-start;gap:.55rem;cursor:pointer;font-size:.85rem;line-height:1.4}
+.check-row input{margin-top:.15rem;flex:0 0 auto}
+
 /* ── Launch-monitor setup guide ─────────────────────────── */
 .modal-scroll{max-height:72vh;overflow-y:auto;padding:1rem 1.1rem 1.2rem}
 .setup-guide{color:var(--text)}
