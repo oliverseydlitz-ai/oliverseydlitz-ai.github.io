@@ -384,7 +384,7 @@ const MemDB = (() => {
     const i = _sessions.findIndex(s => s.id === id);
     if (i >= 0) _sessions.splice(i, 1);
   };
-  return { getSessions, getSession, saveSession, deleteSession };
+  return { getSessions, getSession, saveSession, deleteSession, stamp };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -835,6 +835,19 @@ const CloudDB = (() => {
 
 // Unified data layer — cloud-only for logged-in users, MemDB (ephemeral) for guests
 const Store = (() => {
+  // Ball type and surface are properties of the SESSION but every gate
+  // downstream works on shots, often flattened across sessions (the yardage
+  // book, progress trends). Stamping the measurement context onto each shot
+  // here — the one place sessions enter the app — means no call site has to
+  // thread it, and no call site can forget to.
+  function stamp(sn) {
+    if (!sn || !Array.isArray(sn.shots)) return sn;
+    const ball = sn.conditions?.ball || 'unknown';
+    const surface = sn.conditions?.surface || 'unknown';
+    sn.shots.forEach(s => { s._ball = ball; s._surface = surface; });
+    return sn;
+  }
+
   function fromRow(r) {
     return {
       id: r.id, date: r.date, notes: r.notes, conditions: r.conditions,
@@ -848,13 +861,13 @@ const Store = (() => {
     // cloud rows on top when signed in; on cloud error fall back to local and
     // surface the reason instead of throwing (a throw here used to bubble up
     // through the tab click handlers and silently kill navigation).
-    const local = MemDB.getSessions();
+    const local = MemDB.getSessions().map(stamp);
     if (!cloud()) return local;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const cloudIds = new Set(rows.map(r => r.id));
       const pending = local.filter(s => !cloudIds.has(s.id));
-      return [...pending, ...rows.map(fromRow)].sort((a,b) => new Date(b.date) - new Date(a.date));
+      return [...pending, ...rows.map(r => stamp(fromRow(r)))].sort((a,b) => new Date(b.date) - new Date(a.date));
     } catch (e) {
       console.error('Cloud load failed:', e);
       showDebug('CLOUD LOAD FAILED:\n' + (e?.message || JSON.stringify(e)) + '\n(showing local sessions)');
@@ -863,12 +876,12 @@ const Store = (() => {
   }
   async function getSession(id) {
     const mem = MemDB.getSession(id);   // covers just-imported sessions
-    if (mem) return mem;
+    if (mem) return stamp(mem);
     if (!cloud()) return null;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const r = rows.find(x => x.id === id);
-      return r ? fromRow(r) : null;
+      return r ? stamp(fromRow(r)) : null;
     } catch (e) {
       console.error('Cloud load failed:', e);
       return null;
@@ -1021,7 +1034,6 @@ const Conditions = (() => {
         ? 'Mat: the sole bounces instead of the leading edge digging, so a strike several centimetres behind the ball still reads near-normal. Mats systematically hide fat strikes — the exact thing a low-point drill is meant to catch.'
         : 'Surface not recorded — if you were on a mat, fat strikes may be hidden.');
     }
-    if (!b.spinMeasured) out.push('Spin is only measured with a Rapsodo RPT ball; any spin figure shown otherwise is not a reading.');
     return out;
   }
 
@@ -1031,6 +1043,69 @@ const Conditions = (() => {
   }
 
   return { BALLS, SURFACES, ball, surface, caveats, comparable };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// Spin — measured only with an RPT ball, and never a prescription
+// ────────────────────────────────────────────────────────────────
+// Two separate facts get conflated about spin, and they point different ways:
+//
+//   1. DEVICE. With a Rapsodo RPT ball the MLM2PRO genuinely measures spin at
+//      240fps, and it is decent: MDC 500 rpm over 10 shots. WITHOUT an RPT
+//      ball spin is not measured at all — the figure shown is not a reading,
+//      and the spec's instruction is to suppress it entirely.
+//
+//   2. BIOLOGY. Spin is not a stable characteristic of a golfer between
+//      sessions. On a TrackMan — gold standard, device error negligible —
+//      between-session spin ICC runs 0.02 to 0.60 with SEM 241–455 rpm. The
+//      golfer's own spin wanders more than most training effects do.
+//
+// So the RPT ball fixes (1) and cannot fix (2). Spin is therefore legitimate
+// for DESCRIBING a session and illegitimate for TRACKING CHANGE or driving a
+// drill, on any device, with any ball. That is why there is no spin fault:
+// not because the number is unreadable, but because "your spin improved"
+// is not a claim this data can support.
+//
+// The actionable route to spin is SPIN LOFT, which is derived from launch
+// angle and attack angle (both tier 2) and is the mechanism that produces
+// spin in the first place. The app prescribes from that instead.
+const Spin = (() => {
+  // Is spin a reading at all for this session?
+  // Accepts a session, or a single shot stamped by Store.stamp().
+  function measured(x) {
+    if (!x) return false;
+    if (typeof x._ball === 'string') return x._ball === 'rpt';
+    return Conditions.ball(x).id === 'rpt';
+  }
+
+  // Session-level spin summary. Returns null when not measured, so every call
+  // site suppresses rather than showing a number that is not one.
+  function summary(session, clubType) {
+    if (!measured(session)) return null;
+    const shots = (session?.shots || []).filter(s => (!clubType || s.clubType === clubType) && Number.isFinite(s.spinRate) && s.spinRate > 0);
+    const iv = Metrics.interval(shots.map(s => s.spinRate), ' rpm', 0);
+    if (!iv || iv.n < 3) return null;
+    return { ...iv, enoughForMean: iv.n >= Metrics.MIN_SHOTS_REPORT, mdc: Metrics.mdc('spinRate', iv.n) };
+  }
+
+  // The sentence that must accompany any spin figure, so it is never read as
+  // a trend. Deliberately blunt.
+  const CHANGE_CAVEAT =
+    'Spin is measured here because you used an RPT ball, so this describes today accurately. ' +
+    'It is still not a number to track between sessions: a golfer’s own spin varies more ' +
+    'session to session than almost any training effect, even on a TrackMan.';
+
+  const NOT_MEASURED =
+    'Spin is only measured with a Rapsodo RPT ball. This session was not logged with one, ' +
+    'so no spin figure is shown — anything the device reported would be inferred, not read.';
+
+  // What to look at instead, and why it is legitimate.
+  const ALTERNATIVE =
+    'Spin loft is the mechanism behind spin, and it is derived from launch angle and attack ' +
+    'angle rather than measured off the ball — so it survives without an RPT ball and is ' +
+    'stable enough to prescribe from. That is what the fault engine uses.';
+
+  return { measured, summary, CHANGE_CAVEAT, NOT_MEASURED, ALTERNATIVE };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1520,7 +1595,8 @@ const FaultEngine = (() => {
 
     {
       id:'high-spin-axis', name:'High Spin Axis (Slice Spin)', icon:'🔄', category:'Spin', severity:'high',
-      test: s => s.spinAxis && s.spinAxis > 15,
+      // Spin axis is only measured with an RPT ball, and is tier 3 even then.
+      test: s => Spin.measured(s) && s.spinAxis && s.spinAxis > 15,
       description: shots => {
         const sa = avg(shots,'spinAxis');
         return `Spin axis tilted ${fmt(sa,1)}° clockwise (right). ` +
@@ -1537,7 +1613,7 @@ const FaultEngine = (() => {
 
     {
       id:'low-spin-axis', name:'High Draw/Hook Spin', icon:'🔄', category:'Spin', severity:'medium',
-      test: s => s.spinAxis && s.spinAxis < -15,
+      test: s => Spin.measured(s) && s.spinAxis && s.spinAxis < -15,
       description: shots => `Spin axis tilted ${fmt(avg(shots,'spinAxis'),1)}° counter-clockwise — significant draw/hook spin. ` +
         `While a slight draw is often desirable (+5–10 yards distance), excessive hook spin costs control.`,
       causes:['Face closed to path','Strong grip','Excessive forearm rotation through impact'],
@@ -1868,8 +1944,8 @@ const SwingDNA = (() => {
       }
     }
 
-    // Spin (when available)
-    const spinShots = shots.filter(s=>s.spinRate);
+    // Spin — a reading only with an RPT ball, otherwise suppressed entirely
+    const spinShots = shots.filter(s => s.spinRate && Spin.measured(s));
     if (spinShots.length) {
       const avgSpin = avg(spinShots,'spinRate');
       const driverSpin = spinShots.filter(s=>s.clubType==='d');
@@ -3255,6 +3331,10 @@ const UI = (() => {
     const el = document.getElementById('conditionCaveats');
     if (!el) return;
     const notes = Conditions.caveats(session);
+    // Spin gets its own line either way: named as measured when an RPT ball
+    // was used, named as absent when it was not. Silence would read as "no
+    // spin problem" rather than "no spin data".
+    notes.unshift(Spin.measured(session) ? Spin.CHANGE_CAVEAT : Spin.NOT_MEASURED + ' ' + Spin.ALTERNATIVE);
     const vol = FeedbackEngine.volumeAdvice((session.shots || []).length);
     if (vol) notes.push(vol);
     if (!notes.length) { el.innerHTML = ''; el.hidden = true; return; }
@@ -3595,7 +3675,7 @@ const UI = (() => {
       if (!bench) return null;
       const userLA = avg(cs,'launchAngle');
       const userAA = avg(cs,'attackAngle');
-      const userSpin = avg(cs,'spinRate');
+      const userSpin = avg(cs.filter(Spin.measured), 'spinRate');
       const optLA  = c==='d'?'10–15°': isWood(c)||isHybrid(c)?'9–14°': isShort(c)?'24–40°':'13–22°';
       const optAA  = c==='d'?'+2 to +5°':isIron(c)?'-2 to -5°':'0 to -2°';
       const optSpin= c==='d'?'2000–2800': isWood(c)||isHybrid(c)?'2500–3500':'3500–6000';
@@ -3732,8 +3812,8 @@ const UI = (() => {
       {label:'Side<br><small>yds</small>',  render:s=>{const v=s.sideCarry;return `<span style="color:${Math.abs(v||0)>15?'var(--red)':Math.abs(v||0)>8?'var(--yellow)':'var(--text)'}">${fmt(v,1)}</span>`;}, field:'sideCarry'},
       {label:'Path<br><small>°</small>',    render:s=>fmt(s.clubPath,1),    field:'clubPath'},
       {label:'AoA<br><small>°</small>',     render:s=>{const v=s.attackAngle; const ok=s.clubType==='d'?v>=1:(isIron(s.clubType)&&v<=-2&&v>=-6); return `<span style="color:${ok?'var(--green-light)':'var(--yellow)'}">${fmt(v,1)}</span>`;}, field:'attackAngle'},
-      {label:'Spin<br><small>rpm</small>',  render:s=>s.spinRate?fmt(s.spinRate,0):'—', field:'spinRate'},
-      {label:'Axis<br><small>°</small>',    render:s=>s.spinAxis?fmt(s.spinAxis,1):'—', field:'spinAxis'},
+      {label:'Spin<br><small>rpm</small>',  render:s=>(Spin.measured(s)&&s.spinRate)?fmt(s.spinRate,0):'—', field:'spinRate'},
+      {label:'Axis<br><small>°</small>',    render:s=>(Spin.measured(s)&&s.spinAxis)?fmt(s.spinAxis,1):'—', field:'spinAxis'},
       {label:'Apex<br><small>ft</small>',   render:s=>fmt(s.apex,0),        field:'apex'},
     ];
 
@@ -3780,6 +3860,7 @@ const UI = (() => {
     // shot — wider than most real values. A bare per-shot number here would be
     // exactly the claim the app must never make. Show the noise inline, and
     // put the club mean beside it, which is where it becomes trustworthy.
+    const spinOK = Spin.measured(shot) || Spin.measured(_session);
     const f2pRaw = facePath(shot);
     const f2pSingle = Number.isFinite(f2pRaw)
       ? `${fmt(f2pRaw,1)}° <span class="sm-pm">± ${Metrics.SINGLE_SHOT_F2P_SD}</span>`
@@ -3811,8 +3892,10 @@ const UI = (() => {
       ['Attack Angle', `${fmt(shot.attackAngle,1)}°`, ''],
       ['Face-to-Path', f2pSingle, f2pClub],
       ['Apex', `${fmt(shot.apex,0)} ft`, '<span class="sm-note">modelled</span>'],
-      shot.spinRate ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, ''] : null,
-      shot.spinAxis ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, ''] : null,
+      // Spin is a reading only with an RPT ball; otherwise it is not shown at all.
+      (spinOK && shot.spinRate) ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, '<span class="sm-note">RPT measured</span>'] : null,
+      (spinOK && shot.spinAxis) ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, '<span class="sm-note">RPT measured</span>'] : null,
+      (!spinOK && shot.spinRate) ? ['Spin', 'not measured', '<span class="sm-note">needs an RPT ball</span>'] : null,
     ].filter(Boolean);
 
     document.getElementById('shotModalTitle').innerHTML =
@@ -4187,7 +4270,7 @@ const ImportFlow = (() => {
   function showPreview(shots, filename) {
     document.getElementById('previewCount').textContent =
       `${shots.length} shots · ${[...new Set(shots.map(s=>s.clubType))].length} clubs · `+
-      `${shots.some(s=>s.spinRate)?'Spin data included':'No spin data'}`;
+      `${shots.some(s=>s.spinRate)?'Spin data present (only a reading with an RPT ball)':'No spin data'}`;
 
     const match = filename.match(/(\d{6})/);
     if (match) {
@@ -4216,6 +4299,10 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:{wind,temp,ball,surface}, shots:_shots, createdAt:Date.now(),
     };
+    // Stamp measurement context before anything renders. The import path
+    // bypasses Store.getSessions(), so without this a just-imported session
+    // has unstamped shots and every ball-type gate silently reads "unknown".
+    Store.stamp(session);
     // Save to MemDB and show instantly — no spinner
     MemDB.saveSession(session);
     UI.renderDetail(session);
