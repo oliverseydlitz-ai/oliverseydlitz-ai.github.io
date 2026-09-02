@@ -884,6 +884,15 @@ body.modal-open { overflow: hidden; }
 .drill-row-desc{font-size:.8rem;line-height:1.55;color:var(--text-dim);margin-top:.25rem;text-wrap:pretty}
 .drill-row-why{font-size:.74rem;line-height:1.5;color:var(--text-muted);margin-top:.35rem;
   padding-left:.7rem;border-left:2px solid var(--border)}
+.rd-form{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.7rem}
+.rd-form .qe-field input,.rd-form .qe-field select{width:100%}
+.rd-stat{margin-bottom:.7rem}
+.rd-stat-head{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline;
+  font-size:.82rem;color:var(--text);font-weight:600}
+.rd-stat-val{font-variant-numeric:tabular-nums;color:var(--text)}
+.rd-bar{height:6px;margin:.3rem 0 .2rem;background:var(--surface3);border-radius:999px;overflow:hidden}
+.rd-bar-fill{height:100%;background:var(--pine);border-radius:999px}
+.rd-stat-foot{font-size:.7rem;color:var(--text-muted)}
 .sg-row{border-left-color:var(--pine)}
 .sg-tier{flex:0 0 auto;font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;
   padding:.15rem .4rem;border-radius:999px;white-space:nowrap}

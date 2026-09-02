@@ -3151,6 +3151,234 @@ const ShortGame = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Rounds — the on-course data the rest of the app keeps saying it does not have
+// ────────────────────────────────────────────────────────────────
+// Every other module reasons from range shots. This one takes the six numbers a
+// golfer already knows at the end of a round and answers the question the range
+// cannot: WHERE ARE MY STROKES ACTUALLY GOING.
+//
+// It does that without inventing a strokes model, because there is a sourced
+// one to lean on. Shot Scope's normative table, 90M+ shots and independently
+// replicated by TheGrint/MyGolfSpy across 20,000 golfers and 400,000 rounds:
+//
+//   Hcp   Score  FIR%  GIR%  U&D%  Putts  Penalties
+//    0    +0.8    50    61    47   29.4     0.56
+//    5    +6.3    48    44    41   30.2     0.91
+//   10   +10.9    49    36    31   31.2     1.62
+//   15   +17.4    48    24    21   33.1     2.45
+//   20   +21.7    46    17    20   33.1     3.03
+//   25   +29.0    46    10    18   33.8     4.67
+//
+// Across a 28-stroke scoring range: GIR varies SIXFOLD, penalties EIGHTFOLD,
+// putts by 15% — and fairways hit is flat. 50% down to 46%. A scratch golfer
+// hits about four percentage points more fairways than a 20-handicap.
+//
+// THE METHOD. Each stat is placed on that table independently, which gives an
+// implied handicap per category. A golfer whose greens-in-regulation look like
+// a 15 and whose penalties look like a 25 is not a 20 across the board — they
+// are losing a specific, findable set of strokes to one thing. The spread
+// between those implied handicaps IS the diagnosis, and it needs no strokes
+// model at all: it is their own numbers read against a large published sample.
+//
+// FAIRWAYS ARE LOGGED AND DELIBERATELY NOT PLACED. Four points of spread across
+// 28 strokes of scoring is not a signal, it is a rounding error with a
+// percentage sign. Ranking a golfer on it would manufacture a weakness out of
+// noise, and "hit more fairways" is the most common piece of useless advice in
+// the game. The module records the number and refuses to grade it.
+const Rounds = (() => {
+  const KEY = 'slRounds';
+
+  // The table above, as data. `fir` is carried for display only — see PLACEABLE.
+  const NORMS = [
+    { hcp: 0,  score: 0.83,  fir: 50, gir: 61, updown: 47, putts: 29.4, penalties: 0.56 },
+    { hcp: 5,  score: 6.33,  fir: 48, gir: 44, updown: 41, putts: 30.2, penalties: 0.91 },
+    { hcp: 10, score: 10.88, fir: 49, gir: 36, updown: 31, putts: 31.2, penalties: 1.62 },
+    { hcp: 15, score: 17.38, fir: 48, gir: 24, updown: 21, putts: 33.1, penalties: 2.45 },
+    { hcp: 20, score: 21.69, fir: 46, gir: 17, updown: 20, putts: 33.1, penalties: 3.03 },
+    { hcp: 25, score: 28.97, fir: 46, gir: 10, updown: 18, putts: 33.8, penalties: 4.67 },
+  ];
+
+  // Which stats discriminate well enough to place someone on the table, and
+  // which way is better. `fir` is absent on purpose and that absence is the
+  // finding, not an oversight.
+  const PLACEABLE = {
+    gir:       { label: 'Greens in regulation', unit: '%',    higherBetter: true  },
+    updown:    { label: 'Up and down',          unit: '%',    higherBetter: true  },
+    putts:     { label: 'Putts per round',      unit: '',     higherBetter: false },
+    penalties: { label: 'Penalties per round',  unit: '',     higherBetter: false },
+  };
+  const FIR_NOTE =
+    'Fairways hit is recorded and deliberately not graded. Across a 28-stroke scoring range it moves from ' +
+    '50% to 46% — a scratch golfer hits about four points more fairways than a 20-handicap. It does not ' +
+    'discriminate, so placing you on it would invent a weakness out of noise. What the driver actually costs ' +
+    'you shows up in the penalty count, not the fairway count.';
+
+  // ── Storage ───────────────────────────────────────────────────
+  function all() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(-300))); } catch (_) {}
+  }
+  function record(r) {
+    const holes = r?.holes === 9 ? 9 : 18;
+    const num = v => (Number.isFinite(+v) && v !== '' && v !== null ? +v : null);
+    const row = {
+      id: (crypto.randomUUID ? crypto.randomUUID() : 'rd-' + Date.now()),
+      date: r?.date || new Date().toISOString(),
+      course: (r?.course || '').slice(0, 80),
+      holes,
+      score: num(r?.score), par: num(r?.par) ?? (holes === 9 ? 36 : 72),
+      putts: num(r?.putts), threePutts: num(r?.threePutts), penalties: num(r?.penalties),
+      fairwaysHit: num(r?.fairwaysHit), fairwaysPossible: num(r?.fairwaysPossible),
+      girHit: num(r?.girHit),
+      upDowns: num(r?.upDowns), upDownAttempts: num(r?.upDownAttempts),
+    };
+    if (row.score === null) return null;      // the one field that makes it a round
+    const list = all(); list.push(row); save(list);
+    return row;
+  }
+  function remove(id) { save(all().filter(r => r.id !== id)); }
+  function clear() { save([]); }
+
+  // ── Per-round, scaled to 18 ───────────────────────────────────
+  // Nine-hole rounds are doubled so they sit on the same table. That is exact
+  // for counts and rates alike, and it is stated rather than hidden, because
+  // doubling a nine-hole penalty count assumes the back nine would have gone
+  // like the front and it might not have.
+  function per18(r) {
+    if (!r) return null;
+    const k = r.holes === 9 ? 2 : 1;
+    const pct = (hit, poss) => (Number.isFinite(hit) && Number.isFinite(poss) && poss > 0)
+      ? (hit / poss) * 100 : null;
+    return {
+      id: r.id, date: r.date, course: r.course, holes: r.holes, scaled: k === 2,
+      toPar: Number.isFinite(r.score) && Number.isFinite(r.par) ? (r.score - r.par) * k : null,
+      putts: Number.isFinite(r.putts) ? r.putts * k : null,
+      threePutts: Number.isFinite(r.threePutts) ? r.threePutts * k : null,
+      penalties: Number.isFinite(r.penalties) ? r.penalties * k : null,
+      fir: pct(r.fairwaysHit, r.fairwaysPossible),
+      gir: pct(r.girHit, r.holes),
+      updown: pct(r.upDowns, r.upDownAttempts),
+    };
+  }
+
+  // ── Placing a stat on the table ───────────────────────────────
+  // Linear interpolation between the published rows, clamped at both ends and
+  // flagged when clamped — a golfer better than the 0 row or worse than the 25
+  // row is off the table, and saying "you are a 25" to someone who is a 34 is
+  // just wrong.
+  function place(stat, value) {
+    const spec = PLACEABLE[stat];
+    if (!spec || !Number.isFinite(value)) return null;
+    const pts = NORMS.map(n => ({ hcp: n.hcp, v: n[stat] }));
+    const asc = spec.higherBetter ? [...pts].reverse() : pts;   // v ascending
+    // `better` means "off the good end of the table", which is the SCRATCH row
+    // whichever direction the stat runs. Deriving it from the value's position
+    // rather than the handicap got it backwards for greens in regulation: 80%
+    // is better than scratch and clamps at hcp 0, but sits at the HIGH end of
+    // an ascending value axis.
+    const best = Math.min(...pts.map(x => x.hcp));
+    const clampAt = row => ({ hcp: row.hcp, clamped: true, better: row.hcp === best });
+    if (value <= asc[0].v) return clampAt(asc[0]);
+    const last = asc[asc.length - 1];
+    if (value >= last.v) return clampAt(last);
+    for (let i = 0; i < asc.length - 1; i++) {
+      const a = asc[i], b = asc[i + 1];
+      if (value >= a.v && value <= b.v) {
+        const t = (value - a.v) / (b.v - a.v || 1);
+        return { hcp: a.hcp + t * (b.hcp - a.hcp), clamped: false };
+      }
+    }
+    return null;
+  }
+
+  const MIN_ROUNDS = 3;
+
+  // ── The profile ───────────────────────────────────────────────
+  function profile(rounds = all()) {
+    const rs = (rounds || []).map(per18).filter(Boolean);
+    if (rs.length < MIN_ROUNDS) {
+      return { ok: false, n: rs.length, need: MIN_ROUNDS - rs.length,
+               note: `Log ${MIN_ROUNDS - rs.length} more round${MIN_ROUNDS - rs.length === 1 ? '' : 's'} and ` +
+                     `this can tell you which part of your game is furthest out of line with the rest of it.` };
+    }
+    const avg = k => {
+      const v = rs.map(r => r[k]).filter(Number.isFinite);
+      return v.length ? mean(v) : null;
+    };
+    const stats = {};
+    for (const k of Object.keys(PLACEABLE)) {
+      const value = avg(k);
+      if (value === null) continue;
+      const p = place(k, value);
+      if (p) stats[k] = { ...PLACEABLE[k], key: k, value, implied: p.hcp, clamped: p.clamped, better: p.better };
+    }
+    const list = Object.values(stats);
+    const result = {
+      ok: true, n: rs.length, rounds: rs, stats,
+      fir: avg('fir'), firNote: FIR_NOTE,
+      toPar: avg('toPar'), putts: avg('putts'), threePutts: avg('threePutts'),
+    };
+    if (list.length < 2) {
+      result.note = 'Log a couple more categories — greens, up-and-downs, putts, penalties — and the app can ' +
+                    'compare them against each other.';
+      return result;
+    }
+    const sorted = [...list].sort((a, b) => b.implied - a.implied);   // worst first
+    const worst = sorted[0], best = sorted[sorted.length - 1];
+    const spread = worst.implied - best.implied;
+    result.worst = worst; result.best = best; result.spread = spread;
+    // Under about five points of implied handicap the categories are level and
+    // there is no outlier to name. Saying "this is your weakness" about a
+    // two-point gap would be reading noise.
+    result.even = spread < 5;
+    result.note = result.even
+      ? `Across ${rs.length} rounds your categories sit within ${fmt(spread, 0)} points of each other on the ` +
+        `Shot Scope table — no single part of your game is dragging. That is a real answer: the way down from ` +
+        `here is everything getting slightly better, not one fix.`
+      : `Across ${rs.length} rounds your ${worst.label.toLowerCase()} plays like a ${fmt(worst.implied, 0)} ` +
+        `handicap while your ${best.label.toLowerCase()} plays like a ${fmt(best.implied, 0)}. That gap is ` +
+        `${fmt(spread, 0)} points, and it is where your strokes are — not spread evenly across your game.`;
+    return result;
+  }
+
+  // ── The link back to the range ────────────────────────────────
+  // The open question in the research base is whether range performance
+  // predicts on-course performance. The app measures a directional spread on
+  // the range and now counts penalties on the course, so it can put the two
+  // side by side for THIS golfer — which is the only version of that question
+  // anyone can answer with their own data.
+  //
+  // It is shown as two facts next to each other, not as a correlation. Three
+  // rounds and a handful of sessions cannot establish one, and a scatter plot
+  // with an r on it would be exactly the overreach the rest of the app avoids.
+  function rangeLink(rounds, tail) {
+    const p = profile(rounds);
+    if (!p.ok || !p.stats.penalties) return null;
+    const pen = p.stats.penalties;
+    if (!tail || !tail.ok) {
+      return { ok: false, penalties: pen,
+               note: `You are averaging ${fmt(pen.value, 1)} penalties a round, which is about a ` +
+                     `${fmt(pen.implied, 0)}-handicap rate. The range side of this needs 30 shots of one club ` +
+                     `on a premium ball before the app can show you the dispersion tail that produces them.` };
+    }
+    return {
+      ok: true, penalties: pen, sigma: tail.sigma, p95: tail.p95,
+      note: `${fmt(pen.value, 1)} penalties a round on the course, and a ${fmt(tail.sigma, 1)}° directional ` +
+            `spread with a ${fmt(tail.p95, 1)}° tail on the range. Those are the same problem measured in two ` +
+            `places — the tail is what puts a ball somewhere you have to take a drop from.`,
+      caveat: 'Shown side by side, not correlated. Establishing that your range spread predicts your penalty ' +
+              'count would take far more rounds than anyone logs, and a number claiming it from a handful ' +
+              'would be invented.',
+    };
+  }
+
+  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS,
+           all, record, remove, clear, per18, place, profile, rangeLink };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -6861,7 +7089,103 @@ const UI = (() => {
     renderProgressCharts(sessions,'all');
     try { renderTailTrend(sessions, 'all'); } catch(e){ console.error('tail trend',e); }
     try { renderStrikeTrend(sessions, 'all'); } catch(e){ console.error('strike trend',e); }
+    try { renderRounds(sessions); } catch(e){ console.error('rounds',e); }
     try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
+  }
+
+  // ── On the course ─────────────────────────────────────────────
+  // The only on-course data the app has, and the only place it can answer
+  // "where are my strokes going" rather than reasoning about it from range
+  // shots. Placed in Progress because it is an outcome-over-time question.
+  function renderRounds(sessions) {
+    const el = document.getElementById('roundsHost');
+    if (!el) return;
+    const esc = t => Sanitize.escape(t);
+    const R = Rounds;
+    const rounds = R.all();
+    const p = R.profile(rounds);
+
+    // The dispersion tail for the driver, if there is one, so the range and the
+    // course can sit next to each other.
+    let tail = null;
+    try {
+      const shots = (sessions || []).flatMap(sn => Store.stamp(sn).shots || []);
+      const t = Dispersion.tail(shots, 'd');
+      if (t.ok) tail = t;
+    } catch (_) {}
+    const link = R.rangeLink(rounds, tail);
+
+    const bar = st => {
+      // 0 → 25 handicap across the width, so the categories line up visually.
+      const pct = Math.max(0, Math.min(100, (st.implied / 25) * 100));
+      return `<div class="rd-stat">
+          <div class="rd-stat-head"><span>${esc(st.label)}</span>
+            <span class="rd-stat-val">${fmt(st.value, st.key === 'penalties' ? 1 : 0)}${esc(st.unit)}</span></div>
+          <div class="rd-bar"><div class="rd-bar-fill" style="width:${pct}%"></div></div>
+          <div class="rd-stat-foot">plays like a ${fmt(st.implied, 0)} handicap${st.clamped
+            ? (st.better ? ' — better than the table goes' : ' — worse than the table goes') : ''}</div>
+        </div>`;
+    };
+
+    el.innerHTML = `
+      <div class="tail-block${p.ok ? '' : ' pending'}">
+        <div class="tail-head">Your categories, each placed on its own
+          <span class="tail-n">${rounds.length} round${rounds.length === 1 ? '' : 's'}</span></div>
+        ${p.ok
+          ? `${Object.values(p.stats).sort((a, b) => b.implied - a.implied).map(bar).join('')}
+             <div class="tail-item${p.even ? '' : ' heavy'}">${esc(p.note)}</div>
+             ${Number.isFinite(p.fir) ? `<div class="tail-note"><strong>Fairways hit ${fmt(p.fir, 0)}%.</strong>
+               ${esc(p.firNote)}</div>` : ''}`
+          : `<div class="tail-note">${esc(p.note)}</div>`}
+        <div class="tail-note">Placed against Shot Scope's normative table — 90M+ shots, independently
+          replicated across 20,000 golfers and 400,000 rounds. Greens in regulation varies sixfold from
+          scratch to 25 and penalties eightfold, which is why those place you and fairways cannot.</div>
+      </div>
+
+      ${link ? `<div class="tail-block${link.ok ? '' : ' pending'}">
+        <div class="tail-head">The course and the range, side by side</div>
+        <div class="tail-item">${esc(link.note)}</div>
+        ${link.caveat ? `<div class="tail-note">${esc(link.caveat)}</div>` : ''}
+      </div>` : ''}
+
+      <div class="tail-block">
+        <div class="tail-head">Log a round <span class="tail-n">six numbers you already know</span></div>
+        <div class="rd-form">
+          <label class="qe-field"><span>Holes</span>
+            <select id="rdHoles"><option value="18">18</option><option value="9">9</option></select></label>
+          <label class="qe-field"><span>Score</span><input type="number" id="rdScore" min="18" max="200" inputmode="numeric"></label>
+          <label class="qe-field"><span>Par</span><input type="number" id="rdPar" min="27" max="80" value="72" inputmode="numeric"></label>
+          <label class="qe-field"><span>Putts</span><input type="number" id="rdPutts" min="0" max="80" inputmode="numeric"></label>
+          <label class="qe-field"><span>Three-putts</span><input type="number" id="rdThree" min="0" max="18" inputmode="numeric"></label>
+          <label class="qe-field"><span>Penalties</span><input type="number" id="rdPen" min="0" max="30" inputmode="numeric"></label>
+          <label class="qe-field"><span>Greens in regulation</span><input type="number" id="rdGir" min="0" max="18" inputmode="numeric"></label>
+          <label class="qe-field"><span>Fairways hit</span><input type="number" id="rdFir" min="0" max="18" inputmode="numeric"></label>
+          <label class="qe-field"><span>of fairways possible</span><input type="number" id="rdFirOf" min="0" max="18" value="14" inputmode="numeric"></label>
+          <label class="qe-field"><span>Up and downs</span><input type="number" id="rdUd" min="0" max="18" inputmode="numeric"></label>
+          <label class="qe-field"><span>of attempts</span><input type="number" id="rdUdOf" min="0" max="18" inputmode="numeric"></label>
+        </div>
+        <div class="probe-btns"><button class="probe-btn" id="rdSave">Save round</button></div>
+        <div class="tail-note">Only the score is required. Anything you leave blank is simply not placed —
+          the app never fills a gap with an assumption.</div>
+      </div>`;
+
+    document.getElementById('rdHoles')?.addEventListener('change', e => {
+      const par = document.getElementById('rdPar'), firOf = document.getElementById('rdFirOf');
+      if (par) par.value = e.target.value === '9' ? 36 : 72;
+      if (firOf) firOf.value = e.target.value === '9' ? 7 : 14;
+    });
+    document.getElementById('rdSave')?.addEventListener('click', () => {
+      const v = id => { const el2 = document.getElementById(id); const n = parseFloat(el2?.value); return Number.isFinite(n) ? n : null; };
+      const saved = Rounds.record({
+        holes: parseInt(document.getElementById('rdHoles').value, 10),
+        score: v('rdScore'), par: v('rdPar'), putts: v('rdPutts'), threePutts: v('rdThree'),
+        penalties: v('rdPen'), girHit: v('rdGir'), fairwaysHit: v('rdFir'),
+        fairwaysPossible: v('rdFirOf'), upDowns: v('rdUd'), upDownAttempts: v('rdUdOf'),
+      });
+      if (!saved) { toast('A round needs at least a score.'); return; }
+      toast('Round saved.');
+      renderRounds(sessions);
+    });
   }
 
   // ── Strike quality across sessions ────────────────────────────
@@ -7383,7 +7707,7 @@ const UI = (() => {
   }
 
   return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
-           renderQuietEye, renderDrills, renderShortGame };
+           renderQuietEye, renderDrills, renderShortGame, renderRounds };
 })();
 
 // ────────────────────────────────────────────────────────────────
