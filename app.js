@@ -1153,7 +1153,11 @@ const Spin = (() => {
     const shots = (session?.shots || []).filter(s => (!clubType || s.clubType === clubType) && Number.isFinite(s.spinRate) && s.spinRate > 0);
     const iv = Metrics.interval(shots.map(s => s.spinRate), ' rpm', 0);
     if (!iv || iv.n < 3) return null;
-    return { ...iv, enoughForMean: iv.n >= Metrics.MIN_SHOTS_REPORT, mdc: Metrics.mdc('spinRate', iv.n) };
+    // Spread is the golfer's own, from the shots in this session. No
+    // population MDC is attached: a constant derived from other people would
+    // make this interval describe a sample rather than this swing.
+    return { ...iv, enoughForMean: iv.n >= Metrics.MIN_SHOTS_REPORT,
+             spread: stdDev(shots.map(s => s.spinRate)) };
   }
 
   // The sentence that must accompany any spin figure, so it is never read as
