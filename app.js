@@ -1218,9 +1218,24 @@ const Store = (() => {
       return null;
     }
   }
+  // The two LOCAL stores, together. Every path that adds a session locally goes
+  // through here, because the import path did not and that cost the whole
+  // device-storage feature: ImportFlow wrote straight to MemDB, so a golfer who
+  // had already switched device storage on lost every session they imported
+  // afterwards. It only ever appeared to work because turning the setting on
+  // flushes whatever is in memory, and that was the order the test used.
+  //
+  // Cloud is deliberately NOT in here. The import path renders the session
+  // immediately and syncs to the cloud in the background with its own toast,
+  // and folding an awaited network call into the local write would put a
+  // spinner in front of a render that is currently instant.
+  function saveLocal(s) {
+    MemDB.saveSession(s);               // instant, always works
+    return LocalDB.persist(s);          // device store, if that is switched on
+  }
+
   async function saveSession(s) {
-    MemDB.saveSession(s);               // local first — instant, always works
-    await LocalDB.persist(s);           // and to the device, if that is switched on
+    await saveLocal(s);
     if (cloud()) await CloudDB.saveSession(s);
   }
   async function deleteSession(id) {
@@ -1228,7 +1243,7 @@ const Store = (() => {
     await LocalDB.forget(id);
     if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
   }
-  return { getSessions, getSession, saveSession, deleteSession, stamp };
+  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -6900,8 +6915,10 @@ const ImportFlow = (() => {
     // bypasses Store.getSessions(), so without this a just-imported session
     // has unstamped shots and every ball-type gate silently reads "unknown".
     Store.stamp(session);
-    // Save to MemDB and show instantly — no spinner
-    MemDB.saveSession(session);
+    // Save to BOTH local stores and show instantly — no spinner. This used to
+    // call MemDB.saveSession directly, which meant a session imported after
+    // device storage was switched on never reached the device at all.
+    Store.saveLocal(session);
     UI.renderDetail(session);
     Router.show('session-detail');
     // Persist to cloud in background if logged in (auto-sync on import)

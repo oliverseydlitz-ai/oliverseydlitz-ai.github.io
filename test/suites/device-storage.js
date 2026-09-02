@@ -82,6 +82,26 @@ console.log('— turning it off erases now, not just from here on —');
   ok(a.MemDB.getSessions().length === 2, 'while the current page keeps working from memory');
 }
 
+console.log('— every local write path reaches the device, not just Store.saveSession —');
+// ImportFlow wrote straight to MemDB, bypassing the persistence wired into
+// Store.saveSession. A golfer who switched device storage on and THEN imported
+// lost every session afterwards; it only looked fine because turning the
+// setting on flushes whatever is already in memory, which is the order the
+// first test used. Store.saveLocal is now the single local write path.
+{
+  const a = boot();
+  await a.LocalDB.setEnabled(true);
+  ok(a.idb.size === 0, 'nothing stored yet');
+  await a.Store.saveLocal(mk('imported'));      // the path ImportFlow takes
+  ok(a.idb.size === 1, 'a session added the way an import adds one reaches the device');
+  ok(a.MemDB.getSession('imported') !== null, 'and memory, so it renders instantly');
+
+  const rows = [...a.idb.values()];
+  const next = boot({ keep: true, rows });
+  ok((await next.LocalDB.hydrate()).restored === 1,
+     'so it is still there on the next visit — which is the whole feature');
+}
+
 console.log('— deleting a session removes the device copy too —');
 {
   const a = boot();
