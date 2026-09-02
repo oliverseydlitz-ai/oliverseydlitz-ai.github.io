@@ -1034,6 +1034,142 @@ const Conditions = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// SetupGuide — getting the device honest before it gets read
+// ────────────────────────────────────────────────────────────────
+// Every angular prescription this app makes is downstream of how the unit was
+// set up. Launch direction is measured relative to where the DEVICE thinks the
+// target is, so a misaligned unit doesn't add noise — it adds a constant bias
+// to every shot, and face-to-path inherits it amplified by 1/R (~1.2x). A unit
+// aimed 2° right makes a straight swing look 2.4° open, all session, and the
+// app would confidently prescribe an anti-slice drill for a swing fault that
+// does not exist. Club path and attack angle additionally need the ball at the
+// documented distance, and spin is not measured at all without an RPT ball.
+const SetupGuide = (() => {
+  const STEPS = [
+    {
+      n: 1,
+      title: 'Level the unit before anything else',
+      body: 'Adjust the legs until the unit sits flat. Front-to-back tilt must stay within ' +
+            '<strong>0.2°</strong> — that is the axis attack angle and launch angle are read against, ' +
+            'so a nose-down unit reports every shot as steeper than it was. Side-to-side matters less ' +
+            'but keep it flat too. On an uneven bay, level the unit to the <em>ball</em>, not to the floor.',
+      why: 'Tilt biases attack angle and launch angle on every single shot.',
+    },
+    {
+      n: 2,
+      title: 'Set the ball at the documented distance',
+      body: 'Place the ball <strong>250 cm from the unit</strong>. Club path and angle of attack are only ' +
+            'measured inside that placement window — outside it the device either drops them or reports ' +
+            'them badly, and you will not always be told which.',
+      why: 'Club path and attack angle depend on precise placement, not just on being in view.',
+    },
+    {
+      n: 3,
+      title: 'Switch to Impact Vision to aim',
+      body: 'Open <strong>Impact Vision</strong> on your phone or tablet. It draws the line the device is ' +
+            'actually measuring against. That line — not the bay, not the mat edge, not the target you ' +
+            'picked by eye — is the zero your launch direction and club path are reported from.',
+      why: 'You cannot align to something you cannot see. The on-screen line is the real reference.',
+    },
+    {
+      n: 4,
+      title: 'Lay an alignment stick along the on-screen line',
+      body: 'Put an alignment stick — or a club — on the ground and adjust it until it sits exactly along ' +
+            'the line shown on screen. Take your time here. Every degree you are out becomes a degree of ' +
+            'phantom face-to-path in every shot the app analyses afterwards.',
+      why: 'This is the step that transfers the device’s reference line into the real world.',
+    },
+    {
+      n: 5,
+      title: 'Slide the stick sideways — do not rotate it',
+      body: 'Once the stick matches the line, move it <strong>sideways</strong> to clear the hitting area, ' +
+            'keeping its direction identical. Slide it; never pivot it. Then put your ball where the stick ' +
+            'just was, on the line, inside the club measurement box.',
+      why: 'The stick keeps the direction; the ball takes the position.',
+    },
+    {
+      n: 6,
+      title: 'Check the end state, then play down the stick',
+      body: 'You should now have the <strong>ball on the line inside the measurement box</strong>, and the ' +
+            '<strong>alignment stick parallel beside it</strong> showing you the direction. Aim and swing ' +
+            'down the stick, not at whatever looks like a target out on the range.',
+      why: 'If you play to a different target than the device is measuring, every number is offset.',
+    },
+  ];
+
+  // What each metric actually requires. Shown as a checklist, because "the app
+  // said my face was open" is only meaningful if these were true at the time.
+  const REQUIREMENTS = [
+    { metric: 'Ball speed, club speed, smash factor',
+      needs: 'Nothing special — these are the most reliable numbers the device produces.', ok: true },
+    { metric: 'Attack angle, launch angle',
+      needs: 'Unit levelled within 0.2° front-to-back.' },
+    { metric: 'Club path, attack angle',
+      needs: 'Ball placed 250 cm from the unit.' },
+    { metric: 'Launch direction, face-to-path, any open/closed face reading',
+      needs: 'Impact Vision alignment done properly (steps 3–6). This is the one people skip, and it is the one that silently biases every angular drill the app suggests.' },
+    { metric: 'Spin rate, spin axis',
+      needs: 'A Rapsodo RPT ball. Spin is NOT measured with range balls or with your own premium ball — the number you see is estimated, not read. ShotLab never prescribes from spin for this reason.',
+      warn: true },
+    { metric: 'Dispersion and gapping',
+      needs: 'Your own premium balls. Range balls give 2–4× the spread off a machine with zero variability, and a wedge can fly further on half the spin.',
+      warn: true },
+  ];
+
+  const SUMMARY = 'Ten minutes of setup decides whether the next hour of numbers means anything. ' +
+    'A unit aimed 2° right makes a straight swing read 2.4° open — all session, on every shot — ' +
+    'and this app would prescribe an anti-slice drill for a fault you do not have.';
+
+  function html() {
+    return `
+      <div class="setup-guide">
+        <p class="setup-summary">${SUMMARY}</p>
+
+        <h3 class="setup-h">Setting up</h3>
+        <ol class="setup-steps">
+          ${STEPS.map(s => `
+            <li class="setup-step">
+              <div class="setup-step-n">${s.n}</div>
+              <div class="setup-step-body">
+                <div class="setup-step-title">${s.title}</div>
+                <div class="setup-step-text">${s.body}</div>
+                <div class="setup-step-why">${s.why}</div>
+              </div>
+            </li>`).join('')}
+        </ol>
+
+        <h3 class="setup-h">What each number needs to be true</h3>
+        <div class="setup-reqs">
+          ${REQUIREMENTS.map(r => `
+            <div class="setup-req${r.warn ? ' warn' : ''}${r.ok ? ' ok' : ''}">
+              <div class="setup-req-metric">${r.metric}</div>
+              <div class="setup-req-needs">${r.needs}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function show() {
+    document.getElementById('setupModal')?.remove();
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'setupModal';
+    modal.innerHTML = `
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <h2 class="modal-title">Setting up your launch monitor</h2>
+          <button class="btn-icon" data-close-modal aria-label="Close">✕</button>
+        </div>
+        <div class="modal-scroll">${html()}</div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  }
+
+  return { STEPS, REQUIREMENTS, SUMMARY, html, show };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // CSV Parser
 // ────────────────────────────────────────────────────────────────
 const CSVParser = (() => {
@@ -4909,6 +5045,10 @@ async function init() {
       toggle.style.color = isOn ? 'var(--pine)' : 'var(--text-dim)';
     }
   });
+
+  // Launch-monitor setup guide
+  document.getElementById('setupGuideBtn')?.addEventListener('click', () => SetupGuide.show());
+  document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
 
   // Feedback-schedule picker — the app's most consequential setting.
   const renderFeedbackModes = () => {
