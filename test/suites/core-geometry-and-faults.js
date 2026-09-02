@@ -84,5 +84,28 @@ ok(M.CoachingMode.PROTOCOL.minSecondsBetweenShots===20, 'protocol exposes shot s
 const sess=M.CoachingMode.generateSession('Slice',30);
 ok(sess.balls>0 && /70%/.test(sess.successTarget), 'session prescribes balls and a success target');
 
+console.log('— the launch-window targets come from ONE table —');
+// They used to be hardcoded as strings inline in the render, a second copy of
+// numbers Benchmarks.TARGET already held. That is the exact shape of the bug
+// the calibration audit fixed once: the +3.0 driver attack angle that is the
+// LPGA average sitting in a table labelled PGA. Correcting the authoritative
+// copy would not have changed anything a golfer saw.
+const B = M.Benchmarks;
+ok(typeof B.targetsFor === 'function', 'there is a resolver rather than inline strings');
+const dt = B.targetsFor('d');
+ok(dt.attack === B.TARGET.driverAttackAngle, 'driver attack angle is the TARGET entry itself, not a copy');
+ok(dt.attack.lo === 2 && dt.attack.hi === 5, 'and it is +2 to +5, the target');
+ok(B.get('d').pga.aa === -1.3, 'while the tour AVERAGE stays -1.3, descending — separate on purpose');
+ok(dt.attack.lo !== B.get('d').pga.aa, 'the two are not the same number, which was the original bug');
+ok(B.targetsFor('7i').attack === B.TARGET.ironAttackAngle, 'irons resolve to the iron band');
+ok(B.targetsFor('3w').attack === B.TARGET.otherAttackAngle, 'and woods to their own, not to the iron one');
+ok(B.targetsFor('pw').launch === B.TARGET.shortIronLaunch, 'short irons get the short-iron launch window');
+ok(B.targetsFor('d').spin === B.TARGET.driverSpin, 'and each family gets its own spin reference');
+for (const c of ['d','3w','4h','3i','7i','pw','lw']) {
+  const t = B.targetsFor(c);
+  ok(t.launch && t.attack && t.spin && t.launch.lo < t.launch.hi,
+     `${c}: every band resolves and is the right way round`);
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

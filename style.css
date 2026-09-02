@@ -832,6 +832,11 @@ body.modal-open { overflow: hidden; }
 .fb-hidden{color:var(--text-muted);opacity:.45;text-align:center;letter-spacing:.2em}
 .fb-row-hidden{cursor:pointer}
 .fb-row-hidden:hover td{background:var(--surface2)}
+.cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;
+  color:var(--text-dim);background:var(--surface2);border-left:3px solid var(--yellow);
+  border-radius:var(--radius-sm);text-wrap:pretty}
+.cmp-row.cmp-withheld{opacity:.72}
+.cmp-row.cmp-withheld .cmp-label small{color:var(--yellow);font-weight:600}
 .plan-gate{margin-top:.35rem;font-size:.72rem;line-height:1.45;color:var(--text-muted)}
 .plan-locked{margin-top:.4rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.75rem;line-height:1.5;color:var(--text-dim)}

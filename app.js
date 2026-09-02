@@ -3995,9 +3995,37 @@ const Benchmarks = (() => {
   const TARGET = {
     driverAttackAngle: {lo: 2,  hi: 5,   label: '+2° to +5° (hit up)'},
     ironAttackAngle:   {lo: -5, hi: -2,  label: '-2° to -5° (hit down)'},
+    otherAttackAngle:  {lo: -2, hi: 0,   label: '0 to -2°'},
     driverSpin:        {lo: 2000, hi: 2800, label: '2000–2800 rpm'},
+    woodSpin:          {lo: 2500, hi: 3500, label: '2500–3500 rpm'},
+    ironSpin:          {lo: 3500, hi: 6000, label: '3500–6000 rpm'},
+    driverLaunch:      {lo: 10, hi: 15,  label: '10–15°'},
+    woodLaunch:        {lo: 9,  hi: 14,  label: '9–14°'},
+    ironLaunch:        {lo: 13, hi: 22,  label: '13–22°'},
+    shortIronLaunch:   {lo: 24, hi: 40,  label: '24–40°'},
     faceToPath:        {lo: -2, hi: 2,   label: 'within ±2°'},
   };
+
+  // Resolve the target bands for a club. These used to be hardcoded as strings
+  // inline in the launch-window table — a SECOND copy of numbers this table
+  // already held, which is the precise shape of the bug the audit fixed once
+  // already: the +3.0 driver attack angle that was the LPGA average sitting in
+  // a table labelled PGA. One authoritative copy that nothing read, and one
+  // inline copy that everything did. Correcting the first would not have
+  // changed a single thing a golfer saw.
+  function targetsFor(t) {
+    const launch = t === 'd' ? TARGET.driverLaunch
+                 : (isWood(t) || isHybrid(t)) ? TARGET.woodLaunch
+                 : isShort(t) ? TARGET.shortIronLaunch
+                 : TARGET.ironLaunch;
+    const attack = t === 'd' ? TARGET.driverAttackAngle
+                 : isIron(t) ? TARGET.ironAttackAngle
+                 : TARGET.otherAttackAngle;
+    const spin   = t === 'd' ? TARGET.driverSpin
+                 : (isWood(t) || isHybrid(t)) ? TARGET.woodSpin
+                 : TARGET.ironSpin;
+    return { launch, attack, spin };
+  }
 
   // Estimated spin loft by club family. TrackMan publishes PGA driver 14.7°
   // and 6-iron 24.3°; the most efficient drivers of the ball sit near 10–14°.
@@ -4037,7 +4065,7 @@ const Benchmarks = (() => {
     }
   }
 
-  return { get, status, TARGET, spinLoftBand };
+  return { get, status, TARGET, targetsFor, spinLoftBand };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -4616,29 +4644,61 @@ const Features = (() => {
 
   // ── 4. Session comparison ──────────────────────────────────────
   // Side-by-side metric deltas between two sessions (newer vs older).
+  // Comparing two sessions is where "never compare across measurement
+  // conditions" gets broken most easily, and it was: any two sessions were put
+  // side by side with green and red arrows, so a range-ball session against a
+  // premium-ball one showed a carry "improvement" that was entirely the ball.
+  // Conditions.comparable() existed for exactly this and nothing called it.
+  //
+  // The numbers still show — a golfer is entitled to see what they hit — but
+  // the VERDICT is withheld on the rows the conditions actually change, which
+  // is the same rule the shot table follows: the green arrow is the claim.
   function compare(a, b) {
     try {
       const metric = (s, f, dec=0) => fmt(avg(s.shots, f), dec);
       const num = (s, f) => avg(s.shots, f);
+      const sameConditions = Conditions.comparable(a, b);
+      const spinBoth = Spin.measured(a) && Spin.measured(b);
       const rows = [
-        ['Avg carry',  'carryDistance', 0, 'yds', true],
-        ['Ball speed', 'ballSpeed',     1, 'mph', true],
-        ['Smash',      'smashFactor',   2, '',    true],
-        ['Launch',     'launchAngle',   1, '°',   null],
-        ['Spin',       'spinRate',      0, 'rpm', null],
-        ['Apex',       'apex',          0, 'ft',  null],
+        // conditionSensitive: does ball type or surface change what this
+        // number MEANS, rather than just adding noise to it?
+        ['Avg carry',  'carryDistance', 0, 'yds', true,  true],
+        ['Ball speed', 'ballSpeed',     1, 'mph', true,  true],
+        ['Smash',      'smashFactor',   2, '',    true,  false],
+        ['Launch',     'launchAngle',   1, '°',   null,  false],
+        // Spin is not a reading at all without an RPT ball, so it is dropped
+        // rather than shown as a figure that was never measured.
+        ...(spinBoth ? [['Spin', 'spinRate', 0, 'rpm', null, true]] : []),
+        ['Apex',       'apex',          0, 'ft',  null,  true],
       ];
-      return rows.map(([label, f, dec, unit, higherBetter]) => {
+      const out = rows.map(([label, f, dec, unit, higherBetter, sensitive]) => {
         const av = num(a, f), bv = num(b, f);
         const delta = (av!=null && bv!=null) ? av - bv : null;
+        const verdictOk = higherBetter != null && (sameConditions || !sensitive);
         return {
-          label, unit,
+          label, unit, sensitive, withheld: sensitive && !sameConditions,
           a: metric(a, f, dec), b: metric(b, f, dec),
           delta: delta!=null ? fmt(Math.abs(delta), dec) : null,
           dir: delta==null||Math.abs(delta)<1e-9 ? 'flat' : delta>0 ? 'up' : 'down',
-          good: (delta==null||higherBetter==null) ? null : (higherBetter ? delta>0 : delta<0),
+          good: (delta==null || !verdictOk) ? null : (higherBetter ? delta>0 : delta<0),
         };
       });
+      out.comparable = sameConditions;
+      out.caveats = [];
+      if (!sameConditions) {
+        const ba = Conditions.ball(a), bb = Conditions.ball(b);
+        const sa = Conditions.surface(a), sb = Conditions.surface(b);
+        if (ba.id !== bb.id) out.caveats.push(
+          `These sessions used different balls — ${ba.label} against ${bb.label}. Ball type changes carry ` +
+          `and dispersion by more than most training effects do, so the distance rows are shown without a ` +
+          `verdict: the difference is the ball as much as you.`);
+        if (sa.id !== sb.id) out.caveats.push(
+          `Different surfaces — ${sa.label} against ${sb.label}. A mat lets the sole bounce instead of the ` +
+          `edge digging, so a fat strike still reads near-normal and the two sets are not measuring the ` +
+          `same thing.`);
+      }
+      if (!spinBoth) out.caveats.push(Spin.NOT_MEASURED);
+      return out;
     } catch (e) { console.error('compare()', e); return []; }
   }
 
@@ -5851,16 +5911,19 @@ const UI = (() => {
       const userLA = avg(cs,'launchAngle');
       const userAA = avg(cs,'attackAngle');
       const userSpin = avg(cs.filter(Spin.measured), 'spinRate');
-      const optLA  = c==='d'?'10–15°': isWood(c)||isHybrid(c)?'9–14°': isShort(c)?'24–40°':'13–22°';
-      const optAA  = c==='d'?'+2 to +5°':isIron(c)?'-2 to -5°':'0 to -2°';
-      const optSpin= c==='d'?'2000–2800': isWood(c)||isHybrid(c)?'2500–3500':'3500–6000';
-      const laStatus = userLA===null?'na':
-        (c==='d'&&userLA>=10&&userLA<=15)||(isIron(c)&&userLA>=bench.pga.la*0.85&&userLA<=bench.pga.la*1.15)?'green':
-        Math.abs(userLA-bench.pga.la)<=4?'yellow':'red';
-      const aaStatus = userAA===null?'na':
-        (c==='d'&&userAA>=1)?'green':
-        (isIron(c)&&userAA<=-2&&userAA>=-6)?'green':
-        Math.abs(userAA)<2?'yellow':'red';
+      // Read from Benchmarks.TARGET rather than repeating it. What to AIM at is
+      // deliberately separate from what the tour AVERAGES — the PGA driver
+      // attack angle is -1.3°, descending, while +2 to +5 is the target — and
+      // keeping a second inline copy is how those two got conflated the first
+      // time. The status dots are computed from the same bands, so a number
+      // shown as inside its target cannot be marked red.
+      const tgt = Benchmarks.targetsFor(c);
+      const optLA = tgt.launch.label, optAA = tgt.attack.label, optSpin = tgt.spin.label;
+      const band = (v, b) => v === null ? 'na'
+        : (v >= b.lo && v <= b.hi) ? 'green'
+        : (v >= b.lo - (b.hi - b.lo) * 0.5 && v <= b.hi + (b.hi - b.lo) * 0.5) ? 'yellow' : 'red';
+      const laStatus = band(userLA, tgt.launch);
+      const aaStatus = band(userAA, tgt.attack);
       return `<tr>
         <td><strong>${bench.label}</strong></td>
         <td><span class="status-dot ${laStatus}"></span>${fmt(userLA,1)}°</td><td>${optLA}</td>
@@ -6501,11 +6564,13 @@ const UI = (() => {
       const res = host.querySelector('#cmpResult');
       if (!a || !b || a.id===b.id) { res.innerHTML = `<p class="cmp-hint">Pick two different sessions to compare.</p>`; return; }
       const rows = Features.compare(a, b);
-      res.innerHTML = rows.map(r => {
+      const caveats = (rows.caveats || []).map(c =>
+        `<div class="cmp-caveat">${Sanitize.escape(c)}</div>`).join('');
+      res.innerHTML = caveats + rows.map(r => {
         const arrow = r.dir==='up'?'▲':r.dir==='down'?'▼':'–';
         const cls = r.good===true?'good':r.good===false?'bad':'neutral';
-        return `<div class="cmp-row">
-            <span class="cmp-label">${r.label}</span>
+        return `<div class="cmp-row${r.withheld ? ' cmp-withheld' : ''}">
+            <span class="cmp-label">${r.label}${r.withheld ? ' <small>· not comparable</small>' : ''}</span>
             <span class="cmp-a">${r.a}<small>${r.unit}</small></span>
             <span class="cmp-delta ${cls}">${arrow} ${r.delta!=null?r.delta:''}</span>
             <span class="cmp-b">${r.b}<small>${r.unit}</small></span>

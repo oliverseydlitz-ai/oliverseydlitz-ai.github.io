@@ -64,7 +64,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser',
     'FeedbackEngine','Conditions','Spin','Dispersion','Strike','QuietEye','DrillLibrary','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
-    'ImportFlow','Goals','SessionSharing','RetentionProbe','consistencyScore','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
+    'ImportFlow','Features','Goals','SessionSharing','RetentionProbe','consistencyScore','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
     'curveYards','gearEffectSuspected','gearResidual','gearThreshold','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',
     'isShort','isMid','CLUB_ORDER'];
   try {
