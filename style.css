@@ -257,32 +257,6 @@ button {
 .session-card[data-grade="C"] { border-left-color: #b45309; }
 .session-card[data-grade="D"] { border-left-color: #c2410c; }
 .session-card[data-grade="F"] { border-left-color: #dc2626; }
-
-.sc-left { flex: 1; min-width: 0; }
-.sc-right { display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; flex-shrink: 0; }
-
-.session-date {
-  font-family: var(--font-display);
-  font-weight: 700; font-size: 1.1rem; color: var(--text);
-  letter-spacing: .01em; text-transform: uppercase;
-}
-.session-meta { color: var(--text-muted); font-size: .78rem; margin-top: 3px; }
-.session-stats { display: flex; gap: .875rem; margin-top: .6rem; flex-wrap: wrap; }
-.session-stat { font-size: .78rem; color: var(--text-muted); }
-.session-stat strong { color: var(--text); font-weight: 600; }
-
-/* Grade ring container */
-.session-grade { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.session-grade svg { display: block; overflow: visible; }
-
-.fault-badge {
-  background: #fef2f2; color: var(--red);
-  font-size: .65rem; font-weight: 700;
-  padding: 2px 8px; border-radius: 99px;
-  border: 1px solid #fecaca;
-  letter-spacing: .03em; text-transform: uppercase;
-  animation: badgePulse 3s ease-in-out infinite;
-}
 @keyframes badgePulse { 0%,85%,100%{opacity:1} 92%{opacity:.5} }
 
 /* ── Import flow ───────────────────────────────────────── */
@@ -358,9 +332,6 @@ textarea { resize: vertical; }
 }
 /* Remove dark-theme gradient line */
 .score-banner-content::after { display: none; }
-
-/* Hidden — replaced by SVG ring in JS */
-.score-letter { display: none !important; }
 
 .score-ring {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -1197,43 +1168,6 @@ body {
 
 /* ── EDITORIAL SESSION CARDS ───────────────────────────────── */
 .session-card { padding: 1.2rem 1.35rem !important; }
-.session-date {
-  font-family: var(--font-serif) !important;
-  font-size: 1.4rem !important;
-  font-weight: 400 !important;
-  letter-spacing: -.01em !important;
-  text-transform: none !important;
-  color: var(--text);
-  line-height: 1.15;
-}
-.session-meta {
-  font-family: var(--font-mono) !important;
-  font-size: .65rem !important;
-  letter-spacing: .07em !important;
-  text-transform: uppercase;
-  margin-top: 6px !important;
-}
-.session-stats {
-  border-top: 1px dashed var(--border);
-  padding-top: .7rem !important;
-  margin-top: .8rem !important;
-  gap: 1.1rem !important;
-}
-.session-stat {
-  font-family: var(--font-mono) !important;
-  font-size: .65rem !important;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  color: var(--text-dim) !important;
-}
-.session-stat strong {
-  font-family: var(--font-display) !important;
-  font-size: 1.05rem !important;
-  font-weight: 700 !important;
-  margin-left: 6px;
-  color: var(--text) !important;
-  letter-spacing: -.01em;
-}
 
 /* ── METRIC CARDS — auto numbered ──────────────────────────── */
 .metrics-strip { counter-reset: metric; }
@@ -1485,12 +1419,10 @@ th {
 /* ── Desktop — hero proportions ────────────────────────────── */
 @media (min-width: 768px) {
   .score-ring svg { width: 130px !important; height: 130px !important; }
-  .session-date { font-size: 1.6rem !important; }
   .record-value { font-size: 2.2rem !important; }
   .metric-value { font-size: 1.95rem !important; }
   .view-title { font-size: 2rem !important; }
 }
-
 
 /* ── v3 fixes ─────────────────────────────────────────────── */
 .top-nav .btn-primary,
@@ -1517,7 +1449,6 @@ body {
     linear-gradient(90deg, rgba(220,38,38,.045) 1px, transparent 1px) !important;
 }
 
-
 /* ── TOUR badge — high visibility on green nav ──────────────── */
 .brand-name::after {
   content: 'TOUR' !important;
@@ -1536,7 +1467,6 @@ body {
   display: inline-block !important;
 }
 
-
 /* ── Animation override: ensure content is always visible ──── */
 .view.active {
   animation: none !important;
@@ -1548,7 +1478,6 @@ body {
   opacity: 1 !important;
   transform: none !important;
 }
-
 
 /* ── BRAND-TAG (real <span>, replaces ::after pseudo) ──────── */
 .brand-tag {
@@ -1739,7 +1668,6 @@ body {
   letter-spacing: .04em;
 }
 
-
 /* ═══════════════════════════════════════════════════════════════
    v4 — FEATURES + DARK MODE + POLISH
    Streak · Focus · Achievements · Compare · Search · Dark theme
@@ -1928,7 +1856,6 @@ html.dark .conf-medium { background: #3a2c10; color: #fbbf24; }
 html.dark .sm-fault { background: #2a2410; }
 html.dark .sm-fault.severity-high { background: #2e1414; }
 html.dark .sm-fault.severity-low { background: #14202e; }
-html.dark .fault-badge { background: #2e1414; border-color: #5a2424; }
 html.dark .paywall-overlay { background: rgba(12,12,13,.85); }
 html.dark .ach-item.got { background: linear-gradient(135deg, rgba(244,63,94,.12), transparent); }
 
@@ -1956,7 +1883,6 @@ html.dark .ach-item.got { background: linear-gradient(135deg, rgba(244,63,94,.12
 .goal-progress { font-size: .75rem; color: var(--text-muted); margin: .4rem 0 .4rem; }
 .goal-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .goal-bar-fill { height: 100%; background: var(--pine); transition: width .3s; }
-.goal-delete { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 1rem; }
 
 .alert-item {
   padding: .7rem; border-left: 4px solid var(--yellow); background: rgba(251, 146, 60, .08);
@@ -2033,36 +1959,6 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .session-score-label { font-size: .65rem; color: var(--text-muted); text-transform: uppercase;
   letter-spacing: .04em; text-align: center; }
 
-/* Quick actions sidebar */
-.quick-actions {
-  display: flex; flex-direction: column; gap: .6rem; padding: .8rem;
-  background: linear-gradient(135deg, rgba(220,38,38,.06), rgba(34,197,94,.05));
-  border: 1.5px dashed var(--border-hi); border-radius: var(--radius);
-  margin-bottom: 1.2rem;
-}
-.quick-action-btn {
-  padding: .7rem; background: var(--surface); border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); cursor: pointer; transition: all .15s;
-  display: flex; align-items: center; gap: .5rem; font-weight: 600;
-  font-size: .85rem; color: var(--text);
-}
-.quick-action-btn:hover {
-  border-color: var(--pine); background: rgba(220,38,38,.06);
-  transform: translateX(2px);
-}
-
-/* Category/tag system */
-.session-categories {
-  display: flex; gap: .6rem; margin-bottom: 1rem; flex-wrap: wrap;
-}
-.category-chip {
-  padding: .5rem .9rem; background: var(--surface2); border: 1.5px solid var(--border);
-  border-radius: 20px; font-size: .8rem; font-weight: 600; cursor: pointer;
-  transition: all .15s; color: var(--text-muted);
-}
-.category-chip:hover { border-color: var(--pine); color: var(--text); }
-.category-chip.active { background: var(--pine); color: #fff; border-color: var(--pine); }
-
 /* Drill recommendation cards */
 .drill-card {
   padding: 1rem; background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(51,65,85,.04));
@@ -2074,12 +1970,6 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .drill-title { font-weight: 700; color: var(--text); margin-bottom: .2rem; }
 .drill-desc { font-size: .85rem; color: var(--text-muted); line-height: 1.4; }
 .drill-time { font-size: .75rem; color: var(--text-dim); margin-top: .4rem; }
-
-/* Statistics grid cards */
-.stat-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: .6rem; margin-bottom: 1.2rem;
-}
 .stat-card {
   padding: .8rem; background: var(--surface2); border-radius: var(--radius-sm);
   border: 1.5px solid var(--border); text-align: center;
@@ -2096,7 +1986,6 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 }
 
 html.dark .quick-stats { background: var(--surface); }
-html.dark .quick-action-btn { background: var(--surface); }
 html.dark .drill-card { background: linear-gradient(135deg, rgba(244,63,94,.08), rgba(40,40,46,.4)); }
 
 /* Mobile-first optimizations for touch interaction */
@@ -2111,21 +2000,6 @@ html.dark .drill-card { background: linear-gradient(135deg, rgba(244,63,94,.08),
   /* Shrink action buttons on very small screens, but NOT icon/close buttons */
   .btn-primary, .btn-secondary, .btn-danger { padding: .55rem .9rem; font-size: .8rem; }
 }
-
-/* Better keyboard hints */
-.kbd-hint {
-  display: inline-block; padding: 2px 6px; background: var(--surface3);
-  border: 1px solid var(--border); border-radius: 3px; font-family: var(--font-mono);
-  font-size: .65rem; color: var(--text-muted); margin-left: .3rem;
-}
-
-/* Session rating cards */
-.session-rating {
-  display: flex; gap: .5rem; padding: .6rem; background: var(--surface2);
-  border-radius: var(--radius-sm); align-items: center;
-}
-.rating-star { font-size: 1.5rem; cursor: pointer; opacity: .4; transition: opacity .15s; }
-.rating-star:hover, .rating-star.active { opacity: 1; }
 
 /* Better visual feedback on hover/active */
 button:active { transform: scale(0.98); }
