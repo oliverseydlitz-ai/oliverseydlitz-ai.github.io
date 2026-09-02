@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 let fail = 0; const ok = (c, m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
+const M = require('../harness.js').load();
 const src = fs.readFileSync(path.join(__dirname, '..', '..', 'app.js'), 'utf8');
 
 // The single most repeated defect in this codebase is not a wrong number. It is
@@ -113,6 +114,47 @@ console.log('— and the target bands have exactly one copy —');
   const bench = code.slice(benchStart, src.indexOf('  // ── Shot log', benchStart));
   ok(/targetsFor\(/.test(bench), 'the benchmark table reads the bands rather than restating them');
   ok(!/uAA\s*[<>]=/.test(bench), 'and has no inline attack-angle comparison of its own left');
+}
+
+console.log('— and no replaced formula is still in use anywhere —');
+// The other half of "is this rule reached": a helper written to REPLACE
+// something, with the old thing still live somewhere else. `consistencyScore`
+// was written to replace `100 - stdDev(carries)`, its comment says so, and
+// three call sites were never migrated — one of them 30% of the letter grade.
+// A partial fix is worse than none, because the comment reads as done.
+//
+// Each entry names the dead expression and what supersedes it. Comments are
+// stripped first, so the note explaining a fix does not fail the check on it.
+{
+  const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const ZOMBIES = [
+    ['100 - stdDev',  'consistencyScore() / bagConsistency() — a yard figure is not a percentage'],
+    ['100-stdDev',    'the same, unspaced'],
+    ['faults[0].pct', 'a fault carries `rate`, not `pct` — this rendered as NaN in a red alert'],
+    ['minShots: 15',  'Metrics.MIN_SHOTS_DELIVERY — four rules kept private copies of the 15'],
+  ];
+  for (const [dead, instead] of ZOMBIES) {
+    const n = code.split(dead).length - 1;
+    ok(n === 0, `no live \`${dead}\` left${n ? ` (${n} found)` : ''} — use ${instead}`);
+  }
+}
+
+// `.pct` on its own is NOT dead — `Features.focus()` and `Goals` both return a
+// real `pct`. Only a FAULT does not have one, so that invariant is asserted on
+// the object rather than by grepping for a property name that has honest uses.
+{
+  const { FaultEngine: FE2, Store: St } = M;
+  const shots = Array.from({ length: 24 }, (_, i) => ({ _row: i + 2, clubType: 'd',
+    ballSpeed: 150, clubSpeed: 105, smashFactor: 1.43, launchAngle: 12,
+    attackAngle: -6, clubPath: 0, carryDistance: 250, totalDistance: 270 }));
+  const sn = St.stamp({ id: 'z', date: '2026-07-01',
+    conditions: { ball: 'premium', surface: 'grass' }, shots });
+  const f = FE2.detectFaults(sn.shots, sn)[0];
+  ok(!!f, 'a fault is produced to inspect');
+  ok(f && f.pct === undefined, 'a fault has no `pct` field — anything rendering one printed NaN');
+  ok(f && typeof f.rate === 'number', 'it has `rate`, which is what a percentage should come from');
+  ok(f && typeof f.count === 'number' && typeof f.total === 'number',
+     'plus the raw counts, so a message can say "N of M" instead of a bare percentage');
 }
 
 // A check that cannot fail proves nothing, and this one is a string search —

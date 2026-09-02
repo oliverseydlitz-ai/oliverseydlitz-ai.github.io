@@ -1,3 +1,6 @@
 node_modules
 node_modules/
 package-lock.json
+
+# served mirror built by test/browser/sync.sh
+test/browser/site/
