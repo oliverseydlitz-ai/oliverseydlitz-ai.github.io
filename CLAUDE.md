@@ -185,20 +185,71 @@ const SUPABASE_KEY = '...';  // publishable key (safe to expose)
 - **Session Data** → Console: `await DB.getSessions()` lists all stored sessions
 - **Supabase Logs** → Supabase Dashboard > Logs for real-time events
 
+## ⚠️ Measurement honesty (read `docs/research-base-v2.md` §1 and §9 first)
+
+The research base supersedes earlier guidance and **corrected two foundations**:
+
+1. **The MLM2PRO does not measure face angle.** It is not in Rapsodo's metric
+   set. `facePath()` *derives* it by inverting the D-plane relation, which
+   makes it error-amplified: **±1.8° on a single shot**. Never state a face
+   angle, and never diagnose curvature from one shot.
+2. **Metric trust tiers gate every prescription** — see `Metrics.TIER`:
+   - **Tier 1** (prescribe freely): club speed, ball speed, smash factor, carry.
+   - **Tier 2** (display only): launch angle, attack angle, club path.
+   - **Tier 3** (never prescribe): spin rate, spin axis, launch direction, and
+     all modelled outputs (side carry, total, apex, descent). Consumer-radar
+     spin limits of agreement (−2,628 to +5,103 rpm) exceed the entire
+     amateur-to-tour spin gap.
+
+**Sample floors** (`Metrics`): 10 shots before any club mean, 15 before a
+club-path/attack-angle claim, 30 for dispersion tails. Rules may raise their
+own floor via `minShots`.
+
+**`Metrics.typicalError()` is the moat.** After ~5 sessions the golfer's own
+noise floor beats any published default; it falls back to the MDC table until
+then. Always `trimOutliers()` and report `interval()`, never a bare point.
+
+**`Conditions`** — ball type and surface are recorded per session because they
+change what the numbers *mean*: range balls give 2–4× the dispersion off a
+zero-variance robot, and mats hide fat strikes. Never compare across them.
+
+### Claims the app must never make (§9)
+
+Never state a face angle from one shot · never convert a club-delivery metric
+to strokes gained · never infer kinematic sequence, ground forces or wrist
+position from launch data · never prescribe from spin · never draw dispersion
+or gapping conclusions from range-ball sessions · never quote "+N yards per
+degree of attack angle" · never present carry as a measurement (it is a model
+output) · never claim a rep/week count to "groove" a change · never claim the
+app builds automaticity or rewires motor patterns.
+
+### `FeedbackEngine` — why numbers are hidden by default
+
+The guidance hypothesis is the strongest evidence in the base and it indicts
+this product category. Winstein & Schmidt (n=240): constant vs faded feedback
+was **indistinguishable during acquisition and at 5–10 minutes**, but at 24
+hours the faded group had **35% less error**. An app that measures itself on
+within-session improvement cannot see the damage it does. Default mode is
+`onRequest` (tap to reveal). **Never evaluate a drill by within-session
+improvement** — the retention probe is the efficacy metric.
+
 ## Swing-mechanics constants (do not change casually)
 
 Several numbers in `app.js` are sourced, not guessed. `docs/coaching-calibration-audit.html`
 is the working — read the relevant section before touching any of these.
 
-- **`facePath(shot)`** — face-to-path is `(launchDirection - clubPath) / k`,
-  with `k = 0.85` woods / `0.75` irons. Start direction is a *weighted blend*
-  of face and path, so the naive subtraction under-reports by 15%/25% and
-  misses real slices. Returns `null` when either input is missing.
+- **`facePath(shot)`** — `(launchDirection - clubPath) / R`. `R` falls with
+  loft and is interpolated on spin loft (`0.89 - 0.0045·spinLoft`), anchored to
+  PING 2020 / TrackMan: driver **0.84**, 7-iron **0.78**, PW **0.71**. The
+  "85% face" rule taught everywhere is a driver-only figure. Returns `null`
+  when either input is missing — it is derived, so a missing input means no
+  answer.
 - **`spinLoft(shot)`** — estimated `(launchAngle - attackAngle) / kv`,
   `kv = 0.83` woods / `0.75` irons. These reproduce TrackMan's published tour
   spin lofts exactly (driver 14.7°, 6-iron 24.3°) — that is the regression
   check. Rapsodo does not export dynamic loft, so this is an estimate.
-- **`ANGLE_NOISE = 1.2`** — Rapsodo MLM2PRO measurement error (MAE 1.05°
+- **`Metrics.SINGLE_SHOT_F2P_SD = 1.8`** — derived face-to-path noise.
+- **`ANGLE_NOISE` (legacy)** — Rapsodo MLM2PRO measurement error (MAE 1.05°
   attack angle, 1.19° club path vs a Foresight GCQuad). Fault thresholds sit
   inside this band, which is why `FaultEngine` gates on *recurrence* rather
   than padding thresholds.

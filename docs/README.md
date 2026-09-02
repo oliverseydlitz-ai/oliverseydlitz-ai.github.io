@@ -34,3 +34,5 @@ change any of the following, re-read the corresponding section first:
 - `CoachingMode.TIPS` — written to an external focus of attention on purpose.
   Cues naming the golfer's own body parts are the thing the evidence says to
   avoid; see the practice-science section before rewriting any of them.
+
+| [`research-base-v2.md`](research-base-v2.md) | The engineering spec this app is built against. Supersedes the audit above on two points: the MLM2PRO does **not** measure face angle, and measurement error must gate every prescription. Contains the metric trust tiers, MDC table, transfer-function coefficients, the practice-design evidence hierarchy, and §9's list of claims the app must never make. |

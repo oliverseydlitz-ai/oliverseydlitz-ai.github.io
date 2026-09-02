@@ -757,6 +757,39 @@ tr:hover td { background: var(--surface2); }
   border-left:2px solid var(--pine); border-radius:var(--radius-sm);
 }
 
+/* Measurement caveats — deliberately shown ABOVE prescriptions, because they
+   decide whether the prescription is admissible at all. */
+.caveat-block{
+  margin:0 1rem 1rem; padding:.85rem 1rem;
+  background:var(--surface2); border-left:3px solid var(--yellow);
+  border-radius:var(--radius-sm);
+}
+.caveat-head{
+  font-size:.7rem; letter-spacing:.09em; text-transform:uppercase;
+  font-weight:700; color:var(--text-dim); margin-bottom:.5rem;
+}
+.caveat-item{
+  font-size:.82rem; line-height:1.5; color:var(--text);
+  padding-left:.9rem; position:relative; margin-bottom:.45rem;
+}
+.caveat-item:last-child{margin-bottom:0}
+.caveat-item::before{content:'·'; position:absolute; left:.15rem; color:var(--yellow); font-weight:700}
+.form-hint{
+  margin:-.3rem 0 .8rem; font-size:.75rem; line-height:1.45; color:var(--text-muted);
+}
+
+/* Feedback-schedule picker (Settings) */
+.fb-option{
+  display:block; width:100%; text-align:left; cursor:pointer;
+  padding:.7rem .85rem; margin-bottom:.5rem;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:var(--radius-sm); color:var(--text);
+}
+.fb-option.on{border-color:var(--pine); background:var(--surface3)}
+.fb-option-label{font-weight:650; font-size:.88rem; display:flex; justify-content:space-between; gap:.5rem}
+.fb-option-blurb{font-size:.75rem; line-height:1.45; color:var(--text-muted); margin-top:.25rem}
+.fb-check{color:var(--pine); font-weight:700}
+
 /* ── Yardage book ──────────────────────────────────────── */
 .yardage-intro { font-size: .875rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.55; }
 .yardage-meta { display: block; font-size: .75rem; margin-top: .25rem; color: var(--text-dim); }

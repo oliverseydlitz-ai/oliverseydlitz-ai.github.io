@@ -179,50 +179,177 @@ function mean(values) {
 }
 
 // ── D-Plane geometry ────────────────────────────────────────────
-// Start direction is a WEIGHTED BLEND of face and path, not face alone:
-//     launchDirection = k·face + (1-k)·path
-// where k ≈ 0.85 for a driver and ≈ 0.75 for an iron (loft lowers the ratio).
-// Solving for face and subtracting path collapses to a clean form:
-//     face - path = (launchDirection - path) / k
-// The naive (launchDirection - path) omits the divisor and therefore UNDER-
-// states face-to-path by 15% on driver and 25% on irons — enough that a real
-// 5° open face reads as 3.75° on an iron and slips under the slice threshold.
-const FACE_RATIO_WOOD = 0.85;
-const FACE_RATIO_IRON = 0.75;
-const faceRatio = t => (isWood(t) || isHybrid(t)) ? FACE_RATIO_WOOD : FACE_RATIO_IRON;
+// Start direction is a WEIGHTED BLEND of face and path:
+//     StartDir = R·FaceAngle + (1-R)·ClubPath
+// so face-to-path inverts to  (StartDir - ClubPath) / R.
+//
+// IMPORTANT: the MLM2PRO does NOT measure face angle. It is not in Rapsodo's
+// published metric set. Face-to-path here is a DERIVED, ERROR-AMPLIFIED
+// quantity, never a reading — see Metrics.TIER and never state a face angle.
+//
+// R falls with loft: path's contribution roughly doubles from driver to wedge.
+// The "85% face / 15% path" rule taught everywhere is a driver-only figure.
+// PING 2020 (157 golfers, 1,575 shots, Vicon 720fps + Foresight, air-cannon
+// validated) reconciled with TrackMan gives driver 0.84, 7-iron 0.78, PW 0.71,
+// interpolated on SPIN LOFT rather than club number.
+const R_BY_SPINLOFT = sl => 0.89 - 0.0045 * sl;
+const R_FALLBACK = { driver: 0.84, wood: 0.84, hybrid: 0.80, iron: 0.78, wedge: 0.71 };
 
-// Vertical analogue of the same law: launchAngle = kv·dynamicLoft + (1-kv)·AoA.
-// Rearranged, spin loft (dynamicLoft - AoA) = (launchAngle - AoA) / kv.
-// These kv values reproduce TrackMan's PUBLISHED tour spin lofts exactly:
-// driver 10.9°/-1.3° -> 14.7° (published 14.7), 6i 14.1°/-4.1° -> 24.3° (published 24.3).
+function faceRatio(shot) {
+  const t = typeof shot === 'string' ? shot : shot?.clubType;
+  const sl = typeof shot === 'object' ? spinLoft(shot) : null;
+  // Prefer the spin-loft interpolation; fall back to the club-family anchors.
+  if (Number.isFinite(sl) && sl >= 8 && sl <= 60) return R_BY_SPINLOFT(sl);
+  if (t === 'd' || isWood(t)) return R_FALLBACK.driver;
+  if (isHybrid(t)) return R_FALLBACK.hybrid;
+  if (isShort(t)) return R_FALLBACK.wedge;
+  return R_FALLBACK.iron;
+}
+
+// Vertical analogue: launchAngle = kv·dynamicLoft + (1-kv)·AoA, so
+// spin loft (dynamicLoft - AoA) = (launchAngle - AoA) / kv. These kv values
+// reproduce TrackMan's PUBLISHED tour spin lofts exactly: driver 10.9/-1.3
+// -> 14.7 (published 14.7), 6i 14.1/-4.1 -> 24.3 (published 24.3).
 const LOFT_RATIO_WOOD = 0.83;
 const LOFT_RATIO_IRON = 0.75;
 const loftRatio = t => (isWood(t) || isHybrid(t)) ? LOFT_RATIO_WOOD : LOFT_RATIO_IRON;
 
-// Launch-monitor measurement error. Rapsodo MLM2PRO measured against a
-// Foresight GCQuad: MAE 1.05° attack angle, 1.19° club path. Fault thresholds
-// must clear this margin or they fire on instrument noise, not on the swing.
-const ANGLE_NOISE = 1.2;
-
-// Face-to-path in degrees. Positive = face open to path (fade/slice shape),
-// negative = face closed to path (draw/hook). null when either input is missing.
-function facePath(shot) {
-  const ld = shot.launchDirection, cp = shot.clubPath;
-  if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
-  return (ld - cp) / faceRatio(shot.clubType);
-}
-
-// Estimated spin loft in degrees — the angle between where the face points and
-// where the club is travelling. Primary driver of both spin rate and smash
-// factor, and the metric that separates "missed the middle" from "added loft
-// through impact". Rapsodo does not export dynamic loft, so this is derived
-// from launch angle and attack angle; treat it as an estimate, not a reading.
+// Estimated spin loft — the angle between where the face points and where the
+// club is travelling. Drives both spin and smash factor. Estimated, not read:
+// Rapsodo does not export dynamic loft.
 function spinLoft(shot) {
   const la = shot.launchAngle, aoa = shot.attackAngle;
   if (!Number.isFinite(la) || !Number.isFinite(aoa)) return null;
   const sl = (la - aoa) / loftRatio(shot.clubType);
-  return (sl > 0 && sl < 70) ? sl : null;   // outside this, the inputs are junk
+  return (sl > 0 && sl < 70) ? sl : null;
 }
+
+// Face-to-path in degrees. Positive = face open to path. null when either
+// input is missing. Single-shot noise is ±1.8° (Metrics.SINGLE_SHOT_F2P_SD) —
+// never diagnose curvature from one shot.
+function facePath(shot) {
+  const ld = shot.launchDirection, cp = shot.clubPath;
+  if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
+  return (ld - cp) / faceRatio(shot);
+}
+
+// Spin axis from face-to-path and spin loft. A driver punishes face-to-path
+// ~1.7x harder than a 6-iron because its spin loft is lower.
+function spinAxisFrom(shot) {
+  const f2p = facePath(shot), sl = spinLoft(shot);
+  if (!Number.isFinite(f2p) || !Number.isFinite(sl) || sl <= 0) return null;
+  const rad = Math.PI / 180;
+  return Math.atan(Math.tan(f2p * rad) / Math.tan(sl * rad)) / rad;
+}
+
+// Curvature in yards. Fitted to TrackMan's worked examples within 4.5%.
+// Saturates above ~6° face-to-path.
+function curveYards(shot) {
+  const f2p = facePath(shot), carry = shot.carryDistance, sl = spinLoft(shot);
+  if (!Number.isFinite(f2p) || !Number.isFinite(carry) || carry <= 0) return null;
+  const c = Number.isFinite(sl) ? (2.6e-3 - 4.2e-5 * sl) : 2.0e-3;
+  const raw = c * Math.pow(carry, 1.5) * f2p;
+  return Math.abs(f2p) > 6 ? raw * 0.95 : raw;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Metrics — measurement trust, noise floors and per-user error
+// ────────────────────────────────────────────────────────────────
+// An app that prescribes against noise is worse than an app that says nothing.
+// Everything downstream of the launch monitor is gated through here.
+const Metrics = (() => {
+  // Trust tiers. Gate EVERY prescription on these.
+  //  1 = prescribe freely   2 = display, never prescribe alone   3 = never prescribe
+  const TIER = {
+    ballSpeed: 1, clubSpeed: 1, smashFactor: 1, carryDistance: 1,
+    launchAngle: 2, attackAngle: 2, clubPath: 2,
+    // Tier 3: consumer-radar limits of agreement on spin (-2,628 to +5,103 rpm)
+    // are wider than the entire amateur-to-tour spin gap (589 rpm), and even a
+    // TrackMan's between-session spin ICC bottoms out at 0.02. Spin axis and
+    // launch direction scored ICC < 0.26 in the only study to measure them.
+    spinRate: 3, spinAxis: 3, launchDirection: 3,
+    // Modelled outputs, not measurements — carry included, but carry is the
+    // one model output with enough downstream value to keep at tier 1.
+    totalDistance: 3, sideCarry: 3, apex: 3, descentAngle: 3,
+  };
+  const tier = m => TIER[m] || 3;
+  const canPrescribe = m => tier(m) === 1;
+
+  // Minimum detectable change at 95%, comparing two session means of n shots.
+  // MDC95 = 2.77 x SD_total / sqrt(n), Hopkins' typical-error framework.
+  const MDC_N10 = {
+    ballSpeed: 4.0, clubSpeed: 2.0, carryDistance: 13, spinRate: 500,
+    clubPath: 3.0, attackAngle: 2.2, launchAngle: 1.6, smashFactor: 0.03,
+  };
+  const mdc = (metric, n = 10) => {
+    const base = MDC_N10[metric];
+    if (!base || !n) return null;
+    return base * Math.sqrt(10 / n);
+  };
+
+  // Single-shot face-to-path SD, propagated through the D-plane inversion:
+  // sqrt(0.5^2 + 1.46^2) / 0.84 ~= 1.8 degrees.
+  const SINGLE_SHOT_F2P_SD = 1.8;
+
+  // Sample floors before a mean may be reported at all.
+  const MIN_SHOTS_REPORT  = 10;  // any club mean
+  const MIN_SHOTS_DELIVERY = 15; // club path / attack angle change claims
+  const MIN_SHOTS_TAIL    = 30;  // dispersion tails
+
+  // Wild misreads destroy a 10-shot mean (one user logged a 147 mph swing and
+  // a 0 mph swing back to back). Trim on MAD, and always report how many went.
+  function trimOutliers(values) {
+    const v = (values || []).filter(Number.isFinite);
+    if (v.length < 4) return { kept: v, dropped: 0 };
+    const sorted = [...v].sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)];
+    const mad = sorted.map(x => Math.abs(x - med)).sort((a, b) => a - b)[Math.floor(sorted.length / 2)] || 0;
+    if (mad === 0) return { kept: v, dropped: 0 };
+    const kept = v.filter(x => Math.abs(x - med) / (1.4826 * mad) <= 3.5);
+    return { kept, dropped: v.length - kept.length };
+  }
+
+  // PER-USER TYPICAL ERROR — the strongest methodological move available.
+  // After ~5 sessions this golfer's own noise floor is better known than any
+  // published population default. Falls back to the table until then.
+  function typicalError(sessions, metric, clubType) {
+    const perSession = (sessions || []).map(sn => {
+      const shots = (sn.shots || []).filter(s => !clubType || s.clubType === clubType);
+      const { kept } = trimOutliers(shots.map(s => s[metric]));
+      return kept.length >= 3 ? stdDev(kept) : null;
+    }).filter(Number.isFinite);
+    if (perSession.length < 3) return { value: null, source: 'population', n: perSession.length };
+    return { value: mean(perSession), source: 'personal', n: perSession.length };
+  }
+
+  // Is a change between two session means real, or inside the noise floor?
+  function changeIsReal(metric, delta, n, sessions, clubType) {
+    const te = typicalError(sessions, metric, clubType);
+    const threshold = te.value !== null
+      ? 2.77 * te.value / Math.sqrt(Math.max(1, n))
+      : mdc(metric, n);
+    if (threshold === null) return { real: false, threshold: null, source: 'unknown' };
+    return { real: Math.abs(delta) >= threshold, threshold, source: te.source };
+  }
+
+  // Format a mean the honest way: an interval, never a bare point estimate.
+  function interval(values, unit = '', decimals = 1) {
+    const { kept, dropped } = trimOutliers(values);
+    if (kept.length < 2) return null;
+    const m = mean(kept);
+    const ci = 1.96 * stdDev(kept) / Math.sqrt(kept.length);
+    return {
+      mean: m, ci, n: kept.length, dropped,
+      text: `${fmt(m, decimals)} ± ${fmt(ci, decimals)}${unit} (${kept.length} shots` +
+        (dropped ? `, ${dropped} trimmed` : '') + ')',
+    };
+  }
+
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, SINGLE_SHOT_F2P_SD,
+           MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
+           trimOutliers, typicalError, changeIsReal, interval };
+})();
+
 
 // ────────────────────────────────────────────────────────────────
 // DB — IndexedDB via idb-keyval
@@ -759,6 +886,154 @@ const Store = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// FeedbackEngine — how numbers are scheduled, not which drill is chosen
+// ────────────────────────────────────────────────────────────────
+// The guidance hypothesis is the strongest evidence in the research base and
+// it indicts this entire product category. Winstein & Schmidt (1990), three
+// experiments, n=240: constant feedback and faded feedback were
+// INDISTINGUISHABLE during acquisition and at 5-10 minutes. At 24 hours the
+// faded group had 35% less error (6.5 vs 10.0 RMS, p<.01). Butki & Hoffman
+// (n=78) and Smith et al. (n=48, 10% bandwidth) corroborate it in golf.
+//
+// The implication is precise and uncomfortable: showing a number after every
+// shot inflates in-session performance while degrading next-day retention,
+// and an app that measures itself on within-session improvement CANNOT SEE
+// THE DAMAGE IT IS DOING. Every launch monitor on the market shows numbers
+// after every shot. This module is the deliberate departure.
+const FeedbackEngine = (() => {
+  const KEY = 'slFeedbackMode';
+
+  const MODES = {
+    // Default. Numbers hidden; the golfer taps to reveal. Self-controlled
+    // feedback is contested as a mechanism but reliably produces sub-100%
+    // frequency, which is the part that works — and it is far more palatable
+    // than the app unilaterally hiding data.
+    onRequest: {
+      id: 'onRequest', label: 'Tap to reveal (recommended)',
+      blurb: 'Numbers stay hidden until you ask. You keep control, and you naturally look less often — which is the part the evidence supports.',
+    },
+    // Silence inside tolerance, report only outside it. Silence acts as
+    // implicit positive feedback and self-reduces as the player improves.
+    bandwidth: {
+      id: 'bandwidth', label: 'Only tell me when I miss',
+      blurb: 'Nothing shown when the shot is inside your tolerance band. You only hear about the misses, and the app goes quieter as you get better.',
+    },
+    // High early, progressively reduced across the session.
+    faded: {
+      id: 'faded', label: 'Fade out across the session',
+      blurb: 'Frequent feedback while you warm up, tapering to almost none by the end. This is the exact schedule from the retention studies.',
+    },
+    // The industry default, offered honestly labelled.
+    always: {
+      id: 'always', label: 'Every shot (not recommended)',
+      blurb: 'What every other launch monitor does. Feels better in the moment and measurably costs you next-day retention.',
+    },
+  };
+
+  function getMode() {
+    try { return MODES[localStorage.getItem(KEY)] ? localStorage.getItem(KEY) : 'onRequest'; }
+    catch (_) { return 'onRequest'; }
+  }
+  function setMode(m) { try { if (MODES[m]) localStorage.setItem(KEY, m); } catch (_) {} }
+
+  // Faded schedule: ~100% over the first fifth, decaying to ~20% by the end.
+  function fadedFrequency(idx, total) {
+    if (!total || total < 5) return 1;
+    const p = idx / total;
+    return Math.max(0.2, 1 - p * 1.1);
+  }
+
+  // Is this shot inside the golfer's own tolerance band? Bandwidth feedback
+  // stays silent when it is. Tolerance is the golfer's own typical error, not
+  // a population constant — so the band tightens as they get more consistent.
+  function insideBand(shot, metric, target, tolerance) {
+    const v = shot[metric];
+    if (!Number.isFinite(v) || !Number.isFinite(target)) return true;
+    return Math.abs(v - target) <= tolerance;
+  }
+
+  // The decision the UI asks on every shot.
+  function shouldReveal(ctx) {
+    const { index = 0, total = 0, mode = getMode(), outsideBand = false } = ctx || {};
+    switch (mode) {
+      case 'always':    return { reveal: true,  reason: 'every shot' };
+      case 'faded':     return { reveal: Math.random() < fadedFrequency(index, total),
+                                 reason: `faded (${Math.round(fadedFrequency(index, total) * 100)}%)` };
+      case 'bandwidth': return { reveal: outsideBand, reason: outsideBand ? 'outside tolerance' : 'inside tolerance — silence is the feedback' };
+      default:          return { reveal: false, reason: 'tap to reveal' };
+    }
+  }
+
+  // Error estimation preserves the intrinsic error-detection process that
+  // constant feedback displaces. Ask before showing, on a sample of shots.
+  function shouldAskPrediction(index) { return index > 0 && index % 5 === 0; }
+
+  // Volume distribution: 4 x 60 beats 1 x 240. Warn on marathons.
+  function volumeAdvice(shotCount) {
+    if (shotCount >= 150) {
+      return 'That is a long session. Four 60-ball sessions beat one 240-ball session — ' +
+             'the extra volume in a single sitting mostly buys fatigue.';
+    }
+    if (shotCount >= 100) return 'Long session. Consider splitting the next one across two days.';
+    return null;
+  }
+
+  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction,
+           insideBand, fadedFrequency, volumeAdvice };
+})();
+
+// ────────────────────────────────────────────────────────────────
+// Conditions — ball type and hitting surface change the measurement
+// ────────────────────────────────────────────────────────────────
+// A swing robot with literally zero variability produces 2-4x the lateral
+// dispersion with range balls, and a pitching wedge goes FURTHER on half the
+// spin. That inflation is comparable in size to the whole skill gap between
+// an 80-golfer and a 100-golfer, so a dispersion figure from range-ball data
+// is measuring the ball, not the golfer. Mats separately hide fat strikes,
+// because a rigid surface lets the sole bounce instead of the edge digging.
+const Conditions = (() => {
+  const BALLS = {
+    premium:  { id:'premium',  label:'Premium (own ball)', dispersionValid:true,  gappingValid:true  },
+    rpt:      { id:'rpt',      label:'Rapsodo RPT',        dispersionValid:true,  gappingValid:true, spinMeasured:true },
+    range:    { id:'range',    label:'Range balls',        dispersionValid:false, gappingValid:false },
+    unknown:  { id:'unknown',  label:'Not recorded',       dispersionValid:false, gappingValid:false },
+  };
+  const SURFACES = {
+    grass: { id:'grass', label:'Grass',  masksFatStrikes:false },
+    mat:   { id:'mat',   label:'Mat',    masksFatStrikes:true  },
+    unknown:{id:'unknown',label:'Not recorded', masksFatStrikes:true },
+  };
+
+  const ball = sn => BALLS[sn?.conditions?.ball] || BALLS.unknown;
+  const surface = sn => SURFACES[sn?.conditions?.surface] || SURFACES.unknown;
+
+  // Reasons to withhold a prescription, in plain language.
+  function caveats(sn) {
+    const out = [];
+    const b = ball(sn), sf = surface(sn);
+    if (!b.dispersionValid) {
+      out.push(b.id === 'range'
+        ? 'Range balls: dispersion here is 2–4× wider than your own ball would give, and gapping is unreliable — a wedge can fly further on half the spin. Treat the shape as real and the spread as not.'
+        : 'Ball type not recorded, so dispersion and gapping figures are not comparable between sessions.');
+    }
+    if (sf.masksFatStrikes) {
+      out.push(sf.id === 'mat'
+        ? 'Mat: the sole bounces instead of the leading edge digging, so a strike several centimetres behind the ball still reads near-normal. Mats systematically hide fat strikes — the exact thing a low-point drill is meant to catch.'
+        : 'Surface not recorded — if you were on a mat, fat strikes may be hidden.');
+    }
+    if (!b.spinMeasured) out.push('Spin is only measured with a Rapsodo RPT ball; any spin figure shown otherwise is not a reading.');
+    return out;
+  }
+
+  // Never compare across measurement conditions as if the difference were skill.
+  function comparable(a, b2) {
+    return ball(a).id === ball(b2).id && surface(a).id === surface(b2).id;
+  }
+
+  return { BALLS, SURFACES, ball, surface, caveats, comparable };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // CSV Parser
 // ────────────────────────────────────────────────────────────────
 const CSVParser = (() => {
@@ -851,7 +1126,7 @@ const FaultEngine = (() => {
     // ── PATH & FACE (D-PLANE) ──────────────────────────────────
     {
       id:'slice', name:'Slice / Open Face to Path', icon:'↪️', category:'Path & Face', severity:'high',
-      test: s => facePath(s) > 5 && s.sideCarry > 12,
+      test: s => facePath(s) > 5,   // side carry is tier 3 (modelled) — not used
       description: shots => {
         const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
         const sc = avg(shots,'sideCarry');
@@ -873,7 +1148,7 @@ const FaultEngine = (() => {
 
     {
       id:'hook', name:'Hook / Closed Face to Path', icon:'↩️', category:'Path & Face', severity:'medium',
-      test: s => facePath(s) < -5 && s.sideCarry < -12,
+      test: s => facePath(s) < -5,  // side carry is tier 3 (modelled) — not used
       description: shots => {
         const sc = avg(shots,'sideCarry');
         return `Face is closed to path. Ball is starting left and curving further left due to counter-clockwise spin. ` +
@@ -891,7 +1166,8 @@ const FaultEngine = (() => {
 
     {
       id:'push-right', name:'Consistent Right Miss (Push)', icon:'→', category:'Path & Face', severity:'medium',
-      test: s => s.launchDirection > 5 && s.sideCarry > 8 &&
+      minShots: 30,   // launch direction is only trustworthy as a 30+ shot aggregate
+      test: s => s.launchDirection > 5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° right with neutral face-to-path. ` +
         `Ball is starting right and staying right — a push, not a slice. Face and path are both aimed right of target.`,
@@ -906,7 +1182,8 @@ const FaultEngine = (() => {
 
     {
       id:'pull-left', name:'Consistent Left Miss (Pull)', icon:'←', category:'Path & Face', severity:'medium',
-      test: s => s.launchDirection < -5 && s.sideCarry < -8 &&
+      minShots: 30,   // launch direction is only trustworthy as a 30+ shot aggregate
+      test: s => s.launchDirection < -5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
       description: shots => `Launch direction averaging ${fmt(avg(shots,'launchDirection'),1)}° left with neutral face-to-path. ` +
         `A pull — ball starting left and maintaining direction. Both face and path are aligned left of target.`,
@@ -922,14 +1199,16 @@ const FaultEngine = (() => {
 
     // ── ATTACK ANGLE ──────────────────────────────────────────
     {
+      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
       id:'driver-negative-aa', name:'Negative Attack Angle on Driver', icon:'📉', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -1,
       description: shots => {
         const aa = avg(shots,'attackAngle');
         const carry = avg(shots,'carryDistance');
         return `Attack angle of ${fmt(aa,1)}° (hitting down on driver). ` +
-          `Each degree of downward attack on driver adds ~200–300 rpm of backspin and reduces carry. ` +
-          `At your speed, hitting up at +3° instead could add 15–25 yards of carry without changing anything else.`;
+          `Irons are built to be hit down on; a driver is not. Hitting down on a teed ball costs you carry.` +
+          ` How much depends on your loft and ball, which this app cannot see, so no yardage is quoted here —` +
+          ` published "+N yards per degree" figures assume the driver is re-fitted at the same time.`;
       },
       causes:['Ball too far back in stance (centre or right of centre)',
         'Spine tilt level or tilted toward target at address',
@@ -944,6 +1223,7 @@ const FaultEngine = (() => {
     },
 
     {
+      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
       id:'driver-very-steep', name:'Very Steep Driver Attack', icon:'📉📉', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -4,
       description: shots => `Severely negative attack angle of ${fmt(avg(shots,'attackAngle'),1)}° on driver. ` +
@@ -959,6 +1239,7 @@ const FaultEngine = (() => {
     },
 
     {
+      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
       id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'↗️', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && !isShort(s.clubType) && s.attackAngle > -0.5,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° — too shallow for irons. ` +
@@ -977,6 +1258,7 @@ const FaultEngine = (() => {
     },
 
     {
+      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
       id:'iron-very-steep', name:'Very Steep Iron Attack', icon:'⬇️', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && s.attackAngle < -7,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° is too steep for irons. ` +
@@ -1018,8 +1300,7 @@ const FaultEngine = (() => {
       id:'driver-high-launch', name:'Ballooning / Too High Launch', icon:'🎈', category:'Launch', severity:'low',
       test: s => s.clubType === 'd' && s.launchAngle > 18 && s.carryDistance > 0,
       description: shots => `Launch angle of ${fmt(avg(shots,'launchAngle'),1)}° on driver is too high — creating a ballooning trajectory. ` +
-        `High launch + high spin = loss of carry and poor performance into the wind. ` +
-        `${shots.some(s=>s.spinRate) ? `Spin rate of ${fmt(avg(shots,'spinRate'),0)} rpm confirms this.` : ''}`,
+        `A steeply ascending strike adds height without adding carry.`,
       causes:['Attack angle too steeply upward (> +6°)','Face too open at address producing a scooped hit',
         'Dynamic loft too high'],
       drills:[
@@ -1030,20 +1311,12 @@ const FaultEngine = (() => {
     },
 
     // ── SPIN (when available) ──────────────────────────────────
-    {
-      id:'high-spin-driver', name:'Excessive Spin — Driver', icon:'🌀', category:'Spin', severity:'high',
-      test: s => s.clubType === 'd' && s.spinRate > 3500 && s.spinRate !== 0,
-      description: shots => `Average spin rate of ${fmt(avg(shots,'spinRate'),0)} rpm on driver exceeds the 3500 rpm threshold. ` +
-        `PGA Tour averages ~2686 rpm. High spin balloons the trajectory and kills carry distance — ` +
-        `every 500 rpm above optimal is roughly 8–12 yards of lost carry at the same ball speed.`,
-      causes:['Negative attack angle (most common)','High dynamic loft at impact',
-        'Gear effect from toe/high hits adding spin','Shaft too low-kick (more flex adds spin for some players)'],
-      drills:[
-        {name:'Attack angle is the root cause',desc:'Reduce spin primarily by improving attack angle (see negative attack angle fault). Each +1° of attack angle removes ~250–400 rpm.'},
-        {name:'Low punch shots',desc:'Practice hitting intentional low "punch" drivers with a three-quarter swing and a forward ball position. This trains a neutral dynamic loft at impact.'},
-      ],
-      optimalRange: () => '2000–2800 rpm driver spin',
-    },
+    // NOTE: an 'Excessive Spin — Driver' fault used to live here. It is gone
+    // on purpose. Consumer-radar spin limits of agreement run -2,628 to +5,103
+    // rpm — wider than the entire amateur-to-tour spin gap (589 rpm) — and even
+    // a TrackMan's between-session spin ICC bottoms out at 0.02. Spin is also
+    // only measured at all with an RPT ball. "Reduce your spin" is the most
+    // tempting and least defensible drill this app could ship.
 
     // ── SPIN LOFT (estimated) ──────────────────────────────────
     // Spin loft = dynamic loft - attack angle: the angle between where the
@@ -1273,10 +1546,12 @@ const FaultEngine = (() => {
   // when it recurs at a rate noise alone would not produce, over a sample
   // big enough to judge. A fault on 9 of 12 seven-irons is a pattern; the
   // same fault on 2 of 12 is the radar.
-  const MIN_CLUB_SHOTS = 4;    // too few shots of a club to conclude anything
-  const MIN_AFFECTED   = 2;    // never report a fault off a single shot
-  const MIN_RATE       = 0.30; // share of that club's shots that must trip it
-  const FIRM_RATE      = 0.50; // below this, report but downgrade severity
+  // Sample floors come from Metrics: 10 shots before ANY club mean is
+  // reported, 15 before a club-path or attack-angle claim, 30 for dispersion
+  // tails. A rule may raise its own floor via `minShots`.
+  const MIN_AFFECTED = 2;      // never report a fault off a single shot
+  const MIN_RATE     = 0.30;   // share of that club's shots that must trip it
+  const FIRM_RATE    = 0.50;   // below this, report but downgrade severity
 
   const DOWNGRADE = { high: 'medium', medium: 'low', low: 'low' };
 
@@ -1292,7 +1567,7 @@ const FaultEngine = (() => {
       // whole session — a driver fault should be measured against drivers.
       const clubs = new Set(affected.map(s => s.clubType));
       const relevant = shots.filter(s => clubs.has(s.clubType));
-      if (relevant.length < MIN_CLUB_SHOTS) continue;
+      if (relevant.length < (rule.minShots || Metrics.MIN_SHOTS_REPORT)) continue;
 
       const rate = affected.length / relevant.length;
       if (rate < MIN_RATE) continue;
@@ -1308,12 +1583,13 @@ const FaultEngine = (() => {
         description: typeof rule.description === 'function' ? rule.description(affected) : rule.description,
         evidence: `${affected.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
           (firm ? '' : ' — borderline, worth another session to confirm'),
+        minShots: rule.minShots || Metrics.MIN_SHOTS_REPORT,
         affectedShots: affected.map(s=>s._row),
       });
     }
 
     for (const rule of SESSION_RULES) {
-      if (shots.length < MIN_CLUB_SHOTS) break;   // too small a session to judge
+      if (shots.length < Metrics.MIN_SHOTS_REPORT) break;  // too small a session to judge
       let passes = false;
       try { passes = rule.test(shots); } catch {}
       if (!passes) continue;
@@ -1338,38 +1614,40 @@ const FaultEngine = (() => {
 // Shot Scorer — 0–100 per shot
 // ────────────────────────────────────────────────────────────────
 const ShotScorer = (() => {
+  // Scored ONLY from metrics the device can be trusted on (Metrics.TIER).
+  // Side carry and spin axis used to carry 35 of the 100 points between them.
+  // Both are tier 3 — side carry is a ball-flight model output and spin axis
+  // scored ICC < 0.26 in the only study to measure it. Scoring a golfer on
+  // them was scoring them on noise, so they are gone. The weight moved to
+  // smash factor (tier 1, the highest-value amateur lever) and to spin loft,
+  // which is derived from launch and attack angle (both tier 2).
   function score(shot) {
     let pts = 0, max = 0;
 
-    // Smash factor (0–35 pts)
+    // Strike quality (0-45) — tier 1, and the biggest lever an amateur has
     if (Number.isFinite(shot.smashFactor) && shot.smashFactor > 0) {
-      const threshold = isWood(shot.clubType)||isHybrid(shot.clubType) ? 1.42 : 1.36;
-      const elite     = isWood(shot.clubType)||isHybrid(shot.clubType) ? 1.48 : 1.41;
+      const elite = isWood(shot.clubType) || isHybrid(shot.clubType) ? 1.48 : 1.41;
       const raw = Math.min(1, Math.max(0, (shot.smashFactor - 1.10) / (elite - 1.10)));
-      pts += raw * 35; max += 35;
+      pts += raw * 45; max += 45;
     }
 
-    // Side carry dispersion (0–25 pts)
-    if (Number.isFinite(shot.sideCarry)) {
-      const abs = Math.abs(shot.sideCarry);
-      pts += Math.max(0, 25 - abs * 1.2); max += 25;
-    }
-
-    // Attack angle vs optimal (0–20 pts)
+    // Attack angle vs optimal (0-25) — tier 2
     if (Number.isFinite(shot.attackAngle)) {
-      let ideal = shot.clubType === 'd' ? 3 : isIron(shot.clubType) ? -3.5 : 1;
-      const diff = Math.abs(shot.attackAngle - ideal);
-      pts += Math.max(0, 20 - diff * 3); max += 20;
+      const ideal = shot.clubType === 'd' ? 3 : isIron(shot.clubType) ? -3.5 : 1;
+      pts += Math.max(0, 25 - Math.abs(shot.attackAngle - ideal) * 3.5); max += 25;
     }
 
-    // Club path neutrality (0–10 pts)
+    // Club path neutrality (0-15) — tier 2
     if (Number.isFinite(shot.clubPath)) {
-      pts += Math.max(0, 10 - Math.abs(shot.clubPath) * 1); max += 10;
+      pts += Math.max(0, 15 - Math.abs(shot.clubPath) * 1.5); max += 15;
     }
 
-    // Spin axis bonus/penalty when available (0–10 pts)
-    if (Number.isFinite(shot.spinAxis)) {
-      pts += Math.max(0, 10 - Math.abs(shot.spinAxis) * 0.4); max += 10;
+    // Spin loft vs the club's window (0-15) — derived from two tier-2 metrics
+    const sl = spinLoft(shot);
+    if (Number.isFinite(sl)) {
+      const band = Benchmarks.spinLoftBand(shot.clubType);
+      const miss = sl < band.lo ? band.lo - sl : sl > band.hi ? sl - band.hi : 0;
+      pts += Math.max(0, 15 - miss * 1.5); max += 15;
     }
 
     return max > 0 ? Math.round((pts / max) * 100) : null;
@@ -2797,6 +3075,7 @@ const UI = (() => {
   function renderDetail(session) {
     _session = session;
     _clubFilter = 'all';
+    try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
     document.getElementById('detailTitle').textContent = formatDate(session.date);
     document.getElementById('detailNotes').textContent = session.notes
       ? session.notes + (session.conditions ? ` · ${[session.conditions.wind,session.conditions.temp].filter(Boolean).join(', ')}` : '')
@@ -2834,6 +3113,22 @@ const UI = (() => {
   }
 
   // ── Insights (coach's notes) ──────────────────────────────────
+  // Measurement caveats come FIRST, above any prescription, because they
+  // change whether the prescription is admissible at all.
+  function renderConditionCaveats(session) {
+    const el = document.getElementById('conditionCaveats');
+    if (!el) return;
+    const notes = Conditions.caveats(session);
+    const vol = FeedbackEngine.volumeAdvice((session.shots || []).length);
+    if (vol) notes.push(vol);
+    if (!notes.length) { el.innerHTML = ''; el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = `<div class="caveat-block">
+        <div class="caveat-head">Before you read these numbers</div>
+        ${notes.map(n => `<div class="caveat-item">${Sanitize.escape(n)}</div>`).join('')}
+      </div>`;
+  }
+
   function renderInsights(shots) {
     const el = document.getElementById('insightsCard');
     if (!el) return;
@@ -3758,9 +4053,11 @@ const ImportFlow = (() => {
     const notes = document.getElementById('metaNotes').value.trim();
     const wind  = document.getElementById('metaWind').value.trim();
     const temp  = document.getElementById('metaTemp').value.trim();
+    const ball    = document.getElementById('metaBall')?.value || 'unknown';
+    const surface = document.getElementById('metaSurface')?.value || 'unknown';
     const session = {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
-      notes, conditions:(wind||temp)?{wind,temp}:null, shots:_shots, createdAt:Date.now(),
+      notes, conditions:{wind,temp,ball,surface}, shots:_shots, createdAt:Date.now(),
     };
     // Save to MemDB and show instantly — no spinner
     MemDB.saveSession(session);
@@ -4612,6 +4909,26 @@ async function init() {
       toggle.style.color = isOn ? 'var(--pine)' : 'var(--text-dim)';
     }
   });
+
+  // Feedback-schedule picker — the app's most consequential setting.
+  const renderFeedbackModes = () => {
+    const host = document.getElementById('feedbackModes');
+    if (!host) return;
+    const cur = FeedbackEngine.getMode();
+    host.innerHTML = Object.values(FeedbackEngine.MODES).map(m => `
+      <button class="fb-option${m.id === cur ? ' on' : ''}" data-fb="${Sanitize.escape(m.id)}">
+        <span class="fb-option-label">${Sanitize.escape(m.label)}${m.id === cur ? '<span class="fb-check">✓</span>' : ''}</span>
+        <span class="fb-option-blurb">${Sanitize.escape(m.blurb)}</span>
+      </button>`).join('');
+  };
+  document.getElementById('feedbackModes')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-fb]');
+    if (!btn) return;
+    FeedbackEngine.setMode(btn.getAttribute('data-fb'));
+    renderFeedbackModes();
+    toast('Feedback schedule updated');
+  });
+  renderFeedbackModes();
 
   // Goals management
   const renderGoals = async () => {
