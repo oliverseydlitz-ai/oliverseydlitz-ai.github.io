@@ -6222,7 +6222,7 @@ const UI = (() => {
     renderDispersionStats(shots);
     renderTail(shots);
     renderBallFlight(shots);
-    renderGapping(_session.shots);
+    renderGapping(_session.shots, _session);
     renderLaunchWindows(shots);
     renderFaultCards(shots);
     renderPracticePlan(shots);
@@ -6748,10 +6748,14 @@ const UI = (() => {
   }
 
   // ── Club gapping chart ────────────────────────────────────────
-  function renderGapping(shots) {
+  function renderGapping(shots, session) {
     destroyChart('gapping');
     const section = document.getElementById('gappingSection');
-    const clubs = sortedClubs(shots);
+    // Only clubs that cleared the sample floor belong on a gapping chart. A
+    // club with two shots produced a bar and a gap verdict indistinguishable
+    // from one with forty, and the verdict is the part a golfer acts on.
+    const clubs = sortedClubs(shots)
+      .filter(c => shots.filter(s => s.clubType === c && s.carryDistance > 0).length >= Metrics.MIN_SHOTS_REPORT);
     if (clubs.length < 2) { if(section) section.hidden=true; return; }
     if(section) section.hidden=false;
     const canvas = document.getElementById('chartGapping');
@@ -6799,12 +6803,23 @@ const UI = (() => {
     // render gap table
     const gapTable = document.getElementById('gapTable');
     if (!gapTable) return;
+    const gapBall = Conditions.ball(session);
+    const gappingOK = gapBall.gappingValid;
+    const note = document.getElementById('gapNote');
+    if (note) note.innerHTML = gappingOK ? '' : `<div class="tail-note">Gap sizes are withheld for this
+      session: ${Sanitize.escape(gapBall.label.toLowerCase())} do not gap like your own ball — a wedge can
+      fly further on half the spin — so the order of the clubs here is real and the distance between them is
+      not. Clubs under ${Metrics.MIN_SHOTS_REPORT} shots are left off entirely.</div>`;
     gapTable.innerHTML = `
       <thead><tr><th>Club</th><th>Avg Carry</th><th>Gap</th><th>Status</th></tr></thead>
       <tbody>${clubs.map((c,i) => {
         const carry = carries[i];
         const g = gaps[i];
-        const gapStatus = g === null ? '' :
+        // `Conditions.gappingValid` was defined and read by nothing. Range
+        // balls are the case it exists for: a wedge can fly further on half
+        // the spin, so the ORDER of the clubs survives and the SIZE of the gap
+        // between them does not. The carries stay, the verdict goes.
+        const gapStatus = g === null ? '' : !gappingOK ? `<span style="color:var(--text-muted)">not on these balls</span>` :
           g < 8  ? `<span style="color:var(--red)">⚠ Only ${fmt(g,0)} yds</span>` :
           g > 25 ? `<span style="color:var(--yellow)">⚠ Big gap ${fmt(g,0)} yds</span>` :
                    `<span style="color:var(--green-light)">✓ ${fmt(g,0)} yds</span>`;
