@@ -205,7 +205,40 @@ number that looks like the others.
 
 ---
 
-## 6. Test infrastructure `642fa46` `d588e94`
+## 6. Retention probe and cleanup `1d95df3` `fff2ccf`
+
+**§10 step 3, the spec's primary efficacy metric.** Everything else in the app
+measures a session; this measures whether a session *changed anything*.
+
+Winstein & Schmidt is why it has to exist: constant and faded feedback were
+indistinguishable during acquisition *and* at 5–10 minutes, separating only at
+24 hours where the faded group had 35% less error. Every within-session signal
+was blind to a real 35% difference in what was learned — so grading a drill on
+whether the numbers improved during the session measures the one window the
+evidence says is uninformative.
+
+A probe opens when a session prescribes work, recording the baseline for that
+club and metric. A session 20 hours to 10 days later with 8+ shots of the same
+club settles it, above the prescriptions. The verdict is three-valued on
+purpose: a change smaller than the golfer's own variation reads as **"no
+detectable change", never "no improvement"** — the app cannot tell those apart.
+With too little history it returns unknown rather than borrowing a population
+figure.
+
+**Three faults fired on absent data** — same root cause as the score inflation:
+a missing metric coerces to 0, and 0 satisfied `attackAngle > -0.5`,
+`launchAngle < 9` and `smashFactor < 1.20`.
+
+**The consistency score was unbounded.** `100 - stdDev(carries)` treats a yard
+figure as a percentage and goes negative for any real dispersion. Replaced with
+a coefficient-of-variation score, so a driver and a wedge with the same
+relative spread score alike.
+
+**17 unreachable modules removed** — ~660 lines with zero call sites, found in
+the first review. `app.js` 7,155 → 6,605 lines. Verified by visiting every view
+in a browser with zero console errors.
+
+## 7. Test infrastructure `642fa46` `d588e94`
 
 The harness validating all of the above **never executed `app.js`**. It
 regex-extracted individual modules, so a broken top-level binding was invisible.
@@ -248,17 +281,15 @@ existed only in an ephemeral container.
 
 **Known and unfixed:**
 
-- A fault false-positive with the same root cause as the score inflation:
-  `s.attackAngle > -0.5` fires "Shallow Attack Angle on Irons" on blank AoA,
-  because JS coerces both `null` and `0` to `0` in comparisons. Needs
-  `Number.isFinite` guards across ~10 `FaultEngine` rules.
 - The gear-effect residual threshold (5°) is a hand-picked screen, not fitted.
   It should come from the golfer's own residual distribution like everything
   else.
-- ~660 lines of unreachable modules in `app.js` (17 IIFEs with zero call sites),
-  found in the first review and never removed.
-- `SwingAnalytics.detectPattern` computes `100 - stdDev(carries)`, which goes
-  negative for any real dispersion.
+- `PracticePlan` still has no way to know a drill was actually *done* — the
+  retention probe settles against whatever the next session happens to contain,
+  not against confirmed practice.
+
+*(Closed `1d95df3` / `fff2ccf`: the three faults that fired on missing data, the
+unbounded consistency score, and the 17 unreachable modules.)*
 
 **Repo housekeeping:** 7 `claude/*` branches remain on the remote. This session's
 credentials can create and update refs but not delete them (GitHub returns 403),
