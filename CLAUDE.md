@@ -191,8 +191,8 @@ The research base supersedes earlier guidance and **corrected two foundations**:
 
 1. **The MLM2PRO does not measure face angle.** It is not in Rapsodo's metric
    set. `facePath()` *derives* it by inverting the D-plane relation, which
-   makes it error-amplified: **±1.8° on a single shot**. Never state a face
-   angle, and never diagnose curvature from one shot.
+   makes it error-amplified. Never state a face angle. Uncertainty on it is
+   quoted from the golfer's own shot-to-shot spread, not a population constant.
 2. **Metric trust tiers gate every prescription** — see `Metrics.TIER`:
    - **Tier 1** (prescribe freely): club speed, ball speed, smash factor, carry.
    - **Tier 2** (display only): launch angle, attack angle, club path.
@@ -248,7 +248,12 @@ is the working — read the relevant section before touching any of these.
   `kv = 0.83` woods / `0.75` irons. These reproduce TrackMan's published tour
   spin lofts exactly (driver 14.7°, 6-iron 24.3°) — that is the regression
   check. Rapsodo does not export dynamic loft, so this is an estimate.
-- **`Metrics.SINGLE_SHOT_F2P_SD = 1.8`** — derived face-to-path noise.
+- **`Metrics.DEVICE_ERROR = 0`** — device error is deliberately NOT carried as
+  a separate term. Half the published 1.8° figure (the launch-direction sigma)
+  was never measured by anyone, and an observed shot-to-shot spread already
+  *contains* the device error, so adding a constant on top double-counts it.
+  Uncertainty is quoted from `Metrics.shotSpread()` — the golfer's own data.
+  Sample floors are unaffected: they rest on swing variability, not device error.
 - **`ANGLE_NOISE` (legacy)** — Rapsodo MLM2PRO measurement error (MAE 1.05°
   attack angle, 1.19° club path vs a Foresight GCQuad). Fault thresholds sit
   inside this band, which is why `FaultEngine` gates on *recurrence* rather

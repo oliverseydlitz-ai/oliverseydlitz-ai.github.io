@@ -225,8 +225,8 @@ function spinLoft(shot) {
 }
 
 // Face-to-path in degrees. Positive = face open to path. null when either
-// input is missing. Single-shot noise is ±1.8° (Metrics.SINGLE_SHOT_F2P_SD) —
-// never diagnose curvature from one shot.
+// input is missing. Device error is treated as zero (see Metrics.DEVICE_ERROR);
+// uncertainty is quoted from the golfer's own shot-to-shot spread instead.
 function facePath(shot) {
   const ld = shot.launchDirection, cp = shot.clubPath;
   if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
@@ -287,9 +287,37 @@ const Metrics = (() => {
     return base * Math.sqrt(10 / n);
   };
 
-  // Single-shot face-to-path SD, propagated through the D-plane inversion:
-  // sqrt(0.5^2 + 1.46^2) / 0.84 ~= 1.8 degrees.
-  const SINGLE_SHOT_F2P_SD = 1.8;
+  // DEVICE ERROR IS TREATED AS ZERO, deliberately.
+  //
+  // Not because it is zero — it is not — but because carrying it as a separate
+  // constant is both unsourced and double-counted:
+  //
+  //   Unsourced: the published sqrt(0.5^2 + 1.46^2)/0.84 ~= 1.8 deg combines
+  //   Rapsodo's real club-path RMSE (1.46) with a launch-direction sigma of
+  //   0.5 that nobody has ever measured. No error data exists from any source
+  //   for MLM2PRO launch direction, so half that figure was invented.
+  //
+  //   Double-counted: an observed shot-to-shot spread already CONTAINS the
+  //   device error — observed variance = swing variance + device variance.
+  //   Once an interval is computed from the golfer's own shots, adding a
+  //   device term on top counts the same error twice.
+  //
+  // So: attribute all observed spread to the golfer, and quote uncertainty
+  // only from data we actually have. With a properly levelled and aligned
+  // unit the residual device contribution is small relative to swing
+  // variability, which is what makes this a reasonable modelling choice
+  // rather than a convenient one.
+  const DEVICE_ERROR = 0;
+
+  // Empirical single-shot spread for a metric, from this golfer's own shots.
+  // Replaces the old population constant: if we have their data, use it.
+  function shotSpread(shots, metric, clubType) {
+    const vals = (shots || [])
+      .filter(s => !clubType || s.clubType === clubType)
+      .map(s => (metric === 'facePath' ? facePath(s) : s[metric]));
+    const { kept } = trimOutliers(vals);
+    return kept.length >= 3 ? stdDev(kept) : null;
+  }
 
   // Sample floors before a mean may be reported at all.
   const MIN_SHOTS_REPORT  = 10;  // any club mean
@@ -345,7 +373,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, SINGLE_SHOT_F2P_SD,
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval };
 })();
@@ -3892,8 +3920,11 @@ const UI = (() => {
     // put the club mean beside it, which is where it becomes trustworthy.
     const spinOK = Spin.measured(shot) || Spin.measured(_session);
     const f2pRaw = facePath(shot);
+    // Uncertainty on a single shot is this golfer's own shot-to-shot spread
+    // with this club, measured from their data — not a population constant.
+    const ownSpread = Metrics.shotSpread(sessionShots, 'facePath', shot.clubType);
     const f2pSingle = Number.isFinite(f2pRaw)
-      ? `${fmt(f2pRaw,1)}° <span class="sm-pm">± ${Metrics.SINGLE_SHOT_F2P_SD}</span>`
+      ? `${fmt(f2pRaw,1)}°` + (ownSpread ? ` <span class="sm-pm">± ${fmt(ownSpread,1)}</span>` : '')
       : '—';
     const clubF2P = (sessionShots || [])
       .filter(x => x.clubType === shot.clubType)
