@@ -7036,17 +7036,38 @@ const UI = (() => {
       const cs = shots.filter(s=>s.clubType===c);
       const b = Benchmarks.get(c);
       if (!b) return `<tr><td>${clubLabel(c)}</td><td colspan="6" style="color:var(--text-muted)">No benchmark data</td></tr>`;
+      // Sample floors, the same two the rest of the app uses. A club with three
+      // shots was graded against the tour with a coloured dot exactly like one
+      // with forty, and the angles — tier 2, and noisier — were graded on the
+      // smaller floor meant for ball-flight metrics.
+      const enough = cs.length >= Metrics.MIN_SHOTS_REPORT;
+      const enoughAngle = cs.length >= Metrics.MIN_SHOTS_DELIVERY;
+      if (!enough) return `<tr class="yard-thin">
+        <td><span class="club-dot" style="background:${clubColor(c)}"></span><strong>${b.label}</strong><br>
+          <small style="color:var(--text-muted);font-size:.72rem">${cs.length} shots</small></td>
+        <td colspan="5">${Metrics.MIN_SHOTS_REPORT - cs.length} more before this club can be
+          compared to anything</td></tr>`;
+
       const uSF=avg(cs,'smashFactor'), uCarry=avg(cs,'carryDistance'), uBS=avg(cs,'ballSpeed'), uLA=avg(cs,'launchAngle'), uAA=avg(cs,'attackAngle');
       const sfS=Benchmarks.status(uSF,b.am.sf,b.pga.sf), cS=Benchmarks.status(uCarry,b.am.carry,b.pga.carry);
       const bsS=Benchmarks.status(uBS,b.am.bs,b.pga.bs), laS=Benchmarks.status(uLA,b.am.la,b.pga.la,false);
-      const aaOk = c==='d'?(uAA>=1):isIron(c)?(uAA<=-2&&uAA>=-6):(uAA<=-0.5);
+      // THE TARGET BANDS COME FROM `Benchmarks.TARGET`, VIA `targetsFor`.
+      // This table used to carry its own inline copy — `c==='d' ? uAA>=1 : ...`
+      // with a "+3° ideal" caption — and it disagreed with the real bands in
+      // both directions. +3.0° is the LPGA AVERAGE, not the target; conflating
+      // the tour average with what to aim at is the original bug this whole
+      // area was cleaned up for, and it was still live here in a second place.
+      const tgt = Benchmarks.targetsFor(c);
+      const inBand = (v, band) => Number.isFinite(v) && band && v >= band.lo && v <= band.hi;
+      const aaS = !enoughAngle ? 'na' : inBand(uAA, tgt.attack) ? 'green' : 'yellow';
       return `<tr>
         <td><span class="club-dot" style="background:${clubColor(c)}"></span><strong>${b.label}</strong><br><small style="color:var(--text-muted);font-size:.72rem">${cs.length} shots</small></td>
         <td><span class="status-dot ${sfS}"></span>${fmt(uSF,2)}<br><small class="bench-ref">${fmt(b.am.sf,2)} / ${fmt(b.pga.sf,2)}</small></td>
         <td><span class="status-dot ${cS}"></span>${fmt(uCarry,0)}<br><small class="bench-ref">${fmt(b.am.carry,0)} / ${fmt(b.pga.carry,0)}</small></td>
         <td><span class="status-dot ${bsS}"></span>${fmt(uBS,0)}<br><small class="bench-ref">${fmt(b.am.bs,0)} / ${fmt(b.pga.bs,0)}</small></td>
         <td><span class="status-dot ${laS}"></span>${fmt(uLA,1)}°<br><small class="bench-ref">${fmt(b.am.la,1)}° / ${fmt(b.pga.la,1)}°</small></td>
-        <td><span class="status-dot ${aaOk?'green':'yellow'}"></span>${fmt(uAA,1)}°<br><small class="bench-ref">${c==='d'?'+3°':'-3°'} ideal</small></td>
+        <td><span class="status-dot ${aaS}"></span>${fmt(uAA,1)}°<br><small class="bench-ref">${
+          enoughAngle ? Sanitize.escape(tgt.attack.label) : `needs ${Metrics.MIN_SHOTS_DELIVERY}`}</small></td>
       </tr>`;
     }).join('');
 
@@ -7057,9 +7078,14 @@ const UI = (() => {
         <th>Carry (yds)<br><small>you/am/pga</small></th>
         <th>Ball Spd<br><small>you/am/pga</small></th>
         <th>Launch∠<br><small>you/am/pga</small></th>
-        <th>Attack∠<br><small>you/ideal</small></th>
+        <th>Attack∠<br><small>you/target</small></th>
       </tr></thead>
       <tbody>${rows}</tbody>`;
+    const bn = document.getElementById('benchNote');
+    if (bn) bn.innerHTML = `<div class="tail-note">The am/pga columns are what those groups AVERAGE. The
+      attack-angle column is different: it shows what to AIM at, which is not the same thing — the PGA
+      driver attack angle is −1.3°, descending, while the target is ${Sanitize.escape(Benchmarks.TARGET.driverAttackAngle.label)}.
+      Launch and attack angle are display-only metrics; nothing is prescribed from them.</div>`;
   }
 
   // ── Shot log (sortable, colour-coded) ─────────────────────────

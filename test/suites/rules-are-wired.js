@@ -90,6 +90,31 @@ for (const [id, alias, mod] of CAVEAT_ALIASES) {
      `${mod}.${id} reaches a render path${alias ? ` (as \`${alias}\`)` : ''} — a caveat nothing renders is not a caveat`);
 }
 
+console.log('— and the target bands have exactly one copy —');
+// `Benchmarks.TARGET` is the only place the target bands may live. The
+// launch-window table used to hardcode them inline, which is how the tour
+// AVERAGE and the TARGET got conflated the first time — the PGA driver attack
+// angle is -1.3°, descending, and +3.0° is the LPGA average, neither of which
+// is what to aim at. The benchmark table was still carrying a third copy:
+// `c==='d' ? uAA>=1 : isIron(c) ? (uAA<=-2 && uAA>=-6) : (uAA<=-0.5)`, captioned
+// "+3° ideal", disagreeing with the real bands in both directions.
+{
+  // Scan CODE, not comments. The first version of this check failed on the
+  // comment that explains it: the note recording what the old inline copy
+  // looked like contains the very string the check forbids. A source-scanning
+  // test has to strip the prose or it will eventually be turned off by someone
+  // who documented something well.
+  const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const callSites = (src.split('targetsFor(').length - 1);
+  ok(callSites >= 3, `targetsFor is read from more than one render path (${callSites} call sites)`);
+  ok(!/\+3°[^<]*ideal|ideal[^<]*\+3°/i.test(code),
+     'no "+3° ideal" caption survives — that number is the LPGA average, not a target');
+  const benchStart = code.indexOf('function renderBenchTable');
+  const bench = code.slice(benchStart, src.indexOf('  // ── Shot log', benchStart));
+  ok(/targetsFor\(/.test(bench), 'the benchmark table reads the bands rather than restating them');
+  ok(!/uAA\s*[<>]=/.test(bench), 'and has no inline attack-angle comparison of its own left');
+}
+
 // A check that cannot fail proves nothing, and this one is a string search —
 // exactly the shape that quietly stops discriminating. `ViewPrefs.setPref` is
 // confirmed dead and deliberately left in place (HANDOVER lists it), so it is
