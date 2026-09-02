@@ -40,5 +40,46 @@ ok(toe && toe.likely==='toe', `excess draw spin flagged as a toe strike (${toe &
 const heel=M.gearEffectSuspected({...base,spinAxis:M.spinAxisFrom(base)+12});
 ok(heel && heel.likely==='heel', 'excess fade spin flagged as a heel strike');
 ok(toe && /face angle derived from this shot will be off/i.test(toe.note), 'and says the derivation is invalid for that shot');
+ok(toe.source==='screen', 'with no peer shots it falls back to the loose screen');
+ok(/would let this be measured against your own spread/.test(toe.note), 'and says what would replace it');
+
+// The 5-degree screen was an honest guess and it was wrong in both directions
+// at once: too tight for a golfer whose derivation runs noisy, so ordinary
+// shots read as mis-hits, and too loose for a consistent striker, whose real
+// toe strike sat under it and passed as clean.
+console.log('— the threshold comes from the golfer\'s own residuals when there are enough —');
+// A golfer whose residuals sit wide: a 6-degree deviation is an ordinary shot.
+const peers = (spread, n = 14, offset = 0) => Array.from({ length: n }, (_, i) => {
+  const sh = { ...base, launchDirection: 2 };
+  return { ...sh, spinAxis: M.spinAxisFrom(sh) + offset + spread * ((i % 2 ? 1 : -1) + (i % 3 - 1) * 0.4) };
+});
+const wide = peers(8);
+const ordinaryForThem = { ...base, spinAxis: M.spinAxisFrom(base) + 6 };
+ok(M.gearThreshold(wide, '7i').source === 'personal', `14 shots is enough to use their own spread`);
+ok(M.gearThreshold(wide, '7i').cut > 5, 'a noisy golfer gets a WIDER bar than the old screen');
+ok(M.gearEffectSuspected(ordinaryForThem, wide) === null,
+   'so a 6-degree deviation that is ordinary for them is no longer called a mis-hit');
+
+const tight = peers(0.6);
+ok(M.gearThreshold(tight, '7i').cut < 5, 'a consistent striker gets a TIGHTER bar than the old screen');
+const realMiss = { ...base, spinAxis: M.spinAxisFrom(base) + 4 };
+ok(M.gearEffectSuspected(realMiss, tight) !== null,
+   'so a 4-degree deviation that is genuinely unusual for them is caught, where the 5-degree screen missed it');
+ok(M.gearEffectSuspected(realMiss, []) === null, 'the same shot passes the old screen — that was the bug');
+ok(/against your own 14 shots/.test(M.gearEffectSuspected(realMiss, tight).note),
+   'and the note says the bar is theirs');
+
+console.log('— it centres on their own median, not on zero —');
+// A systematic offset in the derivation is a property of the model and the
+// club, not of any one strike. Anchoring at zero flags every shot.
+const offsetPeers = peers(0.6, 14, 9);
+ok(M.gearThreshold(offsetPeers, '7i').centre > 6, 'a consistent 9-degree offset is read as the centre');
+const typicalForOffset = { ...base, spinAxis: M.spinAxisFrom(base) + 9 };
+ok(M.gearEffectSuspected(typicalForOffset, offsetPeers) === null,
+   'so a shot sitting right on that offset is not flagged, though it is 9 degrees from zero');
+ok(M.gearEffectSuspected(typicalForOffset, []) !== null, 'while the old zero-anchored screen flagged it');
+
+console.log('— under the floor it says which bar it used —');
+ok(M.gearThreshold(peers(1, 4), '7i').source === 'screen', `under ${M.Metrics.MIN_SHOTS_REPORT} shots it will not use their spread`);
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

@@ -323,20 +323,69 @@ function faceAngle(shot) {
 // compare the axis the face-to-path geometry predicts against the axis the
 // device actually saw. A large disagreement in the direction opposite to the
 // face-to-path is the gear-effect signature of an off-centre strike.
-function gearEffectSuspected(shot) {
+// How far the measured spin axis sits from what the face and path predict. A
+// large gap is the signature of an off-centre strike: the head twisted, so the
+// derivation that assumes it did not is invalid for that shot.
+function gearResidual(shot) {
   if (!Spin.measured(shot) || !Number.isFinite(shot.spinAxis)) return null;
   const predicted = spinAxisFrom(shot);
-  if (!Number.isFinite(predicted)) return null;
-  const residual = shot.spinAxis - predicted;
-  // Threshold from the golfer's own data would be better; 5 degrees is a
-  // deliberately loose screen so it flags gross mis-hits, not normal scatter.
-  if (Math.abs(residual) < 5) return null;
+  return Number.isFinite(predicted) ? shot.spinAxis - predicted : null;
+}
+
+// The threshold this is judged against, from the golfer's own residuals for
+// this club — the last hand-picked number in the app that decided something a
+// golfer sees. The old 5 degrees was an honest guess and it was wrong in both
+// directions at once: too tight for someone whose derivation runs noisy, so
+// ordinary shots got called mis-hits, and too loose for a consistent striker,
+// whose genuine toe strike sat under it and passed as clean.
+//
+// Centred on the MEDIAN residual, not on zero, because a systematic offset in
+// the derivation is a property of the model and the club, not of any one
+// strike — anchoring at zero would flag every shot for a golfer whose
+// residuals happen to sit a few degrees off. Scaled by MAD, which blow-ups
+// cannot capture, so the mis-hits being looked for do not set the bar for
+// finding them.
+//
+// No floor is put under the personal threshold, deliberately. The obvious
+// worry is that a very consistent golfer gets a threshold so tight it flags
+// measurement noise — but an observed residual spread ALREADY contains that
+// noise, exactly as Metrics.DEVICE_ERROR = 0 argues, so a floor would be
+// adding the same error a second time under another name.
+const GEAR_K = 3;                    // residuals beyond 3 robust SDs of their own centre
+function gearThreshold(peers, clubType) {
+  const res = (peers || [])
+    .filter(s => !clubType || s.clubType === clubType)
+    .map(gearResidual).filter(Number.isFinite);
+  if (res.length < Metrics.MIN_SHOTS_REPORT) {
+    // Not enough of this club to know their own spread. Fall back to the loose
+    // screen, which only ever catches gross mis-hits — and say which was used.
+    return { centre: 0, cut: 5, source: 'screen', n: res.length };
+  }
+  const sorted = [...res].sort((a, b) => a - b);
+  const centre = sorted[Math.floor((sorted.length - 1) / 2)];
+  const dev = res.map(r => Math.abs(r - centre)).sort((a, b) => a - b);
+  const mad = dev[Math.floor((dev.length - 1) / 2)];
+  const scale = 1.4826 * mad;
+  if (!(scale > 0)) return { centre, cut: 5, source: 'screen', n: res.length };
+  return { centre, cut: GEAR_K * scale, source: 'personal', n: res.length };
+}
+
+function gearEffectSuspected(shot, peers) {
+  const residual = gearResidual(shot);
+  if (residual === null) return null;
+  const t = gearThreshold(peers, shot.clubType);
+  if (Math.abs(residual - t.centre) < t.cut) return null;
+  const toe = residual < t.centre;
   return {
-    residual,
-    likely: residual < 0 ? 'toe' : 'heel',
-    note: `Measured spin axis is ${fmt(Math.abs(residual),1)}° ${residual < 0 ? 'more draw' : 'more fade'} ` +
-          `than the face and path can account for — the signature of a ${residual < 0 ? 'toe' : 'heel'} strike. ` +
-          `Face angle derived from this shot will be off, because the head twisted at impact.`,
+    residual, threshold: t.cut, centre: t.centre, source: t.source, n: t.n,
+    likely: toe ? 'toe' : 'heel',
+    note: `Measured spin axis is ${fmt(Math.abs(residual - t.centre),1)}° ${toe ? 'more draw' : 'more fade'} ` +
+          `than the face and path can account for — the signature of a ${toe ? 'toe' : 'heel'} strike. ` +
+          `Face angle derived from this shot will be off, because the head twisted at impact.` +
+          (t.source === 'personal'
+            ? ` Judged against your own ${t.n} shots with this club, where anything past ${fmt(t.cut,1)}° is unusual.`
+            : ` Judged against a loose ${fmt(t.cut,0)}° screen — ${Metrics.MIN_SHOTS_REPORT}+ shots of this club ` +
+              `with an RPT ball would let this be measured against your own spread instead.`),
   };
 }
 
@@ -5232,7 +5281,7 @@ const UI = (() => {
         `<span class="sm-note">(${fiv.n} shots)</span></span>`;
     }
     // Gear effect makes the derivation invalid for this shot — say so loudly.
-    const gear = gearEffectSuspected(shot);
+    const gear = gearEffectSuspected(shot, sessionShots);
     if (gear) faClub = `<span class="sm-warn">${Sanitize.escape(gear.likely)} strike suspected — ` +
       `face angle unreliable on this shot</span>`;
 

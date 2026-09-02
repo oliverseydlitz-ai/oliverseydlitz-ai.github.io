@@ -65,7 +65,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
     'FeedbackEngine','Conditions','Spin','Dispersion','Strike','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
     'ImportFlow','Goals','SessionSharing','RetentionProbe','consistencyScore','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
-    'curveYards','gearEffectSuspected','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',
+    'curveYards','gearEffectSuspected','gearResidual','gearThreshold','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',
     'isShort','isMid','CLUB_ORDER'];
   try {
     w.eval(src + '\n;window.__app = {' + EXPORTS.map(n => `${n}: typeof ${n} !== 'undefined' ? ${n} : undefined`).join(',') + '};');
