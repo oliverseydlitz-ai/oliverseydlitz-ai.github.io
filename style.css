@@ -840,6 +840,9 @@ body.modal-open { overflow: hidden; }
    prints what it needs instead of a number that would read like a yardage. */
 .yard-thin td{color:var(--text-muted);font-style:italic}
 .yard-thin td strong{font-style:normal}
+/* A record that had a higher reading screened out of it says so on the card —
+   the shot is not hidden, it is flagged for the golfer to go and look at. */
+.record-note{margin-top:.35rem;font-size:.68rem;line-height:1.4;color:var(--text-muted);text-wrap:pretty}
 .fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;

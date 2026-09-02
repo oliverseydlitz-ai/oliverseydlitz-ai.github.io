@@ -481,6 +481,27 @@ const Metrics = (() => {
     return kept.length >= 3 ? stdDev(kept) : null;
   }
 
+  // PHYSICAL CEILINGS — impossible readings, not unlikely ones.
+  //
+  // `Dispersion` already screens "only impossible geometry" (MIN_CARRY 20 yd,
+  // MAX_ANGLE 45°) and this is the same idea for the one screen that shows
+  // nothing but extremes. A personal best is by construction the reading most
+  // likely to be a misread, on a device that has logged a 147 mph swing next
+  // to a 0 mph one, and "Best Smash: 1.71" was displayed as an achievement.
+  //
+  // Only smash factor is here, and deliberately so. It is the one metric with
+  // a HARD bound from the rules of golf: the USGA/R&A limit the coefficient of
+  // restitution to 0.83, which caps smash at about 1.50 for a driver. TrackMan
+  // publish figures up to roughly 1.52 once measurement error is allowed for,
+  // so 1.55 is comfortably above anything a real strike produces and below
+  // anything a glitch produces.
+  //
+  // Carry, ball speed, club speed and apex are NOT screened. A long drive is
+  // unusual, not impossible, and there is no defensible ceiling to put on
+  // them — inventing one to make the feature tidier would be exactly the kind
+  // of unsourced constant the rest of this module refuses.
+  const CEILING = { smashFactor: 1.55 };
+
   // Sample floors before a mean may be reported at all.
   const MIN_SHOTS_REPORT  = 10;  // any club mean
   const MIN_SHOTS_DELIVERY = 15; // club path / attack angle change claims
@@ -494,6 +515,12 @@ const Metrics = (() => {
     const sorted = [...v].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)];
     const mad = sorted.map(x => Math.abs(x - med)).sort((a, b) => a - b)[Math.floor(sorted.length / 2)] || 0;
+    // A MAD of zero means more than half the readings are identical, and there
+    // is no scale to judge the rest against. A median-of-non-zero-deviations
+    // fallback was tried and is self-defeating: with a SINGLE outlier the only
+    // non-zero deviation is the outlier's own, so it sets the scale it is then
+    // measured against and always passes. Records are screened on physical
+    // impossibility instead — see `Metrics.CEILING`.
     if (mad === 0) return { kept: v, dropped: 0 };
     const kept = v.filter(x => Math.abs(x - med) / (1.4826 * mad) <= 3.5);
     return { kept, dropped: v.length - kept.length };
@@ -558,7 +585,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread,
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, CEILING,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval };
 })();
@@ -5171,13 +5198,35 @@ const Analytics = (() => {
     });
   }
 
+  // A personal best is, by construction, the single reading most likely to be a
+  // misread: it is the extreme value of the distribution, and this is a device
+  // that has logged a 147 mph swing next to a 0 mph one. `trimOutliers` is the
+  // rule the whole app already uses for that, and it was applied everywhere
+  // EXCEPT the one place that only ever shows an extreme. "Best Smash 1.71"
+  // is not an achievement — it is above the physical limit and was celebrated.
+  //
+  // The record is not deleted, it is screened: the best of the kept readings
+  // is the record, and if a higher reading was trimmed the card says so, so a
+  // golfer can go and look at that shot rather than wonder where it went.
   function personalBests(sessions) {
     const all = sessions.flatMap(s => s.shots.map(sh => ({...sh, _date:s.date})));
     if (!all.length) return [];
     const top = (field, label, unit, dec=0) => {
+      const vals = all.map(s => s[field]).filter(v => v > 0);
+      if (!vals.length) return null;
+      // Impossible readings only — see Metrics.CEILING for why this screens
+      // smash factor and nothing else.
+      const cap = Metrics.CEILING[field] ?? Infinity;
+      const rawMax = Math.max(...vals);
       let best = null;
-      all.forEach(s => { if (s[field] > 0 && (!best || s[field] > best[field])) best = s; });
-      return best ? { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType), date: formatDate(best._date) } : null;
+      all.forEach(s => { if (s[field] > 0 && s[field] <= cap && (!best || s[field] > best[field])) best = s; });
+      if (!best) return null;
+      const excluded = rawMax > cap ? rawMax : null;
+      return { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType),
+               date: formatDate(best._date),
+               note: excluded === null ? null
+                 : `A reading of ${fmt(excluded,dec)}${unit ? ' ' + unit : ''} is left out — that is past what ` +
+                   `a legal clubface can produce, so it is a misread rather than a record.` };
     };
     return [
       top('carryDistance','Longest Carry','yds'),
@@ -7380,6 +7429,7 @@ const UI = (() => {
         <div class="record-value">${b.value}<span class="record-unit">${b.unit}</span></div>
         <div class="record-label">${b.label}</div>
         <div class="record-meta">${b.club} · ${b.date}</div>
+        ${b.note ? `<div class="record-note">${Sanitize.escape(b.note)}</div>` : ''}
       </div>`).join('');
   }
 
