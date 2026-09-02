@@ -7785,36 +7785,141 @@ const EnhancedMetricsWidget = (() => {
 // ════════════════════════════════════════════════════════════════
 // AccessibilityEnhancements — WCAG 2.1 AA compliance
 // ════════════════════════════════════════════════════════════════
+// This module used to do four things and none of them reached a user.
+//
+//   * It copied every button's own text into an aria-label. A button's text
+//     ALREADY is its accessible name, so at best that changed nothing — and at
+//     worst it overrode a better name, because an aria-label wins over content.
+//     The buttons that genuinely need one are the icon-only buttons with no
+//     text, and the loop skipped exactly those: there was nothing to copy.
+//   * It set --contrast and --animation-duration on the root element. Neither
+//     token is read by any rule in style.css. Nothing happened.
+//   * It toggled a `keyboard-focus` class on the body. No selector uses it.
+//
+// What was actually missing is the part that decides whether a modal is usable
+// without a mouse: the dialog role, a focus that moves into the dialog and
+// comes back afterwards, Tab that stays inside it, and Escape.
+//
+// Modals in this app are opened and closed by setting `.hidden` directly from
+// about twenty places, plus six more built at runtime. Rewriting every one of
+// those is exactly the repeated-structure edit that has broken this file
+// before, so this watches the attribute instead — one hook that covers every
+// call site, including the ones that do not exist yet.
 const AccessibilityEnhancements = (() => {
-  function init() {
-    // Ensure all buttons have proper ARIA labels
-    document.querySelectorAll('button:not([aria-label])').forEach(btn => {
-      const text = btn.textContent?.trim();
-      if (text) btn.setAttribute('aria-label', text);
-    });
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),' +
+                    'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const _open = [];               // innermost dialog last
+  let _seq = 0;
 
-    // Add focus styles
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Tab') {
-        document.body.classList.add('keyboard-focus');
+  const visible = el => el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0;
+  const focusables = el => [...el.querySelectorAll(FOCUSABLE)].filter(visible);
+
+  function opened(el) {
+    if (_open.some(s => s.el === el)) return;
+    if (!el.getAttribute('role')) el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    // Name the dialog from its own heading, so a screen reader announces what
+    // opened rather than just "dialog".
+    if (!el.getAttribute('aria-labelledby') && !el.getAttribute('aria-label')) {
+      const title = el.querySelector('.modal-title, h2, h3, .step-heading');
+      if (title) {
+        if (!title.id) title.id = 'a11y-dlg-' + (++_seq);
+        el.setAttribute('aria-labelledby', title.id);
       }
-    });
-
-    document.addEventListener('click', () => {
-      document.body.classList.remove('keyboard-focus');
-    });
-
-    // High contrast mode support
-    if (window.matchMedia('(prefers-contrast: more)').matches) {
-      document.documentElement.style.setProperty('--contrast', '1.2');
     }
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+    _open.push({ el, restore: document.activeElement });
+    document.body.classList.add('modal-open');
+    focusTop();
+  }
 
-    // Reduced motion support
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      document.documentElement.style.setProperty('--animation-duration', '0.01s');
+  function closed(el) {
+    const i = _open.findIndex(s => s.el === el);
+    if (i < 0) return;
+    const { restore } = _open[i];
+    _open.splice(i, 1);
+    el.removeAttribute('aria-modal');
+    if (!_open.length) document.body.classList.remove('modal-open');
+    // Closing the top one hands focus to whatever is still open underneath;
+    // only when nothing is left does it go back where it came from. Without
+    // that it lands on <body> and the next Tab starts again from the top of
+    // the page, which is how a keyboard user loses their place.
+    if (_open.length) { focusTop(); return; }
+    try { if (restore && document.contains(restore)) restore.focus({ preventScroll: true }); } catch (_) {}
+  }
+
+  // Which dialog is actually on top. Open order is not the answer: the consent
+  // gate and the sign-in modal are both open at first load, the gate sits above
+  // at z-index 400 against 200, and the gate is the one the golfer has to deal
+  // with — but it is earlier in the document, so it opened first and an
+  // open-order stack handed focus to the modal underneath it. Stacking is a
+  // painting question, so ask the paint: highest z-index wins, and among equals
+  // the most recently opened.
+  const zOf = el => {
+    const z = parseInt(getComputedStyle(el).zIndex, 10);
+    return Number.isFinite(z) ? z : 0;
+  };
+  const top = () => {
+    if (!_open.length) return null;
+    let best = _open[0];
+    for (const s of _open) if (zOf(s.el) >= zOf(best.el)) best = s;
+    return best.el;
+  };
+
+  // Focus belongs to whatever is on top right now, which may not be the dialog
+  // that just opened.
+  function focusTop() {
+    const el = top();
+    if (!el || el.contains(document.activeElement)) return;
+    const f = focusables(el);
+    try { (f[0] || el).focus({ preventScroll: true }); } catch (_) {}
+  }
+
+  function onKey(e) {
+    const el = top();
+    if (!el) return;
+    if (e.key === 'Escape') {
+      // The consent gate and the sign-in gate are deliberately not dismissible;
+      // letting Escape past them would drop someone into the app behind a
+      // decision they never made.
+      if (el.hasAttribute('data-no-escape')) return;
+      e.preventDefault();
+      el.hidden = true;
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const f = focusables(el);
+    if (!f.length) { e.preventDefault(); el.focus(); return; }
+    const first = f[0], last = f[f.length - 1];
+    // Tab out of the dialog wraps back into it, rather than walking the page
+    // behind an overlay the user cannot see past.
+    if (e.shiftKey && (document.activeElement === first || !el.contains(document.activeElement))) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !el.contains(document.activeElement))) {
+      e.preventDefault(); first.focus();
     }
   }
 
-  return { init };
+  function watch(el) {
+    if (el.__a11yWatched) return;
+    el.__a11yWatched = true;
+    new MutationObserver(() => (el.hidden ? closed(el) : opened(el)))
+      .observe(el, { attributes: true, attributeFilter: ['hidden'] });
+    if (!el.hidden) opened(el);
+  }
+
+  function init() {
+    document.querySelectorAll('.modal-overlay').forEach(watch);
+    // Modals injected at runtime — the analytics, benchmark, club, efficiency,
+    // learning and shortcut dialogs are all built with innerHTML on demand.
+    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      if (n.classList?.contains('modal-overlay')) watch(n);
+      n.querySelectorAll?.('.modal-overlay').forEach(watch);
+    }))).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('keydown', onKey, true);
+  }
+
+  return { init, openCount: () => _open.length, top };
 })();
 
