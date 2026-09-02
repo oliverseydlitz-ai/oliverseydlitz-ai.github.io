@@ -8,6 +8,25 @@ The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
 layer underneath rather than adding features on top of it.
 
+## Where it stands right now
+
+- **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
+  jsdom) then 8 suites, 143 assertions.
+- **Every ± the app shows is the golfer's own shots.** No population constant
+  reaches a displayed number; the published rates live in
+  Settings → Measurement reference.
+- **Every prescription is gated** by metric trust tier, sample floor, and
+  recurrence rate — see `Metrics.TIER` and `FaultEngine`'s reporting gates.
+- **Spin never drives a drill**, on any ball. With an RPT ball it describes a
+  session; without one it is suppressed entirely.
+- **Face angle and face-to-path are derived**, never presented as measurements,
+  and a suspected off-centre strike invalidates them for that shot.
+- **Feedback defaults to tap-to-reveal**, and the retention probe — not
+  within-session change — is what says whether anything worked.
+
+If you change any sourced constant, read the section that cites it first. They
+are not guesses and the reasoning is why they hold.
+
 ---
 
 ## 1. Three user-facing defects `2503479`
@@ -335,3 +354,37 @@ one layer don't enforce themselves in another.
 missing, a renamed constant, a removed field — and treated each as a one-off
 patch rather than a signal the harness was structurally wrong. It was, and
 fixing it properly should have happened three failures earlier.
+
+---
+
+## Commit index
+
+Every commit in the session, and the section that explains it.
+
+| Commit | § | Subject |
+|---|---|---|
+| `2503479` | 1 | Fix dead Share/Export buttons, inflated form scores, and undefined --radius-md |
+| `5439a59` | 2 | Correct the swing-mechanics layer and rebuild practice plans on the evidence |
+| `0892767` | 2 | docs: mark audit findings as shipped in main @ 5439a59 |
+| `332d15b` | 3 | Rebuild the measurement layer against Research Base v2 |
+| `e982a45` | 4 | Add a launch-monitor setup and alignment guide |
+| `f425e9e` | 5 | Stop presenting single-shot face-to-path as a fact |
+| `0670ee7` | 5 | Gate spin on the RPT ball instead of suppressing it everywhere |
+| `08d82c1` | 5 | Derive intervals from the golfer's own shots, and let confirmed alignment unlock start-line drills |
+| `45fd574` | 5 | Treat device error as zero and quote uncertainty from the golfer's own shots |
+| `fbaa3c6` | 5 | Make every shown interval the golfer's own, and move error rates to Settings |
+| `f739341` | 5 | Remove the last population constant from an interval |
+| `64d44a9` | 5 | Expose estimated face angle, and detect the gear-effect case that invalidates it |
+| `b30bc93` | 5 | Fix load-time crash from a misplaced export, and anchor R to the measured clubs |
+| `642fa46` | 7 | Add a test runner that loads app.js as a whole file, and commit the suites |
+| `d588e94` | 7 | Untrack node_modules |
+| `85036fa` | — | docs: add a work log for 31 Aug – 2 Sep |
+| `1d95df3` | 6 | Add the retention probe, and fix three faults that fired on missing data |
+| `8a787f8` | 6 | Remove 17 unreachable modules |
+| `1b63575` | — | docs: correct work-log header stats after the cleanup |
+
+Sections 1–7 above are in narrative order, which is roughly chronological. The
+run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty
+model and is written up as a single arc in §5 rather than commit by commit —
+several of those commits correct the one before it, and reading them
+individually is more confusing than reading the conclusion.
