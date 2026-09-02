@@ -62,7 +62,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   // throws at load the shim never runs and __app stays undefined, which is
   // exactly the signal we want.
   const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser',
-    'FeedbackEngine','Conditions','Spin','Dispersion','Strike','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
+    'FeedbackEngine','Conditions','Spin','Dispersion','Strike','QuietEye','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
     'ImportFlow','Goals','SessionSharing','RetentionProbe','consistencyScore','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
     'curveYards','gearEffectSuspected','gearResidual','gearThreshold','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',

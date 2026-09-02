@@ -2097,6 +2097,244 @@ const Strike = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// QuietEye — the best-evidenced intervention in golf, and the only
+// part of this app that runs without the launch monitor
+// ────────────────────────────────────────────────────────────────
+// Every other module here is downstream of a radar unit. This one is not, and
+// that is the point: the MLM2PRO does not measure putting at all, while the
+// intervention with the largest surviving effect in the entire research base
+// is a putting one.
+//
+//   Vine, Moore & Wilson (2011), 22 elite golfers, mean handicap 2.78. Ten
+//   competitive rounds of baseline, ONE 20-putt training session with gaze
+//   video feedback, ten more competitive rounds:
+//
+//     putts per round      27.61 trained vs 29.89 control   (-1.92, p<.05)
+//     6-10 ft holed        +5%           vs no change
+//     under pressure       60% holed     vs 36%             (p<.005)
+//     pressure error       4.45 cm       vs 10.28 cm        (p<.005)
+//
+//   Lebeau et al. (2016), meta-analysis of 36 studies: d = 0.84, falling to
+//   0.69 after trim-and-fill for publication bias. Lab versus field was not a
+//   significant moderator. Replicated by He et al. (2024).
+//
+// d ~= 0.69 after bias correction is the largest effect in this document by
+// some distance — external focus of attention, which the whole coaching layer
+// is built around, sits at 0.15.
+//
+// THE HARD LIMIT, AND WHY THE MODULE IS SHAPED THIS WAY. Quiet eye is a
+// property of the golfer's GAZE: how long the eyes fixate the back of the ball
+// before the stroke starts, and whether they hold after impact. A phone can
+// record that; this app cannot see it. So the app must never say a quiet eye
+// got longer, shorter or better. What it can do is state the protocol exactly
+// as it was run, and track the OUTCOME the study actually moved — which is
+// putts holed, not gaze.
+//
+// That split is enforced in the code: there is no field anywhere in here for a
+// gaze duration, because a number the app cannot measure is a number it would
+// eventually be tempted to display.
+const QuietEye = (() => {
+  const KEY = 'slPutts';
+
+  // The protocol as published. The timings are the intervention — a routine
+  // without them is just a routine.
+  const PROTOCOL = [
+    { n: 1, title: 'Fix the routine first',
+      detail: 'Same number of looks at the hole, same number of practice strokes, every putt. The gaze ' +
+              'timings below are measured from a stable routine; without one there is nothing to time.' },
+    { n: 2, title: 'Fixate the back of the ball for 2–3 seconds',
+      detail: 'Before the stroke starts, not during it. This is the quiet-eye period itself, and its ' +
+              'duration predicted 43% of the variance in putting performance in the original study.' },
+    { n: 3, title: 'Hold the gaze 200–300 ms after impact',
+      detail: 'Roughly a quarter of a second on the spot where the ball was. Looking up early is what ' +
+              'collapses under pressure — untrained golfers dropped from 2,794 ms of quiet eye to 1,405 ms.' },
+    { n: 4, title: 'Twenty putts is the whole intervention',
+      detail: 'A single 20-putt session with video feedback produced the result. This is not a programme ' +
+              'that needs months; it needs a phone on a tripod and one honest session.' },
+  ];
+
+  // What may and may not be claimed. Kept as data so the UI cannot render the
+  // effect without the qualifications attached to it.
+  const EVIDENCE = {
+    effect: 'd ≈ 0.69 after correction for publication bias, across 36 studies — the largest effect of any ' +
+            'intervention in this app\'s research base. For comparison, the external-focus cueing that the ' +
+            'rest of the coaching here is built on sits at about 0.15.',
+    caveats: [
+      'The −1.92 putts per round came from 22 golfers with a mean handicap of 2.78. It is a real, ' +
+      'competition-measured result, and it is not a promise to a mid-handicapper — an elite putter and a ' +
+      'weekend one have different amounts of room to gain.',
+      'This app cannot see your eyes. It records what you hole; it has no idea how long you fixated, and ' +
+      'it will never tell you your quiet eye improved. Record yourself if you want to check the gaze part — ' +
+      'video feedback was the training vehicle in the study, not an optional extra.',
+      'Nothing here comes from the launch monitor. The MLM2PRO does not measure putting, so every number ' +
+      'in this section is one you entered.',
+    ],
+  };
+
+  // Distance bands. 6-10 ft is called out because that is the band where the
+  // trained group gained, and pooling it with tap-ins would bury the signal.
+  const BANDS = [
+    { id: 'short', label: 'Inside 6 ft', lo: 0,  hi: 6 },
+    { id: 'mid',   label: '6–10 ft',     lo: 6,  hi: 10, focus: true },
+    { id: 'long',  label: '10–20 ft',    lo: 10, hi: 20 },
+    { id: 'lag',   label: '20 ft +',     lo: 20, hi: Infinity, lag: true },
+  ];
+  const band = ft => BANDS.find(b => ft >= b.lo && ft < b.hi) || BANDS[BANDS.length - 1];
+
+  // Wilson score interval. The normal approximation is wrong at these sample
+  // sizes — it can hand back a lower bound below zero on a 20-putt session,
+  // which is not a probability. Wilson stays inside 0..1 and behaves at the
+  // extremes, including the 20-for-20 case where the naive interval has zero
+  // width and claims certainty.
+  function wilson(holed, n, z = 1.96) {
+    if (!n) return null;
+    const p = holed / n, z2 = z * z;
+    const d = 1 + z2 / n;
+    const centre = (p + z2 / (2 * n)) / d;
+    const half = (z * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))) / d;
+    return { p, lo: Math.max(0, centre - half), hi: Math.min(1, centre + half), n };
+  }
+
+  // HOW MANY PUTTS BEFORE A CHANGE IS VISIBLE. This is the number that keeps
+  // the rest of the module honest, and it is deliberately shown BEFORE a
+  // golfer logs anything rather than as a footnote afterwards.
+  //
+  // The study's headline is +5% holed from 6-10 ft. Detecting a five-point
+  // move in a proportion around 0.3 needs a few hundred putts per side at
+  // conventional power — so a 20-putt session cannot show it, and any app that
+  // graphs 20 putts against 20 putts and calls the difference progress is
+  // graphing noise. Two-proportion normal approximation, alpha .05, power .80.
+  function puttsToDetect(baseRate, delta = 0.05) {
+    const p1 = Math.min(0.999, Math.max(0.001, baseRate));
+    const p2 = Math.min(0.999, Math.max(0.001, p1 + delta));
+    const pbar = (p1 + p2) / 2;
+    const za = 1.959964, zb = 0.8416212;
+    const n = Math.pow(za * Math.sqrt(2 * pbar * (1 - pbar)) + zb * Math.sqrt(p1 * (1 - p1) + p2 * (1 - p2)), 2)
+              / Math.pow(p2 - p1, 2);
+    return Math.ceil(n);
+  }
+
+  // The same question turned round, and the more useful direction. "You need
+  // 1,400 putts a side to see the study's five points" is true and it is where
+  // a lot of self-tracking quietly dies — nobody hits 1,400 six-footers. So
+  // also answer: given the putts you HAVE, what size of change could you see?
+  //
+  // That is always answerable, it shrinks usefully as the log grows, and it
+  // turns a dead end into a bound. Two hundred putts a side cannot confirm a
+  // five-point gain, but it can rule out a fifteen-point one, and knowing which
+  // claims your own data can and cannot support is the whole point.
+  function detectableDelta(nPerSide, baseRate) {
+    if (!nPerSide || nPerSide < 5) return null;
+    let lo = 0.001, hi = 0.9;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (puttsToDetect(baseRate, mid) <= nPerSide) hi = mid; else lo = mid;
+    }
+    return hi;
+  }
+
+  // ── Stored sessions ───────────────────────────────────────────
+  // A putt is { ft, holed, inches? } — distance, whether it went in, and how
+  // far away it finished if it did not. There is no gaze field. On purpose.
+  function all() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(-200))); } catch (_) {}
+  }
+  function record(session) {
+    const putts = (session?.putts || []).filter(p => Number.isFinite(p.ft) && p.ft >= 0);
+    if (!putts.length) return null;
+    const row = {
+      id: (crypto.randomUUID ? crypto.randomUUID() : 'qe-' + Date.now()),
+      date: session.date || new Date().toISOString(),
+      protocol: session.protocol === true,     // did they run the QE protocol this session?
+      putts,
+    };
+    const list = all(); list.push(row); save(list);
+    return row;
+  }
+  function clear() { save([]); }
+
+  // ── Scoring one session ───────────────────────────────────────
+  function score(putts) {
+    const list = (putts || []).filter(p => Number.isFinite(p.ft));
+    if (!list.length) return null;
+    const byBand = BANDS.map(b => {
+      const inBand = list.filter(p => band(p.ft).id === b.id);
+      if (!inBand.length) return null;
+      const holed = inBand.filter(p => p.holed).length;
+      const left = inBand.filter(p => !p.holed && Number.isFinite(p.inches)).map(p => p.inches);
+      return {
+        band: b.id, label: b.label, focus: !!b.focus, lag: !!b.lag,
+        n: inBand.length, holed, rate: wilson(holed, inBand.length),
+        // From long range the study's own measure is proximity, not holed —
+        // scoring a 40-footer on whether it dropped is scoring luck.
+        proximity: left.length ? mean(left) : null,
+      };
+    }).filter(Boolean);
+    const holed = list.filter(p => p.holed).length;
+    return { n: list.length, holed, rate: wilson(holed, list.length), bands: byBand };
+  }
+
+  // ── Across sessions ───────────────────────────────────────────
+  // Compares only the 6-10 ft band, because that is the band the study moved
+  // and pooling it with tap-ins would drown a five-point change in a hundred
+  // gimmes. Reports whether the data can even resolve the change before it
+  // reports the change.
+  function trend(sessions = all()) {
+    const points = sessions.map(s => {
+      const inBand = (s.putts || []).filter(p => band(p.ft).id === 'mid');
+      if (!inBand.length) return null;
+      return { date: s.date, protocol: !!s.protocol, n: inBand.length,
+               holed: inBand.filter(p => p.holed).length };
+    }).filter(Boolean).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const totalN = points.reduce((a, p) => a + p.n, 0);
+    // One session is enough to report from. It is not enough to call a trend,
+    // and the note below never does — but answering "nothing to compare" to
+    // someone who has just logged twenty putts hides the one number they came
+    // for, which is what their own hole rate looks like with an interval on it.
+    if (!points.length) {
+      return { ok: false, points, totalN,
+               note: `No 6–10 ft putts logged yet. That band is where the study found its gain; inside 6 ft ` +
+                     `almost everything drops whatever you do, so it cannot show a change.` };
+    }
+    const holed = points.reduce((a, p) => a + p.holed, 0);
+    const overall = wilson(holed, totalN);
+    const need = puttsToDetect(overall.p, 0.05);
+    const withP = points.filter(p => p.protocol), without = points.filter(p => !p.protocol);
+    const sum = arr => arr.reduce((a, p) => ({ n: a.n + p.n, holed: a.holed + p.holed }), { n: 0, holed: 0 });
+    const a = sum(withP), b = sum(without);
+    const perSide = Math.min(a.n, b.n) || totalN;
+    const mde = detectableDelta(perSide, overall.p);
+    const comparable = !!(a.n >= need && b.n >= need);
+    return {
+      ok: true, points, totalN, overall, need, comparable,
+      protocolled: a.n ? { ...wilson(a.holed, a.n) } : null,
+      plain: b.n ? { ...wilson(b.holed, b.n) } : null,
+      mde,
+      note: (a.n && b.n)
+        ? (comparable
+            ? `With the protocol you have holed ${fmt(a.holed / a.n * 100, 0)}% from 6–10 ft against ` +
+              `${fmt(b.holed / b.n * 100, 0)}% without it, on enough putts either side to separate a ` +
+              `five-point difference.`
+            : `${a.n} putts with the protocol against ${b.n} without. At your hole rate that is enough to ` +
+              `see a change of about ${fmt(mde * 100, 0)} points or bigger — the study's gain was 5, so your ` +
+              `own log cannot confirm it either way yet. What it CAN do is rule out anything larger than ` +
+              `${fmt(mde * 100, 0)} points, which is worth more than a percentage that moves every session.`)
+        : `${totalN} putt${totalN === 1 ? '' : 's'} logged from 6–10 ft, holing ` +
+          `${fmt(overall.p * 100, 0)}% (${fmt(overall.lo * 100, 0)}–${fmt(overall.hi * 100, 0)}%). ` +
+          `That is a baseline, not a score: a log this size can only show a change of about ` +
+          `${fmt(mde * 100, 0)} points or more.`,
+    };
+  }
+
+  return { KEY, PROTOCOL, EVIDENCE, BANDS, band, wilson, puttsToDetect, detectableDelta,
+           all, record, clear, score, trend };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -4059,6 +4297,9 @@ function applyPaywall(el, cta) {
 // UI
 // ────────────────────────────────────────────────────────────────
 const UI = (() => {
+  // Putts being logged right now, before the session is saved. Held here so a
+  // re-render does not throw away what has been tapped in so far.
+  let _qeBuffer = [];
   let _session = null;
   let _clubFilter = 'all';
   const _charts = {};
@@ -5668,6 +5909,10 @@ const UI = (() => {
   function renderPractice(sessions) {
     const empty = document.getElementById('practice-empty');
     const content = document.getElementById('practice-content');
+    // Quiet eye runs on no launch-monitor data at all, so it renders whether or
+    // not a session has ever been imported — turning the empty state from a
+    // dead end into the one thing a new user can actually do today.
+    try { renderQuietEye(); } catch (e) { console.error('quiet eye', e); }
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
@@ -5686,7 +5931,89 @@ const UI = (() => {
     ).join('');
   }
 
-  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice };
+  // ── Quiet eye ─────────────────────────────────────────────────
+  function renderQuietEye() {
+    const el = document.getElementById('quietEyeHost');
+    if (!el) return;
+    const esc = t => Sanitize.escape(t);
+    const t = QuietEye.trend();
+    const sessions = QuietEye.all();
+
+    const summary = t.ok
+      ? `<div class="tail-stats">
+           <div class="disp-stat"><div class="disp-stat-val">${fmt(t.overall.p * 100, 0)}%</div>
+             <div class="disp-stat-label">Holed 6–10 ft</div></div>
+           <div class="disp-stat"><div class="disp-stat-val">${t.totalN}</div>
+             <div class="disp-stat-label">Putts logged</div></div>
+           <div class="disp-stat"><div class="disp-stat-val">±${fmt(t.mde * 100, 0)}</div>
+             <div class="disp-stat-label">Smallest change visible</div></div>
+         </div>
+         <div class="tail-item">${esc(t.note)}</div>`
+      : `<div class="tail-note">${esc(t.note)}</div>`;
+
+    el.innerHTML = `
+      <div class="tail-block">
+        <div class="tail-head">The protocol <span class="tail-n">one 20-putt session</span></div>
+        ${QuietEye.PROTOCOL.map(p => `<div class="tail-item"><strong>${esc(p.title)}.</strong>
+            ${esc(p.detail)}</div>`).join('')}
+        <div class="tail-value">
+          <div class="tail-value-num">d ≈ 0.69</div>
+          <div class="tail-value-sub">${esc(QuietEye.EVIDENCE.effect)}</div>
+        </div>
+        ${QuietEye.EVIDENCE.caveats.map(c => `<div class="tail-note">${esc(c)}</div>`).join('')}
+      </div>
+
+      <div class="tail-block">
+        <div class="tail-head">Log a putt <span class="tail-n">${sessions.length} session${sessions.length === 1 ? '' : 's'}</span></div>
+        <div class="qe-form">
+          <label class="qe-field"><span>Distance (ft)</span>
+            <input type="number" id="qeFt" min="1" max="90" step="1" value="8"></label>
+          <label class="qe-field"><span>Finished (in) — if missed</span>
+            <input type="number" id="qeIn" min="0" max="240" step="1" placeholder="—"></label>
+          <label class="check-row" for="qeProtocol">
+            <input type="checkbox" id="qeProtocol" checked>
+            <span>I ran the quiet-eye protocol on these putts</span></label>
+          <div class="probe-btns">
+            <button class="probe-btn" id="qeHoled">Holed it</button>
+            <button class="probe-btn" id="qeMissed">Missed</button>
+            <button class="probe-btn ghost" id="qeSave">Save session (${_qeBuffer.length})</button>
+          </div>
+          <div class="tail-note" id="qeBufferNote"></div>
+        </div>
+      </div>
+
+      <div class="tail-block${t.ok ? '' : ' pending'}">
+        <div class="tail-head">What your own putts can show</div>
+        ${summary}
+      </div>`;
+
+    const ft = () => parseFloat(document.getElementById('qeFt').value);
+    const inches = () => { const v = parseFloat(document.getElementById('qeIn').value); return Number.isFinite(v) ? v : undefined; };
+    const push = holed => {
+      const d = ft();
+      if (!Number.isFinite(d) || d <= 0) { toast('Enter a distance first.'); return; }
+      _qeBuffer.push({ ft: d, holed, inches: holed ? undefined : inches() });
+      const note = document.getElementById('qeBufferNote');
+      const holedN = _qeBuffer.filter(p => p.holed).length;
+      if (note) note.textContent = `${_qeBuffer.length} putt${_qeBuffer.length === 1 ? '' : 's'} this session, ` +
+        `${holedN} holed. Twenty is the number the study used.`;
+      document.getElementById('qeSave').textContent = `Save session (${_qeBuffer.length})`;
+      document.getElementById('qeIn').value = '';
+    };
+    document.getElementById('qeHoled')?.addEventListener('click', () => push(true));
+    document.getElementById('qeMissed')?.addEventListener('click', () => push(false));
+    document.getElementById('qeSave')?.addEventListener('click', () => {
+      if (!_qeBuffer.length) { toast('Log a putt first.'); return; }
+      const n = _qeBuffer.length;
+      QuietEye.record({ putts: _qeBuffer.slice(), protocol: document.getElementById('qeProtocol').checked });
+      _qeBuffer = [];
+      toast(`Saved ${n} putt${n === 1 ? '' : 's'}.`);
+      renderQuietEye();
+    });
+  }
+
+  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
+           renderQuietEye };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5978,6 +6305,11 @@ async function init() {
       if (v==='progress') { await Router.showProgress(); return; }
       if (v==='yardages') { await Router.showYardages(); return; }
       if (v==='sessions') { await Router.showSessions(); return; }
+      // Practice used to fall through to Router.show(), which only toggles
+      // visibility — so the tab showed whatever had last been painted into it,
+      // which was nothing. Router.showPractice existed, was exported, and was
+      // called from nowhere.
+      if (v==='practice') { await Router.showPractice(); return; }
       Router.show(v);
     } catch (err) {
       // Never let a view-render error leave the tab feeling "dead"
@@ -6032,6 +6364,7 @@ async function init() {
         if (v==='progress') { await Router.showProgress(); return; }
         if (v==='yardages') { await Router.showYardages(); return; }
         if (v==='sessions' || v==='drill') { await Router.showSessions(); return; }
+        if (v==='practice') { await Router.showPractice(); return; }
         Router.show(v);
       } catch (err) {
         console.error('Route action error:', err);

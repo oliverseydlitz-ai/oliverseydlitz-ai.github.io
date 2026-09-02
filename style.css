@@ -827,6 +827,12 @@ body.modal-open { overflow: hidden; }
 .import-error{margin:.75rem 0 .25rem;padding:.7rem .85rem;font-size:.83rem;line-height:1.55;
   color:var(--text);background:var(--surface2);border-left:3px solid var(--red);
   border-radius:var(--radius-sm);text-wrap:pretty}
+.qe-form{display:flex;flex-direction:column;gap:.6rem}
+.qe-field{display:flex;flex-direction:column;gap:.25rem;font-size:.78rem;color:var(--text-dim)}
+.qe-field input{padding:.55rem .7rem;font-size:.95rem;font-variant-numeric:tabular-nums;
+  background:var(--surface);color:var(--text);border:1.5px solid var(--border);
+  border-radius:var(--radius-sm)}
+.qe-field input:focus{border-color:var(--pine);outline:none}
 .probe-ask{margin-bottom:.6rem}
 .probe-btns{display:flex;gap:.45rem;flex-wrap:wrap;margin:.5rem 0 0 1rem}
 .probe-btn{padding:.4rem .8rem;font-size:.8rem;font-weight:600;cursor:pointer;
