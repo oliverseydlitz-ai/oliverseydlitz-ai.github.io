@@ -336,6 +336,25 @@ only module that touches no launch-monitor data.
 - `puttsToDetect()` says the study's +5% needs ~1,400 putts a side;
   `detectableDelta()` inverts it into what your log *can* resolve. Keep both.
 
+### Short game (`ShortGame`) — see `docs/short-game-evidence.md`
+
+20 drills, 10 putting and 10 chipping, built on a 2024 systematic review of
+**52 RCTs** that named three methods superior within their strategy: errorless
+learning, contextual interference (random order), and external focus.
+
+- **Every drill carries a `tier`.** `strong` needs a citable trial; `weak` says
+  outright that no trial supports the format. Do not level these up.
+- **The reviewers' own limitation travels with the finding**: over half those
+  52 trials were underpowered and most used novices on simple putting tasks.
+- **The session builder puts errorless BEFORE random.** That order is the
+  finding — random order before anything is repeatable is just missing in a
+  varied sequence.
+- **Chipping is scored on proximity, median AND mean.** Strokes gained around
+  the green is a function of lie and proximity, not of holing out. The gap
+  between median and mean *is* the chunk rate in feet.
+- **It says putting is the cheapest fix, not the biggest hole** — a 90-shooter
+  loses ~6 strokes to approach + short game and only ~2 to putting.
+
 ### Drill library (`DrillLibrary`)
 
 All 104 drills from §8, each carrying its section's gate. `admissible(drill,

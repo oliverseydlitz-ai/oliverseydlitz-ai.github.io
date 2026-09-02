@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 15 suites, 517 assertions. Must be green.
+npm test             # load gate + 16 suites, 578 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v77` — increment it.
+   Currently `shotlab-v79` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -60,7 +60,7 @@ mechanism when a number changes. Match that.
 
 | Path | What it is |
 |---|---|
-| `app.js` | Everything. ~9,130 lines, 54 IIFE modules + ~24 top-level functions |
+| `app.js` | Everything. ~9,620 lines, 55 IIFE modules + ~24 top-level functions |
 | `index.html` | 7 views, 7 static modals, CSP meta, CDN script tags |
 | `style.css` | Design tokens + components. Two stacked `:root` blocks from successive redesigns |
 | `sw.js` | Service worker. Network-first same-origin, cache-first CDN |
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 54 modules, ~9,130 lines in `app.js`, 517 assertions.
+`main` is green. 55 modules, ~9,620 lines in `app.js`, 578 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -279,6 +279,22 @@ That heuristic found: `Store.saveSession` (imports bypassed device storage),
 `Benchmarks.TARGET` (targets hardcoded in a second copy). Several remain
 unchecked — `Spin.summary`, `SessionSharing.exportAsCSV`, `ClubAnalyzer.analyzeClub`,
 `CoachingMode.generateSession`, `Features.recommendDrill`, `ContentLibrary.getByLevel`.
+
+### The two off-device modules
+
+`QuietEye` and `ShortGame` touch **no launch-monitor data at all**, so they
+render on a brand-new account with nothing imported. That makes them the only
+part of the app a first-time user can actually use on day one — worth
+remembering when weighing where to add next.
+
+Their evidence is a different literature from the rest of the app and it is
+written up in `docs/short-game-evidence.md`. The short version: a 2024
+systematic review of 52 RCTs named errorless learning, contextual interference
+and external focus superior within their strategies — **and stated that over
+half those trials were underpowered and most used novices on simple putting
+tasks.** That limitation travels with the finding everywhere it is shown.
+Drill tiers (`strong` / `moderate` / `weak`) encode it per drill. Do not level
+them up without a citation.
 
 **Also worth knowing:** `FaultEngine`'s drill cues still use internal focus
 ("hold your wrist angle"), which `CoachingMode.TIPS` deliberately avoids. The
@@ -349,5 +365,6 @@ the bug.
 | `docs/research-base-v2.md` | The engineering spec. Measurement tiers, transfer functions, §9 claim ban, §10 build order |
 | `docs/coaching-calibration-audit.html` | Why the benchmarks are what they are |
 | `docs/launch-direction-vs-face-angle.md` | The D-plane model behind `facePath()` and `faceAngle()` |
+| `docs/short-game-evidence.md` | The trials behind `ShortGame` and `QuietEye`, with designs and limitations. **Read before changing a drill's evidence tier** |
 | `docs/worklog-2026-09.md` | What changed and why, with a commit index |
 | `CLAUDE.md` | Workflow policy, constants, module map |

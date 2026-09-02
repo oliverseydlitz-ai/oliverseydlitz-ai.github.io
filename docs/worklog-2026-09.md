@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `d7c932e`; `app.js` 5,964 → 9,130 lines
-(+3,830 of new measurement and coaching logic, −660 of dead modules).
+next, including future me. Commits run `2503479` → `676236a`; `app.js` 5,964 → 9,618 lines
+(+4,320 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 15 suites, 517 assertions.
+  jsdom) then 16 suites, 578 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -598,6 +598,84 @@ against the shipped strings rather than by example.
 
 ---
 
+## 11. The short game `50bb1fd` `676236a`
+
+Two things here: an export that was corrupting its own file, and a short-game
+module built from a fresh literature search.
+
+### 11.1 The export corrupted every row it wrote `50bb1fd`
+
+Settings offered "Export all data (JSON/CSV)" and asked which with
+`confirm('JSON (OK) or CSV (Cancel)?')` — a native dialog using OK and Cancel to
+mean two different formats, which nobody reads right first time and which some
+browsers suppress entirely.
+
+Behind it were **two** CSV writers with different column orders, one inline and
+one in `SessionSharing` that nothing called, and **neither escaped anything**.
+Session notes are free text: a comma shifted every later column by one, and a
+double quote broke the row. The test note — `Windy, gusty — coach said "keep it
+low"` — corrupted the whole file. An export is the one artefact that leaves the
+app, where none of its caveats travel with it.
+
+One writer now, RFC 4180 quoting, spin gated on `Spin.measured()` so a figure
+the device never read does not leave the app, and the conditions exported as
+columns so the file can be checked against how it was recorded.
+
+### 11.2 `ShortGame` — 20 drills off a 2024 review `676236a`
+
+Full write-up in **`docs/short-game-evidence.md`**, which is the file to read
+before touching any of it.
+
+The spine is a February 2024 systematic review in *Frontiers in Sports and
+Active Living* that screened the RCTs on golf motor learning and included 52.
+Three methods came out superior within their strategy — **errorless learning**,
+**contextual interference**, and **external focus of attention** — and, usefully,
+**no single method** came out ahead for cognitive training or augmented
+feedback, which is where most commercial golf content lives.
+
+The two with real trials are cited rather than asserted:
+
+- **Maxwell, Masters, Kerr & Weedon (2001).** Putters who learned with few
+  errors were unaffected by a loaded secondary task; those who learned by
+  missing fell apart. Fewer misses means fewer explicit corrections to test,
+  and explicit skill is what breaks under pressure. The failure mode that
+  protects against is precisely the chunked chip.
+- **Fazeli et al. (2017)**, 30 golfers, six days: random practice putted worse
+  during acquisition and better at retention a week later. And a separate
+  **chipping** trial — three variations, 54 acquisition trials — found no
+  difference during practice and a significant random advantage at retention.
+
+**The limitation is carried everywhere the finding is.** The reviewers state
+that over half the 52 trials were underpowered and most used novices on simple
+putting tasks. So the direction is well supported and the magnitude, for a
+competent golfer on a real green, is not. Drills carry a tier: four say "trial
+evidence", five "supported", two say "no trial" and explain they are there
+because the failure is real, not because a study backs the format.
+
+Three design decisions worth keeping:
+
+**Errorless before random, in the session builder.** That order is the finding
+rather than a preference — random order before anything is repeatable is just
+missing in a varied sequence.
+
+**Chipping is scored on proximity, median and mean together.** Strokes gained
+around the green is a function of lie and proximity, not of holing out. The gap
+between median and mean *is* the chunk rate in feet: on the test set the median
+was 5.5 ft and the mean 9.3 ft, one bad contact in ten, and the app says the
+thing to work on is the bad one rather than the standard one.
+
+**It refuses to flatter the practice green.** About 65% of shots happen inside
+100 yards and amateurs lose most of their short-game strokes to three-putts
+outside 25 ft and chunked chips — but a 90-shooter loses ~6 strokes to approach
+and short game against ~2 to putting. Putting is the cheapest thing to fix, not
+the biggest hole, and the UI says so.
+
+Like `QuietEye`, none of it touches the launch monitor, so both render on a
+brand-new account. They are the only part of the app a first-time user can use
+on day one.
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -750,6 +828,9 @@ Every commit in the session, and the section that explains it.
 | `59aa340` | 10.2 | Fix device storage never receiving an imported session |
 | `67882ba` | 10.4/10.5 | Stop comparing sessions across conditions; read targets from one table |
 | `d7c932e` | 10.6 | Stop asserting body positions the launch monitor cannot see |
+| `7206172` | 10 | docs: record the enforcement pass |
+| `50bb1fd` | 11.1 | Fix an export that corrupted its own file, and split it into two buttons |
+| `676236a` | 11.2 | Add a short-game module: 20 putting and chipping drills, built on the trials |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty
