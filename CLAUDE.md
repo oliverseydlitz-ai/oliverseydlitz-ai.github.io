@@ -481,6 +481,49 @@ where strokes-gained says scoring differences live. Every block prescribes
 **balls as well as minutes** (volume past attention is exercise, not practice),
 and `transferBlock()` is appended to every plan.
 
+### The yardage book and gapping (`Analytics`, `renderGapping`)
+
+The screen a golfer stands over a shot with. It now obeys the same rules as
+everything else, and it did not before:
+
+- **One set of conditions.** `Analytics.conditionGroups()` groups sessions by
+  ball + surface; the book is built on the largest group by **shot** count and
+  names it. Never pool a range-ball session into a stock yardage.
+- **`Metrics.MIN_SHOTS_REPORT` per club.** Below it the club keeps its row and
+  prints what it needs — no number that could read as a yardage.
+- **`Metrics.interval`, never a bare mean.** Carry and total are labelled
+  **modelled**, because the monitor computes them from launch conditions.
+- **Spread is relative** (SD ÷ the club's own carry). Fixed yardage bands
+  judged a wedge and a driver on the same ±6.
+- **Gapping is gated on `Conditions.ball(session).gappingValid`.** Off range
+  balls the club ORDER survives and the gap SIZE does not, so the sizes are
+  withheld and the table says so. Clubs under the floor come off the chart
+  entirely — a bar chart is a visual comparison, and a caveat beside a
+  two-shot bar does not fix it.
+
+### `test/suites/rules-are-wired.js` — run the audit, don't just remember it
+
+The defect this codebase actually has is a rule that is written down, has
+working code, and is never reached — nine instances so far, every one of them
+green on the full suite. This suite asserts that each named gate and caveat is
+referenced from **outside** the module defining it, with the consequence
+spelled out per line.
+
+Two known false-positive modes, both found the hard way, both handled by
+naming the alias rather than weakening the check:
+
+1. A function called **unqualified inside its own module** (`Trajectory.arc`,
+   `UI.renderSessionList`).
+2. A constant **re-exported under a different key** — `Dispersion.CAVEATS`
+   ships as `caveats:`, `Rounds.FIR_NOTE` as `firNote:`.
+
+It carries a **negative control**: `ViewPrefs.setPref` is confirmed dead and
+left in place, so the suite asserts it still reads as unwired. If that ever
+passes as wired, every other pass in the file is worthless. Do not delete it.
+
+**Adding a gate? Add it to this suite.** A gate nothing calls is the same as
+no gate.
+
 ## Tests — run these before every push
 
 ```bash

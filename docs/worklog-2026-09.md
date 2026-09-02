@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 19 suites, 727 assertions.
+  jsdom) then 21 suites, 791 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -888,6 +888,98 @@ whoosh actually tells you.
 
 ---
 
+## 15. The screen a golfer actually uses `336dff3` `9ab5b15` `8e410d1`
+
+### 15.1 The yardage book obeyed none of its own rules `336dff3`
+
+The yardage book is the screen you stand over a shot with, and it was the one
+screen in the app enforcing nothing. Four separate rules, all stated elsewhere
+in the codebase and all skipped here:
+
+- **It pooled across conditions.** Every session flattened into one bag
+  regardless of ball. `Conditions.caveats` says a wedge can fly further on
+  half the spin off range balls; the book averaged those into the number a
+  golfer clubs off. Sessions are grouped by condition signature now and the
+  book is built on the largest group by shot count, with a line naming it and
+  saying how many sessions were excluded.
+- **No sample floor.** A club with two shots got the same bold carry as one
+  with forty. Ten now. Under it the club keeps its row — it is still in the
+  bag — and prints what it needs.
+- **Bare point estimates.** Carry is `Metrics.interval` now, which is what the
+  rest of the app shows.
+- **"Tight / Moderate / Wide" on fixed yardage bands**, so a wedge and a
+  driver were judged on the same ±6 — flattering the wedge and condemning the
+  driver for identical striking. It is spread as a percentage of the club's
+  own carry now, with the legend saying the colour bands are a reading
+  convenience rather than a measured standard.
+
+The "Drill Focus" block on the same screen was not drills. It fired at 5
+shots — half the app's floor — and offered "focus on setup", "Maintain
+rhythm" and "Target practice", then routed to the session list. It names the
+widest club by relative spread now and pulls a real gated drill from the
+library, or says what is locking that section.
+
+### 15.2 `gappingValid` existed for one job and never did it `9ab5b15`
+
+`Conditions.BALLS` has carried a `gappingValid` flag since the module was
+written. **Nothing read it.** The gapping table graded gap sizes off
+range-ball sessions with a red "⚠ Only 6 yds" a golfer would go and buy a
+club over. It withholds the sizes and keeps the order now, which is the
+honest half of what a range ball can tell you, and says which it is doing.
+Clubs under the floor come off the chart entirely — a bar chart's whole job
+is visual comparison, so a caveat next to a two-shot bar does not help.
+
+### 15.3 The audit is a test now `9ab5b15`
+
+The recurring defect in this codebase is not a wrong number. It is a rule
+that is written down, has correct working code, and is never run:
+`Store.saveSession`, `Router.showPractice`, four `FeedbackEngine` functions,
+`Conditions.comparable`, `Benchmarks.TARGET`, `Spin.summary`,
+`DrillLibrary.FAULT_SECTION`, and now `gappingValid`. **Every one passed
+`npm test`**, because a unit suite answers "does this work" and never "is
+this reached".
+
+`test/suites/rules-are-wired.js` asks the second question on every commit: 17
+gates and 6 caveats must be referenced from outside the module that defines
+them, with the consequence spelled out per line.
+
+**It flagged two false positives on its first run**, and they are worth
+recording because they define the check's limits. `Dispersion.CAVEATS` and
+`Rounds.FIR_NOTE` are both rendered — but as `caveats:` and `firNote:`, so
+the constant's own name appears nowhere outside its module. That is the
+second known false-positive mode, after functions called unqualified from
+inside their own module (`Trajectory.arc`, `UI.renderSessionList`). The suite
+names the alias rather than being weakened.
+
+**It carries a negative control**, because a string search is exactly the
+kind of check that quietly stops discriminating. `ViewPrefs.setPref` is
+confirmed dead and deliberately left in place, so the suite asserts it still
+reads as unwired. If that ever passes as "wired", every other pass in the
+file is worthless.
+
+### 15.4 Two more second copies `8e410d1`
+
+Running the sweep across all 57 modules — filtering the two false-positive
+modes plus a third the full run made obvious, an export that exists for the
+test suite — left 33 candidates, of which two were real.
+
+**`Metrics.MIN_SHOTS_DELIVERY = 15` was read by nothing.** CLAUDE.md names it
+as the floor before a club-path or attack-angle claim; the four tier-2 fault
+rules each hardcoded `minShots: 15`. Changing the constant, which is what the
+docs tell you to do, would have changed nothing.
+
+**The import form's ball and surface menus were a hand-maintained copy of
+`Conditions.BALLS` and `SURFACES`** — and had already drifted, saying "Not
+sure" where Conditions says "Not recorded". Filled from the module now.
+
+Third instance of this shape after `Benchmarks.TARGET` and the launch-window
+table. **A constant with a second copy is not a duplication problem, it is a
+correctness problem**: the copy is what ships, and the original is what the
+next person edits.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -984,6 +1076,19 @@ same as it executing. An export nothing calls is the cheapest tell.
 thorough suite and no caller. The tests all passed, the function was correct,
 and no user ever saw its output. Coverage answers "does this work", never "is
 this reached".
+
+**A rule nobody runs is the defect this codebase actually has.** Not a wrong
+number — a rule that is written down, has correct working code, and is never
+reached. It has now happened nine times, and every instance passed the full
+test suite, because a unit suite answers "does this work" and never "is this
+reached". That question is `test/suites/rules-are-wired.js` now, with a
+negative control so it cannot quietly stop discriminating.
+
+**A constant with a second copy is a correctness problem, not a tidiness
+one.** `Benchmarks.TARGET`, the launch-window table, `MIN_SHOTS_DELIVERY`,
+and the ball/surface menus: four instances. The copy is what ships and the
+original is what the next person edits, so the bug is invisible from both
+ends — the code looks right and the edit looks applied.
 
 **A wrong constant in documentation is worse than none.** CLAUDE.md's
 `MIN_CLUB_SHOTS = 4` does not exist and the real floor is ten. It read as
@@ -1087,6 +1192,10 @@ Every commit in the session, and the section that explains it.
 | `2547b02` | — | docs: record the two loop-closing passes, and three lessons from them |
 | `6147e8b` | 14 | Stop prescribing across the inference boundary the app draws two lines above |
 | `25bf347` | 14.1 | Hold the drill library and the coaching tips to the same boundary |
+| `deb6a82` | — | docs: write up the prescription boundary, and a lesson about blind checks |
+| `336dff3` | 15.1 | Make the yardage book obey the rules the rest of the app enforces |
+| `9ab5b15` | 15.2/15.3 | Gate club gapping, and turn the audit that keeps finding bugs into a test |
+| `8e410d1` | 15.4 | Remove two more second copies the new wiring check found |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

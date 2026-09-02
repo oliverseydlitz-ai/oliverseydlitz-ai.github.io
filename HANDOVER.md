@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 19 suites, 727 assertions. Must be green.
+npm test             # load gate + 21 suites, 791 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v86` — increment it.
+   Currently `shotlab-v89` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 56 modules, ~10,280 lines in `app.js`, 727 assertions.
+`main` is green. 56 modules, ~10,398 lines in `app.js`, 791 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -263,19 +263,31 @@ All three items the previous handover listed are done: the drill library is
 joined to `PracticePlan`, the feedback schedule is enforced on the shot table,
 and `Strike.trend()` renders in Progress.
 
-**The single most productive thing to do next is the audit that found most of
-this session's real bugs**, because it keeps paying:
+**That audit is now a test.** `test/suites/rules-are-wired.js` runs it on every
+commit for the gates and caveats that matter, with the consequence written on
+each line and a negative control (`ViewPrefs.setPref`) proving the check can
+still discriminate. **If you add a gate, add it there** — a gate nothing calls
+is the same as no gate.
+
+To sweep the whole file rather than the named list:
 
 ```bash
 # every module export nothing calls from outside it
 grep -o "Module\.[a-zA-Z]*" app.js | sort -u
 ```
 
-**Its one real limitation, learned the hard way:** functions called
-*unqualified from inside their own module* look dead to this grep and are not.
-`Trajectory.arc` and `UI.renderSessionList` both came up as uncalled; both are
-live. Two false positives in ten candidates. Check for a bare `name(` call
-inside the module before deleting anything.
+**Three false-positive modes, all learned the hard way.** A full sweep of 57
+modules returns ~70 candidates and about 33 survive the first two filters, of
+which two were real — so triage matters more than the grep:
+
+1. **Called unqualified inside its own module.** `Trajectory.arc` and
+   `UI.renderSessionList` both looked dead and both are live.
+2. **Re-exported under a different key.** `Dispersion.CAVEATS` ships as
+   `caveats:` and renders as `r.value.caveats`; `Rounds.FIR_NOTE` as
+   `firNote:`. The constant's own name appears nowhere outside its module.
+3. **Exported for the test suite.** Grep `test/` before calling anything dead.
+
+Check all three before deleting or "fixing" anything.
 
 **Confirmed genuinely dead and left in place** (no user-facing gap, so removal
 is the owner's call): `ClubAnalyzer.analyzeClub`, `CoachingMode.generateSession`,
