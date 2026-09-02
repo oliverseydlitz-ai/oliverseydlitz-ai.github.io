@@ -791,6 +791,7 @@ tr:hover td { background: var(--surface2); }
 .fb-check{color:var(--pine); font-weight:700}
 
 .sm-pm{color:var(--text-muted); font-size:.78em; font-variant-numeric:tabular-nums}
+.sm-warn{color:var(--yellow); font-size:.72rem; font-weight:600}
 .sm-note{color:var(--text-muted); font-size:.72rem; font-style:italic}
 
 .check-row{display:flex;align-items:flex-start;gap:.55rem;cursor:pointer;font-size:.85rem;line-height:1.4}

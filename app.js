@@ -192,7 +192,13 @@ function mean(values) {
 // PING 2020 (157 golfers, 1,575 shots, Vicon 720fps + Foresight, air-cannon
 // validated) reconciled with TrackMan gives driver 0.84, 7-iron 0.78, PW 0.71,
 // interpolated on SPIN LOFT rather than club number.
-const R_BY_SPINLOFT = sl => 0.89 - 0.0045 * sl;
+// Clamped to the measured anchors at both ends. Unclamped, the line
+// interpolates to ~0.74 at a pitching wedge, above both PING's measured 0.71
+// and the 0.60-0.70 band quoted for high-loft clubs. Extrapolating a straight
+// line past the data it was fitted to is how you get a confident wrong answer
+// at the edges, so it is held to [0.70, 0.85].
+const R_MIN = 0.70, R_MAX = 0.85;
+const R_BY_SPINLOFT = sl => Math.min(R_MAX, Math.max(R_MIN, 0.89 - 0.0045 * sl));
 const R_FALLBACK = { driver: 0.84, wood: 0.84, hybrid: 0.80, iron: 0.78, wedge: 0.71 };
 
 function faceRatio(shot) {
@@ -231,6 +237,45 @@ function facePath(shot) {
   const ld = shot.launchDirection, cp = shot.clubPath;
   if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
   return (ld - cp) / faceRatio(shot);
+}
+
+// ESTIMATED FACE ANGLE, relative to the target line.
+//   StartDir = R*Face + (1-R)*Path   =>   Face = (StartDir - (1-R)*Path) / R
+// The device does not measure face angle. This inverts the same D-plane
+// relation facePath() uses, so the two are consistent by construction:
+// faceAngle(s) - clubPath === facePath(s). Positive = open.
+function faceAngle(shot) {
+  const ld = shot.launchDirection, cp = shot.clubPath;
+  if (!Number.isFinite(ld) || !Number.isFinite(cp)) return null;
+  const R = faceRatio(shot);
+  return (ld - (1 - R) * cp) / R;
+}
+
+// GEAR EFFECT — the edge case that breaks the whole derivation.
+// The D-plane inversion assumes centre-face contact. On a toe strike the head
+// twists open, pushing launch direction right while gear effect adds draw
+// spin; a heel strike does the opposite. Both make the derived face angle
+// wrong, and Rapsodo reports no impact location, so it cannot be corrected.
+//
+// It CAN be detected, though, when spin axis is measured (RPT ball only):
+// compare the axis the face-to-path geometry predicts against the axis the
+// device actually saw. A large disagreement in the direction opposite to the
+// face-to-path is the gear-effect signature of an off-centre strike.
+function gearEffectSuspected(shot) {
+  if (!Spin.measured(shot) || !Number.isFinite(shot.spinAxis)) return null;
+  const predicted = spinAxisFrom(shot);
+  if (!Number.isFinite(predicted)) return null;
+  const residual = shot.spinAxis - predicted;
+  // Threshold from the golfer's own data would be better; 5 degrees is a
+  // deliberately loose screen so it flags gross mis-hits, not normal scatter.
+  if (Math.abs(residual) < 5) return null;
+  return {
+    residual,
+    likely: residual < 0 ? 'toe' : 'heel',
+    note: `Measured spin axis is ${fmt(Math.abs(residual),1)}° ${residual < 0 ? 'more draw' : 'more fade'} ` +
+          `than the face and path can account for — the signature of a ${residual < 0 ? 'toe' : 'heel'} strike. ` +
+          `Face angle derived from this shot will be off, because the head twisted at impact.`,
+  };
 }
 
 // Spin axis from face-to-path and spin loft. A driver punishes face-to-path
@@ -318,7 +363,9 @@ const Metrics = (() => {
   function shotSpread(shots, metric, clubType) {
     const vals = (shots || [])
       .filter(s => !clubType || s.clubType === clubType)
-      .map(s => (metric === 'facePath' ? facePath(s) : s[metric]));
+      .map(s => metric === 'facePath' ? facePath(s)
+              : metric === 'faceAngle' ? faceAngle(s)
+              : s[metric]);
     const { kept } = trimOutliers(vals);
     return kept.length >= 3 ? stdDev(kept) : null;
   }
@@ -4047,6 +4094,27 @@ const UI = (() => {
       f2pClub = `<span class="sm-note">${clubF2P.length}/${Metrics.MIN_SHOTS_REPORT} shots — not enough to read yet</span>`;
     }
 
+    // Estimated face angle, from the same D-plane inversion as face-to-path,
+    // so the two are consistent by construction. Derived, never measured.
+    const faRaw = faceAngle(shot);
+    const faSpread = Metrics.shotSpread(sessionShots, 'faceAngle', shot.clubType);
+    const faSingle = Number.isFinite(faRaw)
+      ? `${fmt(faRaw,1)}°` + (faSpread ? ` <span class="sm-pm">± ${fmt(faSpread,1)}</span>` : '')
+      : '—';
+    const clubFA = (sessionShots || [])
+      .filter(x => x.clubType === shot.clubType).map(faceAngle).filter(Number.isFinite);
+    let faClub = '<span class="sm-note">derived, not measured</span>';
+    if (clubFA.length >= Metrics.MIN_SHOTS_REPORT) {
+      const fiv = Metrics.interval(clubFA, '', 1);
+      faClub = `<span class="sm-cmp ${Math.abs(fiv.mean) < 2 ? 'up' : 'down'}">` +
+        `${clubLabel(shot.clubType)} avg ${fmt(fiv.mean,1)}° ± ${fmt(fiv.ci,1)} ` +
+        `<span class="sm-note">(${fiv.n} shots)</span></span>`;
+    }
+    // Gear effect makes the derivation invalid for this shot — say so loudly.
+    const gear = gearEffectSuspected(shot);
+    if (gear) faClub = `<span class="sm-warn">${Sanitize.escape(gear.likely)} strike suspected — ` +
+      `face angle unreliable on this shot</span>`;
+
     const rows = [
       ['Club', clubLabel(shot.clubType), ''],
       ['Ball Speed', `${fmt(shot.ballSpeed,1)} mph`, cmp('ballSpeed',1)],
@@ -4060,6 +4128,7 @@ const UI = (() => {
       ['Club Path', `${fmt(shot.clubPath,1)}°`, ''],
       ['Attack Angle', `${fmt(shot.attackAngle,1)}°`, ''],
       ['Face-to-Path', f2pSingle, f2pClub],
+      ['Face Angle', faSingle, faClub],
       ['Apex', `${fmt(shot.apex,0)} ft`, '<span class="sm-note">modelled</span>'],
       // Spin is a reading only with an RPT ball; otherwise it is not shown at all.
       (spinOK && shot.spinRate) ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, '<span class="sm-note">RPT measured</span>'] : null,
