@@ -107,5 +107,32 @@ for (const a of mAlerts) {
 }
 ok(PA.generateAlerts([]).length === 0, 'and no sessions is not a crash');
 
+console.log('— and the formula behind the letter grade —');
+// `100 - stdDev(carries)` survived in THREE more places after `consistencyScore`
+// was written to replace it, including 30% of the overall grade. Pooled across
+// a bag it reads the gapping between clubs as inconsistency.
+const { bagConsistency, stdDev } = M;
+const mk = (club, carry, n) => Array.from({ length: n }, () => ({ clubType: club, carryDistance: carry }));
+const perfect = [...mk('d', 250, 20), ...mk('pw', 110, 20)];
+const old = Math.round(100 - stdDev(perfect.map(s => s.carryDistance)));
+ok(old === 30, `the old formula scored PERFECTLY IDENTICAL shots at ${old}%`);
+const now = bagConsistency(perfect);
+ok(now.score === 100, 'per club, identical shots score 100 — which is what they are');
+ok(now.clubs === 2 && now.shots === 40, 'and it reports how many clubs and shots went into it');
+
+const scattered = [...Array(20)].map((_, i) => ({ clubType: 'd', carryDistance: 250 + (i % 5) * 20 - 40 }));
+ok(bagConsistency(scattered).score < 70, 'a genuinely wide club still scores badly');
+ok(bagConsistency(mk('d', 250, 6)) === null,
+   `under the floor there is no answer, not a flattering one (floor ${Metrics.MIN_SHOTS_REPORT})`);
+ok(bagConsistency([]) === null && bagConsistency(null) === null, 'and no shots is not a crash');
+
+// A null consistency used to multiply into the overall grade as NaN.
+const { PerformanceGrade } = M;
+if (PerformanceGrade) {
+  const g = PerformanceGrade.calculateFullGrade([sess('m','2026-07-08', prem, many(4))]);
+  ok(g && Number.isFinite(g.overall), `an ungradeable consistency still yields a number (${g && g.overall})`);
+  ok(g && g.consistency === null, 'with the component itself honestly null');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

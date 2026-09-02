@@ -161,6 +161,31 @@ function consistencyScore(values) {
   return Math.max(0, Math.min(100, Math.round(100 - cv * 400)));
 }
 
+// Consistency for a WHOLE BAG. Even the corrected score above is wrong when it
+// is handed every carry a golfer has ever hit: the spread of a driver, a
+// 7-iron and a wedge together is the gapping between them, not repeatability,
+// and it moves with which clubs happened to be hit that day. CLAUDE.md already
+// says this about the feedback band — "Pooled across a bag it measures the
+// driver-to-wedge gap" — and three call sites were still pooling.
+//
+// Per club above the sample floor, then weighted by shot count. Returns null
+// when no club qualifies, because "how repeatable are you" has no answer yet.
+function bagConsistency(shots) {
+  const byClub = {};
+  (shots || []).forEach(s => {
+    if (!s || !s.clubType || !(s.carryDistance > 0)) return;
+    (byClub[s.clubType] = byClub[s.clubType] || []).push(s.carryDistance);
+  });
+  let num = 0, den = 0, clubs = 0;
+  Object.values(byClub).forEach(carries => {
+    if (carries.length < Metrics.MIN_SHOTS_REPORT) return;
+    const cs = consistencyScore(carries);
+    if (cs === null) return;
+    num += cs * carries.length; den += carries.length; clubs++;
+  });
+  return den ? { score: Math.round(num / den), clubs, shots: den } : null;
+}
+
 function fmt(val, decimals=1) {
   if (val === null || val === undefined || (typeof val === 'number' && isNaN(val))) return '—';
   return Number(val).toFixed(decimals);
@@ -8911,7 +8936,7 @@ async function init() {
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Avg Carry Distance</div>
               <div style="font-size:2rem;font-weight:800">${metrics.avgCarry} yds</div>
-              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>
+              ${metrics.carryConsistency === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>`}
             </div>
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Ball Speed</div>
@@ -8975,7 +9000,7 @@ async function init() {
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Consistency</div>
               <div style="display:flex;justify-content:space-between;margin-bottom:.6rem">
-                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.consistency.user}%</strong></div>
+                <div><span style="color:var(--text-dim)">You:</span> <strong>${comparison.consistency.user === null ? '—' : comparison.consistency.user + '%'}</strong></div>
                 <div><span style="color:var(--text-dim)">Avg:</span> <strong>${comparison.consistency.community}%</strong></div>
               </div>
               <div style="font-size:1rem;color:#4ade80;font-weight:600">${comparison.consistency.percentile}</div>
@@ -9074,7 +9099,7 @@ async function init() {
                   </div>
                   <div>
                     <div style="font-size:.8rem;color:var(--text-dim)">Consistency</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.consistency}%</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.consistency === null ? '—' : c.consistency + '%'}</div>
                   </div>
                   <div>
                     <div style="font-size:.8rem;color:var(--text-dim)">Ball Speed</div>
@@ -9811,8 +9836,11 @@ const PerformanceGrade = (() => {
     const scores = all_shots.map(ShotScorer.score).filter(x => x !== null);
     const form_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     
-    const carries = all_shots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const consistency = Math.round(100 - stdDev(carries));
+    // 30% of the overall grade came from `100 - stdDev(carries)` — a yard
+    // figure subtracted from 100, pooled across the bag, so a golfer who hit
+    // more clubs graded worse for it. Per club, above the floor, weighted.
+    const bc = bagConsistency(all_shots);
+    const consistency = bc ? bc.score : null;
     
     const session_count = sessions.length;
     const total_shots = all_shots.length;
@@ -9820,7 +9848,15 @@ const PerformanceGrade = (() => {
     const st = Features.streak(sessions);
     const streak_bonus = st.current >= 3 ? 10 : st.current === 2 ? 5 : 0;
 
-    const overall = Math.min(100, Math.round((form_score * 0.5 + consistency * 0.3 + (session_count > 10 ? 20 : session_count * 2)) * 0.9 + streak_bonus));
+    // With no club past the sample floor there is no consistency figure, and
+    // multiplying null by 0.3 put NaN straight into the letter grade. The 30%
+    // moves onto form rather than being scored as zero — an unmeasured
+    // component is not a failed one.
+    const formW = consistency === null ? 0.8 : 0.5;
+    const consW = consistency === null ? 0 : 0.3;
+    const overall = Math.min(100, Math.round(
+      (form_score * formW + (consistency || 0) * consW +
+       (session_count > 10 ? 20 : session_count * 2)) * 0.9 + streak_bonus));
 
     return {
       overall,
@@ -10046,7 +10082,7 @@ const AnalyticsHub = (() => {
       totalSessions: sessions.length,
       totalShots: allShots.length,
       avgCarry: fmt(avg(allShots, 'carryDistance'), 0),
-      carryConsistency: Math.round(100 - stdDev(carries)),
+      carryConsistency: (bagConsistency(allShots) || {}).score ?? null,
       ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
       ballSpeedMax: Math.max(...ballSpeeds),
       launchAngleAvg: fmt(avg(allShots, 'launchAngle'), 1),
@@ -10185,7 +10221,8 @@ const CommunityInsights = (() => {
       consistency: {
         user: userConsistency,
         community: benchmarks.consistency.bySkill[skillLevel],
-        percentile: userConsistency > benchmarks.consistency.bySkill[skillLevel] ? '↑ More consistent' : '← Work on it',
+        percentile: userConsistency === null ? 'not enough shots yet'
+          : userConsistency > benchmarks.consistency.bySkill[skillLevel] ? '↑ More consistent' : '← Work on it',
       },
       formScore: {
         user: userForm,
@@ -10498,8 +10535,7 @@ const EnhancedMetricsWidget = (() => {
     const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     const grade = ShotScorer.grade(avgScore);
 
-    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const consistency = Math.round(100 - stdDev(carries));
+    const consistency = (bagConsistency(allShots) || {}).score ?? null;
     const st = Features.streak(sessions);
 
     return {
@@ -10523,7 +10559,7 @@ const EnhancedMetricsWidget = (() => {
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">FORM GRADE</div>
         </div>
         <div style="padding:1rem;background:rgba(74,222,128,.1);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2.5rem;font-weight:800;color:#4ade80">${stats.consistency}%</div>
+          <div style="font-size:2.5rem;font-weight:800;color:#4ade80">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">CONSISTENCY</div>
         </div>
         <div style="padding:1rem;background:rgba(251,146,60,.1);border-radius:var(--radius-sm);text-align:center">
