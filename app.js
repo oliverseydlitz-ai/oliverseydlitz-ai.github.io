@@ -4985,9 +4985,74 @@ const UI = (() => {
     const clubSel = document.getElementById('progressClub');
     clubSel.innerHTML = ['all',...allClubs].map(c=>
       `<option value="${c}">${c==='all'?'All clubs':clubLabel(c)}</option>`).join('');
-    clubSel.onchange = () => renderProgressCharts(sessions, clubSel.value);
+    clubSel.onchange = () => { renderProgressCharts(sessions, clubSel.value); renderTailTrend(sessions, clubSel.value); };
     renderProgressCharts(sessions,'all');
+    try { renderTailTrend(sessions, 'all'); } catch(e){ console.error('tail trend',e); }
     try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
+  }
+
+  // ── Dispersion tail across sessions ───────────────────────────
+  // The one trend in this view judged against the golfer's own session-to-
+  // session variation rather than drawn as a line and left to be read. A line
+  // chart of a spread invites reading a two-session wiggle as progress, which
+  // is exactly what the rest of the app refuses to do — so the sparkline is
+  // there to show shape, and the sentence under it is the verdict.
+  //
+  // "All clubs" cannot be a tail: pooling a driver and a wedge produces a
+  // spread of the bag, not of anything you could practise. So it asks for a
+  // club, and defaults to the driver, which is the only one the strokes curves
+  // can price anyway.
+  function renderTailTrend(sessions, club) {
+    const el = document.getElementById('tailTrendHost');
+    if (!el) return;
+    const target = club && club !== 'all' ? club
+      : (sessions.some(sn => (sn.shots || []).some(s => s.clubType === 'd')) ? 'd' : null);
+    if (!target) { el.innerHTML = ''; return; }
+
+    const t = Dispersion.trend(sessions, target);
+    const name = Sanitize.escape(clubLabel(target));
+    const head = `<div class="tail-head">${name} — directional spread over time` +
+      (club === 'all' || !club ? ` <span class="tail-n">driver by default</span>` : '') + `</div>`;
+    if (!t.ok) {
+      el.innerHTML = `<div class="tail-block pending">${head}
+          <div class="tail-note">${Sanitize.escape(t.note)}</div></div>`;
+      return;
+    }
+    const last = t.points[t.points.length - 1];
+    el.innerHTML = `<div class="tail-block">${head}
+        ${sparkline(t.points.map(p => p.sigma))}
+        <div class="tail-spark-key">oldest → newest · lower is tighter</div>
+        <div class="tail-stats">
+          <div class="disp-stat"><div class="disp-stat-val">${fmt(last.sigma, 1)}°</div>
+            <div class="disp-stat-label">Latest</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${t.delta > 0 ? '+' : ''}${fmt(t.delta, 1)}°</div>
+            <div class="disp-stat-label">Change</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${t.points.length}</div>
+            <div class="disp-stat-label">Qualifying sessions</div></div>
+        </div>
+        <div class="tail-item${t.real ? '' : ' heavy'}">${Sanitize.escape(t.note)}</div>
+        <div class="tail-note">Only sessions with ${Metrics.MIN_SHOTS_TAIL}+ usable shots of this club on a
+          premium or RPT ball appear here. Range-ball sessions are left out rather than plotted, because a
+          change in the ball would read as a change in you.</div>
+      </div>`;
+  }
+
+  // Deliberately unlabelled and unscaled: it is a shape, not a chart to read
+  // values off. The numbers that matter are in the tiles beneath it.
+  function sparkline(values) {
+    if (!values || values.length < 2) return '';
+    const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
+    const w = 100, h = 28;
+    const pts = values.map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - lo) / span) * (h - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg class="tail-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"
+        aria-label="Directional spread across ${values.length} sessions, oldest to newest. A lower line is a tighter spread.">
+        <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5"
+          vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>`;
   }
 
   // ── Feature: side-by-side session comparison ───────────────────
