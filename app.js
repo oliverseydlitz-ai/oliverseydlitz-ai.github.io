@@ -1399,6 +1399,43 @@ const FeedbackEngine = (() => {
     });
   }
 
+  // How well the golfer can call their own strike, from the estimates they have
+  // made. This is the point of asking: error estimation trains the internal
+  // error-detection process that constant feedback displaces, and the size of
+  // the gap between what they called and what happened IS the thing being
+  // trained. Judged against their own shot-to-shot spread, because being out
+  // by 0.03 means something different to someone whose strike varies by 0.01
+  // than to someone whose varies by 0.05.
+  const MIN_CALLS = 3;
+  function calibration(calls, shots, metric = 'smashFactor', clubType = null) {
+    const pairs = (calls || []).filter(c => Number.isFinite(c.called) && Number.isFinite(c.actual));
+    if (pairs.length < MIN_CALLS) {
+      return { ok: false, n: pairs.length, need: MIN_CALLS - pairs.length,
+               note: `Call ${MIN_CALLS - pairs.length} more before you look and the app can tell you how well ` +
+                     `you read your own strike.` };
+    }
+    const errs = pairs.map(c => Math.abs(c.called - c.actual));
+    const mae = mean(errs);
+    const bias = mean(pairs.map(c => c.called - c.actual));
+    const spread = Metrics.shotSpread(shots, metric, clubType);
+    const ratio = Number.isFinite(spread) && spread > 0 ? mae / spread : null;
+    return {
+      ok: true, n: pairs.length, mae, bias, spread, ratio,
+      note: ratio === null
+        ? `Your calls are out by ${fmt(mae, 3)} on average across ${pairs.length}.`
+        : ratio <= 1
+          ? `Across ${pairs.length} calls you are out by ${fmt(mae, 3)} on average, which is inside your own ` +
+            `shot-to-shot spread of ${fmt(spread, 3)}. You can feel this shot before you see it — that is the ` +
+            `error detection the numbers displace when they arrive first.`
+          : `Across ${pairs.length} calls you are out by ${fmt(mae, 3)}, against a shot-to-shot spread of ` +
+            `${fmt(spread, 3)}. You cannot read this one yet by feel, which is exactly what calling it before ` +
+            `you look is training` +
+            (Math.abs(bias) > mae * 0.6
+              ? `, and you lean ${bias > 0 ? 'high' : 'low'} rather than scattering — a systematic read, not noise.`
+              : '.'),
+    };
+  }
+
   // One line explaining what the golfer is looking at, because a table full of
   // hidden numbers with no explanation reads as a broken app rather than as a
   // deliberate schedule.
@@ -1431,8 +1468,8 @@ const FeedbackEngine = (() => {
     return null;
   }
 
-  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction, BAND_K,
-           insideBand, fadedFrequency, fadedReveal, tolerance, plan, explain, volumeAdvice };
+  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction, BAND_K, MIN_CALLS,
+           insideBand, fadedFrequency, fadedReveal, tolerance, plan, explain, calibration, volumeAdvice };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5106,6 +5143,8 @@ const UI = (() => {
     _session = session;
     _clubFilter = 'all';
     _revealed = new Set();
+    _predictions = new Map();
+    _asking = null;
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
     renderRetention(session).catch(e => console.error('retention', e));
     // Opening a probe on the top fault is what makes the NEXT session able to
@@ -5827,6 +5866,11 @@ const UI = (() => {
   // Cleared when a different session is opened — a reveal is a choice about
   // these shots, not a global preference.
   let _revealed = new Set();
+  // Estimates called before a reveal, same key. Kept so the comparison survives
+  // a re-sort, and so a golfer cannot quietly re-guess after seeing the answer.
+  let _predictions = new Map();
+  // The row currently being asked about, if any.
+  let _asking = null;
 
   function renderShotTable(shots, sortField, sortDir) {
     if (sortField!==undefined) { _sortField=sortField; _sortDir=sortDir; }
@@ -5885,7 +5929,26 @@ const UI = (() => {
         if (c.field === 'clubType') return `<td>${c.render(s,i)}</td>`;
         return `<td class="fb-hidden">·</td>`;
       }).join('');
-      return `<tr class="${rowCls} shot-row${open ? '' : ' fb-row-hidden'}" data-idx="${i}" data-hit="${hit}">${cells}</tr>`;
+      // Error estimation, Tier A rule 3: calling the number before it appears
+      // preserves the intrinsic error-detection process that constant feedback
+      // displaces. Asked on a sample of shots, not all of them — asking every
+      // time is its own burden and stops being a probe.
+      if (_asking === hit && !open) {
+        return `<tr class="fb-ask-row" data-hit="${hit}"><td colspan="${COLS.length}">
+            <div class="fb-ask">
+              <span class="fb-ask-q">Shot ${hit + 1}. Call your smash factor before you look.</span>
+              <input class="fb-ask-in" id="fbAskInput" type="number" step="0.01" min="0.5" max="2" placeholder="1.40" inputmode="decimal">
+              <button class="probe-btn" id="fbAskGo">Reveal</button>
+              <button class="probe-btn ghost" id="fbAskSkip">Just show me</button>
+            </div></td></tr>`;
+      }
+      const guess = _predictions.get(hit);
+      const guessRow = (open && guess !== undefined && Number.isFinite(s.smashFactor))
+        ? `<tr class="fb-guess-row"><td colspan="${COLS.length}">
+             <span class="fb-guess">You called ${fmt(guess, 2)}, it was ${fmt(s.smashFactor, 2)} —
+               out by ${fmt(Math.abs(guess - s.smashFactor), 2)}.</span></td></tr>`
+        : '';
+      return `<tr class="${rowCls} shot-row${open ? '' : ' fb-row-hidden'}" data-idx="${i}" data-hit="${hit}">${cells}</tr>${guessRow}`;
     }).join('');
 
     const mode = FeedbackEngine.getMode();
@@ -5896,9 +5959,13 @@ const UI = (() => {
     // itself hidden off the right edge on a phone.
     const noteHost = document.getElementById('shotFeedbackNote');
     if (noteHost) {
+      const calls = [..._predictions.entries()]
+        .map(([hit, called]) => ({ called, actual: shots[hit] && shots[hit].smashFactor }));
+      const cal = calls.length ? FeedbackEngine.calibration(calls, shots) : null;
       noteHost.innerHTML = mode === 'always' ? '' : `<div class="fb-caption">
           <span class="fb-caption-head">${shown} of ${sorted.length} shown · ${Sanitize.escape(FeedbackEngine.MODES[mode].label)}</span>
           ${Sanitize.escape(FeedbackEngine.explain(mode, sorted.length))}
+          ${cal ? `<div class="fb-cal${cal.ok ? '' : ' pending'}">${Sanitize.escape(cal.note)}</div>` : ''}
           ${shown < sorted.length ? '<button class="fb-caption-btn" id="fbRevealAll">Show them all</button>' : ''}</div>`;
     }
 
@@ -5908,10 +5975,32 @@ const UI = (() => {
     // them a deliberate action rather than happening by default.
     el.querySelectorAll('tr.fb-row-hidden').forEach(tr => tr.addEventListener('click', e => {
       e.stopPropagation();
-      _revealed.add(Number(tr.dataset.hit));
+      const hit = Number(tr.dataset.hit);
+      const d = decisions.get(shots[hit]);
+      // Ask for the estimate first, on the shots the schedule marks — but only
+      // once per shot, and never after the answer has already been seen.
+      if (d && d.predict && !_predictions.has(hit)) { _asking = hit; renderShotTable(shots); return; }
+      _revealed.add(hit);
       renderShotTable(shots);
     }, { capture: true }));
+
+    const answer = keep => {
+      const hit = _asking;
+      if (hit === null) return;
+      const v = parseFloat(document.getElementById('fbAskInput')?.value);
+      if (keep && Number.isFinite(v)) _predictions.set(hit, v);
+      _asking = null;
+      _revealed.add(hit);
+      renderShotTable(shots);
+    };
+    document.getElementById('fbAskGo')?.addEventListener('click', () => answer(true));
+    document.getElementById('fbAskSkip')?.addEventListener('click', () => answer(false));
+    document.getElementById('fbAskInput')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); answer(true); }
+    });
+    document.getElementById('fbAskInput')?.focus();
     document.getElementById('fbRevealAll')?.addEventListener('click', () => {
+      _asking = null;
       shots.forEach((_, i) => _revealed.add(i));
       renderShotTable(shots);
     });

@@ -105,6 +105,34 @@ console.log('— aggregates are never faded, and that is deliberate —');
 ok(typeof F.plan === 'function' && F.plan(shots(20))[0].shot !== undefined,
    'plan() decides per shot, and nothing in it touches a session mean');
 
+console.log('— calling the number before you look is the point, so it gets scored —');
+const calls = (n, err, bias = 0) => Array.from({length:n},(_,i)=>({
+  called: 1.40 + bias + (i%2 ? err : -err), actual: 1.40 }));
+const tightShots = shots(30, 1.40, 0.002);   // shot-to-shot spread ~0.003
+const looseShots = shots(30, 1.40, 0.03);    // ~0.04
+
+ok(F.calibration(calls(2, 0.01), tightShots).ok === false, `under ${F.MIN_CALLS} calls it will not score you`);
+ok(/Call 1 more/.test(F.calibration(calls(2, 0.01), tightShots).note), 'and says how many more it needs');
+
+const good = F.calibration(calls(6, 0.01), looseShots);
+ok(good.ok === true && good.mae > 0, 'it scores the average miss');
+ok(good.ratio < 1, 'a call inside the golfer\'s own spread reads as well calibrated');
+ok(/feel this shot before you see it/.test(good.note), 'and names what that means');
+
+const poor = F.calibration(calls(6, 0.05), tightShots);
+ok(poor.ratio > 1, 'and a call far outside it does not');
+ok(/exactly what calling it before you look is training/.test(poor.note),
+   'framed as the thing being trained rather than as a failure');
+
+// Judged against the golfer's own spread, so the SAME error reads differently
+ok(F.calibration(calls(6, 0.01), tightShots).ratio > F.calibration(calls(6, 0.01), looseShots).ratio,
+   'the same 0.01 miss is poor for a consistent striker and fine for a scattered one');
+
+const leaning = F.calibration(calls(8, 0.005, 0.04), tightShots);
+ok(/lean high/.test(leaning.note), 'a systematic over-call is named as a lean, not as scatter');
+ok(!/lean (high|low)/.test(F.calibration(calls(8, 0.05, 0), tightShots).note),
+   'while a symmetric miss is not');
+
 console.log('— volume advice is still volume advice —');
 ok(/Four 60-ball sessions/.test(F.volumeAdvice(200) || ''), '200 balls gets the distribution warning');
 ok(F.volumeAdvice(40) === null, 'and a normal session gets nothing');
