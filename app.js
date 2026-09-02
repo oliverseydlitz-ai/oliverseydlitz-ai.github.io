@@ -2781,6 +2781,356 @@ const DrillLibrary = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// ShortGame — putting and chipping, built on what the RCTs actually found
+// ────────────────────────────────────────────────────────────────
+// `QuietEye` covers one intervention in depth. This covers the rest of the
+// short game, and it is built around a specific piece of evidence rather than
+// around a list of drills someone liked.
+//
+// THE SPINE: a 2024 systematic review in Frontiers in Sports and Active Living
+// screened the randomised controlled trials on golf motor learning and included
+// 52 of them, grouped by strategy — cognitive training, practice scheduling,
+// augmented feedback, implicit/explicit learning, focus of attention. Three
+// methods came out superior within their strategy:
+//
+//   ERRORLESS LEARNING      practice arranged so almost nothing is missed
+//   CONTEXTUAL INTERFERENCE random / varied order rather than blocked
+//   EXTERNAL FOCUS          attention on the ball, club or target, not the body
+//
+// For cognitive training and augmented feedback, no single method came out
+// ahead — which is worth saying, because that is where most golf content lives.
+//
+// AND THE LIMITATION, STATED BY THE REVIEWERS THEMSELVES: over half the 52
+// trials were statistically underpowered, and most studied simple putting tasks
+// in novices. So the direction is well supported and the magnitude, for a
+// competent golfer on a real green, is not. Every drill here carries the tier
+// it earned rather than a uniform confident tone.
+//
+// WHERE THE STROKES ACTUALLY ARE. About 65% of shots in a round happen from 100
+// yards in, and amateurs give away most of their short-game strokes to
+// three-putts from outside 25 feet and to chunked chips. But Broadie's own
+// comparison is blunter than the folklore: a typical 90-shooter loses roughly
+// six strokes to a scratch golfer across approach play and the short game and
+// only about two to putting. Putting is the cheapest thing to fix, not the
+// biggest hole. The module says so rather than flattering the practice green.
+const ShortGame = (() => {
+  const KEY = 'slShortGame';
+
+  // The three structures, applied OVER a drill rather than instead of one —
+  // the same relationship section I has to the full-swing library.
+  const STRUCTURES = {
+    errorless: {
+      id: 'errorless', name: 'Errorless',
+      how: 'Start at a distance where you hole or finish stone dead almost every time, and only move back ' +
+           'once you have. The point is to make very few mistakes, not to be challenged.',
+      why: 'Maxwell, Masters, Kerr & Weedon (2001): golfers who learned putting with few errors were ' +
+           'unaffected when a second task was loaded on top, while golfers who learned by missing fell ' +
+           'apart. Fewer misses means fewer conscious corrections to test, so less of the skill is held ' +
+           'explicitly — and explicit skill is what breaks first under pressure.',
+      tier: 'strong',
+    },
+    random: {
+      id: 'random', name: 'Random order',
+      how: 'Never the same shot twice in a row. Change distance, lie or club every ball, and do not let ' +
+           'yourself groove one repetition.',
+      why: 'It will feel worse than blocked practice while you do it and better a week later. Fazeli et al. ' +
+           '(2017), 30 golfers over six days: the random group putted worse during practice and more ' +
+           'accurately at retention, and ended with a mental representation closer to a skilled golfer\'s. ' +
+           'The same held for chipping across three shot variations.',
+      tier: 'strong',
+    },
+    external: {
+      id: 'external', name: 'External focus',
+      how: 'Attention on the ball, the clubhead, the landing spot or the hole — never on a body part.',
+      why: 'Named superior within its strategy in the 2024 review, and the effect is small: about g = 0.15 ' +
+           'once publication bias is corrected for. Worth doing because it costs nothing, not because it ' +
+           'will transform anything.',
+      tier: 'moderate',
+    },
+  };
+
+  // Tour reference points, for scale rather than as targets. From published
+  // PGA Tour putting distributions.
+  const TOUR = {
+    make30ft: 0.07,        // makes about 7% from 30 feet
+    threePutt30ft: 0.05,   // three-putts about 5% from 30 feet
+    threePutt40to50ft: { lo: 0.10, hi: 0.20 },
+    note: 'A tour player two-putts from 30 feet almost every time — they hole about 7% and three-putt ' +
+          'about 5%. From 40–50 feet the three-putt rate climbs to somewhere between 10% and 20%. If you ' +
+          'are looking for a target from long range, it is two putts, not one.',
+  };
+
+  const D = (id, name, trains, protocol, extra = {}) =>
+    ({ id, name, trains, protocol, structures: [], tier: 'moderate', ...extra });
+
+  // ── Putting ───────────────────────────────────────────────────
+  const PUTTING = [
+    D('p-gate', 'Errorless distance ladder',
+      'Holing out under no pressure, then extending it',
+      'Start at 2 ft and hole five in a row before moving back a foot. Drop back a foot on any miss. ' +
+      'Stop when you first fail twice at a distance — that number is your session, not a failure.',
+      { structures: ['errorless'], tier: 'strong',
+        why: 'The clearest application of the errorless finding there is: the ladder is designed so you ' +
+             'almost never miss, which is the mechanism, not a side effect.' }),
+
+    D('p-speed', 'Speed ladder to the fringe',
+      'Distance control from long range — where three-putts come from',
+      'Putt to the fringe rather than a hole, from 20, 30, 40 and 50 ft. Score each one on whether it ' +
+      'finishes within a putter length past the fringe. Never putt the same distance twice in a row.',
+      { structures: ['random', 'external'], tier: 'strong',
+        why: 'Amateurs lose more strokes to three-putts from outside 25 ft than to any other putting ' +
+             'category, and from that range it is speed that decides the second putt, not line. Removing ' +
+             'the hole removes the temptation to aim for a make.' }),
+
+    D('p-circle', 'Three-foot circle from long range',
+      'Lag putting scored the way it is actually judged',
+      'Lay a ring of tees three feet around the hole. From 25 ft and beyond, score a putt as good if it ' +
+      'finishes inside the ring — holed or not. Twenty putts, distance changing every time.',
+      { structures: ['random'], tier: 'strong',
+        why: 'The outcome that predicts your score from long range is proximity, not the make. Scoring the ' +
+             'make trains you to run six feet past.' }),
+
+    D('p-clock', 'Clock drill, 4 ft',
+      'The distance that decides whether a lag was worth anything',
+      'Eight balls in a circle at 4 ft. Hole all eight to finish. Restart the count on a miss.',
+      { structures: ['errorless'], tier: 'moderate',
+        why: 'A pressure-flavoured version of errorless practice: the restart is what makes the last two ' +
+             'putts feel like putts that matter.' }),
+
+    D('p-random-band', 'Random-distance call',
+      'Producing a specific pace on demand',
+      'Have someone call a distance — or shuffle cards marked 15, 25, 35, 45 ft — and putt to it. Never ' +
+      'the same twice in a row. Twenty balls.',
+      { structures: ['random', 'external'], tier: 'strong',
+        why: 'Random order beat blocked at retention in the 2017 trial. This is that finding with the ' +
+             'least equipment.' }),
+
+    D('p-oneball', 'One ball, nine holes',
+      'The only version of putting that resembles the game',
+      'Play nine holes on the practice green with one ball. Full routine, no second attempts, and count ' +
+      'the total. Repeat weekly and track the number.',
+      { structures: ['random'], tier: 'moderate',
+        why: 'Practice-green putting with a bucket of balls is blocked practice with an audience. This is ' +
+             'the closest a green gets to the thing being trained.' }),
+
+    D('p-eyes', 'Eyes-closed distance calls',
+      'Feel for pace, tested rather than assumed',
+      'From 20–40 ft, close your eyes as you strike and call whether the putt finished short, right, or ' +
+      'long BEFORE you look. Ten putts. Score how often you were right, not how close you were.',
+      { structures: ['errorless', 'external'], tier: 'moderate',
+        why: 'Error estimation: judging your own outcome before it is shown to you preserves the internal ' +
+             'error-detection that constant feedback displaces.' }),
+
+    D('p-pressure', 'Consequence ladder',
+      'Whether any of it survives caring about the result',
+      'Five putts at 6 ft. Miss one and the count restarts. You may not leave until you finish it.',
+      { structures: ['errorless'], tier: 'moderate',
+        why: 'Quiet-eye duration collapses under pressure in untrained golfers — 1,405 ms against 2,794 ms ' +
+             'trained. Practising without any consequence never tests the part that fails.' }),
+
+    D('p-slope', 'Same hole, four sides',
+      'Reading break instead of memorising one putt',
+      'One hole, four balls at the same distance from four directions — uphill, downhill, and both breaks. ' +
+      'Rotate every ball.',
+      { structures: ['random'], tier: 'moderate',
+        why: 'Varying the condition rather than the repetition is the contextual-interference finding ' +
+             'applied to green reading.' }),
+
+    D('p-firstputt', 'First putt of the day',
+      'The cold start, which is a separate skill',
+      'Log the first putt of every session separately, over ten sessions. One ball, no warm-up rolls.',
+      { structures: [], tier: 'weak',
+        why: 'No trial has tested this in golf. It is here because the first putt of a round is the one you ' +
+             'never practise, and logging it costs nothing.' }),
+  ];
+
+  // ── Chipping ──────────────────────────────────────────────────
+  const CHIPPING = [
+    D('c-landing', 'Landing-spot drill',
+      'Aiming at the spot the ball lands, not the hole',
+      'Put a towel or a coin where you want the ball to pitch. Score whether it lands on the towel — ' +
+      'ignore where it finishes. Ten balls, then move the towel.',
+      { structures: ['external'], tier: 'strong',
+        why: 'The most external target available in the short game: a spot on the ground you can see, ' +
+             'rather than a feeling in your hands. External focus was one of three methods named superior ' +
+             'in the 2024 review of 52 trials.' }),
+
+    D('c-three-var', 'Three shots, random order',
+      'Command of more than one chip',
+      'Pick three genuinely different shots — low runner, standard, higher and softer. Play them in random ' +
+      'order, never the same twice, about 54 balls in total.',
+      { structures: ['random'], tier: 'strong',
+        why: 'This is a published trial rather than an analogy. Golfers practised three chip variations ' +
+             'blocked or randomly over 54 acquisition trials; both improved during practice with no ' +
+             'difference between them, and the random group was significantly more accurate at the random ' +
+             'retention test. Doing them in a row teaches you nothing you keep.' }),
+
+    D('c-proximity', 'Proximity ladder',
+      'The metric strokes gained around the green actually uses',
+      'Ten chips from one lie. Score every one on how far it finishes from the hole in feet, and record ' +
+      'the average — not how many went in.',
+      { structures: [], tier: 'strong',
+        why: 'Strokes gained around the green is a function of lie and proximity. Holing a chip is close to ' +
+             'noise; finishing eight feet away instead of eighteen is not.' }),
+
+    D('c-errorless-lie', 'Errorless lie progression',
+      'Contact first, difficulty second',
+      'Start on a clean, tight-ish lie from 10 yards where you catch it well nearly every time. Only move ' +
+      'to rough, then a bare lie, then downslope, once a full set is struck cleanly.',
+      { structures: ['errorless'], tier: 'strong',
+        why: 'Errorless learning produced putting that survived a loaded secondary task. Chunked chips are ' +
+             'the most pressure-sensitive shot in golf, which is exactly the failure mode it protects.' }),
+
+    D('c-oneclub', 'One club, five distances',
+      'Distance control through length of swing rather than club choice',
+      'One club — a pitching wedge or 9-iron. Chip to five different distances between 5 and 30 yards, in ' +
+      'random order, changing the length of the stroke rather than anything else.',
+      { structures: ['random', 'external'], tier: 'moderate',
+        why: 'Varies the parameter while holding the pattern, which is the shape contextual-interference ' +
+             'work uses. Whether one club beats several is not settled — this is a way to practise, not a ' +
+             'claim that it is the right method.' }),
+
+    D('c-updown', 'Up-and-down count',
+      'The outcome that actually appears on the card',
+      'Nine chips from nine different lies around the green, each followed by the putt. Count how many you ' +
+      'get up and down. One ball each, no retries.',
+      { structures: ['random'], tier: 'moderate',
+        why: 'Chipping practice that stops at the chip never tests the part that costs the stroke. It also ' +
+             'forces random order, since no two lies are the same.' }),
+
+    D('c-clock-face', 'Clock-face wedge lengths',
+      'A repeatable set of distances you can trust on the course',
+      'Three backswing lengths — think 9, 10 and 11 o\'clock — eight balls each, and record the carry for ' +
+      'each position. The output is a chart, not a score.',
+      { structures: [], tier: 'moderate',
+        why: 'A data-generation session as much as practice. Most amateurs have no idea what their ' +
+             'three-quarter wedge actually carries, and guessing it is a distance-control problem dressed ' +
+             'up as a technique one.' }),
+
+    D('c-bare', 'Worst-lie block',
+      'The shot that produces the chunk',
+      'Deliberately play from tight, bare and downslope lies. Ten balls. Score contact only — clean or ' +
+      'not — and ignore the result.',
+      { structures: ['external'], tier: 'moderate',
+        why: 'Scoring contact rather than outcome keeps the feedback on the thing being trained. This is ' +
+             'the one block that is deliberately NOT errorless, so run it after the errorless progression ' +
+             'rather than instead of it.' }),
+
+    D('c-bump', 'Bump-and-run versus flop, same shot',
+      'Choosing the shot, not just hitting it',
+      'From one spot, play the same shot two ways — low and running, then high and soft — and compare the ' +
+      'proximity of ten of each.',
+      { structures: ['random'], tier: 'moderate',
+        why: 'Most amateurs default to the higher shot because it looks like golf on television. Measuring ' +
+             'the two side by side is usually a short and uncomfortable argument.' }),
+
+    D('c-pressure-updown', 'Three in a row, up and down',
+      'Holding a technique when the count matters',
+      'Get up and down three times consecutively before you may stop. Restart on a failure.',
+      { structures: [], tier: 'weak',
+        why: 'Pressure practice in golf is thinly studied and the transfer is not established. Included ' +
+             'because the failure it targets is real, not because a trial supports this format.' }),
+  ];
+
+  const ALL = () => [...PUTTING, ...CHIPPING];
+  const byId = id => ALL().find(d => d.id === id) || null;
+  const structuresFor = drill =>
+    (drill?.structures || []).map(s => STRUCTURES[s]).filter(Boolean);
+
+  // ── Session builder ───────────────────────────────────────────
+  // Errorless first, then random. That order is the finding, not a preference:
+  // errorless work builds a skill that survives pressure, and contextual
+  // interference is what makes it stick beyond the session — but random order
+  // early, before anything is repeatable, is just missing in a varied order.
+  function session(minutes = 30, area = 'both') {
+    const pick = (list, id) => list.find(d => d.id === id);
+    const blocks = [];
+    const put = area !== 'chipping', chip = area !== 'putting';
+    if (chip) blocks.push({ phase: 'Warm up without missing', drill: pick(CHIPPING, 'c-errorless-lie') });
+    if (put)  blocks.push({ phase: 'Warm up without missing', drill: pick(PUTTING, 'p-gate') });
+    if (chip) blocks.push({ phase: 'Then make it random',     drill: pick(CHIPPING, 'c-three-var') });
+    if (put)  blocks.push({ phase: 'Then make it random',     drill: pick(PUTTING, 'p-speed') });
+    blocks.push({ phase: 'Finish on the real thing',
+                  drill: chip ? pick(CHIPPING, 'c-updown') : pick(PUTTING, 'p-oneball') });
+    const each = Math.max(4, Math.round(minutes / blocks.length));
+    return {
+      minutes: each * blocks.length,
+      blocks: blocks.map(b => ({ ...b, minutes: each, structures: structuresFor(b.drill) })),
+      note: 'Errorless first, random second, and the last block is one ball with no retries. That order is ' +
+            'the finding rather than a preference — random order before anything is repeatable is just ' +
+            'missing in a varied sequence.',
+    };
+  }
+
+  // ── Chipping log ──────────────────────────────────────────────
+  // Proximity in feet, because that is what strokes gained around the green is
+  // a function of. Holed chips are recorded as zero and are close to noise;
+  // the number that moves a score is the average leave.
+  function all() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(-200))); } catch (_) {}
+  }
+  function record(entry) {
+    const chips = (entry?.chips || []).filter(c => Number.isFinite(c.leaveFt) && c.leaveFt >= 0);
+    if (!chips.length) return null;
+    const row = {
+      id: (crypto.randomUUID ? crypto.randomUUID() : 'sg-' + Date.now()),
+      date: entry.date || new Date().toISOString(),
+      lie: entry.lie || 'unknown',
+      chips,
+    };
+    const list = all(); list.push(row); save(list);
+    return row;
+  }
+  function clear() { save([]); }
+
+  const MIN_CHIPS = 10;
+
+  // Median as well as mean, and the median is the one to read. A single
+  // chunked chip that finishes 40 feet away drags a ten-shot mean by four feet
+  // — which is real, but it describes that one shot rather than the standard.
+  // Both are shown so a large gap between them is visible, because that gap IS
+  // the chunk rate.
+  function proximity(chips) {
+    const v = (chips || []).map(c => c.leaveFt).filter(Number.isFinite).sort((a, b) => a - b);
+    if (v.length < 3) return null;
+    const mid = Math.floor(v.length / 2);
+    const median = v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+    const avg = mean(v);
+    return {
+      n: v.length, mean: avg, median, best: v[0], worst: v[v.length - 1],
+      holed: v.filter(x => x === 0).length,
+      // A "disaster" is a chip that leaves you a putt you were never going to
+      // hole. Three times the median is a scale-free way of saying that.
+      disasters: v.filter(x => x > Math.max(15, median * 3)).length,
+      enough: v.length >= MIN_CHIPS,
+    };
+  }
+
+  function describe(p) {
+    if (!p) return 'Log at least three chips and this will tell you something.';
+    const gap = p.mean - p.median;
+    const base = `${p.n} chips: typical leave ${fmt(p.median, 1)} ft, average ${fmt(p.mean, 1)} ft.`;
+    if (!p.enough) {
+      return `${base} Under ${MIN_CHIPS} chips this is an impression rather than a measurement.`;
+    }
+    if (p.disasters > 0) {
+      return `${base} ${p.disasters} of them finished a long way out — and that is where the strokes went. ` +
+             `Your average sits ${fmt(gap, 1)} ft above your typical chip because of them, so the thing to ` +
+             `work on is the bad one, not the standard one.`;
+    }
+    return `${base} No blow-ups in this set, and the average and the typical chip are within ` +
+           `${fmt(Math.abs(gap), 1)} ft of each other — which means the number above describes your ` +
+           `chipping rather than one bad contact.`;
+  }
+
+  return { KEY, STRUCTURES, TOUR, PUTTING, CHIPPING, ALL, byId, structuresFor,
+           session, all, record, clear, proximity, describe, MIN_CHIPS };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -6726,6 +7076,7 @@ const UI = (() => {
     // Quiet eye runs on no launch-monitor data at all, so it renders whether or
     // not a session has ever been imported — turning the empty state from a
     // dead end into the one thing a new user can actually do today.
+    try { renderShortGame(); } catch (e) { console.error('short game', e); }
     try { renderQuietEye(); } catch (e) { console.error('quiet eye', e); }
     try { renderDrills(sessions); } catch (e) { console.error('drills', e); }
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
@@ -6799,6 +7150,122 @@ const UI = (() => {
       _drillSection = b.dataset.drillSec;
       renderDrills(sessions);
     }));
+  }
+
+  // ── Short game ────────────────────────────────────────────────
+  let _sgTab = 'putting';
+  let _chipBuffer = [];
+  function renderShortGame() {
+    const el = document.getElementById('shortGameHost');
+    if (!el) return;
+    const esc = t => Sanitize.escape(t);
+    const S = ShortGame;
+    const drills = _sgTab === 'chipping' ? S.CHIPPING : S.PUTTING;
+    const plan = S.session(30, _sgTab);
+    const log = S.all();
+    const allChips = log.flatMap(r => r.chips || []);
+    const prox = S.proximity(allChips);
+
+    const tierChip = t => `<span class="sg-tier sg-tier-${t}">${t === 'strong' ? 'trial evidence'
+      : t === 'moderate' ? 'supported' : 'no trial'}</span>`;
+
+    el.innerHTML = `
+      <div class="tail-block">
+        <div class="tail-head">What the trials found <span class="tail-n">52 RCTs, 2024 review</span></div>
+        ${Object.values(S.STRUCTURES).map(st => `
+          <div class="tail-item"><strong>${esc(st.name)}.</strong> ${esc(st.how)}</div>
+          <div class="tail-note">${esc(st.why)}</div>`).join('')}
+        <div class="tail-note"><strong>And the limitation the reviewers state themselves.</strong> Over half
+          of those 52 trials were statistically underpowered, and most used simple putting tasks in novices.
+          The direction is well supported; the size of it, for a competent golfer on a real green, is not.</div>
+        <div class="tail-note"><strong>Where the strokes actually are.</strong> About 65% of your shots happen
+          from 100 yards in, and amateurs give away most of their short-game strokes to three-putts from
+          outside 25 feet and to chunked chips. But a typical 90-shooter loses roughly six strokes to a
+          scratch golfer across approach play and the short game and only about two to putting. Putting is
+          the cheapest thing to fix, not the biggest hole — worth knowing before you spend a winter on it.</div>
+      </div>
+
+      <div class="drill-tabs">
+        <button class="drill-tab${_sgTab === 'putting' ? ' on' : ''}" data-sg="putting">Putting · ${S.PUTTING.length}</button>
+        <button class="drill-tab${_sgTab === 'chipping' ? ' on' : ''}" data-sg="chipping">Chipping · ${S.CHIPPING.length}</button>
+      </div>
+
+      <div class="tail-block">
+        <div class="tail-head">A ${plan.minutes}-minute session <span class="tail-n">in this order</span></div>
+        ${plan.blocks.map((b, i) => `
+          <div class="tail-item"><strong>${i + 1}. ${esc(b.phase)} — ${esc(b.drill.name)}</strong>
+            (${b.minutes} min). ${esc(b.drill.protocol)}</div>`).join('')}
+        <div class="tail-note">${esc(plan.note)}</div>
+      </div>
+
+      ${drills.map(d => `
+        <div class="drill-row sg-row">
+          <div class="drill-row-head">
+            <span class="drill-row-name">${esc(d.name)}</span>
+            ${tierChip(d.tier)}
+          </div>
+          <div class="drill-row-desc"><strong>Trains:</strong> ${esc(d.trains)}</div>
+          <div class="drill-row-desc">${esc(d.protocol)}</div>
+          ${S.structuresFor(d).length ? `<div class="sg-structs">${S.structuresFor(d)
+            .map(st => `<span class="sg-struct">${esc(st.name)}</span>`).join('')}</div>` : ''}
+          <div class="drill-row-why">${esc(d.why)}</div>
+        </div>`).join('')}
+
+      <div class="tail-block">
+        <div class="tail-head">Log a chip <span class="tail-n">${allChips.length} logged</span></div>
+        <div class="qe-form">
+          <label class="qe-field"><span>How far it finished from the hole (ft) — 0 if holed</span>
+            <input type="number" id="sgLeave" min="0" max="200" step="1" placeholder="6" inputmode="decimal"></label>
+          <label class="qe-field"><span>Lie</span>
+            <select id="sgLie">
+              <option value="fairway">Fairway / tight</option>
+              <option value="rough">Rough</option>
+              <option value="bare">Bare or downslope</option>
+              <option value="bunker">Bunker</option>
+            </select></label>
+          <div class="probe-btns">
+            <button class="probe-btn" id="sgAdd">Add chip</button>
+            <button class="probe-btn ghost" id="sgSave">Save session (${_chipBuffer.length})</button>
+          </div>
+          <div class="tail-note" id="sgBufNote"></div>
+        </div>
+      </div>
+
+      <div class="tail-block${prox ? '' : ' pending'}">
+        <div class="tail-head">Your chipping</div>
+        ${prox ? `<div class="tail-stats">
+            <div class="disp-stat"><div class="disp-stat-val">${fmt(prox.median, 1)} ft</div>
+              <div class="disp-stat-label">Typical leave</div></div>
+            <div class="disp-stat"><div class="disp-stat-val">${fmt(prox.mean, 1)} ft</div>
+              <div class="disp-stat-label">Average</div></div>
+            <div class="disp-stat"><div class="disp-stat-val">${prox.disasters}</div>
+              <div class="disp-stat-label">Blow-ups</div></div>
+          </div>` : ''}
+        <div class="tail-item">${esc(S.describe(prox))}</div>
+        <div class="tail-note">${esc(S.TOUR.note)}</div>
+      </div>`;
+
+    el.querySelectorAll('[data-sg]').forEach(b => b.addEventListener('click', () => {
+      _sgTab = b.dataset.sg; renderShortGame();
+    }));
+    document.getElementById('sgAdd')?.addEventListener('click', () => {
+      const v = parseFloat(document.getElementById('sgLeave').value);
+      if (!Number.isFinite(v) || v < 0) { toast('Enter how far it finished from the hole.'); return; }
+      _chipBuffer.push({ leaveFt: v, lie: document.getElementById('sgLie').value });
+      document.getElementById('sgLeave').value = '';
+      const note = document.getElementById('sgBufNote');
+      if (note) note.textContent = `${_chipBuffer.length} chip${_chipBuffer.length === 1 ? '' : 's'} this session. ` +
+        `${ShortGame.MIN_CHIPS} is where the average starts describing you rather than the last one.`;
+      document.getElementById('sgSave').textContent = `Save session (${_chipBuffer.length})`;
+    });
+    document.getElementById('sgSave')?.addEventListener('click', () => {
+      if (!_chipBuffer.length) { toast('Add a chip first.'); return; }
+      const n = _chipBuffer.length;
+      ShortGame.record({ chips: _chipBuffer.slice(), lie: _chipBuffer[0].lie });
+      _chipBuffer = [];
+      toast(`Saved ${n} chip${n === 1 ? '' : 's'}.`);
+      renderShortGame();
+    });
   }
 
   // ── Quiet eye ─────────────────────────────────────────────────
@@ -6883,7 +7350,7 @@ const UI = (() => {
   }
 
   return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
-           renderQuietEye, renderDrills };
+           renderQuietEye, renderDrills, renderShortGame };
 })();
 
 // ────────────────────────────────────────────────────────────────

@@ -884,6 +884,15 @@ body.modal-open { overflow: hidden; }
 .drill-row-desc{font-size:.8rem;line-height:1.55;color:var(--text-dim);margin-top:.25rem;text-wrap:pretty}
 .drill-row-why{font-size:.74rem;line-height:1.5;color:var(--text-muted);margin-top:.35rem;
   padding-left:.7rem;border-left:2px solid var(--border)}
+.sg-row{border-left-color:var(--pine)}
+.sg-tier{flex:0 0 auto;font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;font-weight:700;
+  padding:.15rem .4rem;border-radius:999px;white-space:nowrap}
+.sg-tier-strong{background:rgba(34,139,94,.14);color:var(--green)}
+.sg-tier-moderate{background:rgba(234,179,8,.14);color:var(--yellow)}
+.sg-tier-weak{background:var(--surface3);color:var(--text-muted)}
+.sg-structs{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem}
+.sg-struct{font-size:.65rem;letter-spacing:.04em;text-transform:uppercase;font-weight:600;
+  padding:.15rem .45rem;border:1px solid var(--border);border-radius:999px;color:var(--text-muted)}
 .qe-form{display:flex;flex-direction:column;gap:.6rem}
 .qe-field{display:flex;flex-direction:column;gap:.25rem;font-size:.78rem;color:var(--text-dim)}
 .qe-field input{padding:.55rem .7rem;font-size:.95rem;font-variant-numeric:tabular-nums;
