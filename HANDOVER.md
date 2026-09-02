@@ -14,8 +14,8 @@ No build step. Vanilla ES6+, four shipped files: `index.html`, `app.js`,
 `style.css`, `sw.js`.
 
 **The one thing to understand before changing anything:** most of this app is
-*refusals*. A shot passes seven gates before it can become a drill, and at each
-one the honest output is often silence. If you add a feature that states a
+*refusals*. A shot passes eight gates before it can become a drill or a strokes
+figure, and at each one the honest output is often silence. If you add a feature that states a
 number without checking those gates, you are undoing the main body of work in
 this codebase. `docs/architecture.html` explains the pipeline; read it.
 
@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 8 suites, ~143 assertions. Must be green.
+npm test             # load gate + 9 suites, ~204 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v59` — increment it.
+   Currently `shotlab-v60` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -60,7 +60,7 @@ mechanism when a number changes. Match that.
 
 | Path | What it is |
 |---|---|
-| `app.js` | Everything. ~6,600 lines, 50 IIFE modules + ~24 top-level functions |
+| `app.js` | Everything. ~7,050 lines, 51 IIFE modules + ~24 top-level functions |
 | `index.html` | 7 views, 7 static modals, CSP meta, CDN script tags |
 | `style.css` | Design tokens + components. Two stacked `:root` blocks from successive redesigns |
 | `sw.js` | Service worker. Network-first same-origin, cache-first CDN |
@@ -78,7 +78,7 @@ mechanism when a number changes. Match that.
 
 ---
 
-## 4. Architecture: the seven gates
+## 4. Architecture: the eight gates
 
 Full version in `docs/architecture.html`. Short version:
 
@@ -91,6 +91,7 @@ Full version in `docs/architecture.html`. Short version:
 | 5 | Recur | `FaultEngine` | Under 2 affected, under 30% rate |
 | 6 | Weight | `PracticePlan` | — outputs the drill |
 | 7 | Retain | `RetentionProbe` | — settles a day+ later |
+| 8 | Value | `Dispersion` | Non-drivers, and spreads outside Broadie & Ko's 5.5–7.9° band, from any strokes figure |
 
 **Trust tiers** (`Metrics.TIER`, `app.js` ~line 363):
 
@@ -102,8 +103,9 @@ Full version in `docs/architecture.html`. Short version:
 ### Key module line numbers
 
 `Metrics` 363 · `Store` 982 · `FeedbackEngine` 1062 · `Conditions` 1153 ·
-`Spin` 1245 · `RetentionProbe` 1391 · `FaultEngine` 1676 · `Benchmarks` 2376 ·
-`PracticePlan` 2528 · `UI` 3167. These drift — grep, don't trust them.
+`Spin` 1245 · `Dispersion` 1334 · `RetentionProbe` 1759 · `FaultEngine` 2044 ·
+`Benchmarks` 2744 · `PracticePlan` 2896 · `UI` 3535.
+These drift — grep, don't trust them.
 
 ---
 
@@ -174,6 +176,14 @@ await ctx.route('**', r =>
   on selectors that exist in the real file.
 - The shot modal opens from `#shotTable tbody tr` — there are six tables in the
   detail view and the others have no click handler.
+- Import is reached by clicking `.bottom-nav-item[data-view="import"]`, and a
+  session is opened with `Router.showDetail(id)`. There is no `Router.showView`
+  and no `Router.openSession` — the exports are `show`, `showDetail`,
+  `showProgress`, `showYardages`, `showSessions`, `showPractice`, `showImport`.
+- The import flow is `#fileInput` (setInputFiles) → `#previewNext` →
+  `#metaBall` / `#metaSurface` / `#metaAligned` → `#saveSession`. Ball type
+  defaults to `unknown`, which disqualifies every dispersion gate — set it
+  explicitly or you will be testing the refusal path by accident.
 - The consent gate must be accepted (`#agreementCheckbox` then
   `#agreementAcceptBtn`), then guest chosen from `#authGuestWrap button`,
   before any view is reachable.
@@ -226,7 +236,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 50 modules, ~6,600 lines in `app.js`, 143 assertions.
+`main` is green. 51 modules, ~7,050 lines in `app.js`, 204 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -247,14 +257,29 @@ whose commit dies with it — a superseded 176-line CLAUDE.md.
 
 ### Next substantial piece
 
-**§10 step 5 of `docs/research-base-v2.md` — the dispersion-tail engine**
-feeding Broadie & Ko's curves. It is the only defensible strokes-gained
-valuation this device supports, and it needs a clear run rather than a rushed
-one. Steps 1, 2, 3 and 6 of that build order are done; 5, 7 (quiet-eye putting)
-and 8 (the ~104-drill library rebuild) are not.
+Steps 1, 2, 3, 5 and 6 of `docs/research-base-v2.md` §10 are done. **Step 4 —
+the smash-factor and strike-quality track (§8A)** is the one to take next: it
+is the highest-value amateur lever in the whole document, it is measured
+entirely with tier-1 metrics, and it is the shortest path to a result. The
+average male amateur has essentially LPGA club speed (93 vs 94 mph) and
+produces 7 mph less ball speed — the driver problem is strike and spin, not
+engine speed, and both are visible in smash factor.
+
+Then step 7 (quiet-eye putting, §8H — best-evidenced intervention in the
+document, needs no launch monitor) and step 8 (the ~104-drill library rebuild,
+restructured around feedback scheduling rather than drill content).
+
+**On `Dispersion`, if you touch it:** its refusals are the feature. A golfer
+with a 10° spread gets no strokes number at all, and that is correct — Broadie &
+Ko calibrated between 5.5° and 7.9°. Widening the band to make the number appear
+more often would be the single easiest way to put a fabricated figure in front
+of a user.
 
 ### Known and unfixed
 
+- `Dispersion.trend()` is written and tested but not yet rendered anywhere. The
+  Progress view is where it belongs — p95 across ≥5 sessions with the golfer's
+  own between-session band, which is drill B32 in the research base.
 - The gear-effect residual threshold (5°) is a hand-picked screen, not fitted.
   It should come from the golfer's own residual distribution like everything
   else does.
@@ -274,9 +299,11 @@ From `docs/research-base-v2.md` §9. These are not style preferences — each ha
 a measurement reason behind it.
 
 Never state a face angle from one shot · never convert a club-delivery metric
-to strokes gained · never infer kinematic sequence, ground forces or wrist
-position from launch data · never prescribe from spin · never draw dispersion
-or gapping conclusions from range-ball sessions · never quote "+N yards per
+to strokes gained — the app's one strokes figure comes from directional spread
+measured directly, via `Dispersion`, and never from a delivery metric · never
+infer kinematic sequence, ground forces or wrist position from launch data ·
+never prescribe from spin · never draw dispersion or gapping conclusions from
+range-ball sessions · never quote "+N yards per
 degree of attack angle" · never present carry as a measurement (it is a model
 output) · never claim a rep or week count to "groove" a change · never claim
 the app builds automaticity or rewires motor patterns.

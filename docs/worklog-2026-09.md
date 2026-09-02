@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `8a787f8`; `app.js` 5,964 → 6,605 lines
-(+1,300 of new measurement and coaching logic, −660 of dead modules).
+next, including future me. Commits run `2503479` → `ce3a3cd`; `app.js` 5,964 → 7,044 lines
+(+1,740 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 8 suites, 143 assertions.
+  jsdom) then 9 suites, 204 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -23,6 +23,9 @@ layer underneath rather than adding features on top of it.
   and a suspected off-centre strike invalidates them for that shot.
 - **Feedback defaults to tap-to-reveal**, and the retention probe — not
   within-session change — is what says whether anything worked.
+- **There is exactly one strokes figure in the app**, it comes from measured
+  directional spread through Broadie & Ko's published curves, and it refuses
+  outside the band those curves were calibrated on.
 
 If you change any sourced constant, read the section that cites it first. They
 are not guesses and the reasoning is why they hold.
@@ -284,22 +287,122 @@ existed only in an ephemeral container.
 
 ---
 
+## 8. Dispersion-tail engine `ce3a3cd`
+
+Step 5 of the research base's build order, and the last thing that had to exist
+before any strokes figure could honestly appear in the app.
+
+### Why a tail engine and not a dispersion statistic
+
+Fairways hit is flat across handicaps — 50% for a scratch, 46% for a 20 —
+while penalty rates vary roughly eightfold over the same range. Broadie & Ko's
+own account of the mechanism is explicit: a 2° improvement takes a 100-golfer
+from ~43% to ~53% fairways but takes OB from 4.4% to 2.0%, and *"the reduction
+of shots which end up in trouble has a greater impact on average score."* So
+the statistic worth showing is the tail, not the centre and not the SD alone.
+
+### Why it skips the obvious chain
+
+Face angle → start line is known. Face-to-path → curvature is known.
+Directional spread → strokes is known. The link nobody has published is
+face-angle SD → directional spread, and curvature amplifies start-line error
+non-linearly, so it cannot be assumed. The engine therefore measures the spread
+directly off the device's own offline outputs and feeds Broadie & Ko's curves
+with that. Face-to-path stays as the explanation served next to a drill and
+never enters the arithmetic. A "your 4° open face is costing you 1.2 strokes"
+figure is fabricated, and this is the structural reason the app cannot produce
+one even by accident.
+
+### Four things in it that look wrong until you know why
+
+**Outliers are not trimmed.** Everywhere else in this app a wild value is a
+misread to remove. Here the wild value is the measurement. Broadie & Ko model
+every non-putt shot as a two-component mixture — good shot with probability
+*p*, bad shot otherwise — because real patterns are skewed and heavy-tailed.
+Trim, and you delete the bad-shot component and are left with exactly the
+Gaussian that under-predicts penalties. Only impossible geometry is screened:
+under 20 yards of carry, or past 45° offline.
+
+**Spread survives a misaligned unit; absolute miss does not.** Aiming error is
+a constant offset, and a constant offset cancels out of any spread measured
+around the golfer's own centre. So sigma is admissible without confirmed
+alignment — which is a genuine and slightly surprising exception to the rest of
+`Conditions`. How far that centre sits from the target is *not* admissible, and
+is withheld until alignment is confirmed.
+
+**The valuation is driver-only.** Broadie & Ko published driver curves. There
+is no equivalent table for an 8-iron, so every other club gets the full tail
+audit and no strokes figure. That is the honest split, not a gap to fill later.
+
+**Outside 5.5°–7.9° it refuses.** Within 1.5° of the band it clamps to the
+nearest calibrated golfer and says so; beyond that there is no number at all.
+This means a genuinely wild driver — the golfer who would most like a number —
+gets a refusal. That is correct, and widening the band to make the number
+appear more often is the easiest available way to put a fabricated figure in
+front of a user.
+
+### The core scale, which took two attempts
+
+The engine needs a scale for the good-shot component to measure the bad ones
+against. A plain MAD is the obvious choice and is not good enough: a bad-shot
+rate around one in eight drags the median deviation up far enough that the cut
+lands past the blow-ups. So the scale is refined — re-measure it from the shots
+currently inside the cut, un-shrink for the truncation, repeat.
+
+That iteration has two fixed points. The lower one is the core, which is what
+is wanted. The upper one is the whole contaminated spread divided by the
+truncation factor, and it is self-sustaining: once the cut sits past every
+shot, nothing is truncated, so the correction inflates a scale that was never
+shrunk, which widens the cut further. The unguarded version walked a 40-shot
+driver set from a 7.5° MAD to 9.3° and then reported **zero** bad shots in a
+pattern that plainly had five. Only downward steps are taken now. On clean data
+the true sigma is already a fixed point, so nothing is given up.
+
+The same investigation corrected my own fixture. The blow-ups I had written
+were 15° misses on a 6.5° spread — 2.3 sigma, which a normal curve produces
+often enough on its own. The engine calling that an ordinary tail was right and
+I was wrong; a real bad shot is 25°+ against that core. Both directions are
+pinned by tests now, because the failure mode of a tail detector is symmetric:
+missing a real tail and inventing one are equally bad.
+
+### Also removed
+
+Three numbers in the dispersion strip that were ungated and wrong in three
+different ways, shown on any session at all:
+
+- a **max-minus-min "spread"**, which grows with sample size and so measured
+  how long you practised rather than how straight you hit it;
+- an **average miss** and a **bias in yards**, both quoted from range-ball
+  sessions (2–4× the dispersion) and from unaligned units (every shot offset by
+  the aiming error).
+
+What survives that is the *shape* — the left/on-line/right split — which the
+`Conditions` caveat already says is the part that stays real on range balls.
+That is all the strip shows now; everything quantitative moved behind the gates.
+
+---
+
 ## Still open
 
-**From the research base's §10 build order:** steps 1, 2 and 6 are done
-(measurement gates and per-user error, feedback engine, physics layer).
+**From the research base's §10 build order:** steps 1, 2, 3, 5 and 6 are done
+(measurement gates and per-user error, feedback engine, retention probe,
+dispersion-tail engine, physics layer).
 
-- **Step 3 — next-day retention probe.** The spec's primary efficacy metric and
-  the natural partner to the feedback engine. Nothing currently measures whether
-  a prescribed drill actually worked, and the guidance-hypothesis evidence says
-  within-session improvement is the wrong signal to look at.
-- **Step 5 — dispersion-tail engine** feeding Broadie & Ko's curves; the only
-  defensible strokes-gained valuation this device supports.
+- **Step 4 — smash-factor and strike-quality track (§8A).** The one to take
+  next. Highest-value amateur lever in the document, measured entirely with
+  tier-1 metrics, fastest to show a result: the average male amateur has
+  essentially LPGA club speed (93 vs 94 mph) and makes 7 mph less ball speed,
+  so the driver problem is strike and spin, not engine speed.
+- **Step 7 — quiet-eye putting (§8H).** Best-evidenced intervention in the
+  document and needs no launch monitor at all.
 - **Step 8 — drill library rebuild**, ~104 drills restructured around feedback
   scheduling rather than drill content.
 
 **Known and unfixed:**
 
+- `Dispersion.trend()` is written and tested but rendered nowhere. It belongs in
+  the Progress view — p95 across ≥5 sessions with the golfer's own
+  between-session band, which is drill B32 in the research base.
 - The gear-effect residual threshold (5°) is a hand-picked screen, not fitted.
   It should come from the golfer's own residual distribution like everything
   else.
@@ -350,6 +453,14 @@ face-to-path display broke §9.1 two commits after adding the module that
 forbids it, because the display layer never asked the module. Rules enforced in
 one layer don't enforce themselves in another.
 
+**I trusted my own test fixture over the engine, briefly.** A tail detector
+was reporting "ordinary" on a set I had built to be heavy-tailed, and my first
+move was to change the estimator. The estimator did have a real bug — it ran
+away upward — but the fixture was also wrong: 15° misses on a 6.5° spread are
+2.3 sigma and genuinely ordinary. Fixing only the code would have produced a
+detector that invents tails. When a measurement disagrees with the fixture,
+the fixture is a hypothesis too.
+
 **I let a stale harness report green four times** — `Conditions` missing, `Spin`
 missing, a renamed constant, a removed field — and treated each as a one-off
 patch rather than a signal the harness was structurally wrong. It was, and
@@ -382,6 +493,9 @@ Every commit in the session, and the section that explains it.
 | `1d95df3` | 6 | Add the retention probe, and fix three faults that fired on missing data |
 | `8a787f8` | 6 | Remove 17 unreachable modules |
 | `1b63575` | — | docs: correct work-log header stats after the cleanup |
+| `998ed92` | — | docs: add an architecture reference |
+| `ff1fdd8` | — | Add HANDOVER.md for a session starting cold |
+| `ce3a3cd` | 8 | Add the dispersion-tail engine and the app's only strokes valuation |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

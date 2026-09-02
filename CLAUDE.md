@@ -55,7 +55,8 @@ stacked in file order as features were added. Grouped by role:
 
 3. **Scoring / analysis engines** — `FaultEngine`, `ShotScorer`, `SwingDNA`,
    `Benchmarks`, `Insights`, `Analytics`, `SwingAnalytics`, `InsightEngine`,
-   `Trajectory`, `ClubAnalyzer`, `GapAnalysis`, `FormQualityTimeline`
+   `Trajectory`, `ClubAnalyzer`, `GapAnalysis`, `FormQualityTimeline`,
+   `Dispersion` (tail engine + the only strokes valuation — see below)
 
 4. **Coaching / practice** — `PracticePlan`, `PracticePlans`, `CoachingMode`,
    `PersonalCoach`, `DrillTracker`, `PracticeEfficiency`,
@@ -216,12 +217,14 @@ zero-variance robot, and mats hide fat strikes. Never compare across them.
 ### Claims the app must never make (§9)
 
 Never state a face angle from one shot · never convert a club-delivery metric
-to strokes gained · never infer kinematic sequence, ground forces or wrist
-position from launch data · never prescribe from spin · never draw dispersion
-or gapping conclusions from range-ball sessions · never quote "+N yards per
-degree of attack angle" · never present carry as a measurement (it is a model
-output) · never claim a rep/week count to "groove" a change · never claim the
-app builds automaticity or rewires motor patterns.
+to strokes gained (the sole strokes figure comes from measured directional
+spread via `Dispersion`, never from a delivery metric) · never infer kinematic
+sequence, ground forces or wrist position from launch data · never prescribe
+from spin · never draw dispersion or gapping conclusions from range-ball
+sessions · never quote "+N yards per degree of attack angle" · never present
+carry as a measurement (it is a model output) · never claim a rep/week count to
+"groove" a change · never claim the app builds automaticity or rewires motor
+patterns.
 
 ### `FeedbackEngine` — why numbers are hidden by default
 
@@ -266,6 +269,28 @@ is the working — read the relevant section before touching any of these.
 - **`CoachingMode.TIPS`** — deliberately written to an *external* focus of
   attention (club, ball, turf, target), never the golfer's own body parts.
   This is the best-evidenced item in the audit; don't rewrite cues inward.
+
+### Dispersion tails and the one strokes number (`Dispersion`)
+
+The only strokes-gained valuation in the app, and the only place a strokes
+figure may appear. It measures directional spread **directly** off the device's
+offline outputs and feeds Broadie & Ko (2009) — it does **not** chain through
+face angle, because the face-angle-SD → spread link is unpublished and
+curvature amplifies start-line error non-linearly.
+
+- **Outliers are not trimmed here.** The blow-up *is* the measurement. Broadie &
+  Ko's two-component mixture is what generates the penalties; trimming leaves
+  the Gaussian that under-predicts them. Only impossible geometry is screened
+  (`MIN_CARRY` 20 yd, `MAX_ANGLE` 45°).
+- **`coreScale()` only ever iterates downward.** The refinement has a second,
+  self-sustaining fixed point at the contaminated spread — see the comment.
+- **Gates:** premium or RPT ball only, `Metrics.MIN_SHOTS_TAIL` (30) usable
+  shots, per club.
+- **Sigma survives a misaligned unit** (a constant offset cancels out of a
+  spread); **absolute bias does not** and is withheld until alignment is confirmed.
+- **Valuation is driver-only** — the published curves are driver curves — and
+  refuses outside 5.5°–7.9° ±1.5°, clamping with a note inside that margin.
+  Every valuation carries `Dispersion.CAVEATS`; do not render one without them.
 
 ### Fault reporting gates (`FaultEngine`)
 

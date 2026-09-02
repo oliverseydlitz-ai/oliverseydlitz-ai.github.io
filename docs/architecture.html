@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="How a shot becomes a drill in ShotLab: the seven gates it passes, the invariants that hold everywhere, and the module map.">
+<meta name="description" content="How a shot becomes a drill in ShotLab: the eight gates it passes, the invariants that hold everywhere, and the module map.">
 <meta name="robots" content="noindex">
 <style>
   :root { color-scheme: light dark; }
@@ -140,7 +140,7 @@ footer a{color:var(--accent)}
 <header>
   <p class="eyebrow">Architecture reference · ShotLab TOUR</p>
   <h1>What has to be true before the app tells a golfer anything</h1>
-  <p class="standfirst">Most of this system is refusals. A shot arrives from a Rapsodo CSV and passes seven gates before it can become a drill — and at every one, the honest output is often silence. This is what each gate checks and why it exists.</p>
+  <p class="standfirst">Most of this system is refusals. A shot arrives from a Rapsodo CSV and passes eight gates before it can become a drill or a strokes figure — and at every one, the honest output is often silence. This is what each gate checks and why it exists.</p>
   <div class="meta">
     <span><b>Entry</b> Rapsodo MLM2PRO CSV</span>
     <span><b>Modules</b> 50 in app.js</span>
@@ -215,11 +215,21 @@ footer a{color:var(--accent)}
         <div class="gate pass"><b>verdict</b> retained · regressed · no detectable change · unknown</div>
       </div>
     </div>
+
+    <div class="stage">
+      <div class="stage-k">8 · Value</div>
+      <div>
+        <div class="stage-t">What is it worth in strokes?</div>
+        <div class="stage-d"><code>Dispersion</code> measures directional spread straight off the device's offline outputs — 30+ shots, premium or RPT ball, one club — and feeds Broadie &amp; Ko's published curves. It does <em>not</em> chain through face angle: the face-angle-SD → spread link is unpublished and curvature amplifies start-line error non-linearly, so face-to-path is the explanation beside the drill and never an input to the number. Outliers are kept here rather than trimmed, because the bad-shot component is the thing being measured.</div>
+        <div class="gate pass"><b>priced</b> driver only, spread inside 5.5°–7.9° ±1.5°, with the caveats attached</div>
+        <div class="gate"><b>refused</b> every other club · any spread past that band · range balls · under 30 shots</div>
+      </div>
+    </div>
   </div>
 
   <div class="note">
     <span class="lab">The gate that cannot be averaged away</span>
-    <p>Six of these gates handle <em>noise</em>, which shrinks as √n. Alignment handles <em>bias</em>, which does not shrink at all. A unit aimed 2° right makes a straight swing read 2.4° open once face-to-path amplifies it by 1/R — identically at 10 shots and at 30, while every other gate grows more confident. That asymmetry is why setup is a checklist rather than a tolerance.</p>
+    <p>Most of these gates handle <em>noise</em>, which shrinks as √n. Alignment handles <em>bias</em>, which does not shrink at all. A unit aimed 2° right makes a straight swing read 2.4° open once face-to-path amplifies it by 1/R — identically at 10 shots and at 30, while every other gate grows more confident. That asymmetry is why setup is a checklist rather than a tolerance.</p>
   </div>
 </section>
 
@@ -233,13 +243,14 @@ footer a{color:var(--accent)}
     <div class="inv-row"><span class="inv-m">spin</span><span class="inv-t">Never drives a drill, on any ball. With an RPT ball it <b>describes a session</b>; without one every spin figure is suppressed and replaced with why.</span></div>
     <div class="inv-row"><span class="inv-m">face angle</span><span class="inv-t">Derived, never presented as a measurement. A suspected off-centre strike <b>invalidates it for that shot</b> rather than quietly widening it.</span></div>
     <div class="inv-row"><span class="inv-m">cues</span><span class="inv-t">External focus only — club, ball, turf, target. A test fails if a cue naming the golfer's own body parts is added.</span></div>
+    <div class="inv-row"><span class="inv-m">strokes</span><span class="inv-t">There is <b>one</b> strokes figure in the app and it comes from measured directional spread. No club-delivery metric is ever converted to strokes, and outside the band Broadie &amp; Ko calibrated there is no number at all.</span></div>
     <div class="inv-row"><span class="inv-m">verdicts</span><span class="inv-t">Three-valued. A change smaller than the golfer's variation is <b>"no detectable change"</b>, never "no improvement" — the app cannot tell those apart and says so.</span></div>
   </div>
 </section>
 
 <section>
   <h2>Module map</h2>
-  <p class="lede">50 IIFE modules in <code>app.js</code>, in file order. The ones that gate are listed first because everything else depends on them.</p>
+  <p class="lede">51 IIFE modules in <code>app.js</code>, in file order. The ones that gate are listed first because everything else depends on them.</p>
 
   <div class="tw"><table>
     <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
@@ -261,6 +272,7 @@ footer a{color:var(--accent)}
       <tr><td><code>FaultEngine</code></td><td>Per-shot and session rules, plus the recurrence gates that decide what is reportable</td></tr>
       <tr><td><code>ShotScorer</code></td><td>0–100 from tier 1 and 2 metrics only — smash 45, attack angle 25, club path 15, spin loft 15</td></tr>
       <tr><td><code>Benchmarks</code></td><td>Tour averages tagged <code>[TM]</code> or <code>[est]</code>, targets held separately, spin-loft bands</td></tr>
+      <tr><td><code>Dispersion</code></td><td>Tail audit, two-sided miss census, and the app's only strokes valuation. Does not trim outliers — the blow-up is the measurement</td></tr>
       <tr><td><code>SwingDNA</code>, <code>Insights</code>, <code>Analytics</code></td><td>Session tendencies, coach's notes, yardage book and personal bests</td></tr>
 
       <tr class="grp"><td colspan="2">Coaching</td></tr>
