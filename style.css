@@ -884,6 +884,9 @@ body.modal-open { overflow: hidden; }
 .drill-row-desc{font-size:.8rem;line-height:1.55;color:var(--text-dim);margin-top:.25rem;text-wrap:pretty}
 .drill-row-why{font-size:.74rem;line-height:1.5;color:var(--text-muted);margin-top:.35rem;
   padding-left:.7rem;border-left:2px solid var(--border)}
+.next-step{border-left:4px solid var(--pine)}
+.next-why{margin-top:.45rem;padding-left:.7rem;border-left:2px solid var(--border);
+  font-size:.73rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .rd-form{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.7rem}
 .rd-form .qe-field input,.rd-form .qe-field select{width:100%}
 .rd-stat{margin-bottom:.7rem}

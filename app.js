@@ -5127,50 +5127,102 @@ const QuickStats = (() => {
 // SmartRecommendations — context-aware next-step suggestions
 // ════════════════════════════════════════════════════════════════
 const SmartRecommendations = (() => {
+  // The one answer to "what should I do today", and the only place in the app
+  // that ranks everything against everything else.
+  //
+  // The old version ranked by SESSION COUNT — under five sessions it said
+  // "build your baseline" whatever the data showed, then named the top fault,
+  // then suggested starting a streak. It knew nothing about the retention
+  // probe, which is the app's own stated efficacy metric; nothing about the
+  // on-course profile, which is outcome data and outranks anything measured on
+  // a range; and nothing about whether the drill it named could even be run on
+  // the balls the golfer used. It also set `desc` to the fault name it had
+  // already used as the title.
+  //
+  // The order below is an argument, so each step carries the reason it sits
+  // where it does. There is exactly one card: the research base's rule 9 is
+  // one cue and never a checklist, and a home screen with seven ranked
+  // priorities is a checklist with better manners.
   function getNextStep(sessions) {
-    if (!sessions.length) return {
-      type: 'first',
-      title: 'Import your first session',
-      desc: 'Upload a Rapsodo CSV to start analyzing your swing',
-      icon: '📤', action: 'import'
+    const list = sessions || [];
+
+    // 1. A due retention probe. Time-boxed — it expires after ten days — and it
+    //    is the only thing in the app that can tell you whether the LAST piece
+    //    of work actually held. Nothing outranks that.
+    try {
+      const due = RetentionProbe.openProbes();
+      if (due.length) return {
+        type: 'probe',
+        title: `Re-test your ${clubLabel(due[0].clubType)}`,
+        desc: `Hit ${RetentionProbe.MIN_SHOTS}+ ${clubLabel(due[0].clubType)} and import it. ` +
+              `That settles whether ${due[0].faultName || 'the last drill'} actually held.`,
+        why: 'Ranked first because it expires. A probe can only be answered between a day and ten days ' +
+             'after it opened, and whether a change held is the only efficacy evidence this app can produce.',
+        icon: '🔁', action: 'import',
+      };
+    } catch (_) {}
+
+    // 2. Nothing imported. The honest day-one answer is not "go buy a launch
+    //    monitor session" — it is the two modules that need no device at all.
+    if (!list.length) return {
+      type: 'offdevice',
+      title: 'Start with the short game',
+      desc: 'Twenty putts with the quiet-eye protocol, or ten chips scored on where they finish. ' +
+            'Neither needs the launch monitor, and both are logged in the app.',
+      why: 'You have no sessions yet, and the best-evidenced intervention in the whole research base is a ' +
+           'putting one — a single 20-putt session produced the published result. Import a CSV whenever you ' +
+           'next hit balls.',
+      icon: '⛳', action: 'practice',
     };
 
-    if (sessions.length < 5) return {
-      type: 'buildup',
-      title: 'Build your baseline',
-      desc: `${5 - sessions.length} more sessions to establish patterns`,
-      icon: '📈', action: 'sessions'
-    };
+    // 3. The on-course profile. Outcome data beats anything inferred from a
+    //    range, so a category that is genuinely out of line outranks a fault.
+    try {
+      const p = Rounds.profile();
+      if (p.ok && !p.even && p.worst) return {
+        type: 'category',
+        title: `Your ${p.worst.label.toLowerCase()} is the outlier`,
+        desc: `It plays like a ${fmt(p.worst.implied, 0)} handicap while the rest of your game plays like a ` +
+              `${fmt(p.best.implied, 0)}. Progress shows what to do about it.`,
+        why: 'Ranked above anything from the range because it is what actually happened on a course. A range ' +
+             'fault is a hypothesis about your scoring; a category gap is your scoring.',
+        icon: '📉', action: 'progress',
+      };
+    } catch (_) {}
 
-    const faults = FaultEngine.detectFaults(sessions[0].shots);
-    if (faults.length > 0) return {
-      type: 'drill',
-      title: `Work on ${faults[0].name}`,
-      desc: faults[0].name,
-      icon: faults[0].icon, action: 'drill'
-    };
+    // 4. The top fault in the most recent session, and only if a drill for it
+    //    can actually be run on what that session measured.
+    try {
+      const latest = list[0];
+      const faults = FaultEngine.detectFaults(latest.shots, latest).filter(f => f.drills && f.drills.length);
+      if (faults.length) {
+        const f = faults[0];
+        const lib = PracticePlan.libraryDrill(f, latest.shots, latest);
+        return {
+          type: 'drill',
+          title: `Work on ${f.name}`,
+          desc: lib.libraryDrill
+            ? `${lib.libraryDrill.name}: ${lib.libraryDrill.desc}`
+            : (lib.lockedNote || f.drills[0].desc),
+          why: lib.libraryDrill
+            ? `It showed on ${f.count} of ${f.total} shots, which is past what measurement noise produces.`
+            : 'It showed often enough to report, but the drill for it needs a measurement this session ' +
+              'did not provide — the note above says which.',
+          icon: f.icon, action: 'drill',
+        };
+      }
+    } catch (_) {}
 
-    const st = Features.streak(sessions);
-    if (st.current === 0) return {
-      type: 'streak',
-      title: 'Start your streak today',
-      desc: 'Practice to build consistency',
-      icon: '🔥', action: 'sessions'
-    };
-
-    const goals = Goals.getGoals();
-    if (Object.keys(goals).length === 0) return {
-      type: 'goal',
-      title: 'Set a goal',
-      desc: 'Give yourself something to chase',
-      icon: '🎯', action: 'settings'
-    };
-
+    // 5. Nothing recurring. That is a result, not an empty state — so point at
+    //    the block the evidence says transfers, rather than inventing a task.
     return {
-      type: 'review',
-      title: 'Check your progress',
-      desc: 'See how you\'re improving',
-      icon: '📊', action: 'progress'
+      type: 'transfer',
+      title: 'Play the course on the range',
+      desc: 'One ball, a new target and club every shot, full routine, no mulligans. Score each one against ' +
+            'a target width you set first.',
+      why: 'Nothing recurred often enough to prescribe against, which is a real result. The block most ' +
+           'golfers skip is the one closest to the game they are practising for.',
+      icon: '⛳', action: 'practice',
     };
   }
 
@@ -5675,10 +5727,11 @@ const UI = (() => {
       if (nextHost) {
         const next = SmartRecommendations.getNextStep(sessions);
         nextHost.innerHTML = `
-          <div class="drill-card" data-route="${Sanitize.escape(next.action)}">
+          <div class="drill-card next-step" data-route="${Sanitize.escape(next.action)}">
             <div class="drill-icon">${next.icon}</div>
-            <div class="drill-title">${next.title}</div>
-            <div class="drill-desc">${next.desc}</div>
+            <div class="drill-title">${Sanitize.escape(next.title)}</div>
+            <div class="drill-desc">${Sanitize.escape(next.desc)}</div>
+            ${next.why ? `<div class="next-why">${Sanitize.escape(next.why)}</div>` : ''}
             <div class="drill-time">→ Tap to go</div>
           </div>`;
       }
