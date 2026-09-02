@@ -3374,8 +3374,128 @@ const Rounds = (() => {
     };
   }
 
-  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS,
-           all, record, remove, clear, per18, place, profile, rangeLink };
+  // ── From diagnosis to practice ────────────────────────────────
+  // A profile that names your weakest category and then stops is half a
+  // feature. This is the join: each on-course category points at the practice
+  // that produces it, and the two off-device modules are in the map alongside
+  // the launch-monitor sections because putting and short game are where two
+  // of the four categories actually live.
+  //
+  // The mapping is deliberately narrow. Greens in regulation goes to distance
+  // control rather than to "ball striking" generally, because for an amateur
+  // the largest single cause of missing greens is not knowing what each club
+  // carries — a wedge chart is a bigger GIR lever than a swing change and it
+  // is a data-generation session, not a technique one.
+  const CATEGORY_WORK = {
+    penalties: {
+      area: 'range', section: 'B',
+      why: 'Penalties are the tail of your dispersion, not the centre of it. Fairways hit barely moves ' +
+           'across the whole handicap range while penalties vary eightfold — so the work is on the bad ' +
+           'shot, and the app can measure that directly off 30 shots of one club.',
+    },
+    gir: {
+      area: 'range', section: 'F',
+      why: 'The largest single cause of missed greens for an amateur is not knowing what each club carries. ' +
+           'A full gapping matrix is a data-generation session rather than a technique one, and it usually ' +
+           'finds two clubs that go the same distance.',
+    },
+    updown: {
+      area: 'short', shortGame: 'chipping',
+      why: 'Up and down is chipping and the putt that follows it, and none of it is measured by the launch ' +
+           'monitor — so this is the one you can work on tonight with no equipment at all.',
+    },
+    putts: {
+      area: 'short', shortGame: 'putting',
+      why: 'Putts per round moves least across the handicap range of any category here, which means a lot ' +
+           'of it is inherited from how far away your approach left you. Work it, but expect the smaller ' +
+           'return — and expect most of it to come from lag distance control rather than from holing more.',
+    },
+  };
+  const workFor = key => CATEGORY_WORK[key] || null;
+
+  // What to do about the profile, with the measurement gate already checked so
+  // nothing is prescribed that this golfer's data cannot support.
+  function prescribe(p, ctx = {}) {
+    if (!p || !p.ok || !p.worst) return null;
+    const w = workFor(p.worst.key);
+    if (!w) return null;
+    const out = { category: p.worst, ...w, even: !!p.even };
+    if (p.even) {
+      out.headline = 'No category is dragging, so there is no single fix to point at. The nearest thing to a ' +
+                     'weakness is ' + p.worst.label.toLowerCase() + ', and it is barely one.';
+    } else {
+      out.headline = `Your ${p.worst.label.toLowerCase()} is the outlier by ${fmt(p.spread, 0)} points of ` +
+                     `implied handicap. That is the one worth a winter.`;
+    }
+    if (w.area === 'range' && typeof DrillLibrary !== 'undefined') {
+      const rows = DrillLibrary.forSection(w.section, ctx);
+      const open = rows.filter(r => r.ok);
+      out.sectionName = DrillLibrary.SECTIONS[w.section].name;
+      out.drills = open.slice(0, 3).map(r => r.drill);
+      out.locked = rows.length - open.length;
+      out.lockedNote = open.length ? null
+        : (rows.find(r => r.reasons.length)?.reasons[0] ||
+           'Nothing in this section can be run on what your sessions have measured so far.');
+    } else if (w.area === 'short' && typeof ShortGame !== 'undefined') {
+      const list = w.shortGame === 'putting' ? ShortGame.PUTTING : ShortGame.CHIPPING;
+      out.sectionName = w.shortGame === 'putting' ? 'Putting' : 'Chipping';
+      // Strongest evidence first — these are never gated, so the ranking is
+      // the only thing distinguishing them.
+      out.drills = [...list].sort((a, b) =>
+        ({ strong: 0, moderate: 1, weak: 2 })[a.tier] - ({ strong: 0, moderate: 1, weak: 2 })[b.tier]).slice(0, 3);
+      out.locked = 0; out.lockedNote = null;
+    }
+    return out;
+  }
+
+  // ── Trend ─────────────────────────────────────────────────────
+  // One category over time, judged against this golfer's own round-to-round
+  // variation. Rounds are noisy — weather, course, how the day went — so the
+  // bar for calling a move real is deliberately the golfer's own spread rather
+  // than any fixed number of strokes.
+  const MIN_TREND_ROUNDS = 5;
+  function trend(stat, rounds = all()) {
+    const spec = PLACEABLE[stat];
+    if (!spec) return { ok: false, note: 'That stat is not one the table can place.' };
+    const pts = (rounds || []).map(per18).filter(Boolean)
+      .filter(r => Number.isFinite(r[stat]))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (pts.length < MIN_TREND_ROUNDS) {
+      return { ok: false, points: pts, need: MIN_TREND_ROUNDS - pts.length,
+               note: `${MIN_TREND_ROUNDS} rounds with ${spec.label.toLowerCase()} logged before this can say ` +
+                     `anything; there ${pts.length === 1 ? 'is 1' : `are ${pts.length}`}. Rounds are noisy — ` +
+                     `weather, course, how the day went — so a short series shows the weather, not you.` };
+    }
+    const vals = pts.map(r => r[stat]);
+    const delta = vals[vals.length - 1] - vals[0];
+    const noise = stdDev(vals.slice(0, -1));
+    const improved = spec.higherBetter ? delta > 0 : delta < 0;
+    // A zero-variance baseline must not mean "no change is detectable" — it is
+    // the opposite. A golfer who took exactly three penalties in five straight
+    // rounds and then took none has moved by any reading, and the first version
+    // of this guard told them nothing had happened because it required
+    // `noise > 0`. With no observed variation, any real difference clears it.
+    const flat = !(noise > 0);
+    const real = flat ? Math.abs(delta) > 0 : Math.abs(delta) > noise;
+    return {
+      ok: true, stat, label: spec.label, unit: spec.unit, points: pts, values: vals,
+      delta, noise, real, improved,
+      first: place(stat, vals[0]), last: place(stat, vals[vals.length - 1]),
+      flat,
+      note: !real
+        ? `${fmt(Math.abs(delta), 1)}${spec.unit} of movement across ${pts.length} rounds, inside your own ` +
+          `round-to-round variation of ${fmt(noise, 1)}${spec.unit}. No detectable change — which is not the ` +
+          `same as no change.`
+        : `${improved ? 'Better' : 'Worse'} by ${fmt(Math.abs(delta), 1)}${spec.unit} across ${pts.length} ` +
+          `rounds` + (flat
+            ? `, off a baseline that had not moved at all. Treat it as real and watch whether it holds — a ` +
+              `run of identical rounds is a small sample looking steadier than it is.`
+            : `, beyond your own round-to-round variation of ${fmt(noise, 1)}${spec.unit}. That is a real move.`),
+    };
+  }
+
+  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS, MIN_TREND_ROUNDS, CATEGORY_WORK,
+           all, record, remove, clear, per18, place, profile, rangeLink, workFor, prescribe, trend };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -7141,6 +7261,52 @@ const UI = (() => {
           replicated across 20,000 golfers and 400,000 rounds. Greens in regulation varies sixfold from
           scratch to 25 and penalties eightfold, which is why those place you and fairways cannot.</div>
       </div>
+
+      ${(() => {
+        // What to do about it. A profile that names your weakest category and
+        // then stops is half a feature — and it would be the same "built but
+        // not wired" pattern this codebase has had to be dug out of repeatedly.
+        const shots = (sessions || []).flatMap(sn => { try { return Store.stamp(sn).shots || []; } catch (_) { return []; } });
+        const counts = {};
+        shots.forEach(x => { if (x.clubType) counts[x.clubType] = (counts[x.clubType] || 0) + 1; });
+        const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+        const rx = R.prescribe(p, { shots, clubType: club, sessions: (sessions || []).length });
+        if (!rx) return '';
+        return `<div class="tail-block${rx.even ? ' pending' : ''}">
+            <div class="tail-head">So work on this
+              <span class="tail-n">${esc(rx.sectionName || '')}</span></div>
+            <div class="tail-item${rx.even ? '' : ' heavy'}">${esc(rx.headline)}</div>
+            <div class="tail-note">${esc(rx.why)}</div>
+            ${rx.drills && rx.drills.length
+              ? rx.drills.map(d => `<div class="tail-item"><strong>${esc(d.name)}.</strong>
+                  ${esc(d.desc || d.protocol || '')}</div>`).join('')
+              : `<div class="tail-note">${esc(rx.lockedNote || '')}</div>`}
+            ${rx.locked ? `<div class="tail-note">${rx.locked} more drill${rx.locked === 1 ? '' : 's'} in that
+              section are locked on what your sessions have measured so far — the Practice tab shows each with
+              its reason.</div>` : ''}
+          </div>`;
+      })()}
+
+      ${(() => {
+        // A category over time, once there are enough rounds for the question
+        // to mean anything. Defaults to the outlier, because that is the one
+        // being worked on.
+        if (!p.ok || !p.worst) return '';
+        const t = R.trend(p.worst.key, rounds);
+        if (!t.ok) return `<div class="tail-block pending">
+            <div class="tail-head">${esc(p.worst.label)} over time</div>
+            <div class="tail-note">${esc(t.note)}</div></div>`;
+        return `<div class="tail-block">
+            <div class="tail-head">${esc(t.label)} over time
+              <span class="tail-n">${t.points.length} rounds</span></div>
+            ${sparkline(t.values)}
+            <div class="tail-spark-key">oldest → newest ·
+              ${t.unit === '%' ? 'higher is better' : 'lower is better'}</div>
+            <div class="tail-item${t.real ? '' : ' heavy'}">${esc(t.note)}</div>
+            ${t.first && t.last ? `<div class="tail-note">On the table that is a move from about a
+              ${fmt(t.first.hcp, 0)} handicap to about a ${fmt(t.last.hcp, 0)} in this one category.</div>` : ''}
+          </div>`;
+      })()}
 
       ${link ? `<div class="tail-block${link.ok ? '' : ' pending'}">
         <div class="tail-head">The course and the range, side by side</div>

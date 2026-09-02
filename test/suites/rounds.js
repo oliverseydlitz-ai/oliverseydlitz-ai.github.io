@@ -91,5 +91,77 @@ ok(R.all().length === 1 && R.all()[0].id !== saved.id, 'and one can be removed')
 R.clear();
 ok(R.all().length === 0, 'clear empties it');
 
+console.log('— the diagnosis now points at the practice that produces it —');
+// A profile that names your weakest category and then stops is half a feature.
+const shot = (o={}) => ({ clubType:'d', ballSpeed:150, clubSpeed:104, smashFactor:1.44,
+  carryDistance:240, sideCarry:6, launchAngle:12, attackAngle:-1, clubPath:1,
+  launchDirection:1, _ball:'premium', _surface:'grass', _aligned:true, ...o });
+const many = (n,o) => Array.from({length:n},(_,i)=>({ _row:i+2, ...shot(o) }));
+
+const penProfile = R.profile([1,2,3,4].map(() => rd({ girHit:8, penalties:4.6, putts:30, upDowns:7, upDownAttempts:14 })));
+ok(penProfile.worst.key === 'penalties', 'penalties is the outlier in this profile');
+const rx = R.prescribe(penProfile, { shots: many(40), clubType:'d', sessions: 1 });
+ok(rx !== null, 'and it produces a prescription');
+ok(rx.area === 'range' && rx.section === 'B', 'penalties route to the dispersion-tail section');
+ok(rx.drills.length > 0, 'with drills whose gates are met');
+ok(/tail of your dispersion, not the centre/.test(rx.why), 'and the reason names the mechanism');
+ok(/vary eightfold/.test(rx.why), 'citing the finding rather than asserting it');
+ok(/worth a winter/.test(rx.headline), 'the headline says it is the one to spend time on');
+
+// The gate travels with it: same diagnosis, range balls, nothing prescribed.
+const gated = R.prescribe(penProfile, { shots: many(40, { _ball:'range' }), clubType:'d', sessions: 1 });
+ok(gated.drills.length === 0, 'on range balls the tail section is entirely locked');
+ok(/2–4× wider/.test(gated.lockedNote), 'and it says what would unlock it, rather than substituting');
+
+console.log('— and the two off-device categories route off-device —');
+const udProfile = R.profile([1,2,3,4].map(() => rd({ girHit:8, penalties:1, putts:30, upDowns:1, upDownAttempts:16 })));
+ok(udProfile.worst.key === 'updown', 'a bad up-and-down rate is the outlier here');
+const udRx = R.prescribe(udProfile, {});
+ok(udRx.area === 'short' && udRx.shortGame === 'chipping', 'which routes to chipping, not to a launch-monitor section');
+ok(udRx.drills.length === 3 && udRx.locked === 0, 'three drills, none gated — no device needed');
+ok(udRx.drills[0].tier === 'strong', 'strongest evidence first, since nothing else distinguishes them');
+ok(/work on tonight with no equipment/.test(udRx.why), 'and it says you can do it tonight');
+
+const puttProfile = R.profile([1,2,3,4].map(() => rd({ girHit:8, penalties:1, putts:34, upDowns:7, upDownAttempts:14 })));
+ok(R.prescribe(puttProfile, {}).shortGame === 'putting', 'bad putting routes to putting');
+ok(/expect the smaller return/.test(R.prescribe(puttProfile, {}).why),
+   'and honestly says putting returns least of the four');
+
+console.log('— a level profile is not handed a fake priority —');
+const levelRx = R.prescribe(R.profile([1,2,3,4].map(() => rd({ girHit:6, penalties:1.62, putts:31.2, upDowns:5, upDownAttempts:16 }))), {});
+ok(levelRx.even === true, 'it knows the categories are level');
+ok(/barely one/.test(levelRx.headline), 'and says the nearest thing to a weakness is barely one');
+ok(R.prescribe(null, {}) === null && R.prescribe({ ok:false }, {}) === null, 'no profile, no prescription');
+
+console.log(`— the trend needs ${R.MIN_TREND_ROUNDS} rounds, because rounds are noisy —`);
+const series = vals => vals.map((v,i) => rd({ penalties: v, date: new Date(2026,0,i+1).toISOString() }));
+ok(R.trend('penalties', series([4,3,4])).ok === false, 'three rounds is not a trend');
+ok(/shows the weather, not you/.test(R.trend('penalties', series([4,3,4])).note),
+   'and it says why a short series is unreadable');
+ok(R.trend('fir', series([4,3,4,5,4])).ok === false, 'fairways cannot be trended either — it is not placeable');
+
+const flat = R.trend('penalties', series([4,3,5,4,3,4]));
+ok(flat.ok === true && flat.real === false, 'movement inside their own round-to-round spread is not a change');
+ok(/not the same as no change/.test(flat.note), 'and it refuses to call that no change');
+
+const better = R.trend('penalties', series([5,4,6,5,4,1]));
+ok(better.real === true && better.improved === true, 'a move beyond it reads as real and as an improvement');
+ok(/Better by/.test(better.note), 'named as better, since fewer penalties is better');
+
+// A zero-variance baseline must not mean "no change is detectable" — it is the
+// opposite. The first version required noise > 0 and so told a golfer who took
+// exactly five penalties in five straight rounds and then one that nothing had
+// happened.
+const offFlat = R.trend('penalties', series([5,5,5,5,5,1]));
+ok(offFlat.flat === true, 'an unmoving baseline is flagged');
+ok(offFlat.real === true, 'and a move off it still counts as real');
+ok(/had not moved at all/.test(offFlat.note), 'the note says the baseline was flat');
+ok(/looking steadier than it is/.test(offFlat.note), 'and warns that a short identical run flatters itself');
+ok(R.trend('penalties', series([5,5,5,5,5,5])).real === false, 'while no movement at all is still no movement');
+ok(better.first.hcp > better.last.hcp, 'and the implied handicap moved the right way');
+
+const worse = R.trend('putts', series([30,30,30,30,30,38]).map((r,i) => ({ ...r, putts: [30,30,30,30,30,38][i] })));
+ok(worse.real === true && worse.improved === false, 'more putts reads as worse, since lower is better there');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
