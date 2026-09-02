@@ -192,24 +192,68 @@ function mean(values) {
 // PING 2020 (157 golfers, 1,575 shots, Vicon 720fps + Foresight, air-cannon
 // validated) reconciled with TrackMan gives driver 0.84, 7-iron 0.78, PW 0.71,
 // interpolated on SPIN LOFT rather than club number.
-// Clamped to the measured anchors at both ends. Unclamped, the line
-// interpolates to ~0.74 at a pitching wedge, above both PING's measured 0.71
-// and the 0.60-0.70 band quoted for high-loft clubs. Extrapolating a straight
-// line past the data it was fitted to is how you get a confident wrong answer
-// at the edges, so it is held to [0.70, 0.85].
-const R_MIN = 0.70, R_MAX = 0.85;
-const R_BY_SPINLOFT = sl => Math.min(R_MAX, Math.max(R_MIN, 0.89 - 0.0045 * sl));
-const R_FALLBACK = { driver: 0.84, wood: 0.84, hybrid: 0.80, iron: 0.78, wedge: 0.71 };
+// R is interpolated piecewise through the MEASURED anchors, so the curve
+// passes exactly through every club anyone actually measured rather than
+// approximating them with a straight line. Anchors are PING 2020 (157
+// golfers, 1,575 shots, Vicon 720fps + Foresight, air-cannon validated)
+// reconciled with TrackMan, placed at each club's own tour spin loft:
+//
+//     driver      spin loft 14.7°   R 0.84   (PING 0.83±0.08, TrackMan 0.87)
+//     7-iron      spin loft 27.5°   R 0.78   (PING 0.81±0.05, TrackMan 0.75)
+//     pitching w. spin loft 35.2°   R 0.71   (PING 0.72±0.06, TrackMan 0.70)
+//
+// Outside that span R is held at the end anchors rather than extrapolated —
+// running a fitted line past its own data is how the edges go confidently
+// wrong. No value outside [0.71, 0.84] is supported by anything measured.
+const R_ANCHORS = [
+  { spinLoft: 14.7, R: 0.84 },
+  { spinLoft: 27.5, R: 0.78 },
+  { spinLoft: 35.2, R: 0.71 },
+];
+
+function R_BY_SPINLOFT(sl) {
+  const a = R_ANCHORS;
+  if (sl <= a[0].spinLoft) return a[0].R;
+  if (sl >= a[a.length - 1].spinLoft) return a[a.length - 1].R;
+  for (let i = 1; i < a.length; i++) {
+    if (sl <= a[i].spinLoft) {
+      const lo = a[i - 1], hi = a[i];
+      return lo.R + (hi.R - lo.R) * (sl - lo.spinLoft) / (hi.spinLoft - lo.spinLoft);
+    }
+  }
+  return a[a.length - 1].R;
+}
+
+// Per-club R for every club in the bag, derived from that club's OWN tour
+// spin loft rather than a coarse driver/iron/wedge banding. Used when a shot
+// has no launch or attack angle of its own to compute spin loft from.
+// Built lazily on first use: Benchmarks is declared further down the file, so
+// computing this at module-init would hit the temporal dead zone and take the
+// whole app down at load.
+let _rByClub = null;
+function rByClub(t) {
+  if (_rByClub === null) {
+    _rByClub = {};
+    for (const c of CLUB_ORDER) {
+      const b = Benchmarks.get(c);
+      if (!b) continue;
+      const kv = (isWood(c) || isHybrid(c)) ? LOFT_RATIO_WOOD : LOFT_RATIO_IRON;
+      _rByClub[c] = R_BY_SPINLOFT((b.pga.la - b.pga.aa) / kv);
+    }
+  }
+  return _rByClub[t];
+}
 
 function faceRatio(shot) {
   const t = typeof shot === 'string' ? shot : shot?.clubType;
   const sl = typeof shot === 'object' ? spinLoft(shot) : null;
-  // Prefer the spin-loft interpolation; fall back to the club-family anchors.
+  // Best: this shot's own spin loft. A 7-iron delivered with a wide-open face
+  // has a different spin loft, and therefore a different R, than a normal one.
   if (Number.isFinite(sl) && sl >= 8 && sl <= 60) return R_BY_SPINLOFT(sl);
-  if (t === 'd' || isWood(t)) return R_FALLBACK.driver;
-  if (isHybrid(t)) return R_FALLBACK.hybrid;
-  if (isShort(t)) return R_FALLBACK.wedge;
-  return R_FALLBACK.iron;
+  // Next: this specific club's tour spin loft, not a club-family band.
+  const byClub = rByClub(t);
+  if (byClub !== undefined) return byClub;
+  return R_ANCHORS[1].R;   // unknown club — the mid anchor
 }
 
 // Vertical analogue: launchAngle = kv·dynamicLoft + (1-kv)·AoA, so
@@ -471,7 +515,7 @@ const MemDB = (() => {
     const i = _sessions.findIndex(s => s.id === id);
     if (i >= 0) _sessions.splice(i, 1);
   };
-  return { getSessions, getSession, saveSession, deleteSession, stamp };
+  return { getSessions, getSession, saveSession, deleteSession };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -983,7 +1027,7 @@ const Store = (() => {
     MemDB.deleteSession(id);
     if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
   }
-  return { getSessions, getSession, saveSession, deleteSession };
+  return { getSessions, getSession, saveSession, deleteSession, stamp };
 })();
 
 // ────────────────────────────────────────────────────────────────
