@@ -4167,7 +4167,7 @@ const FaultEngine = (() => {
 
     // ── ATTACK ANGLE ──────────────────────────────────────────
     {
-      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
+      minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
       id:'driver-negative-aa', name:'Negative Attack Angle on Driver', icon:'📉', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -1,
       description: shots => {
@@ -4191,7 +4191,7 @@ const FaultEngine = (() => {
     },
 
     {
-      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
+      minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
       id:'driver-very-steep', name:'Very Steep Driver Attack', icon:'📉📉', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -4,
       description: shots => `Severely negative attack angle of ${fmt(avg(shots,'attackAngle'),1)}° on driver. ` +
@@ -4207,7 +4207,7 @@ const FaultEngine = (() => {
     },
 
     {
-      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
+      minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
       id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'↗️', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && !isShort(s.clubType) &&
         Number.isFinite(s.attackAngle) && s.attackAngle > -0.5,
@@ -4227,7 +4227,7 @@ const FaultEngine = (() => {
     },
 
     {
-      minShots: 15,   // club-delivery metric — tier 2, needs a bigger sample
+      minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
       id:'iron-very-steep', name:'Very Steep Iron Attack', icon:'⬇️', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && s.attackAngle < -7,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° is too steep for irons. ` +
@@ -9152,6 +9152,26 @@ async function init() {
   paintKeepLocal();
 
   // Launch-monitor setup guide
+  // The import form's ball and surface menus were a second, hand-maintained
+  // copy of Conditions.BALLS and Conditions.SURFACES — the same second-copy
+  // shape as the target bands that got conflated with the tour averages. They
+  // had already drifted: the menu said "Not sure" where Conditions says "Not
+  // recorded". Fill them from the module, so a ball type can only be added in
+  // one place.
+  (function fillConditionMenus() {
+    const fill = (id, table) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const keep = sel.value;
+      sel.innerHTML = Object.values(table).map(o =>
+        `<option value="${Sanitize.escape(o.id)}"${o.id === 'unknown' ? ' selected' : ''}>${Sanitize.escape(o.label)}</option>`
+      ).join('');
+      if (keep && table[keep]) sel.value = keep;
+    };
+    fill('metaBall', Conditions.BALLS);
+    fill('metaSurface', Conditions.SURFACES);
+  })();
+
   document.getElementById('setupGuideBtn')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink2')?.addEventListener('click', () => SetupGuide.show());

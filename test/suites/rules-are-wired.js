@@ -44,6 +44,9 @@ const WIRED = [
   ['libraryDrill',    'PracticePlan',   'the plan stops using the gated library'],
   ['transferBlock',   'PracticePlan',   'no plan ends with the block that transfers'],
   ['conditionGroups', 'Analytics',      'the yardage book pools across ball types again'],
+  ['MIN_SHOTS_DELIVERY','Metrics',      'the four tier-2 fault rules keep their own copy of the 15-shot floor'],
+  ['BALLS',           'Conditions',     'the import menu becomes a second hand-maintained copy of the ball list'],
+  ['SURFACES',        'Conditions',     'the same, for the surface list'],
 ];
 
 console.log('— every gate the app defines is read by something outside its module —');
