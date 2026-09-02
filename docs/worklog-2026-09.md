@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `551671f`; `app.js` 5,964 → 8,586 lines
-(+3,280 of new measurement and coaching logic, −660 of dead modules).
+next, including future me. Commits run `2503479` → `d7c932e`; `app.js` 5,964 → 9,130 lines
+(+3,830 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 14 suites, 405 assertions.
+  jsdom) then 15 suites, 517 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -507,19 +507,111 @@ unlocks" is actionable and a silently shorter list is not.
 
 ---
 
+## 10. Enforcing what the app already claimed `67c53dd` → `d7c932e`
+
+The theme of this pass is a single question asked repeatedly: **is this rule
+actually applied anywhere?** Almost every finding is a rule the app states, has
+code for, and does not run.
+
+### 10.1 The feedback schedule did nothing `67c53dd` `da87dd2`
+
+The setting existed, the engine existed, and nothing consulted either.
+`shouldReveal`, `shouldAskPrediction`, `insideBand` and `fadedFrequency` were
+dead; the only calls into `FeedbackEngine` were `getMode` and `setMode` from
+the Settings picker. The app's headline differentiator — the one architectural
+decision it makes against every other launch monitor — was a radio button.
+
+Wiring it up exposed three things. **Faded was random**, and the table
+re-sorts, so the same shot would hide and reveal itself as the golfer clicked
+column headers; it is fixed quarters now. **The verdict leaked**: rows keep a
+green/amber/red edge from `ShotScorer`, which is a judgement of the shot and
+therefore feedback exactly as much as the numbers are — hiding the figures
+while colour-coding every row defeats the point. **Bandwidth pooled the bag**,
+so on a two-club session it measured the driver-to-wedge gap and reported 53%
+of shots; per club, and at 1.5 SD rather than 1, it reports about one in eight.
+One SD leaves a third of a normal distribution outside it by construction —
+that is ordinary variation with an alarm on it, and it trains someone to ignore
+the alarm.
+
+Error estimation followed: call the number before it appears, on scheduled
+shots, then score the gap against the golfer's own spread. Inside their spread
+reads as "you can feel this shot before you see it"; outside it is the thing
+the drill trains.
+
+### 10.2 Device storage never received an import `59aa340`
+
+The worst finding, because it broke a feature shipped in this same session.
+`ImportFlow.save()` writes straight to `MemDB`; persistence was wired into
+`Store.saveSession`, which the import path never calls. A session imported
+*after* device storage was switched on reached memory and nothing else.
+
+It passed its own browser test because that test imported first and toggled the
+setting second, and turning the setting on flushes whatever is already in
+memory. The real sequence — switch it on once, then import over the following
+weeks — loses every session. `Store.saveLocal()` is now the single local write
+path.
+
+### 10.3 The fault map joined nothing `a7b30bf`
+
+`DrillLibrary.FAULT_SECTION` was written from the research base's section
+headings rather than from `FaultEngine`, so it mapped inventions — `open-face`,
+`two-way-miss`, `gapping`, `steep-aoa` — and returned null for almost every
+fault the app can raise. Three of its twenty-odd keys were real. The original
+test only asserted those three.
+
+All 22 real ids are mapped now, and the suite checks **both directions against
+FaultEngine's source**: no fault unmapped, no mapping pointing at a fault that
+does not exist.
+
+### 10.4 Sessions were compared across measurement conditions `67882ba`
+
+`Conditions.comparable()` existed for exactly this and nothing called it. Any
+two sessions went side by side with green and red arrows, so a range-ball
+session against a premium-ball one reported a 22-yard carry "improvement" that
+was entirely the ball. The numbers still show; the *verdict* is withheld on the
+rows conditions change. Same function was also showing a spin row on sessions
+with no RPT ball — a figure the device never measured.
+
+### 10.5 `Benchmarks.TARGET` was never read `67882ba`
+
+The launch-window table hardcoded its "optimal" columns as inline strings: a
+second copy of numbers that table already held. That is the precise shape of
+the bug the calibration audit fixed once — the +3.0 driver attack angle that is
+the *LPGA* average sitting in a table labelled PGA — regrown in a different
+place. Correcting the authoritative copy would not have changed one thing a
+golfer saw.
+
+### 10.6 Body positions asserted as findings `d7c932e`
+
+Fault cards listed causes under "Root causes", and sixteen of eighty named a
+body position: hip rotation, spine tilt, a cupped lead wrist, casting, early
+extension. §3.6 is explicit that none are recoverable from ball and club-head
+data — dynamic loft is a many-to-one outcome of shaft lean, wrist angle,
+forearm rotation, shaft droop, attack angle and ball position simultaneously,
+and no published regression from wrist angle to dynamic loft exists anywhere.
+
+The content stays, because those genuinely are the things that produce the
+pattern and a phone can check them. The assertion goes: split into "What the
+numbers show" and "Often behind it — but not measured here", with a caveat
+saying the monitor sees the ball and the club head, not you. Tested in bulk
+against the shipped strings rather than by example.
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
 judgement rather than a queue.
 
-- **Wire `DrillLibrary` into `PracticePlan`.** The library and its gates exist
-  and render, but the generated plan still carries its own small drill set.
-  `sectionForFault` is the intended seam.
-- **`FeedbackEngine` is described, not enforced.** The section-I wrappers are
-  the highest-evidence items in the whole base, and nothing actually fades the
-  numbers during a live session.
-- **`Strike.trend()` and `QuietEye` have no home in Progress** — the same gap
-  the tail trend had until it was rendered.
+All three of those are done (§10). What is left:
+
+- **Keep running the uncalled-export audit.** It found most of §10 and several
+  exports are still unchecked: `Spin.summary`, `SessionSharing.exportAsCSV`,
+  `ClubAnalyzer.analyzeClub`, `CoachingMode.generateSession`,
+  `Features.recommendDrill`, `ContentLibrary.getByLevel`.
+- **`FaultEngine`'s drill cues use internal focus** ("hold your wrist angle"),
+  which `CoachingMode.TIPS` deliberately avoids. Consistency rather than
+  efficacy — external cueing is Tier C, g = 0.15 after bias correction.
 
 **Known and unfixed:**
 
@@ -583,6 +675,19 @@ written for either would have been pure churn.
 Defensive rendering makes an app resilient and makes its bugs invisible; the
 only reason it surfaced was a browser run printing console errors.
 
+**A feature can pass its own test and still be broken, if the test uses the
+convenient order.** The device-storage browser test imported a session and then
+turned the setting on. That order works. The order a person uses — turn it on
+once, import for weeks — loses everything, and the test never tried it. Write
+the test for the sequence a user actually follows, not the one that is easiest
+to script.
+
+**"Is this rule applied anywhere?" is a better question than "is this rule
+written down?"** Six findings in §10 are rules the app states clearly, has
+working code for, and never runs. The codebase reads as careful because the
+reasoning is all present in comments; the reasoning being present is not the
+same as it executing. An export nothing calls is the cheapest tell.
+
 **I trusted my own test fixture over the engine, briefly.** A tail detector
 was reporting "ordinary" on a set I had built to be heavy-tailed, and my first
 move was to change the estimator. The estimator did have a real bug — it ran
@@ -637,6 +742,14 @@ Every commit in the session, and the section that explains it.
 | `c9ce37b` | 9.6 | Make the modals usable without a mouse |
 | `18fb2f2` | 9.7 | Add the quiet-eye putting module, and fix a Practice tab that never rendered |
 | `551671f` | 9.8 | Rebuild the drill library as 104 gated drills |
+| `59c963c` | 9 | docs: record the ten-item pass, and correct two claims that were wrong |
+| `67c53dd` | 10.1 | Make the feedback schedule actually hide numbers |
+| `da87dd2` | 10.1 | Ask the golfer to call the number before revealing it |
+| `a7b30bf` | 10.3 | Prescribe from the gated drill library, and fix a fault map that mapped nothing |
+| `be83648` | 10 | Show the smash trend in Progress |
+| `59aa340` | 10.2 | Fix device storage never receiving an imported session |
+| `67882ba` | 10.4/10.5 | Stop comparing sessions across conditions; read targets from one table |
+| `d7c932e` | 10.6 | Stop asserting body positions the launch monitor cannot see |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

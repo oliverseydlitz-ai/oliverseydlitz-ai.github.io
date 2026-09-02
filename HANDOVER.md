@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 14 suites, 405 assertions. Must be green.
+npm test             # load gate + 15 suites, 517 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v70` — increment it.
+   Currently `shotlab-v77` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -60,7 +60,7 @@ mechanism when a number changes. Match that.
 
 | Path | What it is |
 |---|---|
-| `app.js` | Everything. ~8,590 lines, 55 IIFE modules + ~24 top-level functions |
+| `app.js` | Everything. ~9,130 lines, 54 IIFE modules + ~24 top-level functions |
 | `index.html` | 7 views, 7 static modals, CSP meta, CDN script tags |
 | `style.css` | Design tokens + components. Two stacked `:root` blocks from successive redesigns |
 | `sw.js` | Service worker. Network-first same-origin, cache-first CDN |
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 55 modules, ~8,590 lines in `app.js`, 405 assertions.
+`main` is green. 54 modules, ~9,130 lines in `app.js`, 517 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -259,17 +259,32 @@ whose commit dies with it — a superseded 176-line CLAUDE.md.
 **All eight steps of `docs/research-base-v2.md` §10 are now done.** There is no
 next item on that list. What follows is judgement, not a queue.
 
-The most valuable remaining work is probably:
+All three items the previous handover listed are done: the drill library is
+joined to `PracticePlan`, the feedback schedule is enforced on the shot table,
+and `Strike.trend()` renders in Progress.
 
-1. **Wire `DrillLibrary` into `PracticePlan`.** The library and its gates exist
-   and render, but the generated practice plan still holds its own small drill
-   set. Joining them (`sectionForFault` is the intended seam) would mean every
-   prescribed drill carries a checked gate.
-2. **`FeedbackEngine` → the session UI.** The wrappers in section I are the
-   highest-evidence items in the whole base and are currently described rather
-   than enforced — nothing actually fades the numbers during a session.
-3. **`Strike.trend()` and `QuietEye` have no home in Progress.** Same gap the
-   tail trend had until it was rendered.
+**The single most productive thing to do next is the audit that found most of
+this session's real bugs**, because it keeps paying:
+
+```bash
+# every module export nothing calls from outside it
+grep -o "Module\.[a-zA-Z]*" app.js | sort -u
+```
+
+An export with no caller is usually a feature that was built and never wired.
+That heuristic found: `Store.saveSession` (imports bypassed device storage),
+`Router.showPractice` (the Practice tab never rendered), four dead
+`FeedbackEngine` functions (the whole feedback setting did nothing),
+`Conditions.comparable` (sessions compared across ball types), and
+`Benchmarks.TARGET` (targets hardcoded in a second copy). Several remain
+unchecked — `Spin.summary`, `SessionSharing.exportAsCSV`, `ClubAnalyzer.analyzeClub`,
+`CoachingMode.generateSession`, `Features.recommendDrill`, `ContentLibrary.getByLevel`.
+
+**Also worth knowing:** `FaultEngine`'s drill cues still use internal focus
+("hold your wrist angle"), which `CoachingMode.TIPS` deliberately avoids. The
+evidence for external cueing is Tier C (g = 0.15 after bias correction), so
+this is a consistency issue rather than an efficacy one — worth fixing, not
+worth prioritising.
 
 ### Superseded
 

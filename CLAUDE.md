@@ -228,6 +228,23 @@ carry as a measurement (it is a model output) · never claim a rep/week count to
 "groove" a change · never claim the app builds automaticity or rewires motor
 patterns.
 
+### `FeedbackEngine` — enforced, not just offered
+
+The schedule drives the **shot table**, which is the app's only per-shot
+knowledge-of-results surface. `plan(shots)` returns a per-shot decision;
+`explain(mode, n)` is the sentence shown above the table.
+
+- **Faded is deterministic** (`fadedReveal`), not sampled. The table re-renders
+  on every sort, and a schedule that changes when you look at it is not one.
+- **The band is per club and 1.5 SD.** Pooled across a bag it measures the
+  driver-to-wedge gap; at 1 SD it fires on a third of shots by construction.
+- **Hidden rows lose their verdict colour too.** A green/red edge is a
+  judgement, so it is feedback exactly as much as the number is.
+- **Session aggregates are never faded** — a mean with an interval is the
+  summary the retention literature wants a learner to have.
+- `calibration(calls, shots)` scores predict-before-reveal against the golfer's
+  own spread.
+
 ### `FeedbackEngine` — why numbers are hidden by default
 
 The guidance hypothesis is the strongest evidence in the base and it indicts
@@ -324,6 +341,16 @@ only module that touches no launch-monitor data.
 All 104 drills from §8, each carrying its section's gate. `admissible(drill,
 ctx)` returns `{ok, reasons}` — **a locked drill is shown with its reason, never
 filtered out.** Section I are wrappers applied *over* a drill, never instead.
+
+### The inference boundary (`FaultEngine.splitCauses`)
+
+The launch monitor sees the ball and the club head, **not the body**. Fault
+causes are split: `causeIsObservable()` is false for anything naming a hip,
+wrist, spine, posture, lag, casting or early extension, and those render under
+"Often behind it — but not measured here" with `BODY_CAVEAT`. Dynamic loft is
+a many-to-one outcome and cannot be inverted to a wrist angle — there is no
+published regression for it. A bulk test asserts no body-position string is
+ever classified as measured, so a new cause cannot land on the wrong side.
 
 ### Fault reporting gates (`FaultEngine`)
 
@@ -440,6 +467,16 @@ Debugging: `showDebug()` logs to console only; set `localStorage.slDebug='1'`
 to re-enable the on-screen banner.
 
 ---
+
+### Two things that must stay joined
+
+- **`DrillLibrary.FAULT_SECTION`** must cover every id `FaultEngine` can raise.
+  It was first written from the research base's headings and mapped inventions,
+  so it joined almost nothing. A test now checks both directions against
+  FaultEngine's source.
+- **`Benchmarks.TARGET` is the only copy of the target bands.** Read them via
+  `targetsFor(club)`. The launch-window table used to hardcode them inline,
+  which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
 ~55 modules across scoring/coaching/session/dashboard/reporting, dark mode).
