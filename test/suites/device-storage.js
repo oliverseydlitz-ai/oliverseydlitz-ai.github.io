@@ -111,6 +111,25 @@ console.log('— deleting a session removes the device copy too —');
   ok(a.idb.size === 0, 'Store.deleteSession reaches the device store, so Clear Data really clears');
 }
 
+console.log('— sessions on the device that the account has never seen —');
+// This mattered less when guests were ephemeral. With device storage on, a
+// guest accumulates months of sessions in IndexedDB, and signing in merged them
+// into the VIEW without ever uploading them: they looked safe and were one
+// browser-data wipe from gone, on an account that would have kept them.
+{
+  const a = boot();
+  ok(typeof a.CloudDB.localOnlySessions === 'function', 'CloudDB can name what is device-only');
+  ok((await a.CloudDB.localOnlySessions()).length === 0,
+     'a signed-out user has none — the question only makes sense with an account');
+
+  await a.LocalDB.setEnabled(true);
+  await a.Store.saveLocal(mk('only-here'));
+  ok(a.idb.size === 1, 'a session is on the device');
+  // Still signed out, so still nothing to offer: the check is account-scoped.
+  ok((await a.CloudDB.localOnlySessions()).length === 0,
+     'and it is still not "orphaned" until there is an account to be missing from');
+}
+
 console.log('— a browser that refuses to store degrades honestly —');
 await quiet(async () => {
   const a = boot({ failWith: 'QuotaExceededError' });

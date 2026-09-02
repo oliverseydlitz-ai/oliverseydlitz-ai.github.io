@@ -1151,16 +1151,36 @@ const CloudDB = (() => {
     if (error) throw error;
   }
 
-  async function migrateLocalSessions() {
+  // Sessions sitting on this device that the account has never seen.
+  //
+  // This mattered less when guests were ephemeral. It matters now: with device
+  // storage on, a guest accumulates months of sessions in IndexedDB, and
+  // signing in used to merge them into the VIEW without ever uploading them.
+  // They looked safe and were one browser-data wipe from gone, on an account
+  // that would have kept them.
+  async function localOnlySessions() {
     const user = Auth.getUser();
-    if (!user) return;
-    const localSessions = await DB.exportAll();
-    for (const session of localSessions) {
-      await saveSession(session);
-    }
+    if (!user) return [];
+    let local = [];
+    try { local = await DB.exportAll(); } catch (_) { return []; }
+    if (!local.length) return [];
+    let cloudIds = new Set();
+    try { cloudIds = new Set((await getSessions(user.id)).map(r => r.id)); } catch (_) { return []; }
+    return local.filter(s => s && s.id && !cloudIds.has(s.id));
   }
 
-  return { getSessions, saveSession, deleteSession, migrateLocalSessions };
+  // Uploading is NOT automatic on sign-in, deliberately. Pushing a guest's
+  // history to a server the moment they authenticate is data leaving the
+  // device on an action they took for a different reason. The app offers it
+  // and they choose.
+  async function migrateLocalSessions(sessions) {
+    const list = sessions || await localOnlySessions();
+    let pushed = 0;
+    for (const session of list) { await saveSession(session); pushed++; }
+    return pushed;
+  }
+
+  return { getSessions, saveSession, deleteSession, migrateLocalSessions, localOnlySessions };
 })();
 
 // Unified data layer — cloud-only for logged-in users, MemDB (ephemeral) for guests
@@ -8205,6 +8225,24 @@ async function init() {
     const user = Auth.getUser();
     if (!user) return;
     await Router.showSessions();
+    // Offer to back up anything this device holds that the account does not.
+    // Asked rather than done: uploading is data leaving the device, and
+    // signing in is not consent to that.
+    try {
+      const orphans = await CloudDB.localOnlySessions();
+      if (!orphans.length) return;
+      showConfirm(
+        `Back up ${orphans.length} session${orphans.length === 1 ? '' : 's'}?`,
+        `${orphans.length} session${orphans.length === 1 ? ' is' : 's are'} stored on this device but not in ` +
+        `your account. They are one browser-data wipe from gone. Upload them now?`,
+        async () => {
+          try {
+            const n = await CloudDB.migrateLocalSessions(orphans);
+            toast(`Backed up ${n} session${n === 1 ? '' : 's'}.`);
+            await Router.showSessions();
+          } catch (e) { toast('Backup failed: ' + (e?.message || 'could not reach the cloud')); }
+        });
+    } catch (e) { console.error('local-only check', e); }
   }
 
   // Auth tab switching
