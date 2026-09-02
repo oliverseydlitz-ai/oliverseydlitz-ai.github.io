@@ -4009,6 +4009,40 @@ const FaultEngine = (() => {
     'several different actions produce the same club delivery. Treat them as things to look for, not as ' +
     'findings.';
 
+  // ── The same boundary, applied to the drills ─────────────────
+  // Splitting the CAUSES at the inference boundary and then prescribing across
+  // it was the app telling a golfer it cannot see their hips and, four lines
+  // below, telling them what to do with their hips. A drill is classified by
+  // where the golfer's attention goes and, more importantly, by whether the
+  // instruction can be checked at all without video:
+  //
+  //   external — the club, ball, turf, tee, a gate or the target gives the
+  //              feedback. The drill checks itself.
+  //   setup    — a body position at ADDRESS. Static, and the golfer can verify
+  //              it in a mirror or a phone photo before they swing.
+  //   feel     — a body position DURING the swing. Neither the app nor the
+  //              golfer can confirm it happened, and several different actions
+  //              produce the same club delivery, so it is a thing to try, not
+  //              an instruction that can be followed correctly or incorrectly.
+  //
+  // `feel` drills are kept, not deleted — they are standard drills and some of
+  // them are the only drill for their fault. They are shown under their own
+  // heading with FEEL_CAVEAT, exactly as body causes are.
+  const DRILL_FOCUS = ['external', 'setup', 'feel'];
+  const drillFocus = d => (DRILL_FOCUS.includes(d && d.focus) ? d.focus : 'feel');
+  function splitDrills(drills) {
+    const list = (drills || []).filter(Boolean);
+    return {
+      checkable: list.filter(d => drillFocus(d) !== 'feel'),
+      feel: list.filter(d => drillFocus(d) === 'feel'),
+    };
+  }
+  const FEEL_CAVEAT =
+    'These are body feels. Nothing here can tell you whether one happened — not the app, which sees only ' +
+    'the ball and the club head, and not you without video. Different bodies produce the same club ' +
+    'delivery, so treat a feel as something to try until the numbers above move, and drop it if they ' +
+    'do not.';
+
 
   function smashMin(t) { return isWood(t) || isHybrid(t) ? 1.40 : 1.33; }
   function smashGood(t){ return isWood(t) || isHybrid(t) ? 1.44 : 1.37; }
@@ -4030,10 +4064,10 @@ const FaultEngine = (() => {
         'Lateral slide instead of rotational power transfer','Tension in forearms and hands',
         'Over-the-top swing path creating a glancing blow'],
       drills:[
-        {name:'Impact tape',desc:'Apply impact tape (or dry-erase marker) to the face. Note where marks appear. Work toward the sweet spot over 20 balls, consciously trying to move the contact point one position closer each set.'},
-        {name:'Tee gate drill',desc:'Place a tee 1 inch outside the heel and 1 inch outside the toe. Swing through without clipping either. Forces centerline path through impact.'},
-        {name:'Feet together drill',desc:'Hit 10 balls with feet touching. Eliminates lateral slide, forces rotation and centred contact. Use a 7-iron at 60% speed to start.'},
-        {name:'Towel under arm',desc:'Tuck a small towel under your lead armpit. Keep it there through impact. Prevents the arms disconnecting from the body which causes mishits.'},
+        {name:'Impact tape',desc:'Apply impact tape (or dry-erase marker) to the face. Note where marks appear. Work toward the sweet spot over 20 balls, consciously trying to move the contact point one position closer each set.',focus:'external'},
+        {name:'Tee gate drill',desc:'Place a tee 1 inch outside the heel and 1 inch outside the toe. Swing through without clipping either. Forces centerline path through impact.',focus:'external'},
+        {name:'Feet together drill',desc:'Hit 10 balls with feet touching. Eliminates lateral slide, forces rotation and centred contact. Use a 7-iron at 60% speed to start.',focus:'setup'},
+        {name:'Towel under arm',desc:'Tuck a small towel under your lead armpit. Keep it there through impact. Prevents the arms disconnecting from the body which causes mishits.',focus:'external'},
       ],
       optimalRange: t => `>${fmt(smashGood(t),2)} smash factor`,
     },
@@ -4047,9 +4081,9 @@ const FaultEngine = (() => {
       causes:['Weight hanging back on trail side at impact','Ball too far forward in stance for the club',
         'Over-the-top path causing steep descent','Casting the club (early release) from the top'],
       drills:[
-        {name:'Forward ball position check',desc:'Place an alignment stick across your toes. Ball should be 1 ball-width inside the lead heel for short irons, 2 for mid-irons, 3 for long irons.'},
-        {name:'Divot board drill',desc:'Practice on a divot board or place a towel 3 inches behind the ball. Avoid hitting the towel. Forces a ball-first strike pattern.'},
-        {name:'Step-through drill',desc:'After impact, step through with the trail foot so both feet finish facing the target. Forces weight transfer to lead side before impact.'},
+        {name:'Forward ball position check',desc:'Place an alignment stick across your toes. Ball should be 1 ball-width inside the lead heel for short irons, 2 for mid-irons, 3 for long irons.',focus:'setup'},
+        {name:'Divot board drill',desc:'Practice on a divot board or place a towel 3 inches behind the ball. Avoid hitting the towel. Forces a ball-first strike pattern.',focus:'external'},
+        {name:'Step-through drill',desc:'After impact, step through with the trail foot so both feet finish facing the target. Forces weight transfer to lead side before impact.',focus:'feel'},
       ],
       optimalRange: () => 'Attack angle -2° to -5° (irons)',
     },
@@ -4069,10 +4103,10 @@ const FaultEngine = (() => {
         'Early forearm rotation causing "chicken wing" through impact',
         'Insufficient hip rotation causing the arms to flip'],
       drills:[
-        {name:'Grip check',desc:'Strengthen grip by rotating both hands 1 knuckle clockwise. At address you should see 2.5 knuckles on your lead hand. This closes the face slightly at impact.'},
-        {name:'Towel drill – inside approach',desc:'Place a headcover 18 inches behind the ball on your toe line. Practice approaching from the inside without hitting it. Trains in-to-out swing path.'},
-        {name:'Draw finish drill',desc:'Exaggerate rolling the forearms over through impact so the toe of the club passes the heel. "Shake hands with the target" feel at P7.'},
-        {name:'Split hand drill',desc:'Hit balls with 6 inches of space between hands on the grip. The disconnection makes it obvious if the hands are not releasing — forces proper forearm rotation.'},
+        {name:'Grip check',desc:'Strengthen grip by rotating both hands 1 knuckle clockwise. At address you should see 2.5 knuckles on your lead hand. This closes the face slightly at impact.',focus:'setup'},
+        {name:'Towel drill – inside approach',desc:'Place a headcover 18 inches behind the ball on your toe line. Practice approaching from the inside without hitting it. Trains in-to-out swing path.',focus:'external'},
+        {name:'Draw finish drill',desc:'Exaggerate rolling the forearms over through impact so the toe of the club passes the heel. "Shake hands with the target" feel at P7.',focus:'feel'},
+        {name:'Split hand drill',desc:'Hit balls with 6 inches of space between hands on the grip. The disconnection makes it obvious if the hands are not releasing — forces proper forearm rotation.',focus:'setup'},
       ],
       optimalRange: () => 'Face-to-path within ±5°',
     },
@@ -4088,9 +4122,9 @@ const FaultEngine = (() => {
       causes:['Grip too strong (hands rotated too far right)','Excessive forearm rotation (rolling over) through impact',
         'Inside-out path combined with closed face','Trail shoulder dropping too low in downswing'],
       drills:[
-        {name:'Neutral grip drill',desc:'Weaken grip 1 knuckle counter-clockwise. At address, see 2–2.5 knuckles on lead hand. Check that the V formed by thumb and forefinger points to your chin.'},
-        {name:'High finish drill',desc:'Practice finishing with your lead arm pointing at the sky (not wrapped around your body). High finish = face staying square longer through impact zone.'},
-        {name:'Alignment stick in ground',desc:'Stick an alignment stick in the ground 2 feet right of the target. Deliberately try to start the ball at the stick. Trains a more neutral-to-right path, opening the face relative to path.'},
+        {name:'Neutral grip drill',desc:'Weaken grip 1 knuckle counter-clockwise. At address, see 2–2.5 knuckles on lead hand. Check that the V formed by thumb and forefinger points to your chin.',focus:'setup'},
+        {name:'High finish drill',desc:'Practice finishing with your lead arm pointing at the sky (not wrapped around your body). High finish = face staying square longer through impact zone.',focus:'feel'},
+        {name:'Alignment stick in ground',desc:'Stick an alignment stick in the ground 2 feet right of the target. Deliberately try to start the ball at the stick. Trains a more neutral-to-right path, opening the face relative to path.',focus:'external'},
       ],
       optimalRange: () => 'Face-to-path within ±5°',
     },
@@ -4105,8 +4139,8 @@ const FaultEngine = (() => {
       causes:['Alignment problem — shoulders aimed right of target','Ball too far back in stance',
         'Blocked rotation through impact (trail side stopping, arms releasing right)'],
       drills:[
-        {name:'Alignment check',desc:'Place 2 alignment sticks parallel on the ground — one at your feet, one on the target line. Confirm feet, hips, and shoulders are all parallel left of the target, not aimed at it.'},
-        {name:'Hip bump drill',desc:'Feel your lead hip bump toward the target at the start of the downswing before rotating. This prevents "blocking" the rotation and sets up a neutral path.'},
+        {name:'Alignment check',desc:'Place 2 alignment sticks parallel on the ground — one at your feet, one on the target line. Confirm feet, hips, and shoulders are all parallel left of the target, not aimed at it.',focus:'setup'},
+        {name:'Hip bump drill',desc:'Feel your lead hip bump toward the target at the start of the downswing before rotating. This prevents "blocking" the rotation and sets up a neutral path.',focus:'feel'},
       ],
       optimalRange: () => 'Launch direction within ±3°',
     },
@@ -4122,8 +4156,8 @@ const FaultEngine = (() => {
         'Ball too far forward, catching it after the bottom of the arc with an open stance',
         'Over-the-top move creating an outside-in path with face matching it'],
       drills:[
-        {name:'Right eye alignment drill',desc:'At address, close your right eye and look down the target line. If the ball appears right of the target when it should be on it, your alignment is off left.'},
-        {name:'Tee behind ball',desc:'Tee a ball 1.5 inches behind your actual ball. Practice not clipping the back tee — this promotes a shallower, more inside approach angle.'},
+        {name:'Right eye alignment drill',desc:'At address, close your right eye and look down the target line. If the ball appears right of the target when it should be on it, your alignment is off left.',focus:'setup'},
+        {name:'Tee behind ball',desc:'Tee a ball 1.5 inches behind your actual ball. Practice not clipping the back tee — this promotes a shallower, more inside approach angle.',focus:'external'},
       ],
       optimalRange: () => 'Launch direction within ±3°',
     },
@@ -4146,9 +4180,9 @@ const FaultEngine = (() => {
         'Downswing too steep — treating the driver like an iron',
         'Not enough hip shift toward target on downswing'],
       drills:[
-        {name:'Ball position forward',desc:'Tee the ball off the inside of your lead heel. At setup, your spine should tilt ~5° away from the target (right for a right-hander). This is the single biggest adjustment for positive attack angle.'},
-        {name:'Headcover behind ball',desc:'Place a headcover 4 inches directly behind the teed ball. Swing and miss the headcover completely. Forces an upward, sweeping strike.'},
-        {name:'Tee height experiment',desc:'Tee the ball so half of it is above the crown of the driver. Low tee = forced downward hit. High tee = naturally promotes an upward strike. Work progressively higher.'},
+        {name:'Ball position forward',desc:'Tee the ball off the inside of your lead heel. At setup, your spine should tilt ~5° away from the target (right for a right-hander). This is the single biggest adjustment for positive attack angle.',focus:'setup'},
+        {name:'Headcover behind ball',desc:'Place a headcover 4 inches directly behind the teed ball. Swing and miss the headcover completely. Forces an upward, sweeping strike.',focus:'external'},
+        {name:'Tee height experiment',desc:'Tee the ball so half of it is above the crown of the driver. Low tee = forced downward hit. High tee = naturally promotes an upward strike. Work progressively higher.',focus:'external'},
       ],
       optimalRange: () => '+2° to +5° attack angle for driver',
     },
@@ -4163,8 +4197,8 @@ const FaultEngine = (() => {
       causes:['Pronounced over-the-top move','Upper body dominant swing (arms starting downswing)',
         'Collapsing of trail knee/hip in transition'],
       drills:[
-        {name:'Right elbow slot drill',desc:'At the top, feel your right elbow drop to your right hip BEFORE the club moves. This shallows the plane and prevents the steep chop.'},
-        {name:'Pump drill',desc:'Take the club to the top, then pump the downswing halfway (stopping at hip height) three times before completing. Trains the shallow transition feel.'},
+        {name:'Right elbow slot drill',desc:'At the top, feel your right elbow drop to your right hip BEFORE the club moves. This shallows the plane and prevents the steep chop.',focus:'feel'},
+        {name:'Pump drill',desc:'Take the club to the top, then pump the downswing halfway (stopping at hip height) three times before completing. Trains the shallow transition feel.',focus:'feel'},
       ],
       optimalRange: () => '+2° to +5° attack angle for driver',
     },
@@ -4182,9 +4216,9 @@ const FaultEngine = (() => {
         'Incorrect ball position (too far forward for the club)',
         '"Casting" — releasing the lag too early in the downswing'],
       drills:[
-        {name:'Forward shaft lean drill',desc:'At impact, your hands should be ahead of the ball (shaft leaning toward target). Practice "pressing" the shaft forward at impact with slow-motion swings. Check in a mirror.'},
-        {name:'Divot after the ball',desc:'Place a £1 coin on the grass 3 inches in front of the ball. Try to hit the coin with your divot after striking the ball. Proves ball-first, then turf contact.'},
-        {name:'Lead wrist flat',desc:'At impact, your lead wrist should be flat or slightly bowed — not cupped (bent back). A cupped lead wrist is the #1 cause of scooping. Use an impact bag to practice.'},
+        {name:'Forward shaft lean drill',desc:'At impact, your hands should be ahead of the ball (shaft leaning toward target). Practice "pressing" the shaft forward at impact with slow-motion swings. Check in a mirror.',focus:'feel'},
+        {name:'Divot after the ball',desc:'Place a £1 coin on the grass 3 inches in front of the ball. Try to hit the coin with your divot after striking the ball. Proves ball-first, then turf contact.',focus:'external'},
+        {name:'Lead wrist flat',desc:'At impact, your lead wrist should be flat or slightly bowed — not cupped (bent back). A cupped lead wrist is the #1 cause of scooping. Use an impact bag to practice.',focus:'feel'},
       ],
       optimalRange: () => '-2° to -5° attack angle for irons',
     },
@@ -4199,7 +4233,7 @@ const FaultEngine = (() => {
       causes:['Arm-dominant downswing with insufficient hip rotation','Upper body sliding toward target (not rotating)',
         'Trail shoulder too high at address'],
       drills:[
-        {name:'Hip turn start',desc:'Initiate the downswing by rotating the hips, not pulling with the arms. Feel the trail hip pocket move toward the target. Arms naturally shallow when hips lead.'},
+        {name:'Hip turn start',desc:'Initiate the downswing by rotating the hips, not pulling with the arms. Feel the trail hip pocket move toward the target. Arms naturally shallow when hips lead.',focus:'feel'},
         {name:'Swing to 3 o\'clock',desc:'Practice half-swings stopping the club at hip height on the follow-through. This promotes a more rounded, on-plane swing and removes the steep chop.'},
       ],
       optimalRange: () => '-2° to -5° attack angle for irons',
@@ -4219,8 +4253,8 @@ const FaultEngine = (() => {
       causes:['Negative attack angle (see above)','Dynamic loft too low — shaft leaning too far forward',
         'Tee too low','Hitting too far out on toe (reduces effective loft)'],
       drills:[
-        {name:'Positive attack angle (key fix)',desc:'Fix negative attack angle first (see attack angle fault). Launch angle is largely a downstream result of attack angle on driver.'},
-        {name:'Tee it up higher',desc:'Rule of thumb: half the ball should be above the crown at address. Higher tee naturally promotes higher launch and positive attack angle.'},
+        {name:'Positive attack angle (key fix)',desc:'Fix negative attack angle first (see attack angle fault). Launch angle is largely a downstream result of attack angle on driver.',focus:'external'},
+        {name:'Tee it up higher',desc:'Rule of thumb: half the ball should be above the crown at address. Higher tee naturally promotes higher launch and positive attack angle.',focus:'external'},
       ],
       optimalRange: cs => {
         const s = cs || 95;
@@ -4236,8 +4270,8 @@ const FaultEngine = (() => {
       causes:['Attack angle too steeply upward (> +6°)','Face too open at address producing a scooped hit',
         'Dynamic loft too high'],
       drills:[
-        {name:'Lower tee test',desc:'Drop tee height so only 1/4 of the ball is above the crown. Note how trajectory flattens. Find the tee height that gives your peak trajectory without ballooning.'},
-        {name:'Shoulder tilt check',desc:'Excessive spine tilt away from target creates high dynamic loft. Maintain natural shoulder tilt (~5° from horizontal) rather than exaggerating.'},
+        {name:'Lower tee test',desc:'Drop tee height so only 1/4 of the ball is above the crown. Note how trajectory flattens. Find the tee height that gives your peak trajectory without ballooning.',focus:'external'},
+        {name:'Shoulder tilt check',desc:'Excessive spine tilt away from target creates high dynamic loft. Maintain natural shoulder tilt (~5° from horizontal) rather than exaggerating.',focus:'setup'},
       ],
       optimalRange: () => '10–15° for most swing speeds',
     },
@@ -4279,10 +4313,10 @@ const FaultEngine = (() => {
         'Ball too far forward, catching it past the low point with the face already open upward',
         'Hanging back on the trail foot so the shaft leans away from the target'],
       drills:[
-        {name:'Punch-shot ladder',desc:'Hit 10 shots with a 7-iron trying to keep the ball under an imagined 10-foot bar 20 yards ahead. Finish with the hands low and the club no higher than your shoulder. The low finish is the constraint that removes added loft — you cannot flip and still keep it under the bar.'},
-        {name:'Towel-line compression drill',desc:'Lay a towel flat 4 inches BEHIND the ball. Hit shots that miss the towel entirely and take turf in FRONT of the ball. The towel gives instant external feedback on where the low point is, which is what spin loft is really measuring.'},
-        {name:'Trail-hand-only half swings',desc:'Hit 10 half shots with a 9-iron using only your trail hand on the club. It is almost impossible to cast one-handed without losing the club, so this trains retention of the wrist angle without any conscious "hold the lag" thought.'},
-        {name:'Feet-together compression',desc:'Feet touching, 8-iron, 60% speed, 15 balls. Removes lateral slide so the strike has to come from rotation. Watch the spin loft estimate fall as strikes centre up.'},
+        {name:'Punch-shot ladder',desc:'Hit 10 shots with a 7-iron trying to keep the ball under an imagined 10-foot bar 20 yards ahead. Finish with the hands low and the club no higher than your shoulder. The low finish is the constraint that removes added loft — you cannot flip and still keep it under the bar.',focus:'external'},
+        {name:'Towel-line compression drill',desc:'Lay a towel flat 4 inches BEHIND the ball. Hit shots that miss the towel entirely and take turf in FRONT of the ball. The towel gives instant external feedback on where the low point is, which is what spin loft is really measuring.',focus:'external'},
+        {name:'Trail-hand-only half swings',desc:'Hit 10 half shots with a 9-iron using only your trail hand on the club. It is almost impossible to cast one-handed without losing the club, so this trains retention of the wrist angle without any conscious "hold the lag" thought.',focus:'setup'},
+        {name:'Feet-together compression',desc:'Feet touching, 8-iron, 60% speed, 15 balls. Removes lateral slide so the strike has to come from rotation. Watch the spin loft estimate fall as strikes centre up.',focus:'setup'},
       ],
       optimalRange: t => { const b = Benchmarks.spinLoftBand(t); return `${b.lo}–${b.hi}° spin loft`; },
     },
@@ -4307,9 +4341,9 @@ const FaultEngine = (() => {
         'Stalling body rotation and dragging the handle through impact',
         'Over-coaching of "hit down on it" past the point of usefulness'],
       drills:[
-        {name:'Ball-position reset',desc:'Alignment stick across the toes. Short irons one ball-width inside the lead heel, mid-irons two, long irons three. Most excessive deloft is simply a ball played too far back.'},
-        {name:'Height ladder',desc:'With one club, hit 3 low, 3 stock, 3 high, repeating. Deliberately varying delivered loft rebuilds the range you have lost — you cannot hit the high ones with the handle dragged forward.'},
-        {name:'Release-through-the-turf drill',desc:'Feel the clubhead pass the hands after impact into a full, high finish. Pair with a mirror or a phone camera: the lead arm should be extended and the club rising, not stalled low.'},
+        {name:'Ball-position reset',desc:'Alignment stick across the toes. Short irons one ball-width inside the lead heel, mid-irons two, long irons three. Most excessive deloft is simply a ball played too far back.',focus:'setup'},
+        {name:'Height ladder',desc:'With one club, hit 3 low, 3 stock, 3 high, repeating. Deliberately varying delivered loft rebuilds the range you have lost — you cannot hit the high ones with the handle dragged forward.',focus:'external'},
+        {name:'Release-through-the-turf drill',desc:'Feel the clubhead pass the hands after impact into a full, high finish. Pair with a mirror or a phone camera: the lead arm should be extended and the club rising, not stalled low.',focus:'feel'},
       ],
       optimalRange: t => { const b = Benchmarks.spinLoftBand(t); return `${b.lo}–${b.hi}° spin loft`; },
     },
@@ -4326,8 +4360,8 @@ const FaultEngine = (() => {
       },
       causes:['Face open to path at impact (main cause)','Outside-in swing path','Weak grip'],
       drills:[
-        {name:'Close the face to path',desc:'See Slice fault — the spin axis is a direct measurement of face-to-path relationship. Closing the face relative to path will reduce spin axis.'},
-        {name:'D-Plane drill',desc:'Aim your body slightly right, and try to start the ball at your body line while swinging along that line. This creates a draw. Gradually move your aim toward target as spin axis improves.'},
+        {name:'Close the face to path',desc:'See Slice fault — the spin axis is a direct measurement of face-to-path relationship. Closing the face relative to path will reduce spin axis.',focus:'external'},
+        {name:'D-Plane drill',desc:'Aim your body slightly right, and try to start the ball at your body line while swinging along that line. This creates a draw. Gradually move your aim toward target as spin axis improves.',focus:'setup'},
       ],
       optimalRange: () => 'Spin axis within ±10°',
     },
@@ -4339,7 +4373,7 @@ const FaultEngine = (() => {
         `While a slight draw is often desirable (+5–10 yards distance), excessive hook spin costs control.`,
       causes:['Face closed to path','Strong grip','Excessive forearm rotation through impact'],
       drills:[
-        {name:'Face-to-path relationship',desc:'See Hook fault for specific drills. Goal is to reduce face-to-path gap from >15° to the 0–8° range for a controllable draw.'},
+        {name:'Face-to-path relationship',desc:'See Hook fault for specific drills. Goal is to reduce face-to-path gap from >15° to the 0–8° range for a controllable draw.',focus:'external'},
       ],
       optimalRange: () => 'Spin axis within ±10° (slight negative = draw = OK)',
     },
@@ -4357,8 +4391,8 @@ const FaultEngine = (() => {
       causes:['Early release / casting (losing lag before impact)','Deceleration in the downswing',
         'Tension stopping natural wrist release at impact','Passive lower body — arms doing all the work'],
       drills:[
-        {name:'Lag preservation',desc:'Hold your wrist angle (lag) as long as possible in the downswing. Imagine holding a tray of drinks — release only when the hands reach hip height on the downswing.'},
-        {name:'Towel swings',desc:'Swing a damp towel or training aid that "whooshes" at the bottom. If it whooshes early, you\'re casting. Find the feeling of maximum whoosh at the ball.'},
+        {name:'Lag preservation',desc:'Hold your wrist angle (lag) as long as possible in the downswing. Imagine holding a tray of drinks — release only when the hands reach hip height on the downswing.',focus:'feel'},
+        {name:'Towel swings',desc:'Swing a damp towel or a training aid that "whooshes" at the bottom. Listen for where the whoosh peaks: if it comes before the ball, the speed is arriving too early. Move it until it is loudest level with the ball.',focus:'external'},
       ],
       optimalRange: () => 'Ball/club speed ratio > 1.42 (driver), > 1.36 (irons)',
     },
@@ -4373,8 +4407,8 @@ const FaultEngine = (() => {
       causes:['Scooping motion — flipping at impact','Not maintaining posture through impact',
         'Ball too far forward for lofted clubs'],
       drills:[
-        {name:'Bounce awareness',desc:'Wedges are designed to use the bounce (bottom trailing edge). Lead with the bounce by keeping your hands slightly ahead of the ball and the shaft slightly forward. Avoid digging.'},
-        {name:'Flat lead wrist',desc:'At impact your lead wrist should be flat. Practice hinge-and-hold: hinge the wrists on backswing, maintain that hinge at impact, then release. No flipping.'},
+        {name:'Bounce awareness',desc:'Wedges are designed to use the bounce (bottom trailing edge). Lead with the bounce by keeping your hands slightly ahead of the ball and the shaft slightly forward. Avoid digging.',focus:'feel'},
+        {name:'Flat lead wrist',desc:'At impact your lead wrist should be flat. Practice hinge-and-hold: hinge the wrists on backswing, maintain that hinge at impact, then release. No flipping.',focus:'feel'},
       ],
       optimalRange: () => '1.25–1.30 smash (wedges)',
     },
@@ -4400,8 +4434,8 @@ const FaultEngine = (() => {
       causes:['No consistent pre-shot routine','Ball position varying shot-to-shot','Setup changes (grip, stance width)',
         'Fatigue or mental drift during session'],
       drills:[
-        {name:'Rigid pre-shot routine',desc:'Develop and stick to a 3-step routine before every shot: (1) approach from behind and visualise the shot, (2) walk in and take your grip + stance, (3) one waggle + go. Consistency starts before the swing.'},
-        {name:'Ball position gate',desc:'Use an alignment stick to set ball position before every shot in practice. Vary the club but always double-check position relative to the alignment stick.'},
+        {name:'Rigid pre-shot routine',desc:'Develop and stick to a 3-step routine before every shot: (1) approach from behind and visualise the shot, (2) walk in and take your grip + stance, (3) one waggle + go. Consistency starts before the swing.',focus:'external'},
+        {name:'Ball position gate',desc:'Use an alignment stick to set ball position before every shot in practice. Vary the club but always double-check position relative to the alignment stick.',focus:'setup'},
       ],
     },
     {
@@ -4418,7 +4452,7 @@ const FaultEngine = (() => {
       causes:['Inconsistent ball position','Varying spine angle / posture at address',
         'Dynamic loft changing due to wrist action variability'],
       drills:[
-        {name:'Check address position',desc:'Photograph your address position from face-on and down-the-line. Compare to Tour reference photos for your club type. Small setup changes cause large launch angle variations.'},
+        {name:'Check address position',desc:'Photograph your address position from face-on and down-the-line. Compare to Tour reference photos for your club type. Small setup changes cause large launch angle variations.',focus:'setup'},
       ],
     },
     {
@@ -4441,8 +4475,8 @@ const FaultEngine = (() => {
       },
       causes:['Muscle fatigue','Loss of concentration','Dehydration','Hitting too many balls without recovery'],
       drills:[
-        {name:'Structured practice blocks',desc:'Practice in 15-minute focused blocks with 5-minute rest. Quality > quantity. 50 deliberate balls beats 200 tired balls every time.'},
-        {name:'Speed training last',desc:'If doing speed work (fast swings), do it in the first 20 minutes when you are freshest. Technique work later when pace doesn\'t matter as much.'},
+        {name:'Structured practice blocks',desc:'Practice in 15-minute focused blocks with 5-minute rest. Quality > quantity. 50 deliberate balls beats 200 tired balls every time.',focus:'external'},
+        {name:'Speed training last',desc:'If doing speed work (fast swings), do it in the first 20 minutes when you are freshest. Technique work later when pace doesn\'t matter as much.',focus:'external'},
       ],
     },
     {
@@ -4462,8 +4496,8 @@ const FaultEngine = (() => {
       },
       causes:['Face angle variability','Path inconsistency','Contact quality variation'],
       drills:[
-        {name:'Target narrow gate',desc:'Set up two headcovers 20 yards wide 150 yards away (or use flags). Practice until 80% of balls land between them. Narrow target = narrow mind = better shots.'},
-        {name:'Intentional shape drill',desc:'Deliberately hit 5 draws then 5 fades. Controlling shot shape intentionally improves overall path and face consistency.'},
+        {name:'Target narrow gate',desc:'Set up two headcovers 20 yards wide 150 yards away (or use flags). Practice until 80% of balls land between them. Narrow target = narrow mind = better shots.',focus:'external'},
+        {name:'Intentional shape drill',desc:'Deliberately hit 5 draws then 5 fades. Controlling shot shape intentionally improves overall path and face consistency.',focus:'external'},
       ],
     },
   ];
@@ -4547,6 +4581,7 @@ const FaultEngine = (() => {
   }
 
   return { detectFaults, splitCauses, causeIsObservable, BODY_CAVEAT, BODY_CONSTRUCT,
+    splitDrills, drillFocus, DRILL_FOCUS, FEEL_CAVEAT,
            MIN_AFFECTED, MIN_RATE, FIRM_RATE };
 })();
 
@@ -4952,8 +4987,18 @@ const PracticePlan = (() => {
         // evidence says is exercise rather than practice. Ball count and
         // spacing are the part that actually constrains the session.
         balls: Math.max(10, Math.round(minutes * 1.5)),
-        drill: f.drills[0],
-        alternates: f.drills.slice(1, 3),
+        // Checkable first. `f.drills[0]` picked whatever the fault happened to
+        // list first, which for five faults is a body feel — so the plan's
+        // headline block told a golfer to hold a wrist angle while the causes
+        // three lines above said the app cannot see a wrist. Ordering is enough
+        // for two of the five; the other three have nothing but feels, and are
+        // labelled rather than dropped.
+        ...(() => {
+          const { checkable, feel } = FaultEngine.splitDrills(f.drills);
+          const ordered = [...checkable, ...feel];
+          return { drill: ordered[0], alternates: ordered.slice(1, 3),
+                   drillIsFeel: !checkable.length };
+        })(),
         ...libraryDrill(f, shots, session),
       };
     });
@@ -5203,7 +5248,10 @@ const SmartRecommendations = (() => {
           title: `Work on ${f.name}`,
           desc: lib.libraryDrill
             ? `${lib.libraryDrill.name}: ${lib.libraryDrill.desc}`
-            : (lib.lockedNote || f.drills[0].desc),
+            // Checkable before feel, same as the practice plan. The one card on
+            // the home screen is the worst place to lead with an instruction
+            // nothing can confirm you followed.
+            : (lib.lockedNote || (FaultEngine.splitDrills(f.drills).checkable[0] || f.drills[0]).desc),
           why: lib.libraryDrill
             ? `It showed on ${f.count} of ${f.total} shots, which is past what measurement noise produces.`
             : 'It showed often enough to report, but the drill for it needs a measurement this session ' +
@@ -6466,7 +6514,8 @@ const UI = (() => {
               ? `<div class="plan-drill"><strong>${Sanitize.escape(p.libraryDrill.name)}:</strong>
                    ${Sanitize.escape(p.libraryDrill.desc)}</div>
                  <div class="plan-gate">${Sanitize.escape(p.sectionName)} · ${Sanitize.escape(p.structure)}</div>`
-              : `<div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>`}
+              : `<div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>
+                 ${p.drillIsFeel ? `<div class="plan-gate">A feel — nothing measures whether it happened. Every drill for this fault is one.</div>` : ''}`}
             ${p.lockedNote
               ? `<div class="plan-locked">Nothing in the ${Sanitize.escape(p.sectionName || 'matching')} section can be
                    run on what this session measured. ${Sanitize.escape(p.lockedNote)}</div>`
@@ -6818,13 +6867,25 @@ const UI = (() => {
                     <ul class="fault-causes fault-causes-body">${body.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>
                     <p class="fault-inference-note">${Sanitize.escape(FaultEngine.BODY_CAVEAT)}</p>` : '');
                 })()}
-                ${f.drills?.length ? `
-                  <div class="fault-section-title">Drills</div>
-                  <div class="fault-drills">${f.drills.map(d=>`
+                ${(() => {
+                  // Same boundary as the causes above. A drill whose instruction
+                  // is a body position mid-swing cannot be checked by the app or
+                  // by the golfer, so it does not sit in the same list as one the
+                  // ball and turf verify for you.
+                  const { checkable, feel } = FaultEngine.splitDrills(f.drills);
+                  const card = d => `
                     <div class="drill-card">
-                      <div class="drill-name">💡 ${d.name}</div>
-                      <div class="drill-desc">${d.desc}</div>
-                    </div>`).join('')}</div>` : ''}
+                      <div class="drill-name">💡 ${Sanitize.escape(d.name)}</div>
+                      <div class="drill-desc">${Sanitize.escape(d.desc)}</div>
+                    </div>`;
+                  return (checkable.length ? `
+                    <div class="fault-section-title">Drills you can check yourself</div>
+                    <div class="fault-drills">${checkable.map(card).join('')}</div>` : '')
+                  + (feel.length ? `
+                    <div class="fault-section-title">Feels — nothing here can confirm these</div>
+                    <div class="fault-drills fault-drills-feel">${feel.map(card).join('')}</div>
+                    <p class="fault-inference-note">${Sanitize.escape(FaultEngine.FEEL_CAVEAT)}</p>` : '');
+                })()}
                 ${f.optimalRange ? `<div class="fault-optimal">Target: ${typeof f.optimalRange==='function'?f.optimalRange(shots[0]?.clubType):f.optimalRange}</div>` : ''}
                 ${f.affectedShots?.length ? `<div class="fault-shots">Affected shots: rows ${f.affectedShots.slice(0,8).join(', ')}${f.affectedShots.length>8?'…':''}</div>` : ''}
               </div>
@@ -9222,7 +9283,7 @@ const CoachingMode = (() => {
       '⛳ Start line: pick a target 20 yards out and try to start the ball just right of it — let the curve bring it back',
       '🕳️ Headcover gate: put a headcover a foot outside the ball and swing so the club misses it coming down',
       '🎯 Toe-over-heel: feel the toe of the club pass the heel through the ball, like closing a door',
-      '🪵 Trail elbow: let the club drop toward your trail hip pocket before it moves toward the ball',
+      '🪵 Grip end first: from the top, the butt of the club should point down at the ball line before the head starts toward it',
     ],
     'Hook': [
       '⛳ Start line: aim to start the ball left of target and hold the face there through the finish',
@@ -9234,17 +9295,17 @@ const CoachingMode = (() => {
       '🪙 Coin drill: put a coin 3 inches in front of the ball and try to take turf where the coin is',
       '🧺 Towel behind: lay a towel 4 inches behind the ball and miss it on the way down',
       '⛳ Low point: try to bruise the grass in FRONT of the ball, not under it',
-      '🎈 Trail shoulder: let the trail shoulder work down and under, so the club reaches the turf past the ball',
+      '🌱 Off grass, not a mat: a mat lets a thin strike slide into the ball and still look fine — hit these off turf so the strike tells you the truth',
     ],
     'Fat': [
-      '🦶 Lead heel: press the lead heel into the ground as the club starts down',
+      '📐 Ball back a touch: move the ball one ball-width back and watch whether the turf mark moves in front of it',
       '🧺 Towel behind: same towel 4 inches behind the ball — hitting it is the fault, missing it is the fix',
       '⛳ Turf mark: hit 10 shots and look only at where the turf is scuffed; aim to move that mark forward each time',
       '🚶 Step-through: after impact, walk through toward the target so the finish is on the lead side',
     ],
     'Adding Loft Through Impact': [
       '🚧 Under the bar: keep the ball under an imagined bar 10 feet high, 20 yards ahead',
-      '✋ Low finish: finish with the hands no higher than the trail shoulder',
+      '✋ Short finish: stop the club at chest height on the way through instead of swinging to a full finish',
       '🧺 Towel behind: miss a towel 4 inches behind the ball and take turf in front of it',
       '⛳ Flight window: pick a lower window than feels natural and try to fly the ball through it',
     ],

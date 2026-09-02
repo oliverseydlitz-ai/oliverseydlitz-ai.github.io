@@ -833,6 +833,9 @@ body.modal-open { overflow: hidden; }
 .fb-row-hidden{cursor:pointer}
 .fb-row-hidden:hover td{background:var(--surface2)}
 .fault-causes-body li{color:var(--text-muted)}
+/* Drills that are body feels get the same visual demotion the body causes get:
+   still there, plainly less load-bearing than the ones the ball checks. */
+.fault-drills-feel .drill-card{opacity:.82;border-left:2px solid var(--yellow)}
 .fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;

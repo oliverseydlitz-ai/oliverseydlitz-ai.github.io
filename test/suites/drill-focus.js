@@ -1,0 +1,111 @@
+const M = require('../harness.js').load();
+let fail = 0; const ok = (c, m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
+const { FaultEngine: FE, PracticePlan: PP, Store } = M;
+const fs = require('fs');
+const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
+
+// The app splits a fault's CAUSES at the inference boundary — what the monitor
+// measured versus what it cannot see — and then, for five faults, prescribed
+// straight across it: "the app cannot see your wrist" three lines above "hold
+// your wrist angle". These assertions read the real drills out of app.js, so a
+// drill added later cannot land on the wrong side without failing here.
+const block = (() => {
+  const i = src.indexOf('const FaultEngine');
+  return src.slice(i, src.indexOf('\nconst ', i + 10));
+})();
+const drills = [...block.matchAll(/\{name:'([^']*)',desc:'((?:[^'\\]|\\.)*)',focus:'(\w+)'\}/g)]
+  .map(m => ({ name: m[1], desc: m[2], focus: m[3] }));
+const unlabelled = [...block.matchAll(/\{name:'([^']*)',desc:'(?:[^'\\]|\\.)*'\}/g)].map(m => m[1]);
+
+console.log('— every drill declares where the golfer\'s attention goes —');
+ok(drills.length === 52, `all 52 drills carry a focus (found ${drills.length})`);
+ok(unlabelled.length === 0,
+   `no drill is missing one${unlabelled.length ? ': ' + unlabelled.join(', ') : ''}`);
+ok(drills.every(d => FE.DRILL_FOCUS.includes(d.focus)), 'and every value is one of the three');
+
+console.log('— an "external" drill may not contain an in-swing body position —');
+// Deliberately narrower than BODY_CONSTRUCT: "hands" and "arm" appear as
+// landmarks ("shake hands with the target", "the club's heel") and flagging
+// those would make the guard cry wolf until someone turned it off.
+const INSWING = /\b(wrist|wrists|hip|hips|elbow|forearm|forearms|spine|shoulder tilt|lag|casting)\b/i;
+const leaked = drills.filter(d => d.focus === 'external' && INSWING.test(d.name + ' ' + d.desc));
+ok(leaked.length === 0,
+   `nothing classified external names one${leaked.length ? ': ' + leaked.map(d=>d.name).join(', ') : ''}`);
+
+console.log('— the split is the same shape as splitCauses —');
+const mixed = [{ name: 'a', desc: 'x', focus: 'external' }, { name: 'b', desc: 'y', focus: 'feel' },
+               { name: 'c', desc: 'z', focus: 'setup' }];
+const s = FE.splitDrills(mixed);
+ok(s.checkable.length === 2 && s.feel.length === 1, 'setup counts as checkable, feel does not');
+ok(FE.splitDrills(null).checkable.length === 0, 'and it survives no drills at all');
+ok(FE.drillFocus({ name: 'x' }) === 'feel',
+   'an unlabelled drill defaults to feel — the cautious side, not the flattering one');
+ok(FE.drillFocus({ focus: 'nonsense' }) === 'feel', 'as does a focus nobody defined');
+ok(FE.FEEL_CAVEAT.length > 100 && /cannot|not/.test(FE.FEEL_CAVEAT),
+   'and the caveat says outright that nothing confirms these');
+
+console.log('— the practice plan leads with a drill something can check —');
+const shot = (o = {}) => ({ clubType: '7i', ballSpeed: 80, clubSpeed: 62, smashFactor: 1.05,
+  launchAngle: 18, attackAngle: -4, clubPath: -1, carryDistance: 150, sideCarry: 3,
+  _ball: 'premium', _surface: 'grass', _aligned: true, ...o });
+// Three club groups so the plan has to choose a drill several times over,
+// including for the faults whose first-listed drill is a feel.
+const mk = (id, shots) => Store.stamp({ id, date: '2026-07-01',
+  conditions: { ball: 'premium', surface: 'grass', alignment: 'confirmed' }, shots });
+const sess = mk('p', [
+  ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 2, ...shot() })),
+  // low-ball-speed: ratio under 1.30 with the smash still over 1.28
+  ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 20,
+    ...shot({ clubType: '9i', ballSpeed: 80, clubSpeed: 62, smashFactor: 1.33 }) })),
+  // shallow iron attack angle
+  ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 40,
+    ...shot({ clubType: '6i', attackAngle: 2.5, smashFactor: 1.35, ballSpeed: 88, clubSpeed: 65 }) })),
+]);
+const plan = PP.generate(sess.shots, sess);
+const blocks = Array.isArray(plan) ? plan : (plan.blocks || plan.items || []);
+const withDrill = blocks.filter(b => b && b.drill);
+ok(withDrill.length >= 2, `the plan produced ${withDrill.length} blocks with a drill`);
+for (const b of withDrill) {
+  const feels = FE.splitDrills([b.drill]).feel.length > 0;
+  const hadChoice = !b.drillIsFeel;
+  ok(!(feels && hadChoice),
+     `${b.name}: leads with a feel only when every drill for it is one`);
+}
+ok(withDrill.every(b => typeof b.drillIsFeel === 'boolean'),
+   'and every block says which case it is, so the renderer can caveat it');
+
+// low-ball-speed is the one that made this concrete: "Lag preservation — hold
+// your wrist angle" was drills[0], with "Towel swings" (an audible whoosh, and
+// entirely external) sitting right behind it.
+console.log('— the case that started it —');
+const lbs = [...block.matchAll(/id:'low-ball-speed'[\s\S]*?optimalRange/g)][0][0];
+const lbsDrills = [...lbs.matchAll(/\{name:'([^']*)',desc:'(?:[^'\\]|\\.)*',focus:'(\w+)'\}/g)]
+  .map(m => ({ name: m[1], focus: m[2] }));
+ok(lbsDrills.some(d => d.focus !== 'feel'),
+   'low-ball-speed has a checkable drill available');
+ok(FE.splitDrills(lbsDrills).checkable[0].name === 'Towel swings',
+   'and the split surfaces it ahead of "Lag preservation"');
+
+console.log('— and the coaching tips hold the same line —');
+// CLAUDE.md used to claim TIPS "never" named the golfer's own body parts. Four
+// of them did: a trail elbow dropping to a hip pocket, a trail shoulder working
+// down and under, a lead heel pressing into the ground, and a finish measured
+// by where the hands ended up. All four are rewritten onto the club, the ball
+// or the turf. A body word is still allowed as a landmark or a static setup
+// check — purging every noun produces contorted prose — but not as an in-swing
+// position to hold, which is what this asserts.
+const tips = (() => {
+  const i = src.indexOf('const TIPS');
+  return src.slice(i, src.indexOf('\n  }', i));
+})();
+const lines = [...tips.matchAll(/^\s*'([^']+)',?$/gm)].map(m => m[1]);
+ok(lines.length >= 20, `read ${lines.length} tips out of app.js`);
+const HOLD = /\b(wrist|wrists|hip|hips|elbow|forearm|forearms|spine|shoulder|shoulders|knee|torso|lag|casting)\b/i;
+const inward = lines.filter(t => HOLD.test(t));
+ok(inward.length === 0,
+   `no tip asks for an in-swing body position${inward.length ? ': ' + inward.map(t=>t.slice(0,40)).join(' | ') : ''}`);
+ok(lines.filter(t => /knuckle|at address/i.test(t)).length > 0,
+   'static setup checks are still allowed, and one is still there');
+
+console.log(fail?`\n${fail} FAILED`:'\nall passed');
+process.exit(fail?1:0);

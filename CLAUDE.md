@@ -285,9 +285,14 @@ is the working — read the relevant section before touching any of these.
   at is not what the tour averages. The PGA driver attack angle is **-1.3°**
   (descending); **+2..+5°** is the optimal target and **+3.0°** is the *LPGA*
   average. Conflating those was the original bug.
-- **`CoachingMode.TIPS`** — deliberately written to an *external* focus of
-  attention (club, ball, turf, target), never the golfer's own body parts.
-  This is the best-evidenced item in the audit; don't rewrite cues inward.
+- **`CoachingMode.TIPS`** — written to an *external* focus of attention: the
+  subject of a cue is the club, ball, turf, tee or target. Don't rewrite cues
+  inward. A body word may appear as a **landmark** ("chest height") or in a
+  **static setup check** the golfer can verify at address ("count 2 knuckles"),
+  but never as an in-swing position to hold — four cues did exactly that and
+  were rewritten. `test/suites/drill-focus.js` guards both TIPS and the fault
+  drills. (An earlier version of this file claimed TIPS named no body part at
+  all, which was never true of the code.)
 
 ### Dispersion tails and the one strokes number (`Dispersion`)
 
