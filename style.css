@@ -832,6 +832,9 @@ body.modal-open { overflow: hidden; }
 .fb-hidden{color:var(--text-muted);opacity:.45;text-align:center;letter-spacing:.2em}
 .fb-row-hidden{cursor:pointer}
 .fb-row-hidden:hover td{background:var(--surface2)}
+.fault-causes-body li{color:var(--text-muted)}
+.fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
+  font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;
   color:var(--text-dim);background:var(--surface2);border-left:3px solid var(--yellow);
   border-radius:var(--radius-sm);text-wrap:pretty}

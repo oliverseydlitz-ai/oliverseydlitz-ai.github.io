@@ -107,5 +107,49 @@ for (const c of ['d','3w','4h','3i','7i','pw','lw']) {
      `${c}: every band resolves and is the right way round`);
 }
 
+console.log('— the inference boundary: what the device sees vs what it cannot —');
+// The fault cards listed causes under "Root causes", and sixteen of the eighty
+// entries named a body position — hip rotation, spine tilt, a cupped lead
+// wrist, casting. None of those are recoverable from ball and club-head data:
+// dynamic loft alone is the simultaneous outcome of shaft lean, wrist angle,
+// forearm rotation, shaft droop, attack angle and ball position, and the
+// mapping cannot be inverted. Asserting them as findings is exactly what §3.6
+// forbids.
+const FE = M.FaultEngine;
+ok(FE.causeIsObservable('Club path is well out-to-in through impact'), 'a club-delivery cause is observable');
+ok(FE.causeIsObservable('Face open relative to the swing path'), 'so is a face-to-path one');
+for (const bad of [
+  'Casting the club (early release) from the top',
+  'Insufficient hip rotation causing the arms to flip',
+  'Cupped lead wrist at impact adding dynamic loft',
+  'Early extension / coming out of posture',
+  'Spine tilt level or tilted toward target at address',
+  'Lateral slide instead of rotational power transfer',
+]) ok(!FE.causeIsObservable(bad), `not observable: "${bad.slice(0, 44)}…"`);
+
+const split = FE.splitCauses([
+  'Club path is out-to-in', 'Casting the club from the top', 'Face open to the path', 'Insufficient hip rotation',
+]);
+ok(split.observable.length === 2 && split.body.length === 2, 'a mixed list splits both ways');
+ok(split.observable.every(FE.causeIsObservable), 'and nothing lands on the wrong side');
+ok(/cannot see any of them/.test(FE.BODY_CAVEAT), 'the caveat says the app cannot see them');
+ok(/several different actions produce the same club delivery/.test(FE.BODY_CAVEAT),
+   'and why the same delivery has many possible causes');
+
+// The real content, checked in bulk: every body-construct string the engine
+// ships must be classified as unobservable, or it renders as a finding.
+const fs2 = require('fs');
+const src2 = fs2.readFileSync(require('path').join(__dirname, '../../app.js'), 'utf8');
+const seg2 = src2.slice(src2.indexOf('const FaultEngine'), src2.indexOf('const ShotScorer'));
+const all = [];
+for (const m of seg2.matchAll(/causes:\s*\[(.*?)\]/gs))
+  for (const item of m[1].matchAll(/'((?:[^'\\]|\\.)*)'/g)) all.push(item[1]);
+ok(all.length > 50, `${all.length} cause strings shipped`);
+const leaked = all.filter(c => /\b(wrist|casting|cast|hip|spine|posture|early exten|lag)\b/i.test(c) && FE.causeIsObservable(c));
+ok(leaked.length === 0,
+   `no body-position cause is classified as measured${leaked.length ? ' — leaked: ' + leaked.join(' | ') : ''}`);
+const bodyCount = all.filter(c => !FE.causeIsObservable(c)).length;
+ok(bodyCount >= 15, `${bodyCount} of them are correctly held behind the caveat`);
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

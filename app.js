@@ -3253,6 +3253,45 @@ const CSVParser = (() => {
 // ────────────────────────────────────────────────────────────────
 const FaultEngine = (() => {
 
+  // ── The inference boundary, §3.6 ──────────────────────────────
+  // The fault cards list causes under a heading that read "Root causes", and
+  // sixteen of the eighty entries name a body position: hip rotation, spine
+  // tilt, a cupped lead wrist, casting, early extension. The research base is
+  // explicit that none of these are recoverable from ball and club-head data.
+  // Dynamic loft alone is the simultaneous outcome of shaft lean, wrist angle,
+  // forearm rotation, shaft droop, attack angle and ball position — the
+  // mapping is many-to-one and cannot be inverted, and there is no published
+  // regression from a measured wrist angle to a measured dynamic loft
+  // anywhere. "Casting", "over the top" and "early extension" are body-position
+  // constructs; club path is an outcome that many different body actions
+  // produce.
+  //
+  // The content is worth keeping — these ARE the things that commonly produce
+  // the pattern, and a golfer with a video camera can check them. What was
+  // wrong is the app asserting them as findings. So they are classified and
+  // shown apart, under a heading that says the device cannot see them.
+  //
+  // The framing rule from §3.6, verbatim: say "your face was 3° open to your
+  // path"; never say "your lead wrist was cupped."
+  const BODY_CONSTRUCT = /\b(hip|hips|pelvis|torso|shoulder turn|wrist|wrists|lag|cast|casting|early exten|weight shift|ground|x-factor|spine|arm-dominant|over the top|release|posture|sway|slide|sliding|separation|knee|elbow|forearm|grip pressure|stance)\b/i;
+
+  // Can the launch monitor actually see this, or is it a body position someone
+  // would need video to check?
+  const causeIsObservable = text => !BODY_CONSTRUCT.test(String(text || ''));
+  function splitCauses(causes) {
+    const list = (causes || []).filter(Boolean);
+    return {
+      observable: list.filter(causeIsObservable),
+      body: list.filter(c => !causeIsObservable(c)),
+    };
+  }
+  const BODY_CAVEAT =
+    'The monitor sees the ball and the club head, not you. These are the body positions that commonly ' +
+    'produce this pattern, and they are worth checking on video — but the app cannot see any of them, and ' +
+    'several different actions produce the same club delivery. Treat them as things to look for, not as ' +
+    'findings.';
+
+
   function smashMin(t) { return isWood(t) || isHybrid(t) ? 1.40 : 1.33; }
   function smashGood(t){ return isWood(t) || isHybrid(t) ? 1.44 : 1.37; }
 
@@ -3789,7 +3828,8 @@ const FaultEngine = (() => {
     return faults;
   }
 
-  return { detectFaults };
+  return { detectFaults, splitCauses, causeIsObservable, BODY_CAVEAT, BODY_CONSTRUCT,
+           MIN_AFFECTED, MIN_RATE, FIRM_RATE };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5030,7 +5070,7 @@ const UI = (() => {
     if (fc && fc.clean) {
       focusHtml = `<div class="focus-card focus-clean">
           <div class="focus-head"><span class="focus-icon">✅</span><span class="focus-kicker">Focus</span></div>
-          <div class="focus-title">No major faults — keep grooving it</div>
+          <div class="focus-title">No fault clears the reporting bar right now</div>
           <div class="focus-sub">Your recent sessions are clean. Maintain your routine.</div>
         </div>`;
     } else if (fc) {
@@ -5615,7 +5655,15 @@ const UI = (() => {
     const el = document.getElementById('practicePlan');
     if (!el) return;
     const plan = PracticePlan.generate(shots);
-    if (!plan) { el.innerHTML = `<div class="no-faults">✅ No faults to drill — keep grooving your swing!</div>`; return; }
+    // "Grooving" is the vocabulary of a claim the research base rejects: no
+    // study supports a rep or week count that automatises a change, and the
+    // word implies one. It also reads as "nothing here", when what the engine
+    // actually found is that nothing recurred often enough to report.
+    if (!plan) { el.innerHTML = `<div class="no-faults">Nothing recurred often enough to prescribe against.
+      That is a real result, not an empty one — a fault has to appear on at least
+      ${FaultEngine.MIN_AFFECTED ?? 2} shots and on ${Math.round((FaultEngine.MIN_RATE ?? 0.3) * 100)}% of the
+      club's shots before it clears measurement noise. Run the transfer block below and bank the session.</div>`;
+      return; }
     const transfer = PracticePlan.transferBlock();
     const blocks = [...plan, transfer];
     const total = blocks.reduce((a,b)=>a+b.minutes,0);
@@ -5972,9 +6020,20 @@ const UI = (() => {
               </div>
               <div class="fault-body">
                 <p class="fault-desc">${f.description}</p>
-                ${f.causes?.length ? `
-                  <div class="fault-section-title">Root causes</div>
-                  <ul class="fault-causes">${f.causes.map(c=>`<li>${c}</li>`).join('')}</ul>` : ''}
+                ${(() => {
+                  // Split at the inference boundary: what the device measured
+                  // versus what it cannot see. The old markup put both under
+                  // "Root causes", which asserted body positions the launch
+                  // monitor has no way of knowing.
+                  const { observable, body } = FaultEngine.splitCauses(f.causes);
+                  return (observable.length ? `
+                    <div class="fault-section-title">What the numbers show</div>
+                    <ul class="fault-causes">${observable.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>` : '')
+                  + (body.length ? `
+                    <div class="fault-section-title">Often behind it — but not measured here</div>
+                    <ul class="fault-causes fault-causes-body">${body.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>
+                    <p class="fault-inference-note">${Sanitize.escape(FaultEngine.BODY_CAVEAT)}</p>` : '');
+                })()}
                 ${f.drills?.length ? `
                   <div class="fault-section-title">Drills</div>
                   <div class="fault-drills">${f.drills.map(d=>`
