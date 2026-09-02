@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 16 suites, 578 assertions. Must be green.
+npm test             # load gate + 17 suites, 641 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v79` — increment it.
+   Currently `shotlab-v82` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -60,7 +60,7 @@ mechanism when a number changes. Match that.
 
 | Path | What it is |
 |---|---|
-| `app.js` | Everything. ~9,620 lines, 55 IIFE modules + ~24 top-level functions |
+| `app.js` | Everything. ~9,990 lines, 56 IIFE modules + ~24 top-level functions |
 | `index.html` | 7 views, 7 static modals, CSP meta, CDN script tags |
 | `style.css` | Design tokens + components. Two stacked `:root` blocks from successive redesigns |
 | `sw.js` | Service worker. Network-first same-origin, cache-first CDN |
@@ -235,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 55 modules, ~9,620 lines in `app.js`, 578 assertions.
+`main` is green. 56 modules, ~9,990 lines in `app.js`, 641 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -271,6 +271,17 @@ this session's real bugs**, because it keeps paying:
 grep -o "Module\.[a-zA-Z]*" app.js | sort -u
 ```
 
+**Its one real limitation, learned the hard way:** functions called
+*unqualified from inside their own module* look dead to this grep and are not.
+`Trajectory.arc` and `UI.renderSessionList` both came up as uncalled; both are
+live. Two false positives in ten candidates. Check for a bare `name(` call
+inside the module before deleting anything.
+
+**Confirmed genuinely dead and left in place** (no user-facing gap, so removal
+is the owner's call): `ClubAnalyzer.analyzeClub`, `CoachingMode.generateSession`,
+`Features.recommendDrill`, `ContentLibrary.getByLevel`, `ViewPrefs.setPref`,
+`SessionSharing.createShareLink`. Do not re-audit these.
+
 An export with no caller is usually a feature that was built and never wired.
 That heuristic found: `Store.saveSession` (imports bypassed device storage),
 `Router.showPractice` (the Practice tab never rendered), four dead
@@ -280,7 +291,17 @@ That heuristic found: `Store.saveSession` (imports bypassed device storage),
 unchecked — `Spin.summary`, `SessionSharing.exportAsCSV`, `ClubAnalyzer.analyzeClub`,
 `CoachingMode.generateSession`, `Features.recommendDrill`, `ContentLibrary.getByLevel`.
 
-### The two off-device modules
+### The three off-device modules
+
+`QuietEye`, `ShortGame` and `Rounds` touch no launch-monitor data, so they work
+on a brand-new account. `Rounds` is the newest and the most consequential: it is
+the only place the app can say where a golfer's strokes actually go, and it does
+it by placing each stat on Shot Scope's table separately and reading the spread
+between the implied handicaps. **Do not add a strokes-gained figure to it** —
+the app keeps one strokes number, in `Dispersion`, and the spread-between-
+categories method deliberately needs none.
+
+### The two range-independent practice modules
 
 `QuietEye` and `ShortGame` touch **no launch-monitor data at all**, so they
 render on a brand-new account with nothing imported. That makes them the only

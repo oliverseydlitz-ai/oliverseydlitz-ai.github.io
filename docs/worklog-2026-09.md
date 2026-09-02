@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `676236a`; `app.js` 5,964 → 9,618 lines
-(+4,320 of new measurement and coaching logic, −660 of dead modules).
+next, including future me. Commits run `2503479` → `9a19ad6`; `app.js` 5,964 → 9,993 lines
+(+4,690 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 16 suites, 578 assertions.
+  jsdom) then 17 suites, 641 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -676,6 +676,79 @@ on day one.
 
 ---
 
+## 12. On-course data, at last `e763446` `e157ce4` `9a19ad6`
+
+### 12.1 Two more from the export audit, and its limitation
+
+**`Spin.summary` was thoroughly tested and called by nothing.** The app told
+RPT users "spin is measured here because you used an RPT ball, so this
+describes today accurately" — and then showed no session figure anywhere. The
+caveat without the number it qualifies. A well-tested function that no code
+path reaches still does nothing for a user, and the test coverage is exactly
+what let it sit there looking finished.
+
+**`CloudDB.migrateLocalSessions` mattered more than when it was written.** With
+device storage on, a guest accumulates months of sessions in IndexedDB, and
+signing in merged them into the VIEW without uploading them — they looked safe
+and were one browser-data wipe from gone, on an account that would have kept
+them. It asks rather than uploading automatically: signing in is not consent to
+send a history to a server.
+
+**And the audit's limitation, worth knowing before the next person runs it.**
+Functions called *unqualified from inside their own module* are invisible to a
+`Module.method` grep. `Trajectory.arc` and `UI.renderSessionList` both came up
+dead and both are live — two false positives in ten candidates. Deleting on
+that evidence would have broken the ball-flight drawing and the session list.
+
+### 12.2 `MIN_CLUB_SHOTS = 4` never existed `e763446`
+
+CLAUDE.md described the fault gate as "`MIN_CLUB_SHOTS = 4` of that club".
+There is no such constant, and the real per-club floor is
+`Metrics.MIN_SHOTS_REPORT` — **ten, not four**. The documented gate was under
+half the real one.
+
+Not hypothetical damage: earlier in this same session I exported that constant
+from `FaultEngine` on the strength of the docs, and the load gate caught it
+because the identifier does not resolve. **A wrong constant in documentation is
+worse than no constant, because it reads as checked.** The suite now pins all
+four real values plus the absence of the invented one.
+
+### 12.3 `Rounds` — where the strokes actually go `9a19ad6`
+
+The app kept saying it could not answer this, and it was right: it had no
+on-course data. Now it takes the six numbers a golfer knows at the end of a
+round.
+
+It needs no strokes model, because Shot Scope's normative table exists — 90M+
+shots, independently replicated across 20,000 golfers and 400,000 rounds. Each
+stat is placed on that table **independently**, and the **spread between the
+implied handicaps is the diagnosis**. Greens like a 15 and penalties like a 25
+is not a 20 across the board; it is a specific, findable set of strokes going
+to one thing.
+
+Under five points of spread it says the categories are level and calls that a
+real answer rather than hunting for a weakness.
+
+**Fairways hit is logged and never graded**, and the test round shows exactly
+why. That golfer hits **50% of fairways — scratch level on that stat** — while
+taking five penalties a round, which is off the bottom of the table. Grading
+fairways would have called them an elite driver. Fairways move 50% → 46% across
+a 28-stroke scoring range; penalties vary eightfold. Placing anyone on fairway
+percentage manufactures a weakness out of a rounding error.
+
+It also puts penalties per round beside the measured dispersion tail — the
+app's own open question about whether range performance predicts on-course
+performance, asked with one golfer's data. **Side by side, explicitly not
+correlated:** a few rounds cannot establish that and an r printed on it would
+be invented.
+
+One bug caught in test: the clamp flag read "worse than the table" for an 80%
+GIR, because it was derived from the value's position on an ascending axis
+rather than from the handicap. Higher is better for greens and worse for
+penalties; it keys off the scratch row either way now.
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -683,10 +756,12 @@ judgement rather than a queue.
 
 All three of those are done (§10). What is left:
 
-- **Keep running the uncalled-export audit.** It found most of §10 and several
-  exports are still unchecked: `Spin.summary`, `SessionSharing.exportAsCSV`,
-  `ClubAnalyzer.analyzeClub`, `CoachingMode.generateSession`,
-  `Features.recommendDrill`, `ContentLibrary.getByLevel`.
+- **The uncalled-export audit is done** (§12.1). Six confirmed-dead helpers are
+  left in place with no user-facing gap — listed in HANDOVER so nobody
+  re-audits them — and its false-positive mode is written up.
+- **`Rounds` has no trend view.** It profiles the average across rounds but
+  does not show a category moving over time, which is the obvious next step now
+  that there is on-course data to trend.
 - **`FaultEngine`'s drill cues use internal focus** ("hold your wrist angle"),
   which `CoachingMode.TIPS` deliberately avoids. Consistency rather than
   efficacy — external cueing is Tier C, g = 0.15 after bias correction.
@@ -766,6 +841,16 @@ working code for, and never runs. The codebase reads as careful because the
 reasoning is all present in comments; the reasoning being present is not the
 same as it executing. An export nothing calls is the cheapest tell.
 
+**Test coverage can be what hides a dead feature.** `Spin.summary` had a
+thorough suite and no caller. The tests all passed, the function was correct,
+and no user ever saw its output. Coverage answers "does this work", never "is
+this reached".
+
+**A wrong constant in documentation is worse than none.** CLAUDE.md's
+`MIN_CLUB_SHOTS = 4` does not exist and the real floor is ten. It read as
+checked, so I exported it, and only the load gate stopped it. Documented numbers
+now get pinned by tests.
+
 **I trusted my own test fixture over the engine, briefly.** A tail detector
 was reporting "ordinary" on a set I had built to be heavy-tailed, and my first
 move was to change the estimator. The estimator did have a real bug — it ran
@@ -831,6 +916,10 @@ Every commit in the session, and the section that explains it.
 | `7206172` | 10 | docs: record the enforcement pass |
 | `50bb1fd` | 11.1 | Fix an export that corrupted its own file, and split it into two buttons |
 | `676236a` | 11.2 | Add a short-game module: 20 putting and chipping drills, built on the trials |
+| `6d1c6aa` | 11 | docs: write up the short-game research, and index it |
+| `e763446` | 12.1/12.2 | Show the spin reading when it is one, and correct a fault gate the docs invented |
+| `e157ce4` | 12.1 | Offer to back up device-only sessions when a guest signs in |
+| `9a19ad6` | 12.3 | Add round logging — the on-course data the app kept saying it did not have |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

@@ -336,6 +336,26 @@ only module that touches no launch-monitor data.
 - `puttsToDetect()` says the study's +5% needs ~1,400 putts a side;
   `detectableDelta()` inverts it into what your log *can* resolve. Keep both.
 
+### On-course rounds (`Rounds`)
+
+The only on-course data the app has, and the only place it can answer "where
+are my strokes going" rather than reasoning about it from range shots.
+
+- **Each stat is placed on Shot Scope's normative table independently**, giving
+  an implied handicap per category. **The SPREAD between them is the
+  diagnosis** — greens like a 15 and penalties like a 25 is not a 20 across the
+  board. No strokes model is invented; it is their numbers against a published
+  sample (90M+ shots, independently replicated).
+- **Fairways hit is logged and NEVER graded.** It moves 50% → 46% across a
+  28-stroke range. Grading it manufactures a weakness out of a rounding error.
+  `PLACEABLE` deliberately omits it; `FIR_NOTE` says why.
+- Under 5 points of spread it says the categories are level and calls that a
+  real answer rather than hunting for a weakness.
+- `rangeLink()` puts penalties/round beside the measured dispersion tail —
+  **side by side, explicitly not correlated.** A few rounds cannot establish
+  that, and an r printed on it would be invented.
+- Nine-hole rounds are doubled, flagged `scaled`, and the assumption is stated.
+
 ### Short game (`ShortGame`) — see `docs/short-game-evidence.md`
 
 20 drills, 10 putting and 10 chipping, built on a 2024 systematic review of
