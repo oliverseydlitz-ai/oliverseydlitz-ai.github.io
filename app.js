@@ -10287,56 +10287,65 @@ const LearningPath = (() => {
 // PerformanceAlerts — Pro-active notifications
 // ════════════════════════════════════════════════════════════════
 const PerformanceAlerts = (() => {
+  // The red box at the top of the home screen. It had a live rendering bug and
+  // the same broken arithmetic as the insight box next to it:
+  //
+  //   · `${Math.round(faults[0].pct * 100)}%` — there is no `pct` field on a
+  //     fault. The alert read "NaN% of recent shots. Priority fix." in red.
+  //   · `Math.round(100 - stdDev(carries))` — a spread in yards subtracted
+  //     from 100, pooled across three sessions and every club in the bag, and
+  //     escalated to a HIGH-severity alert below 60.
+  //   · A stray `',` inside a template literal printed a quote and a comma at
+  //     the end of that same message.
+  //   · `detectFaults(allShots)` was called without the session, so the
+  //     condition gating inside it received nothing, on three sessions' shots
+  //     flattened together — which is exactly the pooling the engine refuses
+  //     everywhere else.
+  //
+  // An alert should be something time-critical or genuinely serious. Club-level
+  // spread is neither, and `InsightEngine` now reports it honestly one box
+  // down, so it is not duplicated here in red.
   function generateAlerts(sessions) {
     const alerts = [];
+    if (!sessions || !sessions.length) return alerts;
+    const latest = sessions[0];
 
-    if (!sessions.length) return alerts;
+    // A recurring fault in the LATEST session, judged with that session's own
+    // conditions. `rate` is the real field, and a fault the engine itself
+    // marked tentative is not a "priority fix".
+    try {
+      const faults = FaultEngine.detectFaults(latest.shots, latest)
+        .filter(f => f.severity === 'high');
+      const f = faults[0];
+      if (f) {
+        const tentative = f.confidence === 'tentative';
+        alerts.push({
+          icon: tentative ? '🟠' : '🔴',
+          severity: tentative ? 'info' : 'high',
+          title: f.name,
+          message: `${f.count} of ${f.total} ${clubLabel(f.clubType || latest.shots[0]?.clubType)} shots ` +
+                   `(${Math.round((f.rate || 0) * 100)}%) in your last session.` +
+                   (tentative
+                     ? ' Below the rate that rules out measurement noise, so treat it as something to watch.'
+                     : ' That is past what measurement noise produces.'),
+        });
+      }
+    } catch (_) {}
 
-    const recent = sessions.slice(0, 3);
-    const allShots = recent.flatMap(s => s.shots);
-    const faults = FaultEngine.detectFaults(allShots);
+    // Streak milestone. A habit count — no measurement claim, no gate.
+    try {
+      const st = Features.streak(sessions);
+      if (st.current > 3 && st.current % 5 === 0) {
+        alerts.push({ icon: '🔥', severity: 'info', title: 'Streak milestone',
+          message: `${st.current} days in a row.` });
+      }
+    } catch (_) {}
 
-    // Consistency alert
-    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const consistency = Math.round(100 - stdDev(carries));
-    if (consistency < 60) {
-      alerts.push({
-        icon: '⚠️',
-        severity: 'high',
-        title: 'Consistency Alert',
-        message: `Low carry distance consistency (${consistency}%). Focus on repeatable swing.',`,
-      });
-    }
-
-    // Fault escalation
-    if (faults[0]?.severity === 'high') {
-      alerts.push({
-        icon: '🔴',
-        severity: 'high',
-        title: faults[0].name,
-        message: `${faults[0].name} detected in ${Math.round(faults[0].pct * 100)}% of recent shots. Priority fix.`,
-      });
-    }
-
-    // Streak alert
-    const st = Features.streak(sessions);
-    if (st.current > 3 && st.current % 5 === 0) {
-      alerts.push({
-        icon: '🔥',
-        severity: 'info',
-        title: `Streak Milestone!`,
-        message: `${st.current} day streak! Keep the momentum going.`,
-      });
-    }
-
-    // Recovery suggestion
-    if (sessions[0] && new Date() - new Date(sessions[0].date) > 7*24*60*60*1000) {
-      alerts.push({
-        icon: '📅',
-        severity: 'info',
-        title: 'Time to practice',
-        message: `It's been ${Math.floor((new Date() - new Date(sessions[0].date)) / (24*60*60*1000))} days. Schedule a session!`,
-      });
+    // Nothing logged in a while. Also not a measurement claim.
+    const days = Math.floor((Date.now() - new Date(latest.date).getTime()) / 864e5);
+    if (days >= 7) {
+      alerts.push({ icon: '📅', severity: 'info', title: 'Nothing logged in a while',
+        message: `${days} days since your last session. The short-game work in Practice needs no launch monitor.` });
     }
 
     return alerts;

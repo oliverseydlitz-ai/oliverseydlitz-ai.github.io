@@ -79,5 +79,33 @@ console.log('— and an empty history is not a crash —');
 ok(IE.generateInsights([]).length === 0, 'no sessions, no insights');
 ok(Array.isArray(IE.generateInsights(null)), 'and null is handled too');
 
+console.log('— and the red alert box no longer renders NaN —');
+const { PerformanceAlerts: PA } = M;
+// `${Math.round(faults[0].pct * 100)}%` — there is no `pct` field on a fault.
+// The home screen showed "NaN% of recent shots. Priority fix." in red.
+const steep = sess('k','2026-07-08', prem,
+  many(24, { clubType: 'd', attackAngle: -6, launchAngle: 8 }));
+const alerts = PA.generateAlerts([steep]);
+const atext = alerts.map(a => a.title + ' ' + a.message).join(' | ');
+ok(alerts.length > 0, 'a genuinely steep driver still raises an alert');
+ok(!/NaN/.test(atext), `no NaN in the message${/NaN/.test(atext) ? ': ' + atext : ''}`);
+ok(/\d+ of \d+/.test(atext), 'it says how many shots of how many');
+ok(/%/.test(atext) && !/undefined/.test(atext), 'and a real percentage');
+ok(!/','|\.',/.test(atext), "and no stray quote-comma left over from the old template literal");
+
+console.log('— a tentative fault is not a "priority fix" —');
+// FaultEngine downgrades below FIRM_RATE. An alert that shouts at a rate the
+// engine itself is unsure about is the app arguing with its own gate.
+const mixed = sess('l','2026-07-08', prem, [
+  ...many(9,  { clubType: 'd', attackAngle: -6 }),
+  ...many(15, { clubType: 'd', attackAngle: 3 }),
+]);
+const mAlerts = PA.generateAlerts([mixed]);
+for (const a of mAlerts) {
+  ok(!/Priority fix/i.test(a.message), 'nothing says "Priority fix" any more');
+  if (/watch/.test(a.message)) ok(a.severity !== 'high', 'a watch-it fault is not high severity');
+}
+ok(PA.generateAlerts([]).length === 0, 'and no sessions is not a crash');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
