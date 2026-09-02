@@ -837,6 +837,9 @@ tr:hover td { background: var(--surface2); }
 .tail-item.heavy::before{color:var(--yellow)}
 .tail-note{font-size:.75rem;line-height:1.5;color:var(--text-muted);margin-bottom:.4rem}
 .tail-note:last-child{margin-bottom:0}
+.import-error{margin:.75rem 0 .25rem;padding:.7rem .85rem;font-size:.83rem;line-height:1.55;
+  color:var(--text);background:var(--surface2);border-left:3px solid var(--red);
+  border-radius:var(--radius-sm);text-wrap:pretty}
 .probe-ask{margin-bottom:.6rem}
 .probe-btns{display:flex;gap:.45rem;flex-wrap:wrap;margin:.5rem 0 0 1rem}
 .probe-btn{padding:.4rem .8rem;font-size:.8rem;font-weight:600;cursor:pointer;

@@ -2517,10 +2517,31 @@ const CSVParser = (() => {
   // and "zero" dispersion. null keeps the two cases apart.
   const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 
+  // Columns that make a file a Rapsodo export rather than some other CSV.
+  // Without this check any spreadsheet parsed "successfully": Papa returns
+  // rows, none of the column names match, and every shot comes back holding
+  // nothing but its row number. The import then showed "48 shots, 1 club" with
+  // a table of dashes and saved it, and the failure only became visible later
+  // as a session that analysed to nothing. Refusing at the door is the only
+  // place this can be said clearly.
+  const REQUIRED = ['Club Type', 'Ball Speed'];
+
   function parse(csvText) {
     const result = Papa.parse(csvText, { header:true, skipEmptyLines:true, transformHeader:h=>h.trim() });
-    if (!result.data?.length) throw new Error('No data found in CSV');
-    return result.data.map((row,i) => {
+    if (!result.data?.length) throw new Error('That file has no rows in it.');
+
+    const headers = Object.keys(result.data[0] || {});
+    const missing = REQUIRED.filter(c => !headers.includes(c));
+    if (missing.length) {
+      const known = headers.filter(h => h in COLUMN_MAP);
+      throw new Error(
+        `This does not look like a Rapsodo export — it has no ${missing.join(' or ')} column` +
+        (known.length ? `, though ${known.length} other column${known.length === 1 ? '' : 's'} did match.`
+                      : ` and none of its ${headers.length} columns match the ones Rapsodo writes.`) +
+        ` Export from Rapsodo Cloud → Session → Share → CSV and try that file.`);
+    }
+
+    const shots = result.data.map((row,i) => {
       const shot = {_row:i+2};
       for (const [col,field] of Object.entries(COLUMN_MAP)) {
         if (!(col in row)) continue;
@@ -2528,9 +2549,19 @@ const CSVParser = (() => {
       }
       return shot;
     });
+
+    // Right headers, no readings — a session that was exported before anything
+    // was hit, or one where every row failed to record. Saving it produces a
+    // session that silently analyses to nothing.
+    const usable = shots.filter(s => Number.isFinite(s.ballSpeed) && s.ballSpeed > 0);
+    if (!usable.length) {
+      throw new Error(`The columns are right but none of the ${shots.length} rows has a ball speed in it, ` +
+        `so there is nothing to analyse. Check the session actually recorded shots before exporting.`);
+    }
+    return shots;
   }
 
-  return { parse };
+  return { parse, REQUIRED };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5727,15 +5758,49 @@ const ImportFlow = (() => {
     document.getElementById(id).classList.add('active');
   }
 
+  // A Rapsodo session is a hundred rows or so, which parses far too fast to
+  // need a worker — the note in the docs about moving this off the main thread
+  // was solving a problem this file does not have. What it did need was for a
+  // failure to say something useful. Every error here used to be a native
+  // alert() reading "Could not parse CSV: ..." with the raw exception, and the
+  // most common failure of all — the wrong CSV — did not error at all.
+  const MAX_BYTES = 5 * 1024 * 1024;
+
+  function importError(msg) {
+    const el = document.getElementById('importError');
+    if (el) { el.textContent = msg; el.hidden = false; }
+    toast('Import failed — see the message on the import screen.');
+  }
+  function clearImportError() {
+    const el = document.getElementById('importError');
+    if (el) { el.textContent = ''; el.hidden = true; }
+  }
+
   function handleFile(file) {
+    clearImportError();
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) { alert('Please select a CSV file.'); return; }
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      importError(`"${file.name}" is not a CSV. Export from Rapsodo Cloud → Session → Share → CSV.`);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      importError(`That file is ${(file.size / 1048576).toFixed(1)} MB. A Rapsodo session export is a few ` +
+        `kilobytes, so this is almost certainly a different file.`);
+      return;
+    }
+    if (file.size === 0) { importError(`"${file.name}" is empty.`); return; }
+
     const reader = new FileReader();
+    reader.onerror = () => importError('The browser could not read that file. Try exporting it again.');
     reader.onload = e => {
       try {
         _shots = CSVParser.parse(e.target.result);
+        clearImportError();
         showPreview(_shots, file.name);
-      } catch(err) { alert('Could not parse CSV: '+err.message); }
+      } catch(err) {
+        // The message is written to be read by a golfer, not a developer.
+        importError(err.message || 'That file could not be read as a Rapsodo CSV.');
+      }
     };
     reader.readAsText(file);
   }
