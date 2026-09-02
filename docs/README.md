@@ -35,4 +35,6 @@ change any of the following, re-read the corresponding section first:
   Cues naming the golfer's own body parts are the thing the evidence says to
   avoid; see the practice-science section before rewriting any of them.
 
+| [`worklog-2026-09.md`](worklog-2026-09.md) | What changed across 31 Aug – 2 Sep 2026 and why: the defects found, the two research passes, every correction with its reasoning, what is still open, and the mistakes made along the way. Start here if you are picking this up cold. |
+| [`launch-direction-vs-face-angle.md`](launch-direction-vs-face-angle.md) | D-plane note on why launch direction is not face angle. The model the app implements; `faceAngle()` and `facePath()` both derive from it. |
 | [`research-base-v2.md`](research-base-v2.md) | The engineering spec this app is built against. Supersedes the audit above on two points: the MLM2PRO does **not** measure face angle, and measurement error must gate every prescription. Contains the metric trust tiers, MDC table, transfer-function coefficients, the practice-design evidence hierarchy, and §9's list of claims the app must never make. |
