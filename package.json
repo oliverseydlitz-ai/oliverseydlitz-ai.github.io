@@ -1,0 +1,11 @@
+{
+  "name": "shotlab-tour",
+  "private": true,
+  "description": "Test tooling only. The site itself has no build step — GitHub Pages serves the static files directly and ignores this file.",
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

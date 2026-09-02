@@ -283,6 +283,31 @@ where strokes-gained says scoring differences live. Every block prescribes
 **balls as well as minutes** (volume past attention is exercise, not practice),
 and `transferBlock()` is appended to every plan.
 
+## Tests — run these before every push
+
+```bash
+npm install     # once; jsdom only, dev-only. The SITE still has no build step.
+npm test
+```
+
+`test/run.js` does two things, in this order, and the order is the point:
+
+1. **Load gate.** Loads `app.js` as a whole file in jsdom against the real
+   `index.html`, then checks that late declarations are reachable. A top-level
+   throw leaves every later `const` in the temporal dead zone, so the app is
+   dead while `node --check` still passes.
+2. **Unit suites** (`test/suites/`), which run against the modules from that
+   same real load — not regex-extracted copies.
+
+**Why it is built this way.** An earlier harness pulled modules out of
+`app.js` with regexes. `Store.stamp` was then exported from `MemDB` by
+mistake — both modules end with an identical return line — and `app.js` threw
+at load for four commits while `node --check` passed and every suite reported
+green. The gate exists specifically to catch that class of bug; there is a
+test proving it does.
+
+If the gate fails, the suites are not run. They would be meaningless.
+
 ## Code Style & Patterns
 
 - **No build/transpile** — vanilla JS ES6+ (arrow functions, destructuring, async/await supported)
