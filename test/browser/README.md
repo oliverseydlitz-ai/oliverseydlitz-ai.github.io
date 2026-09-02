@@ -4,16 +4,25 @@ These are **not** part of `npm test`. The load gate and the unit suites run in
 jsdom against the real `index.html`, which is enough for logic; these drive a
 real Chromium against a real page and catch a different class of defect.
 
-They need Playwright and a served copy of the site, so they are run by hand:
+They need Playwright and a served copy of the site, so they are run by hand.
+**`playwright-core` is deliberately not a dependency of this repo** — `npm
+install` here stays jsdom-only, and the site itself still has no build step.
 
 ```bash
-# 1. mirror the repo into a served directory with the CDN tags vendored
-./test/browser/sync.sh          # writes into the directory it names
+npm i --no-save playwright-core          # once per checkout
 
-# 2. serve it, and run a check
-cd <that directory> && python3 -m http.server 8766 &
-node test/browser/render-scan.js
+./test/browser/sync.sh                   # mirror the repo, vendor the CDN tags
+cd test/browser/site && python3 -m http.server 8766 &
+cd - && node test/browser/render-scan.js
 ```
+
+The script says all of this if `playwright-core` is missing, rather than
+throwing a module-resolution stack. `PW_CHROME` overrides the Chromium path
+and `PW_URL` the server, if yours differ.
+
+`fixtures/` holds the CSVs the checks import — including `bank.csv`, which is
+a bank statement rather than a golf export, because the import flow has to
+refuse it at the door.
 
 `sync.sh` exists because a browser check can quietly test the **wrong build**.
 The served copy has its CDN `<script>` tags rewritten to vendored files —
