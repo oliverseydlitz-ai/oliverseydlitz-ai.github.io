@@ -2600,7 +2600,10 @@ const DrillLibrary = (() => {
     D(5,'A','Toe-bias / heel-bias alternation','Deliberately strike toe, then heel, then centre. Builds strike-location control rather than avoidance.'),
     D(6,'A','High-face / low-face alternation','Same on the vertical axis. Vertical gear effect runs about 1.5–2× the horizontal.'),
     D(7,'A','Setup-distance calibration','An alignment stick as a fixed reference; re-measure smash after standardising distance from the ball.'),
-    D(8,'A','Posture-hold block','Hold spine angle through impact — a common toe-strike cause. Compare smash before and after.'),
+    // The one drill in the library whose instruction is a body position mid-swing.
+    // Kept, because standing up out of the shot is a real and common toe-strike
+    // cause — but flagged, because nothing here can tell you whether you held it.
+    D(8,'A','Posture-hold block','Hold spine angle through impact — a common toe-strike cause. Compare smash before and after.',{feel:true}),
     D(9,'A','Connection-strap block','Arms-body connector. Log smash SPREAD, not the mean.'),
     D(10,'A','Half-speed proprioception reps','Ten swings at 50%, predicting the strike location before the reveal.',{prediction:true}),
     D(11,'A','Eyes-closed strike feel','Five shots, call the strike location before looking. Error estimation.',{prediction:true}),
@@ -4234,7 +4237,7 @@ const FaultEngine = (() => {
         'Trail shoulder too high at address'],
       drills:[
         {name:'Hip turn start',desc:'Initiate the downswing by rotating the hips, not pulling with the arms. Feel the trail hip pocket move toward the target. Arms naturally shallow when hips lead.',focus:'feel'},
-        {name:'Swing to 3 o\'clock',desc:'Practice half-swings stopping the club at hip height on the follow-through. This promotes a more rounded, on-plane swing and removes the steep chop.'},
+        {name:'Swing to 3 o\'clock',desc:'Practice half-swings, stopping the club level with the ground on the follow-through. This promotes a more rounded, on-plane swing and removes the steep chop.',focus:'external'},
       ],
       optimalRange: () => '-2° to -5° attack angle for irons',
     },
@@ -6513,6 +6516,7 @@ const UI = (() => {
             ${p.libraryDrill
               ? `<div class="plan-drill"><strong>${Sanitize.escape(p.libraryDrill.name)}:</strong>
                    ${Sanitize.escape(p.libraryDrill.desc)}</div>
+                 ${p.libraryDrill.feel ? `<div class="plan-gate">A feel — nothing measures whether it happened.</div>` : ''}
                  <div class="plan-gate">${Sanitize.escape(p.sectionName)} · ${Sanitize.escape(p.structure)}</div>`
               : `<div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>
                  ${p.drillIsFeel ? `<div class="plan-gate">A feel — nothing measures whether it happened. Every drill for this fault is one.</div>` : ''}`}
@@ -7777,6 +7781,7 @@ const UI = (() => {
             <span class="drill-row-state">${r.offDevice ? 'no device needed' : r.ok ? (r.flaggedOnly ? 'open · flagged' : 'open') : 'locked'}</span>
           </div>
           <div class="drill-row-desc">${esc(r.drill.desc)}</div>
+          ${r.drill.feel ? `<div class="drill-row-why">${esc(FaultEngine.FEEL_CAVEAT)}</div>` : ''}
           ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
         </div>`).join('')}
       ${_drillSection === 'I' ? '' : `<div class="tail-note" style="margin-top:.6rem">Whichever of these you

@@ -13,12 +13,19 @@ const block = (() => {
   const i = src.indexOf('const FaultEngine');
   return src.slice(i, src.indexOf('\nconst ', i + 10));
 })();
-const drills = [...block.matchAll(/\{name:'([^']*)',desc:'((?:[^'\\]|\\.)*)',focus:'(\w+)'\}/g)]
-  .map(m => ({ name: m[1], desc: m[2], focus: m[3] }));
-const unlabelled = [...block.matchAll(/\{name:'([^']*)',desc:'(?:[^'\\]|\\.)*'\}/g)].map(m => m[1]);
+// `[^']*` for the NAME is what let "Swing to 3 o\'clock" slip through both the
+// labelling script and the first version of this count: the class stops at the
+// backslash, so the whole drill never matched and both sides agreed there were
+// 52. A regex blind spot shared by the check and the thing it checks reports
+// green for the wrong reason. Escape-aware on both fields now.
+const DRILL_RE = /\{name:'((?:[^'\\]|\\.)*)',desc:'((?:[^'\\]|\\.)*)'(?:,focus:'(\w+)')?\}/g;
+const parsed = [...block.matchAll(DRILL_RE)].map(m => ({ name: m[1], desc: m[2], focus: m[3] }));
+const drills = parsed.filter(d => d.focus);
+const unlabelled = parsed.filter(d => !d.focus).map(d => d.name);
 
 console.log('— every drill declares where the golfer\'s attention goes —');
-ok(drills.length === 52, `all 52 drills carry a focus (found ${drills.length})`);
+ok(parsed.length === 53, `read every drill out of the source (found ${parsed.length})`);
+ok(drills.length === 53, `all 53 carry a focus (found ${drills.length})`);
 ok(unlabelled.length === 0,
    `no drill is missing one${unlabelled.length ? ': ' + unlabelled.join(', ') : ''}`);
 ok(drills.every(d => FE.DRILL_FOCUS.includes(d.focus)), 'and every value is one of the three');
@@ -85,6 +92,33 @@ ok(lbsDrills.some(d => d.focus !== 'feel'),
    'low-ball-speed has a checkable drill available');
 ok(FE.splitDrills(lbsDrills).checkable[0].name === 'Towel swings',
    'and the split surfaces it ahead of "Lag preservation"');
+
+console.log('— the 104-drill library is held to it too —');
+// The library was written from the research base and is almost entirely
+// external already — one drill in 104 asks for a body position mid-swing. So
+// the default here is "external" and the EXCEPTION is declared, rather than
+// labelling all 104 by hand. The guard runs both ways: a drill that trips the
+// regex must carry `feel:true`, and a drill carrying it must actually need it.
+const lib = (() => {
+  const i = src.indexOf('const DrillLibrary');
+  return src.slice(i, src.indexOf('\nconst ', i + 10));
+})();
+const libDrills = [...lib.matchAll(/D\((\d+),'(\w)','((?:[^'\\]|\\.)*)','((?:[^'\\]|\\.)*)'([^)]*)\)/g)]
+  .map(m => ({ n: +m[1], section: m[2], name: m[3], desc: m[4], feel: /feel:\s*true/.test(m[5]) }));
+ok(libDrills.length === 104, `read all 104 library drills (found ${libDrills.length})`);
+
+// Two drills trip the word list without meaning it: a junior's "growing spine"
+// is an injury-load statement, and a "lag block" in putting is lag putting.
+// Named here rather than weakened out of the regex, so the exemption is visible.
+const NOT_A_CUE = new Set(['Junior swing-volume monitor', 'Three-putt-avoidance lag block']);
+const tripped = libDrills.filter(d => INSWING.test(d.name + ' ' + d.desc) && !NOT_A_CUE.has(d.name));
+ok(tripped.every(d => d.feel),
+   `every library drill naming an in-swing body position declares it${
+     tripped.filter(d => !d.feel).length ? ': ' + tripped.filter(d=>!d.feel).map(d=>d.name).join(', ') : ''}`);
+ok(tripped.length === 1 && tripped[0].name === 'Posture-hold block',
+   'and there is exactly one — "Posture-hold block", kept because standing up is a real toe-strike cause');
+ok(libDrills.filter(d => d.feel).every(d => INSWING.test(d.name + ' ' + d.desc)),
+   'nothing carries the flag without needing it');
 
 console.log('— and the coaching tips hold the same line —');
 // CLAUDE.md used to claim TIPS "never" named the golfer's own body parts. Four
