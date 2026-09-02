@@ -1286,6 +1286,374 @@ const Spin = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Dispersion — the tail engine, and the only strokes valuation this
+// device can honestly support
+// ────────────────────────────────────────────────────────────────
+// Three findings force the shape of this module.
+//
+//   1. FAIRWAYS DO NOT TRACK HANDICAP; PENALTIES DO. Fairways hit runs 50% for
+//      a scratch and 46% for a 20-handicap — essentially flat. Penalty rates
+//      vary roughly eightfold over the same range. So the statistic worth
+//      reporting is the TAIL of the offline distribution, not its centre and
+//      not its standard deviation alone.
+//
+//   2. THE CHAIN FROM FACE ANGLE TO STROKES IS BROKEN. Face angle -> start
+//      line is known; face-to-path -> curvature is known; directional spread
+//      -> strokes is known (Broadie & Ko). The missing link is face-angle SD
+//      -> directional spread: nobody has published it, and curvature amplifies
+//      start-line error non-linearly, so it cannot be assumed. The correct
+//      response is to skip the chain: measure the directional spread DIRECTLY
+//      off the device's own outputs and feed that into the published curves.
+//      Face-to-path is then the explanation offered alongside a drill, never
+//      the input to the valuation.
+//
+//   3. A GAUSSIAN UNDER-PREDICTS THE THING THAT COSTS THE STROKES. Broadie &
+//      Ko model every non-putt shot as a two-component mixture — a "good"
+//      shot with probability p and a "bad" shot otherwise — because real shot
+//      patterns are skewed and heavy-tailed. Fit a normal curve to 20 range
+//      shots and the fat tail that generates the penalties disappears. That is
+//      the reason for the 30-shot floor: the bad-shot component is rare by
+//      construction, and a 15-shot sample often contains none of it.
+//
+// Consequences that look odd until you know why:
+//
+//   * OUTLIERS ARE NOT TRIMMED HERE. Everywhere else in this app a wild value
+//     is a misread to be removed. Here the wild value is the measurement.
+//     Trimming it would delete the bad-shot component and turn the engine into
+//     exactly the Gaussian that under-predicts penalties. Only physically
+//     impossible geometry is screened out.
+//   * SPREAD SURVIVES A MISALIGNED UNIT, ABSOLUTE MISS DOES NOT. Aiming error
+//     is a constant offset, and a constant offset cancels out of any spread
+//     around the golfer's own centre. So sigma is admissible without confirmed
+//     alignment; a miss measured from the target line is not, and is withheld.
+//   * MEASURED SIGMA IS AN UPPER BOUND. Side carry is a modelled tier-3
+//     output and carries device noise, and noise adds variance — it can never
+//     subtract it. The golfer's true directional spread is at most what is
+//     shown here, which means the strokes available from tightening it are at
+//     most what is shown too.
+const Dispersion = (() => {
+  // Broadie & Ko (2009), Winter Simulation Conference, calibrated on Golfmetrics
+  // (55,000+ amateur shots). The two calibrated skill levels, and the strokes
+  // saved per degree of directional SD removed. These are DRIVER figures on a
+  // treed course — both qualifications matter, see CAVEATS.
+  const BK = [
+    { score: 100, sigma: 7.9, drive: 225.0, saved: { 1: 1.4, 2: 2.6, 3: 3.9 } },
+    { score:  80, sigma: 5.5, drive: 250.6, saved: { 1: 1.1, 2: 2.1, 3: 2.7 } },
+  ];
+  // How far outside the calibrated 5.5-7.9 band the curves may still be used,
+  // with the result flagged as clamped rather than interpolated. Beyond this
+  // the honest answer is no number at all.
+  const EXTRAP_MARGIN = 1.5;
+
+  // Geometry screen, not a statistical one. A shot cannot have flown less than
+  // 20 yards of carry and still be a full swing worth measuring, and offline
+  // beyond 45 degrees is a mis-read rather than a bad shot.
+  const MIN_CARRY = 20;
+  const MAX_ANGLE = 45;
+
+  // Broadie & Ko's own two-component split: shots inside the core are the
+  // "good" component, shots outside it are the "bad" one. 2 sigma of the
+  // robust core puts 4.55% of a true Gaussian outside — the reference rate
+  // every observed tail is tested against.
+  const TAIL_K = 2;
+  const GAUSSIAN_TAIL = 0.0455;
+  // SD of a normal truncated at +/-2 sigma, as a fraction of the untruncated
+  // SD: sqrt(1 - 2k*phi(k)/(2*Phi(k)-1)) at k=2. Dividing by it un-shrinks a
+  // scale measured inside the cut back to the scale of the core it came from.
+  const TRUNC_FACTOR = 0.8796;
+
+  const CAVEATS = [
+    'These curves are for a treed course. On a course with no trees, or with rough ' +
+    'and no penalty areas, Broadie & Ko\'s own simulations flip the verdict and distance ' +
+    'beats accuracy outright. The strokes below are not universal.',
+    'The published accuracy and distance scenarios are not difficulty-equated — the ' +
+    'accuracy steps span a wider slice of real skill than the distance steps do, which ' +
+    'inflates how valuable accuracy looks. Treat the direction as supported and the size as uncertain.',
+    'Side carry is a modelled output, not a reading, and measurement noise adds spread ' +
+    'without ever removing it. Your true directional spread is at most what is shown, so ' +
+    'the strokes on offer are at most this too.',
+    'This values the spread. It says nothing about what caused it — face, path, strike ' +
+    'and wind all land in the same number, and no published work maps any one of them onto ' +
+    'strokes. Any drill offered here is an explanation, not part of the arithmetic.',
+  ];
+
+  // ── The measurement ───────────────────────────────────────────
+  // Directional error in degrees, right positive. Angle rather than yards
+  // because it is the scale-invariant, target-relative form — the same form
+  // that survived the only study to test whether range performance predicts
+  // on-course performance, and the form Broadie & Ko's model consumes.
+  function offlineAngle(shot) {
+    const side = shot?.sideCarry, carry = shot?.carryDistance;
+    if (!Number.isFinite(side) || !Number.isFinite(carry) || carry < MIN_CARRY) return null;
+    const a = Math.atan2(side, carry) * 180 / Math.PI;
+    return Math.abs(a) > MAX_ANGLE ? null : a;
+  }
+
+  // ── Gates ─────────────────────────────────────────────────────
+  // Shots carry their measurement context from Store.stamp(), so this works on
+  // a session's shots and on a set flattened across sessions alike.
+  const ballOk = s => s?._ball === 'premium' || s?._ball === 'rpt';
+  const aligned = shots => shots.length > 0 && shots.every(s => s._aligned === true);
+
+  function eligible(shots, clubType) {
+    const all = (shots || []).filter(s => !clubType || s.clubType === clubType);
+    const onBall = all.filter(ballOk);
+    const usable = onBall.filter(s => offlineAngle(s) !== null);
+    const reasons = [];
+    if (all.length && onBall.length < all.length) {
+      reasons.push(onBall.length === 0
+        ? 'Range balls, or a ball type that was never recorded. Range-ball dispersion runs 2–4× ' +
+          'wider than your own ball off a zero-variance robot, so a tail measured on them is the ' +
+          'ball\'s tail as much as yours. Nothing below can be computed from these shots.'
+        : `${all.length - onBall.length} of ${all.length} shots were not hit with a premium or RPT ` +
+          'ball and are excluded — range-ball spread is not comparable to your own ball\'s.');
+    }
+    if (usable.length < onBall.length) {
+      reasons.push(`${onBall.length - usable.length} shot${onBall.length - usable.length === 1 ? '' : 's'} ` +
+        'had no side carry or no carry distance, so no offline angle could be computed.');
+    }
+    // Only a real shortfall, not one the ball gate has already caused — saying
+    // "you have 0 of the 30 needed" under "none of these balls count" reads as
+    // a second, independent problem when it is the same one twice.
+    if (usable.length < Metrics.MIN_SHOTS_TAIL && onBall.length > 0) {
+      reasons.push(`A tail needs ${Metrics.MIN_SHOTS_TAIL} usable shots and this has ${usable.length}. ` +
+        'The bad shot is rare by definition — a small sample usually contains none of them, and ' +
+        'reporting a tail without one would say your dispersion is tighter than it is.');
+    }
+    return { ok: usable.length >= Metrics.MIN_SHOTS_TAIL, shots: usable,
+             n: usable.length, need: Math.max(0, Metrics.MIN_SHOTS_TAIL - usable.length), reasons };
+  }
+
+  // ── Statistics ────────────────────────────────────────────────
+  function percentile(sorted, p) {
+    if (!sorted.length) return null;
+    const i = (sorted.length - 1) * p;
+    const lo = Math.floor(i), hi = Math.ceil(i);
+    return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  }
+
+  // Exact upper-tail binomial probability. Used to ask whether the observed
+  // number of bad shots is more than a Gaussian would produce by chance —
+  // "heavy-tailed" is a claim, so it gets tested rather than asserted.
+  function binomTail(k, n, p) {
+    if (k <= 0) return 1;
+    let term = Math.pow(1 - p, n), sum = 0;
+    for (let i = 0; i < k && i <= n; i++) {
+      sum += term;
+      term *= (p / (1 - p)) * ((n - i) / (i + 1));
+    }
+    return Math.max(0, Math.min(1, 1 - sum));
+  }
+
+  // Scale of the good-shot component. The MAD is the starting point — it has a
+  // 50% breakdown point, so blow-ups cannot capture it — and then the scale is
+  // re-measured from the shots currently inside the cut and un-shrunk for the
+  // truncation, until it settles on the core.
+  //
+  // THE REFINEMENT ONLY EVER GOES DOWN, and that is not a tweak. The iteration
+  // has two fixed points. The lower one is the core, which is what is wanted.
+  // The upper one is the whole contaminated spread divided by TRUNC_FACTOR,
+  // and it is self-sustaining: once the cut sits past every shot, nothing is
+  // truncated, so the correction inflates a scale that was never shrunk, which
+  // widens the cut further. An unguarded version of this walked a 40-shot set
+  // from a 7.5 deg MAD up to 9.3 deg and then reported zero bad shots in a
+  // pattern that plainly had some. Refusing every upward step keeps it on the
+  // branch that converges to the core; on clean data the true sigma is already
+  // a fixed point, so nothing is given up.
+  function coreScale(devs) {
+    const sorted = [...devs].sort((a, b) => a - b);
+    let scale = 1.4826 * percentile(sorted, 0.5);
+    if (!(scale > 0)) return 0;
+    for (let i = 0; i < 20; i++) {
+      const inside = devs.filter(d => d <= TAIL_K * scale);
+      if (inside.length < 4) break;
+      const next = Math.sqrt(inside.reduce((a, d) => a + d * d, 0) / inside.length) / TRUNC_FACTOR;
+      if (!(next > 0) || next >= scale || scale - next < 1e-6 * scale) break;
+      scale = next;
+    }
+    return scale;
+  }
+
+  function tail(shots, clubType) {
+    const gate = eligible(shots, clubType);
+    if (!gate.ok) return { ok: false, ...gate };
+    const set = gate.shots;
+    const angles = set.map(offlineAngle);
+    const sorted = [...angles].sort((a, b) => a - b);
+    const centre = percentile(sorted, 0.5);
+
+    // Scale of the "good shot" component, measured so that the bad shots do
+    // not inflate the yardstick used to find them. See coreScale().
+    const dev = angles.map(a => Math.abs(a - centre)).sort((a, b) => a - b);
+    const core = coreScale(dev);
+
+    // The full SD is what Broadie & Ko's sigma_alpha means: the spread of the
+    // whole mixture, bad shots included. Not the core.
+    const sigma = stdDev(angles);
+
+    const cut = TAIL_K * core;
+    const bad = core > 0 ? angles.filter(a => Math.abs(a - centre) > cut) : [];
+    const expected = GAUSSIAN_TAIL * angles.length;
+    const pValue = core > 0 ? binomTail(bad.length, angles.length, GAUSSIAN_TAIL) : 1;
+
+    return {
+      ok: true, n: angles.length, clubType: clubType || null,
+      aligned: aligned(set),
+      centre, sigma, core,
+      p90: percentile(dev, 0.90), p95: percentile(dev, 0.95),
+      worst: dev[dev.length - 1],
+      // Absolute miss is only meaningful measured from a target the unit
+      // actually knew about. Without confirmed alignment the centre is
+      // wherever the unit happened to point, so this is withheld rather than
+      // quoted against a target line that was never established.
+      bias: aligned(set) ? mean(angles) : null,
+      bad: bad.length, badRate: bad.length / angles.length,
+      expectedBad: expected, pValue,
+      // Heavy-tailed means: more bad shots than a normal curve fitted to your
+      // own core would produce, at the 5% level. This is the component that
+      // costs the strokes, and the one a Gaussian summary would hide.
+      heavyTailed: bad.length > expected && pValue < 0.05,
+      caveats: gate.reasons,
+    };
+  }
+
+  // ── Two-sided miss census ─────────────────────────────────────
+  // A one-way miss and a two-way miss are different problems needing different
+  // work, and averaging them produces a centre that looks fine while both
+  // tails are live. Classified on the tail shots only — where the strokes are.
+  function census(shots, clubType) {
+    const t = tail(shots, clubType);
+    if (!t.ok) return { ok: false, ...t };
+    const gate = eligible(shots, clubType);
+    const angles = gate.shots.map(offlineAngle);
+    if (!(t.core > 0)) {
+      return { ok: true, left: 0, right: 0, total: 0, verdict: 'indeterminate', cut: 0, centre: t.centre,
+               note: 'Your shots are too tightly clustered for a core spread to be measured, so there is ' +
+                     'no tail to take a side. Nothing to classify — that is a good problem.' };
+    }
+    const cut = TAIL_K * t.core;
+    const left = angles.filter(a => a - t.centre < -cut).length;
+    const right = angles.filter(a => a - t.centre > cut).length;
+    const total = left + right;
+    let verdict = 'indeterminate', note;
+    if (total < 3) {
+      note = `Only ${total} shot${total === 1 ? '' : 's'} landed outside your own core, which is too few ` +
+             'to tell a one-way miss from a two-way one. That is not a bad sign — it means the tail is thin.';
+    } else if (left >= 2 && right >= 2) {
+      verdict = 'two-way';
+      note = `Your misses go both ways — ${left} left and ${right} right, beyond your own core spread. ` +
+             'A two-way miss is a different problem from a one-way one: there is no side of the target ' +
+             'you can safely aim away from, so the same corridor costs you twice as much.';
+    } else {
+      verdict = 'one-way';
+      const side = left > right ? 'left' : 'right';
+      note = `Your tail is one-way — ${Math.max(left, right)} of ${total} bad shots go ${side}. ` +
+             'That is the more manageable pattern: a one-way miss can be aimed around while you work on it.';
+    }
+    return { ok: true, left, right, total, verdict, note, cut, centre: t.centre };
+  }
+
+  // ── Valuation ─────────────────────────────────────────────────
+  // The only strokes number in this app. It converts a change in directional
+  // spread, and nothing else, using published curves. It does not convert a
+  // club-delivery metric, and it never attributes the change to a cause.
+  function value(sigma, deltaDeg) {
+    if (!Number.isFinite(sigma) || !Number.isFinite(deltaDeg) || deltaDeg <= 0) return null;
+    const hi = BK[0], lo = BK[1];   // 7.9 deg and 5.5 deg
+    let s = sigma, mode = 'interpolated';
+    if (sigma > hi.sigma || sigma < lo.sigma) {
+      if (sigma > hi.sigma + EXTRAP_MARGIN || sigma < lo.sigma - EXTRAP_MARGIN) {
+        return { strokes: null, mode: 'out-of-range',
+                 note: `Broadie & Ko calibrated these curves on golfers between ${lo.sigma}° and ` +
+                       `${hi.sigma}° of directional spread, and yours is ${fmt(sigma, 1)}°. Extending ` +
+                       'their numbers that far past their own data would be inventing a figure, so there is none.' };
+      }
+      s = Math.min(hi.sigma, Math.max(lo.sigma, sigma));
+      mode = 'clamped';
+    }
+    const d = Math.min(3, deltaDeg);
+    // Linear on the published 1/2/3-degree steps, through the origin.
+    const step = curve => {
+      const k = Math.floor(d), frac = d - k;
+      const at = j => (j <= 0 ? 0 : curve[Math.min(3, j)]);
+      return at(k) + frac * (at(k + 1) - at(k));
+    };
+    const w = (s - lo.sigma) / (hi.sigma - lo.sigma);     // 0 at the 80-golfer, 1 at the 100-golfer
+    const strokes = step(lo.saved) + w * (step(hi.saved) - step(lo.saved));
+    return {
+      strokes, mode, sigmaUsed: s, delta: d,
+      truncated: deltaDeg > 3,
+      note: mode === 'clamped'
+        ? `Your spread of ${fmt(sigma, 1)}° sits outside the ${lo.sigma}°–${hi.sigma}° band Broadie & Ko ` +
+          `calibrated, so this is their nearest calibrated golfer at ${fmt(s, 1)}° rather than you. Read it as an order of magnitude.`
+        : null,
+      caveats: CAVEATS,
+    };
+  }
+
+  // ── Trend ─────────────────────────────────────────────────────
+  // Directional spread per session, and whether the latest move is bigger than
+  // this golfer's own session-to-session wobble. Sessions measured under
+  // different conditions are dropped rather than compared: a range-ball session
+  // next to a premium-ball one shows a change in the ball, not the swing.
+  function trend(sessions, clubType) {
+    const points = (sessions || [])
+      .filter(sn => Conditions.ball(sn).dispersionValid)
+      .map(sn => {
+        const t = tail(Store.stamp(sn).shots, clubType);
+        return t.ok ? { date: sn.date, id: sn.id, sigma: t.sigma, p95: t.p95, n: t.n } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (points.length < 2) {
+      return { ok: false, points, note: points.length === 1
+        ? 'One qualifying session so far. A tail is only a trend once there are several to compare.'
+        : 'No session yet has 30 usable shots on a premium or RPT ball, so there is no tail to trend.' };
+    }
+    const sigmas = points.map(p => p.sigma);
+    const delta = sigmas[sigmas.length - 1] - sigmas[sigmas.length - 2];
+    // The golfer's own between-session wobble is the yardstick. Under five
+    // sessions it is not established well enough to rule on, and saying so is
+    // the honest output — a population figure would describe other people.
+    const noise = points.length >= 5 ? stdDev(sigmas.slice(0, -1)) : null;
+    return {
+      ok: true, points, delta, noise,
+      real: noise === null ? null : Math.abs(delta) > noise,
+      note: noise === null
+        ? `${points.length} qualifying session${points.length === 1 ? '' : 's'}. It takes five before your own ` +
+          'session-to-session variation is known well enough to say whether a move in the tail is real.'
+        : Math.abs(delta) > noise
+          ? `${delta < 0 ? 'Tighter' : 'Wider'} by ${fmt(Math.abs(delta), 1)}°, which is more than your own ` +
+            `session-to-session variation of ${fmt(noise, 1)}°. That is a real move.`
+          : `${fmt(Math.abs(delta), 1)}° of movement, inside your own session-to-session variation of ` +
+            `${fmt(noise, 1)}°. No detectable change — which is not the same as no change.`,
+    };
+  }
+
+  // ── The report ────────────────────────────────────────────────
+  // Valuation is driver-only on purpose: Broadie & Ko's published curves are
+  // driver curves, and there is no equivalent table for an 8-iron. Every other
+  // club gets the tail audit without a strokes figure, which is the honest
+  // split rather than a missing feature.
+  function report(shots, clubType, target = 1) {
+    const t = tail(shots, clubType);
+    if (!t.ok) return { ok: false, ...t };
+    const c = census(shots, clubType);
+    const valuable = clubType === 'd';
+    return {
+      ok: true, tail: t, census: c,
+      value: valuable ? value(t.sigma, target) : null,
+      valuationWithheld: valuable ? null :
+        'Broadie & Ko calibrated their strokes curves on tee shots with a driver. There is no published ' +
+        'equivalent for the rest of the bag, so the tail is reported here and left unpriced.',
+    };
+  }
+
+  return { BK, CAVEATS, MIN_CARRY, MAX_ANGLE, TAIL_K, GAUSSIAN_TAIL,
+           offlineAngle, eligible, tail, census, value, trend, report };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -3620,6 +3988,7 @@ const UI = (() => {
     renderSwingDNA(shots);
     renderDispersion(shots);
     renderDispersionStats(shots);
+    renderTail(shots);
     renderBallFlight(shots);
     renderGapping(_session.shots);
     renderLaunchWindows(shots);
@@ -3710,6 +4079,15 @@ const UI = (() => {
   }
 
   // ── Dispersion statistics ─────────────────────────────────────
+  // The SHAPE of the pattern only. This strip used to also show an average
+  // miss, a max-minus-min "spread" and a bias in yards, off any session at
+  // all — three numbers that were wrong in three different ways. Max minus min
+  // grows with sample size and so says more about how long you practised than
+  // how straight you hit it; the average miss and the bias were quoted from
+  // range-ball sessions, where dispersion runs 2-4x wide, and from unaligned
+  // units, where the whole pattern is offset by the aiming error. What
+  // survives that is the shape, which is why it is all that is left here.
+  // Everything quantitative moved to the gated tail engine below.
   function renderDispersionStats(shots) {
     const el = document.getElementById('dispersionStats');
     if (!el) return;
@@ -3718,19 +4096,80 @@ const UI = (() => {
     const left  = sides.filter(v=>v < -7).length;
     const online = sides.filter(v=>v >= -7 && v <= 7).length;
     const right = sides.filter(v=>v > 7).length;
-    const avgMiss = sides.reduce((a,b)=>a+Math.abs(b),0)/sides.length;
-    const spread = Math.max(...sides) - Math.min(...sides);
-    const bias = avg(shots,'sideCarry');
     const stats = [
       {label:'Left', value:`${left} (${Math.round(left/sides.length*100)}%)`},
       {label:'On line', value:`${online} (${Math.round(online/sides.length*100)}%)`},
       {label:'Right', value:`${right} (${Math.round(right/sides.length*100)}%)`},
-      {label:'Avg miss', value:`${fmt(avgMiss,1)} yds`},
-      {label:'Spread', value:`${fmt(spread,0)} yds`},
-      {label:'Bias', value:`${bias>0?'+':''}${fmt(bias,1)} yds ${bias>2?'R':bias<-2?'L':''}`},
     ];
     el.innerHTML = stats.map(s=>`
       <div class="disp-stat"><div class="disp-stat-val">${s.value}</div><div class="disp-stat-label">${s.label}</div></div>`).join('');
+  }
+
+  // ── The tail, and the one strokes number in the app ───────────
+  // Rendered per club, because a directional spread pooled across the bag is
+  // not a spread of anything. Driver first when it is in the selection, since
+  // that is the only club Broadie & Ko's curves can price.
+  function renderTail(shots) {
+    const el = document.getElementById('tailHost');
+    if (!el) return;
+    const clubs = [...new Set((shots || []).map(s => s.clubType).filter(Boolean))]
+      .sort((a, b) => (a === 'd' ? -1 : b === 'd' ? 1 : CLUB_ORDER.indexOf(a) - CLUB_ORDER.indexOf(b)));
+    const blocks = clubs.map(c => tailBlock(shots, c)).filter(Boolean);
+    if (!blocks.length) { el.innerHTML = ''; return; }
+    el.innerHTML = blocks.join('');
+  }
+
+  function tailBlock(shots, club) {
+    const r = Dispersion.report(shots, club, 1);
+    const name = Sanitize.escape(clubLabel(club));
+    const esc = t => Sanitize.escape(t);
+    if (!r.ok) {
+      // A refusal is only worth showing when there were enough shots of the
+      // club for the golfer to have expected an answer. Below that it is
+      // noise about a club they hit four of.
+      if (r.n === 0 && (shots || []).filter(s => s.clubType === club).length < 8) return '';
+      return `<div class="tail-block pending">
+          <div class="tail-head">${name} — no tail yet</div>
+          ${r.reasons.map(x => `<div class="tail-note">${esc(x)}</div>`).join('')}
+        </div>`;
+    }
+    const t = r.tail;
+    const cells = [
+      { label: 'Directional spread', value: `${fmt(t.sigma, 1)}°` },
+      { label: '9 in 10 inside', value: `${fmt(t.p90, 1)}°` },
+      { label: '19 in 20 inside', value: `${fmt(t.p95, 1)}°` },
+    ];
+    const tailLine = t.heavyTailed
+      ? `${t.bad} of your ${t.n} shots finished outside your own core spread, against the ${fmt(t.expectedBad, 1)} ` +
+        `a normal curve fitted to that core would produce. Your bad shots are worse and more frequent than the ` +
+        `middle of your pattern suggests — and that gap is where the strokes go, not the average.`
+      : `${t.bad} of your ${t.n} shots finished outside your own core spread, against the ${fmt(t.expectedBad, 1)} ` +
+        `expected. That is an ordinary tail for this pattern, so the spread figure above describes it fairly.`;
+    const value = r.value && r.value.strokes !== null
+      ? `<div class="tail-value">
+           <div class="tail-value-num">${fmt(r.value.strokes, 1)} strokes</div>
+           <div class="tail-value-sub">is what Broadie &amp; Ko's simulations put on taking 1° off a
+             ${fmt(r.value.sigmaUsed, 1)}° directional spread — and the mechanism is not fairways hit, it is
+             the drop in shots that finish out of bounds.</div>
+         </div>
+         ${r.value.note ? `<div class="tail-note">${esc(r.value.note)}</div>` : ''}
+         ${r.value.caveats.map(x => `<div class="tail-note">${esc(x)}</div>`).join('')}`
+      : `<div class="tail-note">${esc(r.value ? r.value.note : r.valuationWithheld)}</div>`;
+    return `<div class="tail-block">
+        <div class="tail-head">${name} — tail audit <span class="tail-n">${t.n} shots</span></div>
+        <div class="tail-stats">${cells.map(c => `
+          <div class="disp-stat"><div class="disp-stat-val">${c.value}</div>
+            <div class="disp-stat-label">${c.label}</div></div>`).join('')}</div>
+        <div class="tail-item${t.heavyTailed ? ' heavy' : ''}">${esc(tailLine)}</div>
+        ${r.census.ok && r.census.note ? `<div class="tail-item">${esc(r.census.note)}</div>` : ''}
+        ${t.bias === null
+          ? `<div class="tail-note">Spread is measured around your own centre, so it survives a misaligned unit
+               — an aiming error shifts every shot by the same amount and cancels out. How far that centre sits
+               from the target does not, so it is not shown until you confirm alignment.</div>`
+          : `<div class="tail-item">Your centre sits ${fmt(Math.abs(t.bias), 1)}°
+               ${t.bias > 0 ? 'right' : 'left'} of the target line, on a confirmed alignment.</div>`}
+        ${value}
+      </div>`;
   }
 
   // ── Practice plan ─────────────────────────────────────────────
