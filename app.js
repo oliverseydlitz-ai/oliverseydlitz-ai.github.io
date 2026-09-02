@@ -1792,6 +1792,262 @@ const Dispersion = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// Strike — the highest-value lever an amateur has, and the only one
+// this device measures at tier 1 end to end
+// ────────────────────────────────────────────────────────────────
+// The single most actionable finding in the research base, from the USGA/R&A's
+// own 2022 equipment table:
+//
+//              club spd   ball spd   spin    smash
+//   PGA Tour      113        167     2,686   1.478
+//   LPGA Tour       94       140     2,611   1.489
+//   Avg male am     93       133     3,275   1.430
+//
+// The average male amateur already swings at LPGA club speed — 93 against 94 —
+// and makes 7 mph less ball speed doing it. The amateur driver problem is not
+// engine speed. It is where the ball meets the face, and that shows up whole in
+// smash factor, which is a tier-1 metric on this device: no derivation, no
+// model output, no spin. It is also the fastest lever to move — weeks of strike
+// work against months of physical training — and it is the opposite of what
+// almost every golfer self-selects, which is speed training.
+//
+// So this module exists to make the strike gap visible and to keep it honest:
+//
+//   * IT STOPS AT YARDS. The distance-to-strokes link is real and published
+//     (1.2 to 1.8 strokes per 20 yards), so a strokes figure here would not be
+//     the broken face-to-strokes chain. It is still not offered. This app has
+//     exactly ONE strokes number, in `Dispersion`, computed from a directly
+//     measured spread — and a second one, arrived at down a different road,
+//     would leave a golfer holding two figures with no way to know which
+//     question each answers or whether they may be added. The yards are the
+//     honest end of this chain.
+//   * THE CARRY CONVERSION IS DRIVER-ONLY. The research base works its example
+//     at driver ball speeds; no published anchor gives yards per mph for a
+//     9-iron, where a shorter flight makes the ratio smaller. Other clubs get
+//     the ball-speed figure and no yardage.
+//   * EVERY GAP IS CHECKED AGAINST THE GOLFER'S OWN SAMPLING NOISE before it
+//     is called a gap at all. A 0.01 shortfall measured over ten shots with a
+//     0.02 spread is not a shortfall, it is the same number twice.
+const Strike = (() => {
+  // Chain B in the research base, worked at driver speeds: closing 1.430 to
+  // 1.478 at 93 mph takes ball speed 133 to 137.5, +4.5 mph, and that is put
+  // at +7 to +8 yards. So 1.55 to 1.78 yards per mph of ball speed — carried
+  // as the RANGE the source gives rather than collapsed to a midpoint, because
+  // the range is the honest precision of the claim.
+  const YD_PER_BALL_MPH = { lo: 7 / 4.5, hi: 8 / 4.5 };
+
+  // A club-speed spread this wide is needed before a smash-versus-speed slope
+  // means anything: fit a line through ten swings that were all the same
+  // effort and the slope is noise with a direction.
+  const MIN_SPEED_RANGE = 5;      // mph
+  const MIN_SPEED_SHOTS = 15;
+
+  const clubShots = (shots, club) =>
+    (shots || []).filter(s => (!club || s.clubType === club) && Number.isFinite(s.smashFactor) && s.smashFactor > 0);
+
+  // What this club's strike is worth aiming at. Tour smash falls steeply with
+  // loft — 1.48 at driver, 1.36 at 7-iron, 1.20 at lob wedge — so a single
+  // "good smash" number across the bag would call every wedge a disaster.
+  function reference(club) {
+    const row = Benchmarks.get(club);
+    return row ? row.pga.sf : null;
+  }
+
+  // ── Baseline (drill A1) ───────────────────────────────────────
+  // A measurement, not a training session. Mean AND spread, because the spread
+  // is the thing most strike drills actually move — a golfer can hold a mean
+  // while turning a tight pattern into a scattered one.
+  function baseline(shots, club) {
+    const set = clubShots(shots, club);
+    const iv = Metrics.interval(set.map(s => s.smashFactor), '', 3);
+    if (!iv || iv.n < Metrics.MIN_SHOTS_REPORT) {
+      return { ok: false, n: iv ? iv.n : set.length,
+               need: Math.max(0, Metrics.MIN_SHOTS_REPORT - (iv ? iv.n : set.length)),
+               note: `Smash factor needs ${Metrics.MIN_SHOTS_REPORT} shots of a club before a mean is worth ` +
+                     `reporting, and this has ${iv ? iv.n : set.length}.` };
+    }
+    return { ok: true, club, mean: iv.mean, ci: iv.ci, n: iv.n, dropped: iv.dropped,
+             spread: stdDev(set.map(s => s.smashFactor)),
+             clubSpeed: Metrics.interval(set.map(s => s.clubSpeed), '', 1),
+             ballSpeed: Metrics.interval(set.map(s => s.ballSpeed), '', 1) };
+  }
+
+  // ── The gap, and what it is worth (drill A1 + chain B) ────────
+  function headroom(shots, club) {
+    const b = baseline(shots, club);
+    if (!b.ok) return { ok: false, ...b };
+    const ref = reference(club);
+    if (ref === null) return { ok: false, note: 'No tour reference for this club.' };
+    const gap = ref - b.mean;
+
+    // Beyond this golfer's own sampling noise, or not a gap at all.
+    if (gap <= b.ci) {
+      return { ok: true, club, mean: b.mean, ref, gap, real: false, n: b.n,
+               note: gap <= 0
+                 ? `Your ${clubLabel(club)} smash of ${fmt(b.mean, 3)} is at or above the tour reference of ` +
+                   `${fmt(ref, 2)}. There is no strike gap to work on here — look at another club.`
+                 : `The ${fmt(gap, 3)} between your ${fmt(b.mean, 3)} and the tour ${fmt(ref, 2)} is smaller than ` +
+                   `the ±${fmt(b.ci, 3)} on your own ${b.n}-shot average. That is not a gap yet, it is the same ` +
+                   `number measured twice. More shots would settle it.` };
+    }
+
+    const speed = b.clubSpeed && b.clubSpeed.n >= Metrics.MIN_SHOTS_REPORT ? b.clubSpeed.mean : null;
+    const ballGain = speed === null ? null : gap * speed;
+    const carry = (club === 'd' && ballGain !== null)
+      ? { lo: ballGain * YD_PER_BALL_MPH.lo, hi: ballGain * YD_PER_BALL_MPH.hi } : null;
+    return {
+      ok: true, club, mean: b.mean, ref, gap, real: true, n: b.n, ci: b.ci,
+      clubSpeed: speed, ballGain, carry,
+      // Named as a chained inference every time it is shown. Each link is
+      // sourced, the arithmetic is exact, and the result is still an estimate
+      // built out of three separate claims rather than something measured.
+      chained: true,
+      note: speed === null
+        ? `Your ${clubLabel(club)} smash is ${fmt(gap, 3)} below the tour reference. Club speed was not ` +
+          `recorded often enough to say what that is worth in ball speed.`
+        : `Closing that ${fmt(gap, 3)} at your own ${fmt(speed, 0)} mph club speed is worth about ` +
+          `${fmt(ballGain, 1)} mph of ball speed` +
+          (carry ? `, which works out at roughly ${fmt(carry.lo, 0)}–${fmt(carry.hi, 0)} yards of carry.` : '.'),
+    };
+  }
+
+  // ── The weak link across the bag (drill A13) ──────────────────
+  // Strike quality is rarely uniform, and the club a golfer practises is
+  // rarely the one costing them most. Only clubs with a real sample compete.
+  function weakLink(shots) {
+    const clubs = [...new Set((shots || []).map(s => s.clubType).filter(Boolean))];
+    const rows = clubs.map(c => {
+      const b = baseline(shots, c);
+      const ref = reference(c);
+      if (!b.ok || ref === null) return null;
+      return { club: c, mean: b.mean, ref, gap: ref - b.mean, ci: b.ci, n: b.n, real: ref - b.mean > b.ci };
+    }).filter(Boolean).sort((a, b2) => b2.gap - a.gap);
+    if (!rows.length) {
+      return { ok: false, rows: [],
+               note: `No club has the ${Metrics.MIN_SHOTS_REPORT} shots needed to compare strike quality across the bag.` };
+    }
+    const worst = rows.find(r => r.real) || null;
+    return {
+      ok: true, rows, worst,
+      note: worst
+        ? `Across the ${rows.length} club${rows.length === 1 ? '' : 's'} with enough shots, your ` +
+          `${clubLabel(worst.club)} sits furthest below its own tour reference — ${fmt(worst.gap, 3)} of smash. ` +
+          `Strike quality is rarely uniform, and this is not usually the club people practise.`
+        : `None of the ${rows.length} club${rows.length === 1 ? '' : 's'} with enough shots is measurably below ` +
+          `its tour reference. Nothing to rank.`,
+    };
+  }
+
+  // ── Does swinging harder cost you the strike? (drill A14) ─────
+  // The question every golfer who has bought a speed trainer should ask first.
+  // A least-squares slope of smash on club speed, reported only when the
+  // session actually varied the effort and the slope clears its own error.
+  function speedCost(shots, club) {
+    const set = clubShots(shots, club).filter(s => Number.isFinite(s.clubSpeed) && s.clubSpeed > 0);
+    if (set.length < MIN_SPEED_SHOTS) {
+      return { ok: false, n: set.length,
+               note: `This needs ${MIN_SPEED_SHOTS} shots of one club with club speed recorded; there are ${set.length}.` };
+    }
+    const xs = set.map(s => s.clubSpeed), ys = set.map(s => s.smashFactor);
+    const range = Math.max(...xs) - Math.min(...xs);
+    if (range < MIN_SPEED_RANGE) {
+      return { ok: false, n: set.length, range,
+               note: `Every swing here was within ${fmt(range, 1)} mph of the others. A line fitted through one ` +
+                     `effort level has a slope, but it does not mean anything — hit a block deliberately varying ` +
+                     `effort between about 60% and full to answer this.` };
+    }
+    const mx = mean(xs), my = mean(ys);
+    const sxx = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+    const slope = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / sxx;
+    const resid = ys.map((y, i) => y - (my + slope * (xs[i] - mx)));
+    const se = Math.sqrt(resid.reduce((a, r) => a + r * r, 0) / (set.length - 2) / sxx);
+    const real = Math.abs(slope) > 1.96 * se;
+    const perTen = slope * 10;
+    return {
+      ok: true, club, n: set.length, range, slope, se, real, perTen,
+      note: !real
+        ? `Across a ${fmt(range, 0)} mph spread of club speed your strike held steady — the slope is inside its ` +
+          `own error, so there is no evidence here that swinging harder costs you the middle of the face.`
+        : slope < 0
+          ? `Your smash falls about ${fmt(Math.abs(perTen), 3)} for every 10 mph of extra club speed, and that ` +
+            `slope is bigger than its own error. Speed is costing you strike — which is the case where speed ` +
+            `training makes a golfer shorter, not longer.`
+          : `Your smash RISES about ${fmt(perTen, 3)} per 10 mph. Strike holds up as you swing harder, so speed ` +
+            `work is not being paid for out of contact.`,
+    };
+  }
+
+  // ── Does it hold up over a long session? (drill A15) ──────────
+  // Fatigue is a within-session physical effect, so unlike a learning claim it
+  // is legitimately measured within the session. Judged against this golfer's
+  // own shot-to-shot spread, never a published threshold.
+  function fatigue(shots, club) {
+    const set = clubShots(shots, club);
+    const third = Math.floor(set.length / 3);
+    if (third < 5) {
+      return { ok: false, n: set.length,
+               note: `A fatigue check compares the first third of a block with the last, and needs at least 15 ` +
+                     `shots of one club to do it. There are ${set.length}.` };
+    }
+    const first = set.slice(0, third).map(s => s.smashFactor);
+    const last = set.slice(-third).map(s => s.smashFactor);
+    const drop = mean(first) - mean(last);
+    // The spread of a difference of two means, from this golfer's own shots.
+    const band = 1.96 * Math.sqrt((stdDev(first) ** 2 + stdDev(last) ** 2) / third);
+    return {
+      ok: true, club, n: set.length, per: third, first: mean(first), last: mean(last), drop, band,
+      real: Math.abs(drop) > band,
+      note: Math.abs(drop) <= band
+        ? `Your strike at the end of the block matched the start to within your own variation. No measurable ` +
+          `fade over ${set.length} shots.`
+        : drop > 0
+          ? `Your smash fell ${fmt(drop, 3)} from the first ${third} shots to the last ${third}, beyond your own ` +
+            `variation. Past that point in a block you are practising a strike you do not have fresh.`
+          : `Your smash ROSE ${fmt(-drop, 3)} across the block, beyond your own variation — you were warming up, ` +
+            `not tiring. The first ${third} shots are not your baseline.`,
+    };
+  }
+
+  // ── Trend (drill A18) ─────────────────────────────────────────
+  // A trend across sessions, never a paired before-and-after: two sessions
+  // cannot separate a change from the golfer's ordinary week-to-week swing.
+  function trend(sessions, club) {
+    const points = (sessions || [])
+      .map(sn => {
+        const b = baseline((sn.shots || []), club);
+        return b.ok ? { date: sn.date, id: sn.id, mean: b.mean, spread: b.spread, n: b.n } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b2) => new Date(a.date) - new Date(b2.date));
+    if (points.length < 3) {
+      return { ok: false, points,
+               note: `Smash trends need at least three sessions with ${Metrics.MIN_SHOTS_REPORT}+ shots of this ` +
+                     `club; there ${points.length === 1 ? 'is 1' : `are ${points.length}`}. Two sessions cannot ` +
+                     `tell a change from an ordinary week.` };
+    }
+    const means = points.map(p => p.mean);
+    const delta = means[means.length - 1] - means[0];
+    const noise = stdDev(means.slice(0, -1));
+    return {
+      ok: true, points, delta, noise, real: Math.abs(delta) > 1.96 * noise,
+      note: Math.abs(delta) > 1.96 * noise
+        ? `${delta > 0 ? 'Up' : 'Down'} ${fmt(Math.abs(delta), 3)} across ${points.length} sessions, beyond your ` +
+          `own session-to-session variation. That is a real change in strike quality.`
+        : `${fmt(Math.abs(delta), 3)} of movement across ${points.length} sessions, inside your own ` +
+          `session-to-session variation. No detectable change — which is not the same as no change.`,
+    };
+  }
+
+  function report(shots, club) {
+    return { club, baseline: baseline(shots, club), headroom: headroom(shots, club),
+             speedCost: speedCost(shots, club), fatigue: fatigue(shots, club) };
+  }
+
+  return { YD_PER_BALL_MPH, MIN_SPEED_RANGE, MIN_SPEED_SHOTS,
+           reference, baseline, headroom, weakLink, speedCost, fatigue, trend, report };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // MeasurementReference — the published error rates, kept out of the maths
 // ────────────────────────────────────────────────────────────────
 // Every +/- the app shows is computed from the golfer's own shots. These
@@ -4124,6 +4380,7 @@ const UI = (() => {
     renderScoreBanner(shots);
     renderMetricsStrip(shots, _session.shots);
     renderSwingDNA(shots);
+    renderStrike(shots, _session.shots);
     renderDispersion(shots);
     renderDispersionStats(shots);
     renderTail(shots);
@@ -4241,6 +4498,78 @@ const UI = (() => {
     ];
     el.innerHTML = stats.map(s=>`
       <div class="disp-stat"><div class="disp-stat-val">${s.value}</div><div class="disp-stat-label">${s.label}</div></div>`).join('');
+  }
+
+  // ── Strike quality ────────────────────────────────────────────
+  // Placed ABOVE dispersion in the detail view on purpose. It is the lever
+  // with the largest evidenced return for an amateur, it is measured at tier 1
+  // from end to end, and it moves in weeks — so it should be the first thing
+  // read, not something found after scrolling past four charts.
+  function renderStrike(shots, allShots) {
+    const el = document.getElementById('strikeHost');
+    if (!el) return;
+    const esc = t => Sanitize.escape(t);
+    const clubs = [...new Set((shots || []).map(s => s.clubType).filter(Boolean))]
+      .sort((a, b) => (a === 'd' ? -1 : b === 'd' ? 1 : CLUB_ORDER.indexOf(a) - CLUB_ORDER.indexOf(b)));
+
+    // The weak link is computed over the WHOLE session, not the current club
+    // filter — its entire point is that the club costing you most is rarely
+    // the one you were looking at.
+    const wl = Strike.weakLink(allShots || shots);
+    const bag = wl.ok && wl.worst
+      ? `<div class="tail-block"><div class="tail-head">Across the bag</div>
+           <div class="tail-item">${esc(wl.note)}</div>
+           <div class="tail-stats">${wl.rows.slice(0, 3).map(r => `
+             <div class="disp-stat"><div class="disp-stat-val">${fmt(r.mean, 2)}</div>
+               <div class="disp-stat-label">${esc(clubLabel(r.club))} · ${fmt(Math.abs(r.gap), 2)} ${r.gap > 0 ? 'below' : 'above'} tour</div></div>`).join('')}</div>
+         </div>`
+      : '';
+
+    const blocks = clubs.map(c => strikeBlock(shots, c)).filter(Boolean);
+    if (!blocks.length && !bag) { el.innerHTML = ''; return; }
+    el.innerHTML = bag + blocks.join('');
+  }
+
+  function strikeBlock(shots, club) {
+    const esc = t => Sanitize.escape(t);
+    const name = esc(clubLabel(club));
+    const b = Strike.baseline(shots, club);
+    if (!b.ok) {
+      // Same rule as the tail: only worth a refusal if the golfer hit enough
+      // of the club to have expected an answer.
+      if ((shots || []).filter(s => s.clubType === club).length < 6) return '';
+      return `<div class="tail-block pending"><div class="tail-head">${name} — strike</div>
+          <div class="tail-note">${esc(b.note)}</div></div>`;
+    }
+    const h = Strike.headroom(shots, club);
+    const sc = Strike.speedCost(shots, club);
+    const fg = Strike.fatigue(shots, club);
+    const gain = h.ok && h.real
+      ? `<div class="tail-value">
+           <div class="tail-value-num">${h.carry ? `${fmt(h.carry.lo, 0)}–${fmt(h.carry.hi, 0)} yards` : `${fmt(h.ballGain, 1)} mph ball speed`}</div>
+           <div class="tail-value-sub">${esc(h.note)}</div>
+         </div>
+         <div class="tail-note">This is a chained estimate, not a measurement: your gap × your club speed ×
+           a published yards-per-mph figure. Each link is sourced and the arithmetic is exact, which is not
+           the same as the answer being measured. No strokes figure is offered from it — the app keeps one,
+           in the tail audit below, and it comes from a spread it measured directly.</div>`
+      : `<div class="tail-item">${esc(h.note || b.note || '')}</div>`;
+    return `<div class="tail-block">
+        <div class="tail-head">${name} — strike <span class="tail-n">${b.n} shots</span></div>
+        <div class="tail-stats">
+          <div class="disp-stat"><div class="disp-stat-val">${fmt(b.mean, 3)}</div>
+            <div class="disp-stat-label">Your smash ±${fmt(b.ci, 3)}</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${fmt(Strike.reference(club) ?? 0, 2)}</div>
+            <div class="disp-stat-label">Tour reference</div></div>
+          <div class="disp-stat"><div class="disp-stat-val">${fmt(b.spread, 3)}</div>
+            <div class="disp-stat-label">Shot-to-shot spread</div></div>
+        </div>
+        ${gain}
+        ${sc.ok ? `<div class="tail-item${sc.real && sc.slope < 0 ? ' heavy' : ''}">${esc(sc.note)}</div>`
+                : `<div class="tail-note">${esc(sc.note)}</div>`}
+        ${fg.ok ? `<div class="tail-item${fg.real && fg.drop > 0 ? ' heavy' : ''}">${esc(fg.note)}</div>`
+                : `<div class="tail-note">${esc(fg.note)}</div>`}
+      </div>`;
   }
 
   // ── The tail, and the one strokes number in the app ───────────
