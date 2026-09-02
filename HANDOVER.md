@@ -14,7 +14,7 @@ No build step. Vanilla ES6+, four shipped files: `index.html`, `app.js`,
 `style.css`, `sw.js`.
 
 **The one thing to understand before changing anything:** most of this app is
-*refusals*. A shot passes eight gates before it can become a drill or a strokes
+*refusals*. A shot passes nine gates before it can become a drill or a strokes
 figure, and at each one the honest output is often silence. If you add a feature that states a
 number without checking those gates, you are undoing the main body of work in
 this codebase. `docs/architecture.html` explains the pipeline; read it.
@@ -26,7 +26,7 @@ this codebase. `docs/architecture.html` explains the pipeline; read it.
 ```bash
 cd /home/user/oliverseydlitz-ai.github.io   # or wherever it cloned
 npm install          # jsdom only, dev-only; the SITE has no build step
-npm test             # load gate + 9 suites, ~204 assertions. Must be green.
+npm test             # load gate + 14 suites, 405 assertions. Must be green.
 git log --oneline -5
 ```
 
@@ -49,7 +49,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
    rendering, also drive it in a browser (§6).
 3. **Bump the service-worker cache** in `sw.js` when any of `app.js`,
    `style.css`, `index.html` changes, or clients keep the stale version.
-   Currently `shotlab-v60` — increment it.
+   Currently `shotlab-v70` — increment it.
 
 Commit messages in this repo explain *why*, not just what, and name the
 mechanism when a number changes. Match that.
@@ -60,7 +60,7 @@ mechanism when a number changes. Match that.
 
 | Path | What it is |
 |---|---|
-| `app.js` | Everything. ~7,050 lines, 51 IIFE modules + ~24 top-level functions |
+| `app.js` | Everything. ~8,590 lines, 55 IIFE modules + ~24 top-level functions |
 | `index.html` | 7 views, 7 static modals, CSP meta, CDN script tags |
 | `style.css` | Design tokens + components. Two stacked `:root` blocks from successive redesigns |
 | `sw.js` | Service worker. Network-first same-origin, cache-first CDN |
@@ -78,7 +78,7 @@ mechanism when a number changes. Match that.
 
 ---
 
-## 4. Architecture: the eight gates
+## 4. Architecture: the nine gates
 
 Full version in `docs/architecture.html`. Short version:
 
@@ -92,6 +92,7 @@ Full version in `docs/architecture.html`. Short version:
 | 6 | Weight | `PracticePlan` | — outputs the drill |
 | 7 | Retain | `RetentionProbe` | — settles a day+ later |
 | 8 | Value | `Dispersion` | Non-drivers, and spreads outside Broadie & Ko's 5.5–7.9° band, from any strokes figure |
+| 9 | Admit | `DrillLibrary` | Drills whose measurement precondition is not met — **shown locked with the reason, never hidden** |
 
 **Trust tiers** (`Metrics.TIER`, `app.js` ~line 363):
 
@@ -102,9 +103,7 @@ Full version in `docs/architecture.html`. Short version:
 
 ### Key module line numbers
 
-`Metrics` 363 · `Store` 982 · `FeedbackEngine` 1062 · `Conditions` 1153 ·
-`Spin` 1245 · `Dispersion` 1334 · `RetentionProbe` 1759 · `FaultEngine` 2044 ·
-`Benchmarks` 2744 · `PracticePlan` 2896 · `UI` 3535.
+`Metrics` 416 · `LocalDB` 611 · `Store` 1167 · `FeedbackEngine` 1249 · `Conditions` 1340 · `Spin` 1432 · `Dispersion` 1521 · `Strike` 1880 · `QuietEye` 2136 · `DrillLibrary` 2358 · `RetentionProbe` 2712 · `FaultEngine` 3080 · `Benchmarks` 3780 · `PracticePlan` 3932 · `UI` 4571.
 These drift — grep, don't trust them.
 
 ---
@@ -236,7 +235,7 @@ gate in `npm test` is what catches it.
 
 ### Repo state
 
-`main` is green. 51 modules, ~7,050 lines in `app.js`, 204 assertions.
+`main` is green. 55 modules, ~8,590 lines in `app.js`, 405 assertions.
 
 **Seven `claude/*` branches remain on the remote.** They should be deleted; a
 Claude session's token can create and update refs but **not delete them**
@@ -255,7 +254,24 @@ byte-identical to `archive/v6-ball-flight`, which preserves 12 commits of
 physics ball-flight work worth keeping. `claude/hello-qiJhv` is the only one
 whose commit dies with it — a superseded 176-line CLAUDE.md.
 
-### Next substantial piece
+### Next substantial piece — the build order is finished
+
+**All eight steps of `docs/research-base-v2.md` §10 are now done.** There is no
+next item on that list. What follows is judgement, not a queue.
+
+The most valuable remaining work is probably:
+
+1. **Wire `DrillLibrary` into `PracticePlan`.** The library and its gates exist
+   and render, but the generated practice plan still holds its own small drill
+   set. Joining them (`sectionForFault` is the intended seam) would mean every
+   prescribed drill carries a checked gate.
+2. **`FeedbackEngine` → the session UI.** The wrappers in section I are the
+   highest-evidence items in the whole base and are currently described rather
+   than enforced — nothing actually fades the numbers during a session.
+3. **`Strike.trend()` and `QuietEye` have no home in Progress.** Same gap the
+   tail trend had until it was rendered.
+
+### Superseded
 
 Steps 1, 2, 3, 5 and 6 of `docs/research-base-v2.md` §10 are done. **Step 4 —
 the smash-factor and strike-quality track (§8A)** is the one to take next: it
@@ -277,19 +293,13 @@ of a user.
 
 ### Known and unfixed
 
-- `Dispersion.trend()` is written and tested but not yet rendered anywhere. The
-  Progress view is where it belongs — p95 across ≥5 sessions with the golfer's
-  own between-session band, which is drill B32 in the research base.
-- The gear-effect residual threshold (5°) is a hand-picked screen, not fitted.
-  It should come from the golfer's own residual distribution like everything
-  else does.
-- `RetentionProbe` settles against whatever the next session happens to
-  contain, not against *confirmed* practice — so a golfer who ignored the drill
-  still gets a verdict. Fixing it means letting people mark a drill as done.
-- `style.css` has two stacked `:root` blocks from successive redesigns and
-  some dead rules. Never audited.
-- The app has no on-course data at all, so it cannot compute true strokes
-  gained. Anything claiming otherwise would be fabricated.
+- **`style.css`'s two `:root` blocks are not a problem** — this was wrong in an
+  earlier handover. The second adds two font tokens and redefines nothing. The
+  dead rules were real and are gone.
+- The app still has no on-course data, so it cannot compute true strokes
+  gained. `Dispersion` values a *spread* against published curves; that is the
+  closest honest thing and it is not the same claim.
+- Anything claiming true on-course strokes gained would be fabricated.
 
 ---
 

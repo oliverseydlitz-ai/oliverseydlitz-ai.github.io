@@ -56,7 +56,9 @@ stacked in file order as features were added. Grouped by role:
 3. **Scoring / analysis engines** — `FaultEngine`, `ShotScorer`, `SwingDNA`,
    `Benchmarks`, `Insights`, `Analytics`, `SwingAnalytics`, `InsightEngine`,
    `Trajectory`, `ClubAnalyzer`, `GapAnalysis`, `FormQualityTimeline`,
-   `Dispersion` (tail engine + the only strokes valuation — see below)
+   `Dispersion` (tail engine + the only strokes valuation — see below),
+   `Strike` (smash/strike-quality track), `QuietEye` (putting, no device),
+   `DrillLibrary` (104 drills + their gates)
 
 4. **Coaching / practice** — `PracticePlan`, `PracticePlans`, `CoachingMode`,
    `PersonalCoach`, `DrillTracker`, `PracticeEfficiency`,
@@ -292,6 +294,37 @@ curvature amplifies start-line error non-linearly.
   refuses outside 5.5°–7.9° ±1.5°, clamping with a note inside that margin.
   Every valuation carries `Dispersion.CAVEATS`; do not render one without them.
 
+### Strike quality (`Strike`)
+
+The highest-value amateur lever and tier 1 end to end. Gated at
+`Metrics.MIN_SHOTS_REPORT`; a gap smaller than the golfer's own ± is reported
+as *not* a gap.
+
+- **It stops at yards.** Distance→strokes is published and legitimate, but the
+  app keeps exactly one strokes figure (`Dispersion`) so two numbers from two
+  roads can never be confused or added. Don't add a second.
+- **Carry conversion is driver-only** (`YD_PER_BALL_MPH`, 1.55–1.78, read off
+  the research base's own worked example). Other clubs get ball speed, no yards.
+- Every gain is labelled a **chained estimate** where it is shown.
+
+### Quiet eye (`QuietEye`)
+
+The largest effect in the research base (d ≈ 0.69 after trim-and-fill) and the
+only module that touches no launch-monitor data.
+
+- **There is no gaze field anywhere, deliberately.** The app cannot see gaze,
+  so it must never claim a quiet eye changed. It tracks the outcome only.
+- Wilson intervals, not the normal approximation — at 20 putts the naive
+  interval returns a negative lower bound and claims certainty at 20-for-20.
+- `puttsToDetect()` says the study's +5% needs ~1,400 putts a side;
+  `detectableDelta()` inverts it into what your log *can* resolve. Keep both.
+
+### Drill library (`DrillLibrary`)
+
+All 104 drills from §8, each carrying its section's gate. `admissible(drill,
+ctx)` returns `{ok, reasons}` — **a locked drill is shown with its reason, never
+filtered out.** Section I are wrappers applied *over* a drill, never instead.
+
 ### Fault reporting gates (`FaultEngine`)
 
 A fault reports only when it recurs at a rate measurement noise would not
@@ -385,6 +418,23 @@ module — see the module map under Core Modules.
 Plus **dark mode** (`html.dark` token overrides; toggle in Settings, persisted
 to `localStorage.slTheme`) and a **global error boundary** (`showFatalError`)
 that shows a friendly recovery screen instead of a blank page.
+
+## Device storage (`LocalDB`)
+
+Guests were losing everything on refresh while the button said their data
+stayed on the device. `DB` (IndexedDB) is now reachable behind an explicit
+opt-in, **off by default**, in Settings → Data & Export.
+
+- On boot `hydrate()` reads the device store into `MemDB` once; `MemDB` stays
+  the single synchronous read path so no call site changed.
+- `setEnabled(true)` **writes the flag first and rolls back on failure** —
+  `hydrate()` re-reads it, and both yield at every await, so a boot in flight
+  used to clobber the switch.
+- It **probes** the store with a round trip before promising anything: a
+  first-time guest has nothing to write, so a broken browser would otherwise
+  only surface at the first real import.
+- The guest note renders `LocalDB.describe()`, the same sentence as the
+  setting, so the two cannot drift.
 
 Debugging: `showDebug()` logs to console only; set `localStorage.slDebug='1'`
 to re-enable the on-screen banner.

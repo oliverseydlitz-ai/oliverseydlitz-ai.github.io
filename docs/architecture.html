@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="How a shot becomes a drill in ShotLab: the eight gates it passes, the invariants that hold everywhere, and the module map.">
+<meta name="description" content="How a shot becomes a drill in ShotLab: the nine gates it passes, the invariants that hold everywhere, and the module map.">
 <meta name="robots" content="noindex">
 <style>
   :root { color-scheme: light dark; }
@@ -140,7 +140,7 @@ footer a{color:var(--accent)}
 <header>
   <p class="eyebrow">Architecture reference · ShotLab TOUR</p>
   <h1>What has to be true before the app tells a golfer anything</h1>
-  <p class="standfirst">Most of this system is refusals. A shot arrives from a Rapsodo CSV and passes eight gates before it can become a drill or a strokes figure — and at every one, the honest output is often silence. This is what each gate checks and why it exists.</p>
+  <p class="standfirst">Most of this system is refusals. A shot arrives from a Rapsodo CSV and passes nine gates before it can become a drill or a strokes figure — and at every one, the honest output is often silence. This is what each gate checks and why it exists.</p>
   <div class="meta">
     <span><b>Entry</b> Rapsodo MLM2PRO CSV</span>
     <span><b>Modules</b> 50 in app.js</span>
@@ -225,6 +225,16 @@ footer a{color:var(--accent)}
         <div class="gate"><b>refused</b> every other club · any spread past that band · range balls · under 30 shots</div>
       </div>
     </div>
+
+    <div class="stage">
+      <div class="stage-k">9 · Admit</div>
+      <div>
+        <div class="stage-t">Is this drill's precondition even met?</div>
+        <div class="stage-d"><code>DrillLibrary</code> holds all 104 drills with their section's measurement gate attached, and <code>admissible()</code> asks whether this golfer's shots, ball, surface and alignment satisfy it. A failing gate returns its <em>reason</em>: a locked drill stays on screen with the sentence that would unlock it, because "hit 30 of these on your own ball" is actionable and a quietly shorter list is not.</div>
+        <div class="gate hold"><b>locks</b> dispersion and gapping on range balls · start line without confirmed alignment · any trend under its session count</div>
+        <div class="gate pass"><b>flags, never blocks</b> a mat session — the pattern is real, the fat strikes are what it hides</div>
+      </div>
+    </div>
   </div>
 
   <div class="note">
@@ -244,13 +254,15 @@ footer a{color:var(--accent)}
     <div class="inv-row"><span class="inv-m">face angle</span><span class="inv-t">Derived, never presented as a measurement. A suspected off-centre strike <b>invalidates it for that shot</b> rather than quietly widening it.</span></div>
     <div class="inv-row"><span class="inv-m">cues</span><span class="inv-t">External focus only — club, ball, turf, target. A test fails if a cue naming the golfer's own body parts is added.</span></div>
     <div class="inv-row"><span class="inv-m">strokes</span><span class="inv-t">There is <b>one</b> strokes figure in the app and it comes from measured directional spread. No club-delivery metric is ever converted to strokes, and outside the band Broadie &amp; Ko calibrated there is no number at all.</span></div>
+    <div class="inv-row"><span class="inv-m">attribution</span><span class="inv-t">A change and the <b>credit</b> for it are separate questions. The retention probe measures the change either way and asks whether the drill was done before it says the drill did anything.</span></div>
+    <div class="inv-row"><span class="inv-m">gaze</span><span class="inv-t">There is no field for a gaze duration anywhere in the putting module. A number the app cannot measure is one it would eventually display.</span></div>
     <div class="inv-row"><span class="inv-m">verdicts</span><span class="inv-t">Three-valued. A change smaller than the golfer's variation is <b>"no detectable change"</b>, never "no improvement" — the app cannot tell those apart and says so.</span></div>
   </div>
 </section>
 
 <section>
   <h2>Module map</h2>
-  <p class="lede">51 IIFE modules in <code>app.js</code>, in file order. The ones that gate are listed first because everything else depends on them.</p>
+  <p class="lede">55 IIFE modules in <code>app.js</code>, in file order. The ones that gate are listed first because everything else depends on them.</p>
 
   <div class="tw"><table>
     <thead><tr><th>Module</th><th>Responsibility</th></tr></thead>
@@ -273,6 +285,9 @@ footer a{color:var(--accent)}
       <tr><td><code>ShotScorer</code></td><td>0–100 from tier 1 and 2 metrics only — smash 45, attack angle 25, club path 15, spin loft 15</td></tr>
       <tr><td><code>Benchmarks</code></td><td>Tour averages tagged <code>[TM]</code> or <code>[est]</code>, targets held separately, spin-loft bands</td></tr>
       <tr><td><code>Dispersion</code></td><td>Tail audit, two-sided miss census, and the app's only strokes valuation. Does not trim outliers — the blow-up is the measurement</td></tr>
+      <tr><td><code>Strike</code></td><td>Smash baseline, the gap to tour and what closing it is worth in ball speed and yards, the weak link across the bag, whether speed costs strike. Stops at yards on purpose</td></tr>
+      <tr><td><code>QuietEye</code></td><td>The putting protocol and its outcome log. No gaze field anywhere — the app cannot see gaze, so it never claims one changed</td></tr>
+      <tr><td><code>DrillLibrary</code></td><td>104 drills, each carrying its section's measurement gate. A locked drill is shown with its reason, never filtered out</td></tr>
       <tr><td><code>SwingDNA</code>, <code>Insights</code>, <code>Analytics</code></td><td>Session tendencies, coach's notes, yardage book and personal bests</td></tr>
 
       <tr class="grp"><td colspan="2">Coaching</td></tr>

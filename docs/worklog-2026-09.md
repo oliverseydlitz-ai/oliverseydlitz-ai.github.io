@@ -1,8 +1,8 @@
 # Work log — 31 Aug to 2 Sep 2026
 
 What changed, why, and what was wrong before. Written for whoever picks this up
-next, including future me. Commits run `2503479` → `ce3a3cd`; `app.js` 5,964 → 7,044 lines
-(+1,740 of new measurement and coaching logic, −660 of dead modules).
+next, including future me. Commits run `2503479` → `551671f`; `app.js` 5,964 → 8,586 lines
+(+3,280 of new measurement and coaching logic, −660 of dead modules).
 
 The short version: the app's coaching content was well-built on top of a
 measurement layer that was quietly wrong. Most of this work is correcting the
@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 9 suites, 204 assertions.
+  jsdom) then 14 suites, 405 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -382,33 +382,150 @@ That is all the strip shows now; everything quantitative moved behind the gates.
 
 ---
 
+## 9. The ten-item pass `6fe2141` → `551671f`
+
+A second pass over the whole app, ranked by user harm rather than by the build
+order. Two of the ten turned out to rest on a false premise and are recorded
+here as corrections rather than as work.
+
+### 9.1 Guest sessions were being destroyed silently `6fe2141`
+
+The guest button said "Your data stays on this device only". It stayed nowhere:
+everything local went to `MemDB`, a plain array, while `DB` — a complete
+IndexedDB store — had sat unused since it was written. Import ninety shots, hit
+refresh, lose all of it with no warning. That sentence was the only outright
+false statement in an app whose entire argument is that it does not say things
+it cannot support.
+
+Fixed as a choice, off by default, because writing a golfer's history to a
+device without asking is its own broken promise. `LocalDB` keeps the change to
+two lines in `Store`: hydrate IndexedDB into `MemDB` at boot, fan writes out.
+
+Two bugs the tests found that a green suite would have hidden. The switch had
+no way to know the store was broken — a first-time guest has nothing to write,
+so "write everything in memory" wrote nothing and the switch flipped on cleanly
+in a browser about to refuse the first real import; it now round-trips a probe.
+And the enabled flag lost a race with boot: `hydrate()` re-reads it, both yield
+at every await, so a boot in flight reset the state to a flag not yet written —
+a switch reading "on" that stored nothing and gave no reason.
+
+Two pre-existing bugs surfaced alongside it, both in `PersonalCoach`.
+`generateAssessment` called `avg(shots.map(ShotScorer.score), undefined)`, and
+`ShotScorer` returns null for an unscorable shot — so it read a property off
+null and threw on every home render with sessions. `safeRender` caught it,
+which is exactly why nobody noticed: the coaching block just never appeared.
+The value was assigned to a variable never used. Next to it, a consistency
+figure of `100 - stdDev(carry)` — the unbounded-score bug fixed once already
+elsewhere, in a second copy that was missed.
+
+### 9.2 Strike quality `b41abe7`
+
+Step 4 of the build order, and on the evidence the most valuable thing in it.
+The average male amateur has LPGA club speed — 93 mph against 94 — and makes
+7 mph less ball speed. The driver problem is strike, not engine, and smash
+factor is tier 1.
+
+It stops at yards. Distance-to-strokes is published and legitimate, so a
+strokes figure here would not be the broken face chain — but the app has one
+strokes number, in `Dispersion`, and a second down a different road leaves a
+golfer holding two figures with no way to know which answers what.
+
+### 9.3 The retention probe was crediting practice that never happened `0baaee3`
+
+The worst finding of the pass, because it sat inside the feature the app puts
+forward as its efficacy metric. A probe settled against whatever session came
+next, with no way of knowing whether the drill was done — so a golfer who
+ignored it entirely was told "the strongest evidence this app can produce that
+something worked". The measurement was fine; the attribution was invented.
+Same failure as reading strokes off a face angle, one layer up.
+
+The app now asks. All three answers give different, useful readings, and a
+change measured without practice becomes the more valuable fact: this is what
+your week-to-week movement looks like with nothing behind it.
+
+### 9.4 The gear-effect screen `91fff71`
+
+The last hand-picked number deciding something a golfer sees, and wrong in both
+directions at once: too tight for a golfer whose derivation runs noisy, too
+loose for a consistent striker whose real toe strike passed as clean. Now the
+golfer's own residual spread, centred on their median rather than on zero,
+because a systematic offset is a property of the model and not of any strike.
+
+### 9.5 The wrong CSV imported as nothing `82dba9e`
+
+The docs said parsing should move to a web worker. It should not — a Rapsodo
+export is a hundred rows. The real defect was that any CSV imported
+successfully: a bank statement parses, no columns match, every shot holds only
+its row number, and the preview offers to save "48 shots · 1 club" of dashes.
+Nothing fails; the mistake surfaces later as a session that analyses to
+nothing. Now refused at the door, with the wrong-file and nearly-right cases
+distinguished.
+
+### 9.6 Two items that were not what the handover said
+
+**The `:root` blocks do not collide.** The first defines 29 tokens, the second
+adds two font variables and redefines none. The two "undefined" tokens a scan
+finds are set at runtime and both have declaration fallbacks. Corrected in the
+handover rather than repeated.
+
+The dead rules were real — 125 lines orphaned by the 17-module removal. Finding
+them needed care: class names here are routinely built in template literals, so
+a name that never appears as a literal is usually alive. A naive scan called 36
+classes dead and 18 of those were template-built; deleting them would have
+silently unstyled the fault cards and the retention verdicts.
+
+**The accessibility module did nothing.** It copied every button's text into an
+aria-label (which is already the accessible name, and an aria-label overrides
+content, so at best a no-op), and set two tokens plus a body class that no rule
+reads. What was missing was every part that makes a dialog usable without a
+mouse. Now done with a MutationObserver rather than twenty edits — and the
+browser caught what reasoning did not: both first-load gates are open at once,
+and an open-order stack put focus in the modal *underneath* the consent gate,
+because the gate is earlier in the document but paints on top.
+
+### 9.7 Quiet eye `18fb2f2`, and a tab that never rendered
+
+Step 7. The largest effect in the base, and the only module needing no launch
+monitor. The app cannot see gaze, so there is no gaze field anywhere in it.
+
+The statistical core is the honest part: seeing the study's +5% takes about
+1,400 putts a side, which is where self-tracking normally dies — so it also
+answers the question inverted. Twenty putts resolves 43 points; 500 a side
+resolves 9. Your log cannot confirm the effect, but it can bound it.
+
+Found while wiring it: the **Practice tab never rendered**. The nav delegator
+handled four views and let the rest fall through to `Router.show()`, which only
+toggles visibility. `Router.showPractice` existed, was exported, and was called
+from nowhere.
+
+### 9.8 The drill library `551671f`
+
+Step 8, and the last of the build order. 104 drills, each carrying its
+section's measurement gate as data. A failing gate returns its reason instead
+of hiding the drill, because "hit 30 of these on your own ball and this
+unlocks" is actionable and a silently shorter list is not.
+
+---
+
 ## Still open
 
-**From the research base's §10 build order:** steps 1, 2, 3, 5 and 6 are done
-(measurement gates and per-user error, feedback engine, retention probe,
-dispersion-tail engine, physics layer).
+**The §10 build order is finished — all eight steps.** What is left is
+judgement rather than a queue.
 
-- **Step 4 — smash-factor and strike-quality track (§8A).** The one to take
-  next. Highest-value amateur lever in the document, measured entirely with
-  tier-1 metrics, fastest to show a result: the average male amateur has
-  essentially LPGA club speed (93 vs 94 mph) and makes 7 mph less ball speed,
-  so the driver problem is strike and spin, not engine speed.
-- **Step 7 — quiet-eye putting (§8H).** Best-evidenced intervention in the
-  document and needs no launch monitor at all.
-- **Step 8 — drill library rebuild**, ~104 drills restructured around feedback
-  scheduling rather than drill content.
+- **Wire `DrillLibrary` into `PracticePlan`.** The library and its gates exist
+  and render, but the generated plan still carries its own small drill set.
+  `sectionForFault` is the intended seam.
+- **`FeedbackEngine` is described, not enforced.** The section-I wrappers are
+  the highest-evidence items in the whole base, and nothing actually fades the
+  numbers during a live session.
+- **`Strike.trend()` and `QuietEye` have no home in Progress** — the same gap
+  the tail trend had until it was rendered.
 
 **Known and unfixed:**
 
-- `Dispersion.trend()` is written and tested but rendered nowhere. It belongs in
-  the Progress view — p95 across ≥5 sessions with the golfer's own
-  between-session band, which is drill B32 in the research base.
-- The gear-effect residual threshold (5°) is a hand-picked screen, not fitted.
-  It should come from the golfer's own residual distribution like everything
-  else.
-- `PracticePlan` still has no way to know a drill was actually *done* — the
-  retention probe settles against whatever the next session happens to contain,
-  not against confirmed practice.
+- `PracticePlan` still has no way to know a drill was actually *done* as a
+  plan. The retention probe now asks (§9.3), but the answer is not fed back
+  into how the next plan is weighted.
 
 *(Closed `1d95df3` / `fff2ccf`: the three faults that fired on missing data, the
 unbounded consistency score, and the 17 unreachable modules.)*
@@ -453,6 +570,19 @@ face-to-path display broke §9.1 two commits after adding the module that
 forbids it, because the display layer never asked the module. Rules enforced in
 one layer don't enforce themselves in another.
 
+**Two of my own ranked priorities rested on a false premise.** The colliding
+`:root` blocks and the "just needs a web worker" CSV parser were both inherited
+from an earlier handover and both were wrong on inspection. Ranking work from a
+document rather than from the code puts confident items near the top of a list
+where they do not belong. Checking first cost minutes; the fix I would have
+written for either would have been pure churn.
+
+**A green suite hid two crashes for an unknown number of commits.** The
+`PersonalCoach` null dereference threw on every home render with sessions, and
+`safeRender` swallowed it — so the symptom was an absent block, not an error.
+Defensive rendering makes an app resilient and makes its bugs invisible; the
+only reason it surfaced was a browser run printing console errors.
+
 **I trusted my own test fixture over the engine, briefly.** A tail detector
 was reporting "ordinary" on a set I had built to be heavy-tailed, and my first
 move was to change the estimator. The estimator did have a real bug — it ran
@@ -496,6 +626,17 @@ Every commit in the session, and the section that explains it.
 | `998ed92` | — | docs: add an architecture reference |
 | `ff1fdd8` | — | Add HANDOVER.md for a session starting cold |
 | `ce3a3cd` | 8 | Add the dispersion-tail engine and the app's only strokes valuation |
+| `86f526f` | 8 | docs: record the tail engine, and correct the pipeline to eight gates |
+| `6fe2141` | 9.1 | Make guest sessions survive a refresh, and stop the button saying they already do |
+| `dbadf12` | 9 | Show the dispersion tail across sessions in Progress |
+| `b41abe7` | 9.2 | Add the strike-quality engine |
+| `0baaee3` | 9.3 | Stop the retention probe crediting practice that never happened |
+| `91fff71` | 9.4 | Judge a suspected off-centre strike against the golfer's own residuals |
+| `82dba9e` | 9.5 | Refuse the wrong CSV at the door instead of importing it as nothing |
+| `45d441d` | 9.6 | Remove CSS left behind by the module cleanup, and correct a note about :root |
+| `c9ce37b` | 9.6 | Make the modals usable without a mouse |
+| `18fb2f2` | 9.7 | Add the quiet-eye putting module, and fix a Practice tab that never rendered |
+| `551671f` | 9.8 | Rebuild the drill library as 104 gated drills |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty
