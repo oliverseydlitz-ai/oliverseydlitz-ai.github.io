@@ -790,6 +790,9 @@ tr:hover td { background: var(--surface2); }
 .fb-option-blurb{font-size:.75rem; line-height:1.45; color:var(--text-muted); margin-top:.25rem}
 .fb-check{color:var(--pine); font-weight:700}
 
+.sm-pm{color:var(--text-muted); font-size:.78em; font-variant-numeric:tabular-nums}
+.sm-note{color:var(--text-muted); font-size:.72rem; font-style:italic}
+
 /* ── Launch-monitor setup guide ─────────────────────────── */
 .modal-scroll{max-height:72vh;overflow-y:auto;padding:1rem 1.1rem 1.2rem}
 .setup-guide{color:var(--text)}

@@ -3776,6 +3776,27 @@ const UI = (() => {
       return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs avg</span>`;
     };
 
+    // Face-to-path is DERIVED, not measured, and carries ±1.8° on a single
+    // shot — wider than most real values. A bare per-shot number here would be
+    // exactly the claim the app must never make. Show the noise inline, and
+    // put the club mean beside it, which is where it becomes trustworthy.
+    const f2pRaw = facePath(shot);
+    const f2pSingle = Number.isFinite(f2pRaw)
+      ? `${fmt(f2pRaw,1)}° <span class="sm-pm">± ${Metrics.SINGLE_SHOT_F2P_SD}</span>`
+      : '—';
+    const clubF2P = (sessionShots || [])
+      .filter(x => x.clubType === shot.clubType)
+      .map(facePath).filter(Number.isFinite);
+    let f2pClub = '<span class="sm-note">derived, not measured</span>';
+    if (clubF2P.length >= Metrics.MIN_SHOTS_REPORT) {
+      const m = mean(clubF2P);
+      const ci = Metrics.SINGLE_SHOT_F2P_SD / Math.sqrt(clubF2P.length);
+      f2pClub = `<span class="sm-cmp ${Math.abs(m) < 2 ? 'up' : 'down'}">` +
+        `${clubLabel(shot.clubType)} avg ${fmt(m,1)}° ± ${fmt(ci,1)} (${clubF2P.length})</span>`;
+    } else if (clubF2P.length) {
+      f2pClub = `<span class="sm-note">${clubF2P.length}/${Metrics.MIN_SHOTS_REPORT} shots — not enough to read yet</span>`;
+    }
+
     const rows = [
       ['Club', clubLabel(shot.clubType), ''],
       ['Ball Speed', `${fmt(shot.ballSpeed,1)} mph`, cmp('ballSpeed',1)],
@@ -3785,11 +3806,11 @@ const UI = (() => {
       ['Total', `${fmt(shot.totalDistance,1)} yds`, cmp('totalDistance',1)],
       ['Launch Angle', `${fmt(shot.launchAngle,1)}°`, cmp('launchAngle',1)],
       ['Launch Dir', `${fmt(shot.launchDirection,1)}°`, ''],
-      ['Side Carry', `${fmt(shot.sideCarry,1)} yds`, ''],
+      ['Side Carry', `${fmt(shot.sideCarry,1)} yds`, '<span class="sm-note">modelled</span>'],
       ['Club Path', `${fmt(shot.clubPath,1)}°`, ''],
       ['Attack Angle', `${fmt(shot.attackAngle,1)}°`, ''],
-      ['Face-to-Path', `${fmt(facePath(shot),1)}°`, ''],
-      ['Apex', `${fmt(shot.apex,0)} ft`, ''],
+      ['Face-to-Path', f2pSingle, f2pClub],
+      ['Apex', `${fmt(shot.apex,0)} ft`, '<span class="sm-note">modelled</span>'],
       shot.spinRate ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, ''] : null,
       shot.spinAxis ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, ''] : null,
     ].filter(Boolean);
