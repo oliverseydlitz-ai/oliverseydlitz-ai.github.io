@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 21 suites, 791 assertions.
+  jsdom) then 25 suites, 913 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -980,6 +980,136 @@ next person edits.
 
 ---
 
+## 16. Every screen, against the app's own rules `166e206` → `7bf8340`
+
+§15 fixed the yardage book. The same reading applied to every remaining
+surface found the same defect on all of them, plus a live rendering bug.
+
+### 16.1 The Progress trend box `166e206`
+
+The app's headline "am I getting better" surface, with three faults:
+
+- **It pooled across conditions.** Switching from range balls to your own ball
+  adds yards to every carry and the box reported it as "↑ Carry distance +15
+  yds (9%)" — a change of equipment presented as improvement.
+- **No significance test.** `Metrics.changeIsReal` exists for exactly this
+  question and was called only by the retention probe, so any 1% move got an
+  arrow and a colour.
+- **A fixed sign on tier-2 angles.** "Attack angle: higher is better" is true
+  of a driver and is a thin strike with a 7-iron. Across a whole bag there is
+  no direction, so no verdict is given; filtered to one club it reads off
+  `Benchmarks.movedToward(band, from, to)`.
+
+**And the shared primitive had a zero-variance hole.** `typicalError` returns
+the mean within-session spread; when that is zero, `changeIsReal` divided by
+it and `Math.abs(delta) >= 0` made every delta real — **including a delta of
+exactly nothing.** `Rounds.trend()` had the same hole and the right answer
+differs by context: there the baseline is round-level numbers a golfer can
+genuinely repeat, so a flat run is real-with-a-warning; here the floor is
+built from shot scatter, so a zero is degenerate data and cannot be judged.
+
+### 16.2 Personal bests `2fc9b4c`
+
+A record is by construction the reading most likely to be wrong — the extreme
+value of the distribution, on a device that has logged a 147 mph swing next to
+a 0 mph one. "Best Smash: 1.71" was a record card; it is past what a legal
+clubface can produce.
+
+Screened on physical impossibility, the precedent `Dispersion` already sets.
+`Metrics.CEILING` holds exactly one entry, and the suite pins that: smash
+factor is the one metric with a hard bound from the rules of golf (COR capped
+at 0.83 → about 1.50). **Carry and ball speed are deliberately not screened**
+— a long drive is unusual, not impossible, and inventing a ceiling to tidy the
+feature is the unsourced constant this codebase refuses.
+
+**A MAD trim was tried first and does not work**, which is worth recording
+because it looks like it should: with a single outlier among tied values the
+only non-zero deviation is the outlier's own, so it becomes the scale it is
+measured against and always passes.
+
+### 16.3 The fourth copy of the target bands `ec2e512` `4f6496c`
+
+CLAUDE.md says `Benchmarks.TARGET` is the only copy and that the launch-window
+table used to hardcode them inline, "which is how the tour average and the
+target got conflated the first time". **Two more copies were still live.**
+
+The benchmark table: `c==='d' ? uAA>=1 : isIron(c) ? (uAA<=-2 && uAA>=-6) : ...`
+captioned **"+3° ideal"** — the LPGA average. `ShotScorer`: attack angle scored
+against a single point, driver `3` again, and `+1` for anything that is not a
+driver or an iron where the real band is 0 to −2, so the sign was wrong. A
+driver delivered at +5°, the top of its own band, was docked 7 of 25 points for
+not being +3.
+
+Both read `targetsFor` now, and `rules-are-wired.js` guards the single-copy
+rule. **That check failed on its own explanation first** — the comment
+describing the old inline copy contains the string the check forbids. A
+source-scanning test has to strip prose or it gets switched off by someone who
+documented something well.
+
+A sweep for a fifth found none: the remaining numeric thresholds in
+`FaultEngine` are fault triggers, a separate and correctly buffered concept.
+`test/suites/faults-vs-targets.js` pins the one relationship that must hold —
+**the app must never report a fault about a number it elsewhere calls the
+target** — by walking every band at lo/mid/hi and asserting silence.
+
+### 16.4 The home screen `4f6496c` `6a065b8` `a16ea84`
+
+**`QuickStats`** — three of its four tiles were bag-mix artifacts. "Avg" was
+the mean carry of a driver, a 7-iron and a wedge together (210 yards on the
+fixture, a number no club produces) and it moved with which clubs were hit, so
+a wedge session read as regression. Anchored on one named club now, on the
+most recent session's conditions — deliberately a different anchor from the
+yardage book, which wants the largest comparable sample because you club off
+it. A test pins that the two features pick differently on the same data.
+
+**`InsightEngine`** — `const consistency = 100 - stdDev(carries)`, a spread in
+yards subtracted from 100 and printed as a percentage. "You're improving! +N
+pts vs last week" off sessions 0–2 against 3–5, which are not weeks. "Long
+session! Make sure to rest" from a shot count compared against an average that
+included itself. Replaced with four things nothing else on the screen says,
+the first being **that the conditions changed**.
+
+**`PerformanceAlerts`** — the same broken arithmetic, escalated to a
+high-severity red alert below 60; a stray `',` printing a quote and a comma
+mid-sentence; `detectFaults(allShots)` called without the session across three
+sessions flattened together; and **`faults[0].pct`, a field that does not
+exist**, so the home screen read "**NaN% of recent shots. Priority fix.**" in
+red for an unknown length of time.
+
+### 16.5 A fix that was only ever half applied `6592a21`
+
+`consistencyScore()` was written to replace `100 - stdDev(carries)` — its
+comment says so and explains why. **Three call sites were never migrated**,
+one of them 30% of the user's overall letter grade.
+
+Even the corrected score is wrong on a whole bag, so `bagConsistency()`
+computes it per club above the floor and weights by shot count. The size of
+the old error, pinned in the suite: a golfer hitting **perfectly identical**
+drivers and wedges scored **30%**, because the 70-yard gap between the clubs
+was read as inconsistency.
+
+Handling the resulting null exposed one more: the grade computed
+`form_score * 0.5 + consistency * 0.3`, so an ungradeable consistency would
+have put NaN into the letter. The 30% moves onto form — an unmeasured
+component is not a failed one.
+
+### 16.6 Two checks, promoted `7bf8340`
+
+**Zombie formulas.** `rules-are-wired.js` asserts a replaced expression is not
+still live: `100 - stdDev`, `faults[0].pct`, `minShots: 15`. Narrowed by hand
+where a name has honest uses — `.pct` is real on `Features.focus()` and
+`Goals`, so the fault invariant is asserted on the object instead. A check that
+cries wolf gets switched off.
+
+**`test/browser/render-scan.js`**, out of scratch and into the repo. It renders
+every view, the session detail with all fault cards open and all nine drill
+tabs, then greps the DOM for NaN / undefined / [object Object]. No unit suite
+could have caught the `pct` bug: the function under test returned a perfectly
+well-formed object and the defect existed only at the point of render.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -1076,6 +1206,27 @@ same as it executing. An export nothing calls is the cheapest tell.
 thorough suite and no caller. The tests all passed, the function was correct,
 and no user ever saw its output. Coverage answers "does this work", never "is
 this reached".
+
+**A half-applied fix is worse than no fix.** `consistencyScore()` was written
+to replace `100 - stdDev(carries)` and documented as such; three call sites
+were never migrated, one of them 30% of the letter grade. The comment reads as
+done, so nobody looks. Same shape as the wrong constant in documentation
+below, and the same remedy: when you replace something, assert the old thing
+is gone rather than trusting that you got them all.
+
+**A unit suite cannot see a render-only bug.** `faults[0].pct` printed "NaN%"
+in a red home-screen alert for an unknown length of time, and every test
+passed the whole way — because `detectFaults` returns a perfectly well-formed
+object and the defect lives entirely in the template literal that reads a
+field off it. Anything assembled by string interpolation needs to be looked at
+after rendering, not before.
+
+**Three of the worst numbers in the app were the same mistake:** a figure
+pooled across the whole bag. Average carry, "consistency", the feedback band,
+the letter grade. Pooled across a bag those measure WHICH CLUBS you hit, not
+how you hit them — a golfer with perfectly identical drivers and wedges scored
+30% consistent. The app already knew this and had written it down about the
+feedback band; nobody had applied it anywhere else.
 
 **A rule nobody runs is the defect this codebase actually has.** Not a wrong
 number — a rule that is written down, has correct working code, and is never
@@ -1196,6 +1347,16 @@ Every commit in the session, and the section that explains it.
 | `336dff3` | 15.1 | Make the yardage book obey the rules the rest of the app enforces |
 | `9ab5b15` | 15.2/15.3 | Gate club gapping, and turn the audit that keeps finding bugs into a test |
 | `8e410d1` | 15.4 | Remove two more second copies the new wiring check found |
+| `da98184` | — | docs: record the yardage book, the gapping gate, and the audit-as-test |
+| `166e206` | 16.1 | Make the Progress trend box mean something, and fix a zero-variance hole |
+| `2fc9b4c` | 16.2 | Stop celebrating a device misread as a personal best |
+| `ec2e512` | 16.3 | Delete the third copy of the target bands, from the table that still had it |
+| `eb0ec0d` | 16.3 | Pin the one relationship between fault thresholds and target bands |
+| `4f6496c` | 16.3/16.4 | Stop the home screen's four headline numbers being bag-mix artifacts |
+| `6a065b8` | 16.4 | Rewrite the home insight box, which was subtracting yards from 100 |
+| `a16ea84` | 16.4 | Fix the red alert box, which was rendering "NaN% of recent shots" |
+| `6592a21` | 16.5 | Finish a fix that was only ever half applied |
+| `7bf8340` | 16.6 | Catch the half-applied fix and the render-only bug mechanically |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

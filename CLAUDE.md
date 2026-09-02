@@ -524,12 +524,55 @@ passes as wired, every other pass in the file is worthless. Do not delete it.
 **Adding a gate? Add it to this suite.** A gate nothing calls is the same as
 no gate.
 
+### Never pool across the bag (`bagConsistency`, `QuickStats`, `yardageBook`)
+
+The single most repeated arithmetic error here. A carry figure averaged over a
+driver, a 7-iron and a wedge measures **which clubs you hit**, not how you hit
+them, and it moves with the club mix — a wedge-heavy session reads as
+regression. CLAUDE.md said this about the feedback band ("Pooled across a bag
+it measures the driver-to-wedge gap") and nothing else obeyed it.
+
+- **`bagConsistency(shots)`** is the only correct bag-wide consistency: per
+  club above the sample floor, weighted by shot count, `null` when no club
+  qualifies. `100 - stdDev(carries)` is banned — a spread in yards is not a
+  percentage, and it scored a golfer hitting *perfectly identical* drivers and
+  wedges at 30%. `rules-are-wired.js` fails if it reappears.
+- **Anchor on one club** for any single headline number. `QuickStats.pick()`
+  takes the most-hit club in the recent comparable sessions and the row names
+  it.
+- **Anchor on conditions too**, and note the two right answers differ:
+  the yardage book uses the LARGEST comparable group (it is a reference table
+  you club off); the home row and the Progress trend use the MOST RECENT
+  session's conditions (they answer "how am I hitting it now"). A test pins
+  that they disagree on the same data.
+
+### Records and impossible readings (`Metrics.CEILING`)
+
+A personal best is the reading most likely to be a misread — it is the extreme
+value, on a device that has logged a 147 mph swing next to a 0 mph one.
+`CEILING` screens **impossible** readings only, the precedent `Dispersion`
+sets, and holds exactly **one** entry: smash factor 1.55, because the COR limit
+of 0.83 is a hard bound from the rules of golf. Carry, ball speed and apex are
+deliberately unscreened — a long drive is unusual, not impossible. **Do not add
+a ceiling without a citable physical bound.** A MAD trim does not work here:
+with one outlier among tied values it becomes its own scale and passes.
+
 ## Tests — run these before every push
 
 ```bash
 npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
+
+`test/browser/` holds two checks that are **not** in `npm test` — they need
+Playwright and a served site. Run `test/browser/render-scan.js` after touching
+any render path: it renders every view and greps the DOM for `NaN` /
+`undefined` / `[object Object]`. A red home-screen alert read "NaN% of recent
+shots" for an unknown length of time and every unit suite passed, because the
+function under test returned a well-formed object and the bug lived entirely
+in the template literal reading a field off it. `sync.sh` builds the served
+mirror and refuses to finish if a CDN tag survives the rewrite — that mirror
+went stale once and reported a rewritten feature's old text.
 
 `test/run.js` does two things, in this order, and the order is the point:
 
