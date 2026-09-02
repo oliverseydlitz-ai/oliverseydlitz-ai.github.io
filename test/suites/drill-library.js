@@ -84,10 +84,67 @@ ok(L.byId('i99').name === 'Next-day retention probe', 'including the efficacy me
 
 console.log('— faults join to sections, many to one —');
 ok(L.sectionForFault('poor-contact') === 'A', 'contact faults go to strike quality');
-ok(L.sectionForFault('open-face') === 'D', 'face faults to face-to-path');
-ok(L.sectionForFault('gapping') === 'F', 'gapping to distance control');
-ok(L.sectionForFault('nonexistent') === null, 'and an unknown fault maps to nothing rather than a default drill');
+ok(L.sectionForFault('slice') === 'D', 'curvature faults to face-to-path');
+ok(L.sectionForFault('pull-left') === 'C', 'directional faults to start line');
+ok(L.sectionForFault('fat-shot') === 'E', 'and strike-height faults to low point');
+ok(L.sectionForFault('nonexistent') === null, 'an unknown fault maps to nothing rather than a default drill');
 ok(Object.values(L.FAULT_SECTION).every(s => s in L.SECTIONS), 'every mapping points at a real section');
+
+// The first version of this table was written from the section headings rather
+// than from FaultEngine, so it mapped inventions like 'open-face' and
+// 'two-way-miss' and returned null for almost every fault the app can raise —
+// a join that looks complete and joins nothing. Both directions are checked.
+const fs = require('fs');
+const src = fs.readFileSync(require('path').join(__dirname, '../../app.js'), 'utf8');
+const seg = src.slice(src.indexOf('const FaultEngine'), src.indexOf('const ShotScorer'));
+const realIds = [...new Set([...seg.matchAll(/id:'([a-z0-9-]+)'/g)].map(m => m[1]))];
+ok(realIds.length > 15, `found ${realIds.length} real fault ids to check against`);
+const unmapped = realIds.filter(i => !L.sectionForFault(i));
+ok(unmapped.length === 0, `every fault FaultEngine can raise maps to a section${unmapped.length ? ' — missing: ' + unmapped.join(', ') : ''}`);
+const bogus = Object.keys(L.FAULT_SECTION).filter(k => !realIds.includes(k));
+ok(bogus.length === 0, `and no mapping points at a fault that does not exist${bogus.length ? ' — ' + bogus.join(', ') : ''}`);
+
+console.log('— the plan prescribes from the gated library, not from a loose list —');
+const { PracticePlan: P, FeedbackEngine: FE } = M;
+const mk = (n, o = {}) => Array.from({ length: n }, (_, i) => ({ _row: i + 2, ...shot(o) }));
+const fault = (id, rows) => ({ id, name: id, icon: '·', severity: 'high', drills: [{ name: 'fallback', desc: 'x' }],
+  affectedShots: rows });
+
+// A contact fault on 20 premium-ball shots: section A, and A opens at 10.
+const good = P.libraryDrill(fault('poor-contact', []), mk(20), null);
+ok(good.section === 'A', 'a contact fault resolves to strike quality');
+ok(good.libraryDrill !== null, 'and gets a real drill from the library');
+ok(good.structure.includes('Bandwidth'), 'carrying its section\'s structure, which is the part that transfers');
+ok(good.lockedNote === null, 'with nothing withheld');
+
+// The same fault on range balls: strike quality does not care about the ball.
+ok(P.libraryDrill(fault('poor-contact', []), mk(20, { _ball: 'range' })).libraryDrill !== null,
+   'range balls do not lock strike quality — smash does not care what ball it was');
+
+// A dispersion fault on range balls: section B is premium-only, so it locks.
+const locked = P.libraryDrill(fault('dispersion-wide', []), mk(40, { _ball: 'range' }));
+ok(locked.section === 'B', 'a dispersion fault resolves to the tail section');
+ok(locked.libraryDrill === null, 'which is entirely locked on range balls');
+ok(/2–4× wider/.test(locked.lockedNote), 'and says what would unlock it rather than substituting a drill');
+
+// A start-line fault from an unaligned unit.
+const unaligned2 = P.libraryDrill(fault('pull-left', []), mk(20, { _aligned: false }));
+ok(unaligned2.libraryDrill === null && /constant offset/.test(unaligned2.lockedNote),
+   'start-line work is withheld from an unaligned unit, with the reason');
+
+ok(Object.keys(P.libraryDrill({ id: 'not-a-fault', drills: [] }, mk(20))).length === 0,
+   'an unmapped fault falls back to the fault\'s own drill rather than guessing');
+
+console.log('— and every plan carries the wrapper that decides whether it transfers —');
+for (const m of ['faded','bandwidth','onRequest','always']) {
+  FE.setMode(m);
+  const w = P.wrapperFor(m);
+  ok(w && w.section === 'I', `${m} maps to a section-I wrapper (${w && w.name})`);
+}
+ok(/argues against/.test(P.wrapperFor('always').note),
+   'and "show every number" is told it is the setting the evidence argues against');
+ok(/matters more than/.test(P.wrapperFor('faded').note),
+   'while the rest are told the wrapper outranks the drill choice');
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

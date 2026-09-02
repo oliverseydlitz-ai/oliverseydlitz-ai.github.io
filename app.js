@@ -2684,17 +2684,32 @@ const DrillLibrary = (() => {
   const bySection = s => ALL.filter(d => d.section === s);
   const wrappers = () => bySection('I');
 
-  // Faults name a mechanism; sections name a measurement. This is the join,
-  // and it is deliberately many-to-one: several faults land on strike quality
+  // Faults name a mechanism; sections name a measurement. This is the join, and
+  // it is deliberately many-to-one: several faults land on strike quality
   // because that is where the evidence says the strokes are.
+  //
+  // Every key here is a real id from FaultEngine, checked against it. The first
+  // version of this table was written from the section headings rather than
+  // from the code, so it mapped inventions like 'open-face' and 'two-way-miss'
+  // and returned null for almost every fault the app can actually raise — a
+  // join that looks complete and joins nothing.
   const FAULT_SECTION = {
-    'poor-contact': 'A', 'thin-strike': 'A', 'low-smash': 'A', 'strike-scatter': 'A',
-    'two-way-miss': 'B', 'wide-dispersion': 'B', 'penalty-prone': 'B',
-    'start-line': 'C', 'aim': 'C',
-    'open-face': 'D', 'closed-face': 'D', 'over-the-top': 'D', 'in-to-out': 'D', 'slice': 'D', 'hook': 'D',
-    'steep-aoa': 'E', 'shallow-aoa': 'E', 'fat-strike': 'E', 'low-point': 'E',
-    'gapping': 'F', 'distance-control': 'F', 'spin-loft': 'F',
-    'speed': 'G',
+    // Strike quality — smash factor and energy transfer
+    'poor-contact': 'A', 'inconsistent-contact': 'A', 'low-ball-speed': 'A',
+    'session-fatigue': 'A',                 // A15 is the fatigue probe
+    // Dispersion tails
+    'dispersion-wide': 'B',
+    // Start line — where the ball set off, before any curve
+    'pull-left': 'C', 'push-right': 'C',
+    // Face-to-path — curvature and the spin axis it produces
+    'slice': 'D', 'hook': 'D', 'high-spin-axis': 'D', 'low-spin-axis': 'D',
+    // Low point and vertical strike — attack angle, launch height, spin loft,
+    // and the thin/fat strikes that come from the same delivery
+    'fat-shot': 'E', 'wedge-thin': 'E',
+    'driver-negative-aa': 'E', 'driver-very-steep': 'E',
+    'iron-shallow-aa': 'E', 'iron-very-steep': 'E',
+    'driver-high-launch': 'E', 'driver-low-launch': 'E', 'variable-launch': 'E',
+    'high-spin-loft': 'E', 'low-spin-loft-iron': 'E',
   };
   const sectionForFault = fid => FAULT_SECTION[fid] || null;
 
@@ -4138,8 +4153,68 @@ const PracticePlan = (() => {
         balls: Math.max(10, Math.round(minutes * 1.5)),
         drill: f.drills[0],
         alternates: f.drills.slice(1, 3),
+        ...libraryDrill(f, shots, session),
       };
     });
+  }
+
+  // ── The join to the gated library ─────────────────────────────
+  // A fault names a mechanism; a DrillLibrary section names a measurement. The
+  // fault's own drill text stays as the fallback, but the drill a plan actually
+  // prescribes now comes from the library WITH its gate checked — so the app
+  // cannot hand someone a dispersion drill off a range-ball session or a
+  // start-line drill from an unaligned unit.
+  //
+  // When the whole section is locked the plan says so instead of substituting
+  // something that happens to pass. Being told "this needs 30 shots of one club
+  // on your own ball" is a instruction; being quietly given a different drill is
+  // how a golfer ends up practising the thing that was measurable rather than
+  // the thing that was wrong.
+  function libraryDrill(fault, shots, session) {
+    const section = DrillLibrary.sectionForFault(fault.id);
+    if (!section) return {};
+    const clubs = faultClubs(fault, shots);
+    const club = clubs.length ? mode_(clubs.map(s => s.clubType)) : null;
+    const ctx = { shots: clubs, clubType: club, sessions: 1 };
+    const rows = DrillLibrary.forSection(section, ctx);
+    const open = rows.filter(r => r.ok);
+    const sec = DrillLibrary.SECTIONS[section];
+    return {
+      section, sectionName: sec.name, structure: sec.structure,
+      libraryDrill: open.length ? open[0].drill : null,
+      libraryAlternates: open.slice(1, 3).map(r => r.drill),
+      // What is not available, and the one reason that would unlock the most.
+      locked: rows.length - open.length,
+      lockedNote: open.length ? null
+        : (rows.find(r => r.reasons.length)?.reasons[0] ||
+           'No drill in this section can be run on what this session measured.'),
+    };
+  }
+
+  // Most common value — the club a fault actually lives on, rather than the
+  // first one that happened to trip it.
+  function mode_(vals) {
+    const c = {};
+    vals.forEach(v => { if (v) c[v] = (c[v] || 0) + 1; });
+    return Object.keys(c).sort((a, b) => c[b] - c[a])[0] || null;
+  }
+
+  // The section-I wrapper that matches how the golfer has the app set up. These
+  // are the highest-evidence items in the research base and they apply over
+  // whatever drill is running, so a plan that lists drills without one is
+  // missing the part that decides whether any of it transfers.
+  function wrapperFor(mode = FeedbackEngine.getMode()) {
+    const byMode = { faded: 'i95', bandwidth: 'i96', onRequest: 'i98', always: 'i95' };
+    const d = DrillLibrary.byId(byMode[mode] || 'i95');
+    if (!d) return null;
+    return {
+      ...d,
+      note: mode === 'always'
+        ? 'Your feedback is set to show every number, which is the one setting the evidence argues against. ' +
+          'Run this wrapper over the session and change the setting when you are ready.'
+        : 'This is how the session is run, not what is in it — and on the evidence it matters more than ' +
+          'which drill above you pick.',
+    };
   }
 
   // A block that belongs in every session regardless of fault, because the
@@ -4161,7 +4236,7 @@ const PracticePlan = (() => {
     };
   }
 
-  return { generate, transferBlock, scoringWeight };
+  return { generate, transferBlock, scoringWeight, libraryDrill, wrapperFor };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5470,6 +5545,7 @@ const UI = (() => {
     const blocks = [...plan, transfer];
     const total = blocks.reduce((a,b)=>a+b.minutes,0);
     const balls = blocks.reduce((a,b)=>a+(b.balls||0),0);
+    const wrapper = PracticePlan.wrapperFor();
     el.innerHTML = `
       <div class="plan-intro">A ${total}-minute, ${balls}-ball session, weighted by how much each fault is
         likely costing you — severity, how often it recurred, and how much the clubs it appeared on matter
@@ -5479,10 +5555,26 @@ const UI = (() => {
           <div class="plan-num">${i+1}</div>
           <div class="plan-body">
             <div class="plan-head"><span>${p.icon} ${Sanitize.escape(p.name)}</span><span class="plan-min">${p.minutes} min · ${p.balls} balls</span></div>
-            <div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>
+            ${p.libraryDrill
+              ? `<div class="plan-drill"><strong>${Sanitize.escape(p.libraryDrill.name)}:</strong>
+                   ${Sanitize.escape(p.libraryDrill.desc)}</div>
+                 <div class="plan-gate">${Sanitize.escape(p.sectionName)} · ${Sanitize.escape(p.structure)}</div>`
+              : `<div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>`}
+            ${p.lockedNote
+              ? `<div class="plan-locked">Nothing in the ${Sanitize.escape(p.sectionName || 'matching')} section can be
+                   run on what this session measured. ${Sanitize.escape(p.lockedNote)}</div>`
+              : ''}
             ${p.evidence ? `<div class="plan-evidence">${Sanitize.escape(p.evidence)}</div>` : ''}
           </div>
         </div>`).join('')}
+      ${wrapper ? `<div class="plan-item plan-wrapper">
+          <div class="plan-num">↻</div>
+          <div class="plan-body">
+            <div class="plan-head"><span>Over the whole session</span><span class="plan-min">wrapper</span></div>
+            <div class="plan-drill"><strong>${Sanitize.escape(wrapper.name)}:</strong> ${Sanitize.escape(wrapper.desc)}</div>
+            <div class="plan-evidence">${Sanitize.escape(wrapper.note)}</div>
+          </div>
+        </div>` : ''}
       <div class="plan-note">${Sanitize.escape(CoachingMode.PROTOCOL.note)}</div>`;
     applyPaywall(el, "Sign in to unlock your personalised practice plan");
   }

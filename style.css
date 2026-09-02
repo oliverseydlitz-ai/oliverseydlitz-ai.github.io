@@ -832,6 +832,10 @@ body.modal-open { overflow: hidden; }
 .fb-hidden{color:var(--text-muted);opacity:.45;text-align:center;letter-spacing:.2em}
 .fb-row-hidden{cursor:pointer}
 .fb-row-hidden:hover td{background:var(--surface2)}
+.plan-gate{margin-top:.35rem;font-size:.72rem;line-height:1.45;color:var(--text-muted)}
+.plan-locked{margin-top:.4rem;padding-left:.7rem;border-left:2px solid var(--yellow);
+  font-size:.75rem;line-height:1.5;color:var(--text-dim)}
+.plan-item.plan-wrapper{border-left-color:var(--pine)}
 .fb-cal{margin-top:.45rem;padding-left:.7rem;border-left:2px solid var(--pine);
   font-size:.75rem;line-height:1.5;color:var(--text-dim)}
 .fb-cal.pending{border-left-color:var(--text-muted);color:var(--text-muted)}
