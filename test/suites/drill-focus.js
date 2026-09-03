@@ -68,7 +68,11 @@ const sess = mk('p', [
   ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 40,
     ...shot({ clubType: '6i', attackAngle: 2.5, smashFactor: 1.35, ballSpeed: 88, clubSpeed: 65 }) })),
 ]);
-const plan = PP.generate(sess.shots, sess);
+// generate(shots, totalMin, session). The first version of this passed the
+// session as `totalMin`, which made every block's minutes and balls NaN — and
+// this suite still passed, because it only asserted on the drills. Two live
+// call sites had the same mistake.
+const plan = PP.generate(sess.shots, 45, sess);
 const blocks = Array.isArray(plan) ? plan : (plan.blocks || plan.items || []);
 const withDrill = blocks.filter(b => b && b.drill);
 ok(withDrill.length >= 2, `the plan produced ${withDrill.length} blocks with a drill`);
@@ -80,6 +84,12 @@ for (const b of withDrill) {
 }
 ok(withDrill.every(b => typeof b.drillIsFeel === 'boolean'),
    'and every block says which case it is, so the renderer can caveat it');
+ok(withDrill.every(b => Number.isFinite(b.minutes) && b.minutes > 0),
+   'every block has real minutes, not NaN');
+ok(withDrill.every(b => Number.isFinite(b.balls) && b.balls > 0),
+   'and real balls — volume past attention is exercise, so the count has to exist');
+ok(withDrill.reduce((a2, b) => a2 + b.minutes, 0) <= 60,
+   'and the whole plan fits in the time it was asked for');
 
 // low-ball-speed is the one that made this concrete: "Lag preservation — hold
 // your wrist angle" was drills[0], with "Towel swings" (an audible whoosh, and

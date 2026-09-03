@@ -6425,7 +6425,7 @@ const UI = (() => {
     renderGapping(_session.shots, _session);
     renderLaunchWindows(shots);
     renderFaultCards(shots);
-    renderPracticePlan(shots);
+    renderPracticePlan(shots, _session);
     renderBenchTable(shots);
     renderShotTable(shots);
   }
@@ -6719,10 +6719,13 @@ const UI = (() => {
   }
 
   // ── Practice plan ─────────────────────────────────────────────
-  function renderPracticePlan(shots) {
+  function renderPracticePlan(shots, session) {
     const el = document.getElementById('practicePlan');
     if (!el) return;
-    const plan = PracticePlan.generate(shots);
+    // The session has to be passed. `generate(shots)` left `session` null, so
+    // `detectFaults` inside it received no conditions and could not apply the
+    // range-ball or alignment gates — on the app's headline practice feature.
+    const plan = PracticePlan.generate(shots, 45, session);
     // "Grooving" is the vocabulary of a claim the research base rejects: no
     // study supports a rep or week count that automatises a change, and the
     // word implies one. It also reads as "nothing here", when what the engine
@@ -9154,42 +9157,41 @@ async function init() {
     document.getElementById('efficiencyModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions yet'); return; }
-    const efficiency = PracticeEfficiency.calculateEfficiency(sessions);
-    if (!efficiency) { toast('Unable to calculate'); return; }
+    const esc = t => Sanitize.escape(String(t));
+    const latest = sessions[0];
+    const st = PracticeEfficiency.structure(latest);
+    const vol = PracticeEfficiency.volume(latest);
 
     const html = `
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;padding:1.5rem">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            ⚡ Practice Efficiency
+        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem">
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
+            ⚡ How you practised
             <button data-close="efficiencyModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
+          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">Your last session, read off the order you hit in</div>
           <div style="display:grid;gap:1rem">
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Rating</div>
-              <div style="font-size:2rem;font-weight:800;color:#4ade80">${efficiency.efficiencyRating}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem">
+            ${st.ok ? `
               <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Sessions (recent 5)</div>
-                <div style="font-size:1.6rem;font-weight:800">${efficiency.recentSessions}</div>
+                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Order</div>
+                <div style="font-size:1.8rem;font-weight:800;text-transform:capitalize">${esc(st.mode)}</div>
+                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">
+                  The club changed on ${Math.round(st.rate * 100)}% of shots — ${st.switches}
+                  change${st.switches === 1 ? '' : 's'} across ${st.shots} shots of ${st.clubs} clubs.</div>
               </div>
-              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Total Shots</div>
-                <div style="font-size:1.6rem;font-weight:800">${efficiency.totalShots}</div>
-              </div>
-              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Shots/Hour</div>
-                <div style="font-size:1.6rem;font-weight:800">${efficiency.shotsPerHour}</div>
-              </div>
-              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:.3rem">Avg Quality</div>
-                <div style="font-size:1.6rem;font-weight:800">${efficiency.avgQuality}/100</div>
-              </div>
-            </div>
-            <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-weight:600;margin-bottom:.4rem">💡 Recommendation</div>
-              <div style="font-size:.95rem;color:var(--text)">${efficiency.recommendation}</div>
+              <div class="tail-note">${esc(st.note)}</div>
+              <div class="tail-note">${esc(st.caveat)}</div>`
+            : `<div class="tail-note">${esc(st.why)}</div>`}
+            ${vol ? `<div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Volume</div>
+                <div style="font-size:1.6rem;font-weight:800">${vol.shots}${vol.prescribed ? ` <small style="font-weight:400;color:var(--text-dim)">vs ${vol.prescribed} prescribed</small>` : ''}</div>
+                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">${esc(vol.note)}</div>
+              </div>` : ''}
+            <div class="tail-note">
+              <strong>There is no efficiency score here, because there is no clock.</strong> This app has never
+              recorded how long a session took, and the figure that used to sit at the top of this modal
+              divided by an assumed hour per session — which made every golfer "Low", including one striking
+              it at 96 out of 100.
             </div>
           </div>
         </div>
@@ -10585,38 +10587,92 @@ const ClubAnalyzer = (() => {
 // PracticeEfficiency — Calculate quality vs quantity metrics
 // ════════════════════════════════════════════════════════════════
 const PracticeEfficiency = (() => {
-  function calculateEfficiency(sessions) {
-    if (!sessions.length) return null;
+  // What was here could only ever return one answer.
+  //
+  //   totalTime = recent.length * 1;            // "assume 1 hour per session"
+  //   ratio = (quality/100) * (shots/(time*60));
+  //
+  // Quality over 100 is at most 1, and shots-per-minute for a real session is
+  // well under 1, so `ratio` rounds to 0 or 1 — while the bands it is then
+  // tested against are 80 / 60 / 40. **Every golfer got "Low"**, rendered at
+  // 2rem in green, including one striking it at 96/100. The hours were
+  // invented outright: the app has never recorded how long a session took.
+  //
+  // Efficiency needs time and the app has none. What it DOES have, on every
+  // shot, is the club and the order it was hit in — and that is the
+  // contextual-interference variable, one of the three methods the 2024 review
+  // of 52 RCTs named superior within its strategy. Nothing else in the app
+  // computes it, and it is measured rather than assumed.
+  const BLOCKED = 0.15;   // almost every shot the same club as the last
+  const VARIED  = 0.60;   // most shots a different club from the last
 
-    const recent = sessions.slice(0, 5);
-    const allShots = recent.flatMap(s => s.shots);
-    const totalTime = recent.length * 1; // assume 1 hour per session
-
-    const scores = allShots.map(ShotScorer.score).filter(x=>x!==null);
-    const qualityScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
-    const shotCount = allShots.length;
-    const efficiencyRatio = Math.round((qualityScore / 100) * (shotCount / (totalTime * 60)));
-
-    return {
-      recentSessions: recent.length,
-      totalShots: shotCount,
-      avgQuality: qualityScore,
-      hoursSpent: totalTime,
-      shotsPerHour: Math.round(shotCount / totalTime),
-      qualityPerHour: Math.round((qualityScore * shotCount) / (totalTime * 100)),
-      efficiencyRating: efficiencyRatio > 80 ? 'Excellent' : efficiencyRatio > 60 ? 'Good' : efficiencyRatio > 40 ? 'Fair' : 'Low',
-      recommendation: generateEfficiencyRecommendation(efficiencyRatio, shotCount, qualityScore),
-    };
+  // Shots in the order they were hit. `_row` is the CSV row, which is hit
+  // order; without it there is no order to read and the answer is "cannot say"
+  // rather than whatever the array happens to be sorted by.
+  function inHitOrder(shots) {
+    const list = (shots || []).filter(s => s && s.clubType);
+    if (!list.length) return null;
+    if (!list.every(s => Number.isFinite(s._row))) return null;
+    return [...list].sort((a, b) => a._row - b._row);
   }
 
-  function generateEfficiencyRecommendation(ratio, shotCount, quality) {
-    if (ratio > 80) return '🎯 Great focus! Keep up the intentional practice.';
-    if (shotCount > 500 && quality < 60) return '📈 Try fewer, more focused shots. Quality > Quantity.';
-    if (quality > 80 && shotCount < 200) return '💪 You\'re doing well! Add more volume to solidify skills.';
-    return '⚡ Mix it up: balance quality feedback with practice volume.';
+  function structure(session) {
+    const ordered = inHitOrder(session && session.shots);
+    if (!ordered) return { ok: false, why: 'This session has no shot order recorded, so how it was run cannot be read.' };
+    const clubs = new Set(ordered.map(s => s.clubType));
+    if (clubs.size < 2) return { ok: false, single: true, club: ordered[0].clubType,
+      why: `Every shot was a ${clubLabel(ordered[0].clubType)}. Ordering only means something once there is ` +
+           `more than one club to order.` };
+    if (ordered.length < Metrics.MIN_SHOTS_REPORT) return { ok: false,
+      why: `${Metrics.MIN_SHOTS_REPORT - ordered.length} more shots before the shape of a session is worth reading.` };
+
+    let switches = 0;
+    for (let i = 1; i < ordered.length; i++) if (ordered[i].clubType !== ordered[i - 1].clubType) switches++;
+    const rate = switches / (ordered.length - 1);
+    const mode = rate <= BLOCKED ? 'blocked' : rate >= VARIED ? 'varied' : 'mixed';
+
+    // The finding, and the reviewers' own limitation with it. Random order
+    // tests WORSE within the session and better a day later — which is the
+    // same guidance-hypothesis point the feedback schedule rests on, so a
+    // blocked session feeling better is exactly what the evidence predicts.
+    const note = mode === 'blocked'
+      ? 'Blocked practice — one club at a time. It feels better during the session and, in the trials, ' +
+        'tests worse a day later. That is the same effect the feedback schedule is built around.'
+      : mode === 'varied'
+      ? 'Varied order — the club changed on most shots. That is contextual interference, one of the three ' +
+        'methods the 2024 review named superior, and it is meant to feel worse at the time.'
+      : 'A mix — some blocks, some switching. Worth knowing which half of the session was which.';
+
+    return { ok: true, mode, rate, switches, shots: ordered.length, clubs: clubs.size, note,
+      // The order the evidence actually supports: something repeatable first,
+      // then vary it. Random order before anything is repeatable is just
+      // missing in a varied sequence — `ShortGame.session()` builds the same way.
+      caveat: 'Over half the 52 trials in that review were underpowered and most used novices on simple ' +
+              'putting tasks. And varying comes after something repeatable, not instead of it.' };
   }
 
-  return { calculateEfficiency };
+  // Volume, stated against what the plan asked for rather than against an
+  // invented hour. `PracticePlan` prescribes balls as well as minutes because
+  // volume past attention is exercise rather than practice.
+  function volume(session, shots) {
+    const n = ((session && session.shots) || shots || []).length;
+    if (!n) return null;
+    let prescribed = null;
+    try {
+      // generate(shots, totalMin, session) — passing the session as `totalMin`
+      // made every block's minutes and balls NaN.
+      const plan = PracticePlan.generate(session.shots, 45, session);
+      const blocks = Array.isArray(plan) ? plan : (plan.blocks || plan.items || []);
+      prescribed = blocks.reduce((a, b) => a + (b.balls || 0), 0) || null;
+    } catch (_) {}
+    return { shots: n, prescribed,
+      note: prescribed
+        ? `The plan for what this session found asks for ${prescribed} balls. Volume past attention is ` +
+          `exercise rather than practice — which is why the plan counts balls and not just minutes.`
+        : 'No plan to compare against yet — nothing recurred often enough to prescribe for.' };
+  }
+
+  return { structure, volume, BLOCKED, VARIED };
 })();
 
 // ════════════════════════════════════════════════════════════════
