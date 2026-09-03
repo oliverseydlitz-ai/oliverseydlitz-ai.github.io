@@ -4168,7 +4168,7 @@ const FaultEngine = (() => {
         {name:'Divot board drill',desc:'Practice on a divot board or place a towel 3 inches behind the ball. Avoid hitting the towel. Forces a ball-first strike pattern.',focus:'external'},
         {name:'Step-through drill',desc:'After impact, step through with the trail foot so both feet finish facing the target. Forces weight transfer to lead side before impact.',focus:'feel'},
       ],
-      optimalRange: () => 'Attack angle -2° to -5° (irons)',
+      optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
 
     // ── PATH & FACE (D-PLANE) ──────────────────────────────────
@@ -4191,7 +4191,7 @@ const FaultEngine = (() => {
         {name:'Draw finish drill',desc:'Exaggerate rolling the forearms over through impact so the toe of the club passes the heel. "Shake hands with the target" feel at P7.',focus:'feel'},
         {name:'Split hand drill',desc:'Hit balls with 6 inches of space between hands on the grip. The disconnection makes it obvious if the hands are not releasing — forces proper forearm rotation.',focus:'setup'},
       ],
-      optimalRange: () => 'Face-to-path within ±5°',
+      optimalRange: () => `Face-to-path ${Benchmarks.TARGET.faceToPath.label}`,
     },
 
     {
@@ -4209,7 +4209,7 @@ const FaultEngine = (() => {
         {name:'High finish drill',desc:'Practice finishing with your lead arm pointing at the sky (not wrapped around your body). High finish = face staying square longer through impact zone.',focus:'feel'},
         {name:'Alignment stick in ground',desc:'Stick an alignment stick in the ground 2 feet right of the target. Deliberately try to start the ball at the stick. Trains a more neutral-to-right path, opening the face relative to path.',focus:'external'},
       ],
-      optimalRange: () => 'Face-to-path within ±5°',
+      optimalRange: () => `Face-to-path ${Benchmarks.TARGET.faceToPath.label}`,
     },
 
     {
@@ -4267,7 +4267,7 @@ const FaultEngine = (() => {
         {name:'Headcover behind ball',desc:'Place a headcover 4 inches directly behind the teed ball. Swing and miss the headcover completely. Forces an upward, sweeping strike.',focus:'external'},
         {name:'Tee height experiment',desc:'Tee the ball so half of it is above the crown of the driver. Low tee = forced downward hit. High tee = naturally promotes an upward strike. Work progressively higher.',focus:'external'},
       ],
-      optimalRange: () => '+2° to +5° attack angle for driver',
+      optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
 
     {
@@ -4283,7 +4283,7 @@ const FaultEngine = (() => {
         {name:'Right elbow slot drill',desc:'At the top, feel your right elbow drop to your right hip BEFORE the club moves. This shallows the plane and prevents the steep chop.',focus:'feel'},
         {name:'Pump drill',desc:'Take the club to the top, then pump the downswing halfway (stopping at hip height) three times before completing. Trains the shallow transition feel.',focus:'feel'},
       ],
-      optimalRange: () => '+2° to +5° attack angle for driver',
+      optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
 
     {
@@ -4303,7 +4303,7 @@ const FaultEngine = (() => {
         {name:'Divot after the ball',desc:'Place a £1 coin on the grass 3 inches in front of the ball. Try to hit the coin with your divot after striking the ball. Proves ball-first, then turf contact.',focus:'external'},
         {name:'Lead wrist flat',desc:'At impact, your lead wrist should be flat or slightly bowed — not cupped (bent back). A cupped lead wrist is the #1 cause of scooping. Use an impact bag to practice.',focus:'feel'},
       ],
-      optimalRange: () => '-2° to -5° attack angle for irons',
+      optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
 
     {
@@ -4319,7 +4319,7 @@ const FaultEngine = (() => {
         {name:'Hip turn start',desc:'Initiate the downswing by rotating the hips, not pulling with the arms. Feel the trail hip pocket move toward the target. Arms naturally shallow when hips lead.',focus:'feel'},
         {name:'Swing to 3 o\'clock',desc:'Practice half-swings, stopping the club level with the ground on the follow-through. This promotes a more rounded, on-plane swing and removes the steep chop.',focus:'external'},
       ],
-      optimalRange: () => '-2° to -5° attack angle for irons',
+      optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
 
     // ── LAUNCH CONDITIONS ──────────────────────────────────────
@@ -4339,10 +4339,11 @@ const FaultEngine = (() => {
         {name:'Positive attack angle (key fix)',desc:'Fix negative attack angle first (see attack angle fault). Launch angle is largely a downstream result of attack angle on driver.',focus:'external'},
         {name:'Tee it up higher',desc:'Rule of thumb: half the ball should be above the crown at address. Higher tee naturally promotes higher launch and positive attack angle.',focus:'external'},
       ],
-      optimalRange: cs => {
-        const s = cs || 95;
-        return s > 105 ? '10–12° launch' : s > 95 ? '11–13° launch' : '12–15° launch';
-      },
+      // `optimalRange` is called with a CLUB TYPE. This treated it as a club
+      // speed — `'d' > 105` is false, `'d' > 95` is false — so the
+      // "speed-dependent" band never varied and always returned the loosest
+      // of three private copies, none of which matched `Benchmarks.TARGET`.
+      optimalRange: t => `${Benchmarks.targetsFor(t).launch.label} launch`,
     },
 
     {
@@ -4356,7 +4357,7 @@ const FaultEngine = (() => {
         {name:'Lower tee test',desc:'Drop tee height so only 1/4 of the ball is above the crown. Note how trajectory flattens. Find the tee height that gives your peak trajectory without ballooning.',focus:'external'},
         {name:'Shoulder tilt check',desc:'Excessive spine tilt away from target creates high dynamic loft. Maintain natural shoulder tilt (~5° from horizontal) rather than exaggerating.',focus:'setup'},
       ],
-      optimalRange: () => '10–15° for most swing speeds',
+      optimalRange: t => `${Benchmarks.targetsFor(t).launch.label} launch`,
     },
 
     // ── SPIN (when available) ──────────────────────────────────

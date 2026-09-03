@@ -115,6 +115,23 @@ console.log('— and the target bands have exactly one copy —');
   const bench = code.slice(benchStart, src.indexOf('  // ── Shot log', benchStart));
   ok(/targetsFor\(/.test(bench), 'the benchmark table reads the bands rather than restating them');
   ok(!/uAA\s*[<>]=/.test(bench), 'and has no inline attack-angle comparison of its own left');
+
+  // `optimalRange` states a TARGET, which is Benchmarks' job — it is not a
+  // fault trigger, so the FaultEngine exemption above does not cover it. Ten
+  // of them restated a band as a literal string, and two of those disagreed
+  // with the real one: face-to-path said ±5° against TARGET's ±2°, and a
+  // "swing-speed dependent" launch band held three more private copies AND
+  // never fired, because `optimalRange` is called with a CLUB TYPE and it
+  // compared that string to 105.
+  const ranges = [...src.matchAll(/optimalRange:\s*[^,]*?=>\s*([^\n]*)/g)].map(m => m[1]);
+  ok(ranges.length >= 15, `read ${ranges.length} optimalRange bodies`);
+  const ANGLE_LITERAL = /[-+±]?\d+(?:\.\d+)?\s*°/;
+  const literal = ranges.filter(r => ANGLE_LITERAL.test(r) && !/Benchmarks\.|spinLoftBand/.test(r));
+  ok(literal.length <= 4,
+     `at most the four with no TARGET entry state a band as a literal (${literal.length}): ` +
+     literal.map(r => r.trim().slice(0, 42)).join(' | '));
+  ok(!ranges.some(r => /[<>]=?\s*\d{2,}/.test(r)),
+     'and none compares its argument to a number — it receives a club type, not a speed');
 }
 
 console.log('— and no replaced formula is still in use anywhere —');
