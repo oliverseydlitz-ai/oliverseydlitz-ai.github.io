@@ -25,9 +25,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 ### Single-Page App (SPA)
-- **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 58 feature modules
-- **style.css** (~2100 lines) — Design system; mobile-first, dark theme
+- **index.html** (~920 lines) — Main structure; nav, views, modals, toast system
+- **app.js** (~12,250 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 58 feature modules
+- **style.css** (~2,470 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
 
@@ -48,7 +48,8 @@ to hand someone starting cold.
 2. **Measurement foundation** — `Metrics` (trust tiers, sample floors,
    `interval()`, `typicalError()`, `changeIsReal()`, `CEILING`), `Conditions`
    (ball + surface, and what they invalidate), `Spin` (suppressed without an
-   RPT ball), `FeedbackEngine` (the guidance-hypothesis schedule),
+   RPT ball), `FeedbackEngine` (the guidance-hypothesis evidence and the range
+   wrapper it points at — NOT a display setting; see its section),
    `RetentionProbe` (the app's only efficacy metric), `PracticeLog` (the only
    record of what the golfer actually did — see below), `MeasurementReference`,
    `SetupGuide`
@@ -70,7 +71,8 @@ to hand someone starting cold.
    target bands), `Insights`, `InsightEngine`, `Analytics` (yardage book +
    `conditionGroups`), `Trajectory`, `ClubAnalyzer`, `Dispersion` (tail engine
    and the app's only strokes valuation), `Strike` (smash / strike quality),
-   `QuietEye` (putting, no device), `DrillLibrary` (104 gated drills),
+   `QuietEye` (putting, no device), `DrillLibrary` (104 gated entries, of which
+   79 are drills — see its section),
    `ShortGame` (20 putting and chipping drills), `Rounds` (on-course data)
 
 5. **Coaching / practice** — `PracticePlan`, `CoachingMode`,
@@ -597,7 +599,7 @@ the first session read as the app being broken rather than careful.
 
 **Every number and claim in it is read from the module that owns it** —
 `Metrics.TIER` (all three tiers, enumerated from the table), the sample floors,
-`FeedbackEngine.MODES[getMode()]` (the mode actually set, in its own words),
+`FeedbackEngine.WHY_SHOWN` (verbatim, so the screen and the module cannot drift),
 `Conditions.BALLS`, `RetentionProbe.MAX_GAP_DAYS`, `ShortGame.ALL.length`. Not
 one is typed into the module. An orientation screen is the **easiest place in a
 codebase to ship a fabricated constant**: nothing downstream consumes the text,
@@ -954,15 +956,32 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`test/browser/` holds two checks that are **not** in `npm test` — they need
-Playwright and a served site. Run `test/browser/render-scan.js` after touching
-any render path: it renders every view and greps the DOM for `NaN` /
-`undefined` / `[object Object]`. A red home-screen alert read "NaN% of recent
-shots" for an unknown length of time and every unit suite passed, because the
-function under test returned a well-formed object and the bug lived entirely
-in the template literal reading a field off it. `sync.sh` builds the served
-mirror and refuses to finish if a CDN tag survives the rewrite — that mirror
-went stale once and reported a rewritten feature's old text.
+`npm test` runs **52 suites**. `test/browser/` holds checks that are **not** in
+it — they need Playwright (`npm i --no-save playwright-core`) and a served
+mirror.
+
+**Run `test/browser/render-scan.js` after touching any render path or any CSS.**
+It does three things at a 393px viewport (an iPhone 15 Pro), and **exits
+non-zero on any of them**:
+
+1. Greps every view for `NaN` / `undefined` / `[object Object]`. A red
+   home-screen alert read "NaN% of recent shots" for an unknown length of time
+   while every unit suite passed, because the function under test returned a
+   well-formed object and the bug lived entirely in the template literal
+   reading a field off it.
+2. Measures **horizontal overflow** per view. Nothing in jsdom can see this — it
+   only exists once a real engine has applied CSS.
+3. Collects page errors.
+
+It **used to only print**, so its exit status was 0 whatever it found and
+"render scan clean" meant "the scan ran". Do not reintroduce that: a check that
+cannot fail is not a check.
+
+The workflow is: edit → `bash test/browser/sync.sh` → serve
+`test/browser/site/` → run the scan. **Forgetting the sync is the classic
+mistake** — you then measure the previous version and conclude a fix did not
+work. `sync.sh` also refuses to finish if a CDN tag survives the rewrite; that
+mirror went stale once and reported a rewritten feature's old text.
 
 `test/run.js` does two things, in this order, and the order is the point:
 
@@ -1232,7 +1251,68 @@ to re-enable the on-screen banner.
   `targetsFor(club)`. The launch-window table used to hardcode them inline,
   which is how the tour average and the target got conflated the first time.
 
-**Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-58 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
-Repo audited end-to-end: no stray files, no non-golf content, only `main` +
-active branches exist.
+## Where things stand (read this first in a new session)
+
+State at handover: `main` and `claude/codebase-review-continuation-dw5cgd` are
+identical, working tree clean, **52 suites green**, render scan passing, service
+worker at **v132**, 58 modules.
+
+### Open, and NOT fixable from this repo
+
+1. **Check the Supabase redirect allowlist.** Auth → URL Configuration. This is
+   the highest-value unchecked item and there is no MCP tool that can read it.
+   It matters because OAuth uses the **implicit flow**, which returns the access
+   token in the URL *fragment* — a wildcard in the allowlist means a crafted
+   Google login link can deliver a live token to somebody else's domain. Site
+   URL should be `https://oliverseydlitz-ai.github.io` and the redirect list
+   should contain that (plus `http://localhost:*` for local dev) and nothing
+   loose.
+2. **Leaked-password protection is off** — Auth → Providers → Email. It is the
+   only outstanding Supabase security advisor.
+3. **The project auto-pauses** after ~7 days idle on the free tier. Cloud reads
+   then fail for signed-in users. The app now says so (`Store.cloudStatus`), but
+   the cure is a paid plan or regular use.
+
+### Known and deliberately not done
+
+- **Session tokens live in `localStorage`.** HttpOnly cookies need a server to
+  set them and this is a static site. Moving to **PKCE** would stop the token
+  appearing in the URL at all and is the real fix, but it is a genuine refactor
+  of the login path — `purgeAuthStorage()` wipes the PKCE verifier, which is why
+  implicit flow was chosen in the first place. Do not half-do it.
+- **Rate limiting and password hashing are Supabase defaults and were never
+  verified for this project.** Do not claim they are configured; the honest
+  statement is "documented default, unverified". Testing it by hammering the
+  live auth endpoint is not acceptable.
+- **The logo and the app disagree.** `favicon.svg` (and the PNGs rendered from
+  it) are pine green `#0b4d2e`; the app is `#0c0c0d` with a `#dc2626` accent.
+  Oliver has not chosen a direction — do not unify it unprompted.
+
+### Things this session got wrong, so the next one does not repeat them
+
+- **Reading a Supabase project while it is `COMING_UP` returns nonsense.** It
+  reported 0 tables and 0 users on a database that has 10 users and 9 rows, and
+  that was reported to Oliver as fact before being retracted. Wait for `status`
+  to leave `COMING_UP` before concluding anything.
+- **A browser check that only prints is not a check.** `render-scan` was
+  reported as passing for most of a session when its exit code was 0 by
+  construction.
+- **Verify a new guard against the real defect.** The overflow check was proved
+  by putting the bug back — and reintroducing *one* of the three misplaced hosts
+  did **not** reproduce it, because a single flex item shrinks enough to fit.
+  A control built from one element would have looked fine and caught nothing.
+- **Source-scanning checks match their own explanatory comments.** This has bitten
+  three times now (the `+3° ideal` check, the module count, the "When to show your
+  numbers" string). Strip comments before scanning, or anchor on the claim.
+- **`module-map.js` reads any backticked name in a `###` heading as a module.**
+  `renderSince` and `authLog` both broke the suite that way. Put function names
+  in prose, not in headings.
+
+`HANDOVER.md` is a point-in-time narrative from earlier the same day. It is not
+wrong, but **this file is the authority** — where they differ, CLAUDE.md wins.
+
+**Last updated:** September 2026 — ShotLab v3. 58 modules, 52 test suites,
+service worker v132. Deterministic auth, cloud sync behind verified row-level
+security, dark mode, installable PWA, printable yardage card, full SEO and
+crawlability layer. Repo audited end-to-end: no stray files, no non-golf
+content, only `main` + active branches exist.
