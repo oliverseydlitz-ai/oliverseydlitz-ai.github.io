@@ -2370,3 +2370,10 @@ html.range-open, html.range-open body { overflow: hidden; }
 .session-tag{padding:.15rem .45rem;font:inherit;font-size:.7rem;font-weight:600;border:1px solid var(--border);
   border-radius:999px;background:transparent;color:var(--text-muted);cursor:pointer}
 .session-tag:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Correcting the alignment flag ────────────────────────────────
+   A caveat that names what is withheld and offers no way to answer it
+   is a dead end. Sized as a quiet link, not a call to action: it is a
+   claim about what happened, not a setting to flip. */
+.caveat-fix{margin-top:.7rem}
+.caveat-fix .link-btn{font-size:.78rem}

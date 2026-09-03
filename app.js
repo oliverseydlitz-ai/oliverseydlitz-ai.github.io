@@ -1343,7 +1343,29 @@ const Store = (() => {
     await LocalDB.forget(id);
     if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
   }
-  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp };
+  // Correcting a session's alignment flag after the fact.
+  //
+  // The checkbox only exists during import, so a golfer who levelled the unit
+  // and forgot to tick it had no route back — and the app went on withholding
+  // the absolute miss from data that could support it, forever, with no way to
+  // say so. The reverse matters as much: someone who ticked it out of habit
+  // needs to be able to take it back, because a falsely-confirmed alignment is
+  // the most expensive wrong flag in the file. Bias is the error that more
+  // shots cannot remove.
+  //
+  // One write path, and it RE-STAMPS: every gate downstream reads `_aligned`
+  // off the shot, not the session, so changing the session alone would leave
+  // the flag correct in storage and wrong in every calculation.
+  async function setAlignment(id, confirmed) {
+    const sn = await getSession(id);
+    if (!sn) return null;
+    sn.conditions = { ...(sn.conditions || {}), alignment: confirmed ? 'confirmed' : 'unknown' };
+    stamp(sn);
+    await saveSession(sn);
+    return sn;
+  }
+
+  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp, setAlignment };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -7428,10 +7450,51 @@ const UI = (() => {
     if (vol) notes.push(vol);
     if (!notes.length) { el.innerHTML = ''; el.hidden = true; return; }
     el.hidden = false;
+    // The alignment flag is the one condition a golfer can correct afterwards.
+    // Ball and surface are facts about the session that cannot be re-observed;
+    // whether they levelled the unit that day is something they know and the
+    // import form only ever asked once. Without this the caveat above is a
+    // dead end: it names what is being withheld and offers no way to answer it.
+    const isAligned = Conditions.aligned(session);
     el.innerHTML = `<div class="caveat-block">
         <div class="caveat-head">Before you read these numbers</div>
         ${notes.map(n => `<div class="caveat-item">${Sanitize.escape(n)}</div>`).join('')}
+        <div class="caveat-fix">
+          <button class="link-btn" id="fixAlignment" data-on="${isAligned ? '1' : '0'}">
+            ${isAligned
+              ? 'Actually, I did not align the unit that session →'
+              : 'I did align the unit that session →'}</button>
+        </div>
       </div>`;
+
+    document.getElementById('fixAlignment')?.addEventListener('click', () => {
+      const turningOn = !isAligned;
+      // Deliberately not a silent toggle. This is a claim about what happened
+      // on a particular day, and it changes which prescriptions the app is
+      // willing to make — so it is confirmed in the same words the setup guide
+      // uses, with the cost of getting it wrong stated rather than implied.
+      showConfirm(
+        turningOn ? 'Confirm alignment for this session' : 'Withdraw the alignment confirmation',
+        turningOn
+          ? 'Only do this if you actually levelled the unit and set the target line with Impact Vision ' +
+            'that day. Confirming unlocks start-line and face-to-path work at 10 shots instead of 30 — ' +
+            'and if the unit was not aligned, every one of those readings is shifted by the same amount ' +
+            'in the same direction. That is bias, and unlike random error, more shots will not remove it: ' +
+            'the app just gets more confident in the wrong answer.'
+          : 'This session will go back to being read as unaligned. Start-line work returns to the larger ' +
+            'sample, and the absolute miss is withheld again — the spread is unaffected, since an aiming ' +
+            'error cancels out of it.',
+        () => {
+          Store.setAlignment(session.id, turningOn)
+            .then(updated => {
+              if (!updated) { toast('Could not update that session.'); return; }
+              _session = updated;
+              toast(turningOn ? 'Alignment confirmed for this session' : 'Alignment confirmation withdrawn');
+              renderDetail(updated);
+            })
+            .catch(err => { console.error('alignment', err); toast('Could not update that session.'); });
+        });
+    });
   }
 
   function renderInsights(shots) {
@@ -7616,7 +7679,8 @@ const UI = (() => {
         ${t.bias === null
           ? `<div class="tail-note">Spread is measured around your own centre, so it survives a misaligned unit
                — an aiming error shifts every shot by the same amount and cancels out. How far that centre sits
-               from the target does not, so it is not shown until you confirm alignment.</div>`
+               from the target does not, so it is not shown until you confirm alignment. If you did level the
+               unit that session, you can say so at the top of this page.</div>`
           : `<div class="tail-item">Your centre sits ${fmt(Math.abs(t.bias), 1)}°
                ${t.bias > 0 ? 'right' : 'left'} of the target line, on a confirmed alignment.</div>`}
         ${value}

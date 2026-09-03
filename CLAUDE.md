@@ -554,6 +554,28 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
   session's conditions (they answer "how am I hitting it now"). A test pins
   that they disagree on the same data.
 
+### Correcting the alignment flag (`Store.setAlignment`)
+
+The alignment checkbox only exists during import, so a golfer who levelled the
+unit and forgot to tick it had no route back — and `Dispersion` went on
+withholding the absolute miss from data that could support it, forever. The
+caveat named what was withheld and offered no way to answer it.
+
+- **Both directions.** Someone who ticked it out of habit must be able to take
+  it back: a falsely-confirmed alignment is the most expensive wrong flag in the
+  file, because bias is the error more shots cannot remove.
+- **It re-stamps before it saves.** Every gate downstream reads `_aligned` off
+  the *shot*, not the session, so changing the session alone would leave the
+  flag right in storage and wrong in every calculation. That ordering is why
+  this is one function rather than two lines at a call site.
+- **Not a silent toggle.** It goes through `showConfirm` and states the cost of
+  getting it wrong — a confirmed-but-unaligned unit makes the app more confident
+  in a wrong answer — alongside what confirming unlocks (start-line work at 10
+  shots instead of 30).
+- The suite pins the asymmetry: confirming releases the absolute miss and does
+  **not** move sigma by a hair, because a constant offset cancels out of a
+  spread. That is the point, not a coincidence.
+
 ### Session tags (`SessionTags`) — a finder, never a variable
 
 The session search filters notes as free text, which answers "the one where I
