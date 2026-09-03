@@ -1287,6 +1287,11 @@ const Store = (() => {
   }
   const cloud = () => !!Auth.getUser();
 
+  // Whether the last read actually reached the cloud. Null until a signed-in
+  // read has been attempted, so "not known yet" never renders as "fine".
+  let _cloud = null;
+  const cloudStatus = () => (cloud() ? _cloud : null);
+
   async function getSessions() {
     // Local-first so the app NEVER breaks if the cloud is unreachable. Merge
     // cloud rows on top when signed in; on cloud error fall back to local and
@@ -1298,10 +1303,23 @@ const Store = (() => {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const cloudIds = new Set(rows.map(r => r.id));
       const pending = local.filter(s => !cloudIds.has(s.id));
+      _cloud = { ok: true, at: Date.now(), error: null, shown: local.length + rows.length };
       return [...pending, ...rows.map(r => stamp(fromRow(r)))].sort((a,b) => new Date(b.date) - new Date(a.date));
     } catch (e) {
+      // Degrading to local is right — a cloud outage must never break the app.
+      // Doing it SILENTLY is not. A signed-in user on a device holding three of
+      // their twenty sessions saw a normal-looking home screen with three
+      // sessions on it, and nothing anywhere said the view was partial. That is
+      // the one thing this codebase refuses everywhere else: presenting an
+      // incomplete answer as a complete one.
+      //
+      // It is not hypothetical. A free-tier Supabase project pauses itself
+      // after a week of inactivity, so every cloud read fails until someone
+      // opens the dashboard — exactly the period when a golfer is least likely
+      // to have opened the app, and most likely to have lost the local copy.
       console.error('Cloud load failed:', e);
       showDebug('CLOUD LOAD FAILED:\n' + (e?.message || JSON.stringify(e)) + '\n(showing local sessions)');
+      _cloud = { ok: false, at: Date.now(), error: (e && e.message) || 'unknown error', shown: local.length };
       return local;
     }
   }
@@ -1365,7 +1383,7 @@ const Store = (() => {
     return sn;
   }
 
-  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp, setAlignment };
+  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp, setAlignment, cloudStatus };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -6874,7 +6892,43 @@ const UI = (() => {
   }
 
   // ── Home: dashboard + recent sessions ─────────────────────────
+  // ── Cloud reachability ────────────────────────────────────────
+  // Rendered above everything on the home view, because it changes what the
+  // rest of the screen MEANS. Every count, trend and yardage below it is
+  // computed from whatever loaded, and if half the account did not load then
+  // every one of those numbers is answering a different question than the
+  // golfer thinks it is.
+  //
+  // The warning against deleting is the point, not politeness. The realistic
+  // harm is not the missing rows — it is a golfer seeing three sessions where
+  // there should be twenty, assuming the app lost the rest, and clearing them
+  // out or re-importing over the top.
+  function renderSyncBanner() {
+    const el = document.getElementById('syncBanner');
+    if (!el) return;
+    const st = Store.cloudStatus();
+    if (!st || st.ok) { el.hidden = true; el.innerHTML = ''; return; }
+    const n = st.shown;
+    el.hidden = false;
+    el.innerHTML = `<div class="sync-warn">
+        <div class="sync-warn-head">⚠ Your cloud sessions did not load</div>
+        <p class="sync-warn-p">You are signed in, but this device could not reach the server, so you are
+          looking at ${n} session${n === 1 ? '' : 's'} stored on this device — not your whole account.
+          Everything below is calculated from those alone.</p>
+        <p class="sync-warn-p"><strong>Do not delete anything or re-import until this clears.</strong>
+          Your cloud data is not gone; this device simply cannot see it right now.</p>
+        <p class="sync-warn-why">${Sanitize.escape(st.error)}</p>
+        <button class="btn-secondary btn-sm" id="syncRetry">Try again</button>
+      </div>`;
+    document.getElementById('syncRetry')?.addEventListener('click', async () => {
+      const btn = document.getElementById('syncRetry');
+      if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+      try { await Router.showSessions(); } catch (_) { /* the banner re-renders either way */ }
+    });
+  }
+
   function renderHome(sessions) {
+    try { renderSyncBanner(); } catch (e) { console.error('sync banner', e); }
     // Render tip of the day
     try {
       const tips = [

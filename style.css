@@ -2419,3 +2419,13 @@ html.range-open, html.range-open body { overflow: hidden; }
 .intro-p strong{color:var(--text)}
 .intro-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.4rem}
 .intro-foot{font-size:.75rem;color:var(--text-muted);margin:.8rem 0 0}
+
+/* ── Cloud reachability warning ───────────────────────────────────
+   Rendered above the home view because it changes what everything
+   below it means, not merely how it looks. */
+.sync-warn{margin:1rem;padding:1rem 1.1rem;border:1px solid var(--accent);border-left-width:4px;
+  border-radius:var(--radius);background:color-mix(in srgb, var(--accent) 8%, transparent)}
+.sync-warn-head{font-size:.95rem;font-weight:800;color:var(--accent);margin-bottom:.5rem}
+.sync-warn-p{font-size:.83rem;line-height:1.55;margin:0 0 .5rem}
+.sync-warn-why{font-size:.74rem;color:var(--text-muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  margin:.6rem 0 .8rem;word-break:break-word}

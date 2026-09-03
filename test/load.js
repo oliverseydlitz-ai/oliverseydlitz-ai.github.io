@@ -61,7 +61,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   // woven in — the file above it is byte-for-byte what ships. If the file
   // throws at load the shim never runs and __app stays undefined, which is
   // exactly the signal we want.
-  const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser',
+  const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser','Auth',
     'FeedbackEngine','Conditions','Spin','Dispersion','Strike','QuietEye','ShortGame','Rounds','DrillLibrary','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','InsightEngine','PerformanceAlerts','PerformanceGrade','SessionSnapshot','PersonalCoach','PracticeEfficiency','LearningPath','AnalyticsHub','ClubAnalyzer','ContentLibrary','CommunityInsights','QuickStats','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
     'ImportFlow','Features','CloudDB','SmartRecommendations','Goals','SessionSharing','RetentionProbe','PracticeLog','RangeCard','SessionTags','FirstRun','consistencyScore','bagConsistency','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',

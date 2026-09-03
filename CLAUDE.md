@@ -986,6 +986,74 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 - **Store is local-first:** always returns local sessions and merges cloud on
   top; cloud errors degrade gracefully and never break tab navigation.
 
+## Cloud, auth and the database (audited September 2026)
+
+The live project is `jdmahrrxtxqrcpcwmwvx` (eu-west-1). `supabase-setup.sql`
+mirrors the applied migrations — **if you change one, change the other.** A
+setup script that has drifted from the database it claims to describe is worse
+than none, because it is trusted.
+
+### Isolation is verified, not assumed
+
+Seven adversarial checks were run against the live database as a second real
+user: A cannot read, update, delete or forge B's rows, and an anonymous caller
+sees nothing and can insert nothing. All pass. **This was never broken.** Re-run
+them after any policy change — a policy that reads correctly and does not hold
+is the same defect class as a gate nothing calls.
+
+### What was actually wrong
+
+1. **The project pauses itself.** Free-tier Supabase suspends after ~7 days
+   idle, and it was suspended when this audit started. Every cloud read then
+   fails and a signed-in user silently falls back to whatever is cached on the
+   device. **That silence was the real bug** — see below. The pause itself needs
+   a paid plan or regular use; no code fixes it.
+2. **`anon` held full CRUD grants** on `public.sessions`. RLS refused it, so
+   nothing was ever exposed — but the grant existed only to be refused, one
+   policy edit away from being a hole. Revoked; policies are now scoped `TO
+   authenticated` rather than `public`.
+3. **No payload ceiling.** `shots` was unbounded user JSON on a shared database.
+   RLS stops one user reading another's data; nothing stopped one user filling
+   the disk for everyone. Now capped at 5000 shots / 4 MB per row, 2000 rows per
+   user — roughly 40x the largest real session, so only a bug or an attack can
+   reach it.
+4. **The index did not serve the sort.** The only query is
+   `.eq('user_id').order('date', desc)`; the index was on `user_id` alone.
+5. `FORCE ROW LEVEL SECURITY` is now on, so a future `SECURITY DEFINER`
+   function owned by `postgres` cannot silently read every user's rows.
+   `service_role` has `BYPASSRLS` and is unaffected, so `delete-account` still
+   works.
+
+### The silent partial view (`Store.cloudStatus`, `renderSyncBanner`)
+
+Degrading to local when the cloud is unreachable is right — an outage must never
+break the app. Doing it **silently** was not. A signed-in user on a device
+holding three of their twenty sessions saw a normal home screen with three
+sessions on it, and nothing said the view was partial. That is the one thing
+this codebase refuses everywhere else: **an incomplete answer presented as a
+complete one.** With a project that pauses itself weekly, it is the normal case.
+
+`getSessions` now records the outcome; the banner renders **above everything**
+on the home view, because it changes what every count, trend and yardage below
+it *means*. `cloudStatus()` returns `null` for a guest — not `ok`, since a guest
+is not a healthy sync. The warning against deleting is the point, not manners:
+the realistic harm is a golfer seeing three sessions where there should be
+twenty, assuming the app lost the rest, and clearing them out.
+
+### Two dashboard settings this repo cannot set
+
+- **Leaked-password protection is OFF** (Auth → Providers → Email). Supabase
+  checks new passwords against HaveIBeenPwned. It is the only outstanding
+  security advisor.
+- **Auto-pause**, as above.
+
+### `delete-account` edge function
+
+Reviewed and sound: `verify_jwt` on, validates the caller's JWT server-side,
+deletes only that caller's rows and auth record, service_role never leaves the
+server. `ON DELETE CASCADE` on `user_id` means removing the auth user takes the
+data with it, so the explicit row delete is defence in depth.
+
 ## Features module (`Features` in app.js)
 
 `Features` is one module among the 58 listed in Core Modules above — not the
