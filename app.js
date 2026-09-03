@@ -6367,11 +6367,20 @@ const UI = (() => {
       const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
       const grade = avgScore ? ShotScorer.grade(avgScore) : null;
       const highFaults = faults.filter(f=>f.severity==='high');
-      const driverShots = s.shots.filter(x=>x.clubType==='d');
-      const driverCarry = avg(driverShots,'carryDistance');
-      const prevScore = sessions[sessions.indexOf(s)+1]?.shots.map(ShotScorer.score).filter(x=>x!==null);
-      const prevAvgScore = prevScore?.length ? Math.round(prevScore.reduce((a,b)=>a+b,0)/prevScore.length) : null;
-      const improved = avgScore && prevAvgScore && avgScore > prevAvgScore;
+      // The card computed a per-club carry and then displayed a bag-pooled one
+      // two lines down. Anchor on the club this session was mostly about and
+      // say which it is — "Avg Carry 199" for a bag of drivers and wedges
+      // describes no club anyone owns, and moves with the club mix.
+      const cardCounts = {};
+      s.shots.forEach(x => { if (x.clubType && x.carryDistance > 0) cardCounts[x.clubType] = (cardCounts[x.clubType]||0)+1; });
+      const cardClub = Object.keys(cardCounts).sort((x,y)=>cardCounts[y]-cardCounts[x])[0] || null;
+      const cardShots = cardClub ? s.shots.filter(x => x.clubType === cardClub) : s.shots;
+      // The "↑ Improving" badge compared this session's form score to the
+      // previous one's and fired on ANY increase — one point, on a different
+      // ball, off a different club mix. The Progress view answers this
+      // properly, against the golfer's own spread; a badge that fires on noise
+      // is worse than no badge, because it teaches people to read noise.
+      const improved = false;
       return `
         <li>
           <div class="session-card" data-id="${s.id}">
@@ -6380,16 +6389,16 @@ const UI = (() => {
               <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
                 <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(s.shots,'ballSpeed'),0)}</div>
-                  <div class="stat-label">Ball Speed</div>
+                  <div class="stat-value">${fmt(avg(cardShots,'ballSpeed'),0)}</div>
+                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' ball spd' : 'Ball Speed'}</div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(s.shots,'carryDistance'),0)}</div>
-                  <div class="stat-label">Avg Carry</div>
+                  <div class="stat-value">${fmt(avg(cardShots,'carryDistance'),0)}</div>
+                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' carry' : 'Avg Carry'}</div>
                 </div>
                 <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(s.shots,'launchAngle'),1)}</div>
-                  <div class="stat-label">Launch</div>
+                  <div class="stat-value">${fmt(avg(cardShots,'launchAngle'),1)}</div>
+                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' launch' : 'Launch'}</div>
                 </div>
               </div>
               <div class="session-card-badges">
@@ -6508,7 +6517,16 @@ const UI = (() => {
   function renderBallFlight(shots) {
     const el=document.getElementById('ballFlight'); if(!el) return;
     if(!shots.length){ el.innerHTML=''; return; }
-    el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(shots)}</div>`;
+    // One club. With no filter set this averaged a driver's launch and apex
+    // with a wedge's and drew the mean as a single flight — a trajectory no
+    // club in the bag produces, rendered as though a ball had flown it.
+    const c = {};
+    shots.forEach(s => { if (s.clubType && s.launchAngle > 0) c[s.clubType] = (c[s.clubType]||0)+1; });
+    const club = Object.keys(c).sort((x,y)=>c[y]-c[x])[0] || null;
+    const set = club ? shots.filter(s => s.clubType === club) : shots;
+    el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(set)}` +
+      (club ? `<div class="traj-note">Your ${Sanitize.escape(clubLabel(club))}, averaged over ${set.length} shots.</div>` : '') +
+      `</div>`;
   }
 
   // ── Insights (coach's notes) ──────────────────────────────────
@@ -9056,7 +9074,8 @@ async function init() {
             </div>
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Avg Carry Distance</div>
-              <div style="font-size:2rem;font-weight:800">${metrics.avgCarry} yds</div>
+              <div style="font-size:2rem;font-weight:800">${metrics.avgCarry === null ? '—' : metrics.avgCarry + ' yds'}</div>
+              ${metrics.carryClub ? `<div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${Sanitize.escape(metrics.carryClub)}</div>` : ''}
               ${metrics.carryConsistency === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>`}
             </div>
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
@@ -10286,7 +10305,16 @@ const AnalyticsHub = (() => {
     return {
       totalSessions: sessions.length,
       totalShots: allShots.length,
-      avgCarry: fmt(avg(allShots, 'carryDistance'), 0),
+      // Per club, named. A bag-pooled carry rendered at 2rem is a number for
+      // a bag nobody owns.
+      ...(() => {
+        const c = {};
+        allShots.forEach(s => { if (s.clubType && s.carryDistance > 0) c[s.clubType] = (c[s.clubType]||0)+1; });
+        const club = Object.keys(c).sort((x,y)=>c[y]-c[x])[0] || null;
+        const cs = club ? allShots.filter(s => s.clubType === club) : [];
+        return { carryClub: club ? clubLabel(club) : null,
+                 avgCarry: club ? fmt(avg(cs, 'carryDistance'), 0) : null };
+      })(),
       carryConsistency: (bagConsistency(allShots) || {}).score ?? null,
       ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
       // Math.max() of nothing is -Infinity, which rendered as "-Infinity mph".
