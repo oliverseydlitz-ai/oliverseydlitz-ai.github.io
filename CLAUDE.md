@@ -554,6 +554,26 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
   session's conditions (they answer "how am I hitting it now"). A test pins
   that they disagree on the same data.
 
+### The trend column in the yardage book (`Analytics.clubSeries`)
+
+The book says what you carry; the question straight after it is whether that is
+moving, and it could not answer it.
+
+- **The verdict comes from `ClubAnalyzer.calculateClubTrend`**, which already
+  existed and already tests against the golfer's own spread. It is now
+  exported. A second trend calculator here is how `Benchmarks.TARGET` ended up
+  with twelve disagreeing copies — `rules-are-wired.js` fails if the render
+  grows its own `changeIsReal`.
+- **The sparkline is drawn only when the verdict is real.** A flat line and a
+  rising one are read the same way by the eye whatever the caption says, so a
+  change the app has just decided is inside the golfer's own noise does not get
+  drawn as a direction.
+- **`clubSeries` drops sessions below the per-club floor** rather than plotting
+  them thin: a three-shot point looks identical to a twenty-shot point on a
+  sparkline, and it would move a trend the app refuses to report anywhere else.
+- **Three points minimum.** Two is a difference, not a shape — and the two-point
+  verdict is still available, as a number with a threshold attached.
+
 ### Records and impossible readings (`Metrics.CEILING`)
 
 A personal best is the reading most likely to be a misread — it is the extreme

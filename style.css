@@ -2346,3 +2346,13 @@ html.range-open, html.range-open body { overflow: hidden; }
 .probe-deadline{margin-top:.45rem;font-size:.78rem;font-weight:700;color:var(--accent)}
 .probe-block.lapsed{opacity:.9}
 .probe-block.lapsed .probe-head{color:var(--text-muted)}
+
+/* ── Yardage-book trend column ────────────────────────────────────
+   The sparkline is drawn only when the verdict is real — see the
+   legend. `flat` is the default state, and it is a finding. */
+.yard-trend{white-space:nowrap;font-size:.76rem;color:var(--text-muted)}
+.yard-trend.up{color:var(--green)}
+.yard-trend.down{color:var(--accent)}
+.yard-spark{display:block;margin-bottom:.15rem}
+.yard-trend-label{display:block;font-weight:600}
+.yard-trend-n{display:block;color:var(--text-muted);font-weight:400;font-size:.7rem}

@@ -5617,7 +5617,37 @@ const Analytics = (() => {
       top('apex','Highest Apex','ft'),
     ].filter(Boolean);
   }
-  return { yardageBook, conditionGroups, personalBests };
+  // Per-session mean carry for one club, oldest first. The BOOK says what you
+  // carry; this says whether that is moving, which is the question a golfer
+  // asks the moment they read a stock yardage.
+  //
+  // Sessions below the per-club floor are DROPPED, not plotted thin. A point
+  // built on three shots looks exactly like a point built on twenty on a
+  // sparkline, and the eye reads the line, not the sample size — so a
+  // three-shot session would move a trend the app refuses to report anywhere
+  // else. Callers pass one condition group; this does not re-check that.
+  function clubSeries(sessions, club) {
+    const points = (sessions || [])
+      .map(s => {
+        const carries = (s.shots || [])
+          .filter(x => x.clubType === club && x.carryDistance > 0)
+          .map(x => x.carryDistance);
+        return carries.length >= Metrics.MIN_SHOTS_REPORT
+          ? { date: s.date, at: new Date(s.date || 0).getTime(), mean: mean(carries), n: carries.length }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.at - b.at);
+    // Two points is a difference, not a shape. The trend VERDICT is still
+    // available at two (ClubAnalyzer.calculateClubTrend), and it is a number
+    // with a threshold attached; a two-point line is just that number drawn as
+    // if it were a direction.
+    if (points.length < 3) return null;
+    const vals = points.map(p => p.mean);
+    return { points, lo: Math.min(...vals), hi: Math.max(...vals), n: points.length };
+  }
+
+  return { yardageBook, conditionGroups, personalBests, clubSeries };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -8344,12 +8374,50 @@ const UI = (() => {
       }
     } catch(e){ console.error('drillFinder',e); }
 
+    // A stock yardage says what you carry. The question straight after it is
+    // whether that is moving, and the book could not answer it.
+    //
+    // The VERDICT comes from ClubAnalyzer.calculateClubTrend — the one that
+    // already exists and already tests against the golfer's own spread. A
+    // second trend calculator here is how the target bands ended up with twelve
+    // disagreeing copies. Sessions are newest-first for it, since it anchors on
+    // the first for comparability.
+    const newestFirst = [...used].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    // A sparkline of per-session means. It is drawn ONLY when the verdict is
+    // real: a flat-looking line and a rising one are read the same way by the
+    // eye whatever the caption says, so a shape that the app has just decided
+    // is inside the golfer's own noise does not get drawn as a direction.
+    const spark = series => {
+      if (!series) return '';
+      const { points, lo, hi } = series;
+      const span = hi - lo || 1;
+      const w = 64, h = 18;
+      const d = points.map((p, i) =>
+        `${(i / (points.length - 1) * w).toFixed(1)},${(h - (p.mean - lo) / span * h).toFixed(1)}`).join(' ');
+      return `<svg class="yard-spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">
+          <polyline points="${d}" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+    };
+
+    const trendCell = club => {
+      let t = null;
+      try { t = ClubAnalyzer.calculateClubTrend(newestFirst, club); } catch (_) { return '<td>—</td>'; }
+      if (!t) return '<td>—</td>';
+      const series = t.real ? Analytics.clubSeries(used, club) : null;
+      const cls = !t.real ? 'flat' : t.delta > 0 ? 'up' : 'down';
+      return `<td class="yard-trend ${cls}">${series ? spark(series) : ''}
+        <span class="yard-trend-label">${Sanitize.escape(t.label)}</span>
+        ${series ? `<small class="yard-trend-n">over ${series.n} sessions</small>` : ''}</td>`;
+    };
+
     document.getElementById('yardageTable').innerHTML = `
-      <thead><tr><th>Club</th><th>Stock carry</th><th>Range</th><th>Spread</th><th>Total</th><th>Shots</th></tr></thead>
+      <thead><tr><th>Club</th><th>Stock carry</th><th>Trend</th><th>Range</th><th>Spread</th><th>Total</th><th>Shots</th></tr></thead>
       <tbody>${book.map(b=>{
         if (!b.enough) return `<tr class="yard-thin">
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td colspan="4">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
+          <td colspan="5">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
           <td>${b.count}</td>
         </tr>`;
         // Colour off the RELATIVE spread. The old bands were fixed yardages, so
@@ -8359,6 +8427,7 @@ const UI = (() => {
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
           <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
+          ${trendCell(b.club)}
           <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
           <td><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>
               <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)} yds</small></td>
@@ -8371,7 +8440,12 @@ const UI = (() => {
     if (legend) legend.innerHTML = `<div class="tail-note">Spread is the shot-to-shot standard deviation as a
       percentage of the club's own carry, so a driver and a wedge are judged on the same footing; the colour
       bands are a reading convenience, not a measured standard. Total distance is a roll-out model — shown
-      for reference, never used to prescribe anything.</div>`;
+      for reference, never used to prescribe anything.</div>
+      <div class="tail-note">Trend compares this club's session means against your own shot-to-shot spread,
+      and only across sessions in these conditions with at least ${Metrics.MIN_SHOTS_REPORT} of the club in
+      them. A line is drawn only when the move clears that spread — a flat line and a rising one are read
+      the same way by the eye whatever the caption says, so a change the app has decided is inside your own
+      noise does not get drawn as a direction.</div>`;
 
     const bests = Analytics.personalBests(sessions);
     document.getElementById('recordsGrid').innerHTML = bests.map(b=>`
@@ -11607,7 +11681,10 @@ const ClubAnalyzer = (() => {
       .filter(Boolean);
   }
 
-  return { analyzeClub, compareClubs };
+  // Exported so the yardage book can show the same verdict. A second trend
+  // calculator is how Benchmarks.TARGET ended up with twelve disagreeing
+  // copies; there is one of these and every surface reads it.
+  return { analyzeClub, compareClubs, calculateClubTrend };
 })();
 
 // ════════════════════════════════════════════════════════════════

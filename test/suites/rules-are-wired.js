@@ -66,6 +66,8 @@ const WIRED = [
   ['daysLeft',        'RetentionProbe', 'the countdown is computed and never shown, so the golfer misses the window'],
   ['deadline',        'RetentionProbe', 'a task that expires never says so'],
   ['expired',         'RetentionProbe', 'lapsed probes are recorded and never surfaced — a hit rate that only counts the checks you answered'],
+  ['clubSeries',      'Analytics',      'the yardage book says what you carry and never whether it is moving'],
+  ['calculateClubTrend','ClubAnalyzer', 'a second trend calculator grows beside it, the way the target bands did'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];
 
