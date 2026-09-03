@@ -4556,10 +4556,14 @@ const FaultEngine = (() => {
         return stdDev(vals) > 20;
       },
       description: shots => {
-        const vals = shots.map(s=>s.sideCarry);
+        // Unfiltered, this took Math.min of an array containing undefined —
+        // NaN — for any shot the parser had no side carry for. The rule's own
+        // test gates on it, so in practice it held; one missing field would
+        // have broken the sentence.
+        const vals = shots.map(s=>s.sideCarry).filter(Number.isFinite);
         const sd = stdDev(vals);
-        const leftMost = Math.min(...vals);
-        const rightMost = Math.max(...vals);
+        const leftMost = vals.length ? Math.min(...vals) : null;
+        const rightMost = vals.length ? Math.max(...vals) : null;
         return `Side carry standard deviation of ${fmt(sd,1)} yards. Left-right spread: ${fmt(leftMost,1)} to +${fmt(rightMost,1)} yards. ` +
           `Total dispersion width of ${fmt(rightMost-leftMost,0)} yards. Tour players average <25 yard dispersion. ` +
           `Wide dispersion = difficult course management and pressure situations.`;
@@ -5889,9 +5893,13 @@ const Features = (() => {
       if (!sessions.length) return {};
       const all = sessions.flatMap(s=>s.shots);
       const clubs = {};
+      // `|| 0` pushed a zero for every shot with no carry reading, and those
+      // zeros were then averaged in — a club with three missing carries out of
+      // ten came out 30% short.
       all.forEach(shot => {
+        if (!(shot.carryDistance > 0)) return;
         if (!clubs[shot.clubType]) clubs[shot.clubType] = [];
-        clubs[shot.clubType].push(shot.carryDistance || 0);
+        clubs[shot.clubType].push(shot.carryDistance);
       });
       return Object.entries(clubs).reduce((acc,[club,dists]) => {
         acc[club] = { avg: Math.round(avg(dists.map(d=>({carryDistance:d})),'carryDistance')||0), count: dists.length };
@@ -8991,7 +8999,7 @@ async function init() {
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Ball Speed</div>
               <div style="font-size:1.5rem;font-weight:800">${metrics.ballSpeedAvg} mph avg</div>
-              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Max: ${metrics.ballSpeedMax} mph</div>
+              ${metrics.ballSpeedMax === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Max: ${metrics.ballSpeedMax} mph</div>`}
             </div>
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Launch Angle</div>
@@ -9012,7 +9020,7 @@ async function init() {
                 ${metrics.topPerformers.map(c => `
                   <div style="display:flex;justify-content:space-between;padding:.4rem .6rem;background:rgba(0,0,0,.1);border-radius:4px">
                     <span>${c.club}</span>
-                    <span style="color:#60a5fa;font-weight:600">${c.avgCarry} yds (${c.shots} shots)</span>
+                    <span style="color:#60a5fa;font-weight:600">${c.avgCarry === null ? 'no carry data' : c.avgCarry + ' yds'} (${c.shots} shots)</span>
                   </div>
                 `).join('')}
               </div>
@@ -9147,7 +9155,7 @@ async function init() {
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem">
                   <div>
                     <div style="font-size:.8rem;color:var(--text-dim)">Avg Carry</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.avgCarry} yds</div>
+                    <div style="font-size:1.3rem;font-weight:800">${c.avgCarry === null ? '—' : c.avgCarry + ' yds'}</div>
                   </div>
                   <div>
                     <div style="font-size:.8rem;color:var(--text-dim)">Shots</div>
@@ -10184,7 +10192,8 @@ const AnalyticsHub = (() => {
       avgCarry: fmt(avg(allShots, 'carryDistance'), 0),
       carryConsistency: (bagConsistency(allShots) || {}).score ?? null,
       ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
-      ballSpeedMax: Math.max(...ballSpeeds),
+      // Math.max() of nothing is -Infinity, which rendered as "-Infinity mph".
+      ballSpeedMax: ballSpeeds.length ? Math.max(...ballSpeeds) : null,
       launchAngleAvg: fmt(avg(allShots, 'launchAngle'), 1),
       launchAngleRange: launchAngles.length ? [Math.min(...launchAngles), Math.max(...launchAngles)] : null,
       sessionFrequency: calculateFrequency(sessions),
@@ -10231,15 +10240,20 @@ const AnalyticsHub = (() => {
       if (!clubStats[s.clubType]) {
         clubStats[s.clubType] = { shots: 0, totalCarry: 0 };
       }
+      // Same phantom zero: a missing carry added 0 to the total and 1 to the
+      // divisor. Count only the shots that actually carried a reading.
       clubStats[s.clubType].shots++;
-      clubStats[s.clubType].totalCarry += s.carryDistance || 0;
+      if (s.carryDistance > 0) {
+        clubStats[s.clubType].withCarry = (clubStats[s.clubType].withCarry || 0) + 1;
+        clubStats[s.clubType].totalCarry += s.carryDistance;
+      }
     });
 
     return Object.entries(clubStats)
       .map(([club, stats]) => ({
         club: clubLabel(club),
         shots: stats.shots,
-        avgCarry: Math.round(stats.totalCarry / stats.shots),
+        avgCarry: stats.withCarry ? Math.round(stats.totalCarry / stats.withCarry) : null,
       }))
       .sort((a, b) => b.shots - a.shots)
       .slice(0, 5);
@@ -10558,12 +10572,14 @@ const ClubAnalyzer = (() => {
       club: clubLabel(clubType),
       shotCount: clubShots.length,
       avgCarry: carries.length ? Math.round(carries.reduce((a,b)=>a+b,0)/carries.length) : 0,
-      bestCarry: Math.max(...carries, 0),
-      worstCarry: Math.min(...carries, 1000),
-      carryRange: Math.max(...carries, 0) - Math.min(...carries, 1000),
+      // The sentinels were the bug: with no carries `Math.min(..., 1000)` is
+      // 1000, so `worstCarry` read 1000 yards and `carryRange` read -1000.
+      bestCarry: carries.length ? Math.max(...carries) : null,
+      worstCarry: carries.length ? Math.min(...carries) : null,
+      carryRange: carries.length ? Math.max(...carries) - Math.min(...carries) : null,
       consistency: consistencyScore(carries),
       avgBallSpeed: ballSpeeds.length ? fmt(ballSpeeds.reduce((a,b)=>a+b,0)/ballSpeeds.length, 1) : '—',
-      maxBallSpeed: Math.max(...ballSpeeds, 0),
+      maxBallSpeed: ballSpeeds.length ? Math.max(...ballSpeeds) : null,
       gapToNext: null, // filled in by Gap Engine
       gapToPrev: null,
       trend: calculateClubTrend(clubShots),
