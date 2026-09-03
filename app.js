@@ -9167,7 +9167,7 @@ async function init() {
                     <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
                   </div>
                 </div>
-                <div style="font-size:.9rem;color:${c.trend.startsWith('📈') ? '#4ade80' : c.trend.startsWith('📉') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${c.trend}</div>
+                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('📈') ? '#4ade80' : c.trend.label.startsWith('📉') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
               </div>
             `).join('')}
           </div>
@@ -10604,32 +10604,57 @@ const ClubAnalyzer = (() => {
       maxBallSpeed: ballSpeeds.length ? Math.max(...ballSpeeds) : null,
       gapToNext: null, // filled in by Gap Engine
       gapToPrev: null,
-      trend: calculateClubTrend(clubShots),
+      // Set by `compareClubs`, which still has the sessions. A trend is a
+      // session-to-session question and this function only ever sees shots.
+      trend: null,
     };
 
     return analysis;
   }
 
-  function calculateClubTrend(clubShots) {
-    if (clubShots.length < 3) return '→ Insufficient data';
-    const recent = clubShots.slice(0, 3).map(s => s.carryDistance || 0).filter(c => c > 0);
-    const older = clubShots.slice(3, 6).map(s => s.carryDistance || 0).filter(c => c > 0);
-
-    if (!recent.length || !older.length) return '→ Insufficient data';
-
-    const recentAvg = recent.reduce((a,b)=>a+b,0)/recent.length;
-    const olderAvg = older.reduce((a,b)=>a+b,0)/older.length;
-    const change = recentAvg - olderAvg;
-
-    if (change > 3) return '📈 Improving';
-    if (change < -3) return '📉 Declining';
-    return '→ Stable';
+  // This compared the first three shots of a FLATTENED array against shots
+  // four to six of it — not a chronology, just wherever `flatMap` happened to
+  // put them — and called a 3-yard difference "📈 Improving", in green. The
+  // minimum detectable change for carry is 13 yards at ten shots
+  // (`Metrics.MDC_N10`), so the threshold was a quarter of the smallest change
+  // the device can resolve, off a sixth of the shots.
+  //
+  // Session to session, per club, against the golfer's own spread, and only
+  // among sessions on the same ball — a change of equipment moves every carry.
+  function calculateClubTrend(sessions, clubType) {
+    const list = (sessions || []).filter(s => s && s.shots);
+    if (list.length < 2) return { label: '→ One session', real: false };
+    const anchor = list[0];
+    const same = list.filter(s => Conditions.comparable(s, anchor));
+    const withClub = same
+      .map(s => ({ s, carries: s.shots.filter(x => x.clubType === clubType && x.carryDistance > 0)
+                                      .map(x => x.carryDistance) }))
+      .filter(x => x.carries.length >= Metrics.MIN_SHOTS_REPORT);
+    if (withClub.length < 2) {
+      return { label: `→ Needs ${Metrics.MIN_SHOTS_REPORT}+ of this club in two sessions`, real: false };
+    }
+    const mean1 = mean(withClub[0].carries);
+    const mean2 = mean(withClub[1].carries);
+    const delta = mean1 - mean2;
+    const v = Metrics.changeIsReal('carryDistance', delta, withClub[0].carries.length,
+                                   same.map(x => x), clubType);
+    if (v.real === null) return { label: '→ Not enough history to judge', real: false, note: v.note };
+    if (!v.real) return { label: `→ Inside your own spread (±${fmt(v.threshold, 0)} yds)`, real: false };
+    return { label: delta > 0 ? `📈 +${fmt(delta, 0)} yds` : `📉 ${fmt(delta, 0)} yds`,
+             real: true, delta };
   }
 
+  // Sessions are kept, not flattened, because the trend is a session-to-session
+  // question and flattening threw the only structure that could answer it away.
   function compareClubs(sessions) {
-    const allShots = sessions.flatMap(s => s.shots);
-    const clubs = sortedClubs(allShots);
-    return clubs.map(c => analyzeClub(allShots, c)).filter(Boolean);
+    const list = sessions || [];
+    const allShots = list.flatMap(s => s.shots || []);
+    return sortedClubs(allShots)
+      .map(c => {
+        const a = analyzeClub(allShots, c);
+        return a ? { ...a, trend: calculateClubTrend(list, c) } : null;
+      })
+      .filter(Boolean);
   }
 
   return { analyzeClub, compareClubs };
