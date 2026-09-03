@@ -3728,6 +3728,127 @@ const MeasurementReference = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
+// PracticeLog — what the golfer actually did between sessions
+// ────────────────────────────────────────────────────────────────
+// `RetentionProbe.settle` takes a `practised` argument and, until now, the only
+// source for it was a question asked days later: "did you work on X since that
+// session?" That is a recall task, and the app already refuses to trust recall
+// everywhere else — it will not let a golfer eyeball a carry number, but it was
+// happy to let them eyeball a week.
+//
+// This is the missing source of truth. A block ticked off at the mat is a
+// record made at the time, by the person doing it, about the thing they were
+// literally in the middle of.
+//
+// THE ASYMMETRY IS THE WHOLE MODULE. A log entry PROVES practice happened. An
+// empty log proves nothing at all: phones die, bays have no signal, and most
+// practice in the world goes unlogged. So `workedOn()` returns `true` or
+// `null` and NEVER `false`. Reading an empty log as "did not practise" would
+// manufacture the exact false attribution this feature exists to prevent, just
+// with the sign flipped — and it would do it silently, on the app's only
+// efficacy metric.
+const PracticeLog = (() => {
+  const KEY = 'slPracticeLog';
+  const MAX = 400;                 // a couple of years of honest logging
+
+  function all() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (_) { return []; }
+    if (!raw) return [];
+    let list = null;
+    try { list = JSON.parse(raw); } catch (_) { return []; }
+    if (!Array.isArray(list)) return [];
+    // Screen at the door, the same way CSVParser and readBackup do. A rotten
+    // entry here would silently join itself to the wrong probe.
+    return list.filter(e => e && typeof e === 'object' &&
+      typeof e.id === 'string' && Number.isFinite(e.at));
+  }
+
+  function write(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list.slice(-MAX))); return true; }
+    catch (_) { return false; }
+  }
+
+  // Record one completed block. `at` is settable so a golfer can log a session
+  // they did yesterday, but it is clamped to the past: a log entry dated
+  // forward would sit inside no probe window and quietly count for nothing.
+  function log(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const now = Date.now();
+    const at = Number.isFinite(entry.at) ? Math.min(entry.at, now) : now;
+    const rec = {
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'pl-' + now + '-' + Math.random().toString(36).slice(2),
+      at,
+      faultId:  entry.faultId  || null,
+      clubType: entry.clubType || null,
+      drill:    entry.drill ? String(entry.drill).slice(0, 120) : null,
+      balls:    Number.isFinite(entry.balls)   && entry.balls   > 0 ? Math.round(entry.balls)   : null,
+      minutes:  Number.isFinite(entry.minutes) && entry.minutes > 0 ? Math.round(entry.minutes) : null,
+      source:   entry.source === 'manual' ? 'manual' : 'plan',
+    };
+    const list = all();
+    list.push(rec);
+    return write(list) ? rec : null;
+  }
+
+  const remove = id => write(all().filter(e => e.id !== id));
+  const clear  = () => write([]);
+
+  function between(fromMs, toMs) {
+    const a = Number.isFinite(fromMs) ? fromMs : -Infinity;
+    const b = Number.isFinite(toMs)   ? toMs   :  Infinity;
+    return all().filter(e => e.at >= a && e.at <= b).sort((x, y) => x.at - y.at);
+  }
+
+  // Did the golfer work on this fault, on this club, in this window?
+  //
+  // Returns true or null. Never false — see the module note. The club has to
+  // match as well as the fault: a probe is opened per club, and "I did the
+  // low-point drill" with a wedge says nothing about the driver probe.
+  function workedOn(faultId, clubType, fromMs, toMs) {
+    if (!faultId) return null;
+    const hit = between(fromMs, toMs).filter(e =>
+      e.faultId === faultId && (!clubType || !e.clubType || e.clubType === clubType));
+    return hit.length ? true : null;
+  }
+
+  // Everything logged against a fault+club in a window, for showing the golfer
+  // WHY the app answered its own question. An answer with no visible working is
+  // the same trust problem as a number with no source.
+  function evidence(faultId, clubType, fromMs, toMs) {
+    if (!faultId) return [];
+    return between(fromMs, toMs).filter(e =>
+      e.faultId === faultId && (!clubType || !e.clubType || e.clubType === clubType));
+  }
+
+  // A plain count over a window, for the practice view. Days are counted
+  // distinctly because three blocks in one afternoon is one practice day, and
+  // "9 sessions this week" off a single visit is the kind of number this app
+  // does not print.
+  function summary(days = 28, now = Date.now()) {
+    const from = now - days * 864e5;
+    const rows = between(from, now);
+    if (!rows.length) return null;
+    const dayKey = t => new Date(t).toISOString().slice(0, 10);
+    return {
+      entries: rows.length,
+      days: new Set(rows.map(e => dayKey(e.at))).size,
+      balls: rows.reduce((a, e) => a + (e.balls || 0), 0),
+      minutes: rows.reduce((a, e) => a + (e.minutes || 0), 0),
+      window: days,
+      last: rows[rows.length - 1].at,
+    };
+  }
+
+  // The sentence that goes with an empty log, so the absence is not read as a
+  // verdict by the golfer either.
+  const EMPTY_NOTE = 'Nothing logged. That is not the same as nothing done — an empty log ' +
+    'cannot tell the app you skipped it, only that it was not ticked off here.';
+
+  return { log, remove, clear, all, between, workedOn, evidence, summary, EMPTY_NOTE };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // RetentionProbe — the app's primary efficacy metric
 // ────────────────────────────────────────────────────────────────
 // Everything else in this app measures a session. This measures whether a
@@ -3815,7 +3936,7 @@ const RetentionProbe = (() => {
   // Only a probe the golfer confirms they practised is allowed to be evidence
   // that the drill did anything, and an unanswered probe says so rather than
   // assuming either way.
-  function settle(probe, session, history, practised = null) {
+  function settle(probe, session, history, practised = null, practisedSource = null) {
     const shots = (session.shots || []).filter(s => s.clubType === probe.clubType);
     const after = baselineFor(shots, probe.metric);
     if (!after) return null;
@@ -3826,6 +3947,12 @@ const RetentionProbe = (() => {
     const settled = {
       ...probe, status: 'settled', settledAt: Date.now(), probeSessionId: session.id,
       after, delta, gapDays, practised,
+      // HOW the app knows, not just what it concluded. 'logged' came from a
+      // block ticked off at the time; 'recalled' came from the golfer being
+      // asked days later. They are not equally good evidence and the record
+      // should not pretend they are.
+      practisedSource: practised === null ? null
+        : (practisedSource === 'logged' ? 'logged' : 'recalled'),
       // Whether the drill may be credited with the change. Not the same
       // question as whether the change is real, and kept apart from it.
       attributable: practised === true,
@@ -3876,10 +4003,16 @@ const RetentionProbe = (() => {
         return `${club}: not enough history yet to say whether this held. ${r.note || ''}`.trim();
     }
     if (r.practised === true) {
+      // Where the "you practised it" came from changes how much weight it can
+      // carry. A block ticked off at the mat is a record; an answer given days
+      // later is a memory, and this app does not treat a memory as a reading.
+      const how = r.practisedSource === 'logged'
+        ? `You logged the work at the time`
+        : `You said you practised it`;
       return r.outcome === 'retained'
-        ? `${measured} You practised it, so this is the strongest evidence this app can produce that ` +
+        ? `${measured} ${how}, so this is the strongest evidence this app can produce that ` +
           `something worked.`
-        : `${measured} You practised it, so this is about the drill rather than about the week.`;
+        : `${measured} ${how}, so this is about the drill rather than about the week.`;
     }
     if (r.practised === false) {
       return `${measured} You did not work on this in between, so it is not a verdict on the drill — ` +
@@ -3893,11 +4026,34 @@ const RetentionProbe = (() => {
            `crediting practice that may not have happened is how a measurement turns into a story.`;
   }
 
+  // What the log can say about a probe, before the golfer is asked anything.
+  //
+  // The window is the probe's own: from the session that opened it to the
+  // session answering it. Practice before the baseline is not what the probe is
+  // about, and practice after the follow-up has not been measured yet.
+  //
+  // Returns null when the log is silent, and the caller must then ASK. An empty
+  // log is not a "no" — see the note on PracticeLog.workedOn. This is the only
+  // place the app is allowed to answer its own attribution question, and it can
+  // only ever answer it one way.
+  function evidenceFor(probe, session) {
+    if (!probe || !session) return null;
+    const to = new Date(session.date || Date.now()).getTime();
+    const worked = PracticeLog.workedOn(probe.faultId, probe.clubType, probe.openedAt, to);
+    if (worked !== true) return null;
+    const rows = PracticeLog.evidence(probe.faultId, probe.clubType, probe.openedAt, to);
+    return {
+      practised: true, source: 'logged', entries: rows.length,
+      balls: rows.reduce((a, e) => a + (e.balls || 0), 0),
+      days: new Set(rows.map(e => new Date(e.at).toISOString().slice(0, 10))).size,
+    };
+  }
+
   function openProbes() { return all().filter(p => p.status === 'open'); }
   function settled()    { return all().filter(p => p.status === 'settled'); }
   function clear()      { save([]); }
 
-  return { open, due, settle, describe, openProbes, settled, all, clear,
+  return { open, due, settle, describe, evidenceFor, openProbes, settled, all, clear,
            MIN_GAP_HOURS, MAX_GAP_DAYS, MIN_SHOTS };
 })();
 
@@ -5181,6 +5337,10 @@ const PracticePlan = (() => {
       const minutes = Math.max(5, Math.round(totalMin * weight / totalW));
       return {
         name: f.name, icon: f.icon, severity: f.severity,
+        // The join keys. Without these a ticked-off block is a note to nobody:
+        // PracticeLog cannot match it to the probe that asked whether this
+        // fault, on this club, was worked on.
+        faultId: f.id, clubType: f.clubType,
         confidence: f.confidence, evidence: f.evidence,
         minutes,
         // Minutes alone let a golfer rake 120 balls in 20 minutes, which the
@@ -6067,6 +6227,16 @@ const Trajectory = (() => {
 // ────────────────────────────────────────────────────────────────
 // Paywall helper — blur section content for guest users
 // ────────────────────────────────────────────────────────────────
+// Wrap a rendered block in the sign-in overlay for a guest.
+//
+// THIS REASSIGNS innerHTML, WHICH DESTROYS EVERY LISTENER ALREADY ATTACHED TO
+// THE BLOCK. Two renders had attached theirs first, so a guest got fault cards
+// that would not expand and plan blocks that could not be ticked off — no
+// error, no log line, just controls that quietly did nothing. It is the same
+// failure as setting `hidden` on a section that gets re-rendered, one layer up.
+//
+// So: call this FIRST, and attach listeners only when it returns false. The
+// return value is the point of the return value.
 function applyPaywall(el, cta) {
   if (Auth.getUser()) return false;
   if (!el || !el.innerHTML.trim()) return false;
@@ -6601,7 +6771,25 @@ const UI = (() => {
     try { history = await Store.getSessions(); } catch (_) {}
     // Ask before settling. The probe cannot tell whether the drill was done,
     // and settling silently is what let it credit practice that never happened.
-    const pending = RetentionProbe.due(session);
+    let pending = RetentionProbe.due(session);
+
+    // Answer what the log can answer, before asking the golfer anything. A
+    // block ticked off at the mat is a record made at the time; the question
+    // below is a recall task days later, and this app does not treat a memory
+    // as a reading when it has the reading.
+    //
+    // Only ever settles as PRACTISED. The log cannot say a golfer skipped
+    // something — see PracticeLog.workedOn — so a silent log falls through to
+    // the question rather than being read as a "no".
+    if (pending.length) {
+      const settledFromLog = [];
+      pending.forEach(p => {
+        const ev = RetentionProbe.evidenceFor(p, session);
+        if (ev) { RetentionProbe.settle(p, session, history, true, 'logged'); settledFromLog.push(p.id); }
+      });
+      if (settledFromLog.length) pending = pending.filter(p => !settledFromLog.includes(p.id));
+    }
+
     if (pending.length) {
       el.hidden = false;
       el.innerHTML = `<div class="probe-block pending">
@@ -6616,13 +6804,15 @@ const UI = (() => {
               </div>
             </div>`).join('')}
           <div class="tail-note">The change gets measured either way. This only decides whether the drill
-            can be credited with it — a number the app cannot attribute is a number it should not attribute.</div>
+            can be credited with it — a number the app cannot attribute is a number it should not attribute.
+            ${Sanitize.escape(PracticeLog.EMPTY_NOTE)}</div>
         </div>`;
       el.querySelectorAll('.probe-ask').forEach(row => {
         row.querySelectorAll('.probe-btn').forEach(btn => btn.addEventListener('click', () => {
           const probe = pending.find(p => p.id === row.dataset.probe);
           const a = btn.dataset.answer;
-          RetentionProbe.settle(probe, session, history, a === 'yes' ? true : a === 'no' ? false : null);
+          RetentionProbe.settle(probe, session, history,
+            a === 'yes' ? true : a === 'no' ? false : null, 'recalled');
           renderRetention(session).catch(e => console.error('retention', e));
         }));
       });
@@ -6913,6 +7103,10 @@ const UI = (() => {
                    run on what this session measured. ${Sanitize.escape(p.lockedNote)}</div>`
               : ''}
             ${p.evidence ? `<div class="plan-evidence">${Sanitize.escape(p.evidence)}</div>` : ''}
+            ${p.faultId ? `<button class="plan-done" data-fault="${Sanitize.escape(p.faultId)}"
+                 data-club="${Sanitize.escape(p.clubType || '')}" data-balls="${p.balls || 0}"
+                 data-minutes="${p.minutes || 0}"
+                 data-drill="${Sanitize.escape((p.libraryDrill || p.drill || {}).name || '')}">Done ✓</button>` : ''}
           </div>
         </div>`).join('')}
       ${wrapper ? `<div class="plan-item plan-wrapper">
@@ -6923,8 +7117,33 @@ const UI = (() => {
             <div class="plan-evidence">${Sanitize.escape(wrapper.note)}</div>
           </div>
         </div>` : ''}
-      <div class="plan-note">${Sanitize.escape(CoachingMode.PROTOCOL.note)}</div>`;
-    applyPaywall(el, "Sign in to unlock your personalised practice plan");
+      <div class="plan-note">${Sanitize.escape(CoachingMode.PROTOCOL.note)}</div>
+      <div class="plan-note">Ticking a block off records that you did it. That is what lets a retention
+        check credit the drill instead of asking you to remember a week later —
+        and the app will never read an un-ticked block as work you skipped.</div>`;
+
+    // Paywall FIRST, for the same reason: it reassigns innerHTML and would
+    // throw the tick-off listeners away, leaving a guest with buttons that
+    // look live and record nothing.
+    if (applyPaywall(el, "Sign in to unlock your personalised practice plan")) return;
+
+    // The write path for PracticeLog. Nothing else in the app records what the
+    // golfer actually DID, which is why RetentionProbe had to ask.
+    el.querySelectorAll('.plan-done').forEach(btn => btn.addEventListener('click', () => {
+      if (btn.classList.contains('logged')) return;
+      const rec = PracticeLog.log({
+        faultId:  btn.dataset.fault,
+        clubType: btn.dataset.club || null,
+        drill:    btn.dataset.drill || null,
+        balls:    Number(btn.dataset.balls) || null,
+        minutes:  Number(btn.dataset.minutes) || null,
+        source:   'plan',
+      });
+      if (!rec) { toast('Could not save that — this browser is blocking storage.'); return; }
+      btn.classList.add('logged');
+      btn.textContent = 'Logged ✓';
+      toast('Logged. A retention check can credit this one.');
+    }));
   }
 
   // ── Club filter ───────────────────────────────────────────────
@@ -7300,10 +7519,12 @@ const UI = (() => {
         </div>`;
     }).join('');
 
+    // Paywall FIRST — it reassigns innerHTML, so listeners attached before it
+    // are thrown away and a guest gets cards that will not open.
+    if (applyPaywall(el, "Sign in to unlock fault detection & drills")) return;
     el.querySelectorAll('.fault-card').forEach(card => {
       card.querySelector('.fault-header').addEventListener('click', () => card.classList.toggle('open'));
     });
-    applyPaywall(el, "Sign in to unlock fault detection & drills");
   }
 
   // ── Benchmarking ──────────────────────────────────────────────

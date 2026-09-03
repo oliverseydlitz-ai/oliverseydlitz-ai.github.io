@@ -879,6 +879,13 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .cmp-row.cmp-withheld{opacity:.72}
 .cmp-row.cmp-withheld .cmp-label small{color:var(--yellow);font-weight:600}
 .plan-gate{margin-top:.35rem;font-size:.72rem;line-height:1.45;color:var(--text-muted)}
+/* Ticking a block off is the only write path PracticeLog has, so it has to
+   read as a control rather than as a label. */
+.plan-done{margin-top:.6rem;padding:.4rem .8rem;font:inherit;font-size:.74rem;font-weight:600;
+  border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);
+  color:var(--text);cursor:pointer}
+.plan-done:hover{border-color:var(--accent);color:var(--accent)}
+.plan-done.logged{border-color:var(--green);color:var(--green);cursor:default;opacity:.85}
 .plan-locked{margin-top:.4rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.75rem;line-height:1.5;color:var(--text-dim)}
 .plan-item.plan-wrapper{border-left-color:var(--pine)}

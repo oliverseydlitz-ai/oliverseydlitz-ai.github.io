@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~10,700 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 54 feature modules
+- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 55 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -49,7 +49,8 @@ to hand someone starting cold.
    `interval()`, `typicalError()`, `changeIsReal()`, `CEILING`), `Conditions`
    (ball + surface, and what they invalidate), `Spin` (suppressed without an
    RPT ball), `FeedbackEngine` (the guidance-hypothesis schedule),
-   `RetentionProbe` (the app's only efficacy metric), `MeasurementReference`,
+   `RetentionProbe` (the app's only efficacy metric), `PracticeLog` (the only
+   record of what the golfer actually did — see below), `MeasurementReference`,
    `SetupGuide`
 
 3. **Core infra** — `Sanitize`, `CookieConsent`, `Agreement`, `DB`, `MemDB`,
@@ -634,6 +635,45 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### The practice log (`PracticeLog`) — and the asymmetry that defines it
+
+`RetentionProbe.settle` takes a `practised` argument, and its only source was a
+question asked days later: *"did you work on X since that session?"* That is a
+recall task, and this app refuses to trust recall everywhere else — it will not
+let a golfer eyeball a carry number, but it was happy to let them eyeball a
+week. `PracticeLog` is the record made **at the time**, by the person doing it.
+
+**`workedOn()` returns `true` or `null` and NEVER `false`.** A log entry proves
+practice happened. An empty log proves nothing: phones die, bays have no signal,
+and most practice in the world goes unlogged. Reading an empty log as "did not
+practise" would manufacture the exact false attribution the probe exists to
+prevent, just with the sign flipped — silently, on the app's only efficacy
+metric. `EMPTY_NOTE` says the same thing to the golfer.
+
+- `RetentionProbe.evidenceFor(probe, session)` answers what the log can answer
+  **before** the golfer is asked. Its window is the probe's own — baseline to
+  follow-up. Practice before the baseline is not what the probe is about.
+- `settle()` records `practisedSource`: `'logged'` (ticked off at the mat) or
+  `'recalled'` (answered days later). `describe()` reads differently for each,
+  because a memory is not a reading.
+- The write path is the **Done ✓** button on each practice-plan block, which is
+  why plan blocks now carry `faultId` and `clubType` — without the join keys a
+  ticked-off block is a note to nobody.
+- `summary()` counts distinct **days**, not blocks. Three blocks in one
+  afternoon is one practice day.
+
+### `applyPaywall` goes FIRST (`test/suites/paywall-order.js`)
+
+It reassigns the block's `innerHTML`, which **destroys every listener already
+attached to it** — no error, no log line, just controls that quietly stop
+working for signed-out users only. Two renders had it the wrong way round:
+fault cards would not expand for a guest, and the plan's tick-off buttons
+recorded nothing. Same class of defect as setting `hidden` on a section that
+gets re-rendered.
+
+Call it first and attach listeners only when it returns `false`. The return
+value is the point of the return value. The suite checks every call site.
+
 ### Remembering the venue (`Conditions.remember` / `recall`)
 
 Ball type and surface are the two inputs every condition gate hangs off, and
@@ -756,7 +796,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 54 listed in Core Modules above — not the
+`Features` is one module among the 55 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -806,6 +846,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-54 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
+55 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.

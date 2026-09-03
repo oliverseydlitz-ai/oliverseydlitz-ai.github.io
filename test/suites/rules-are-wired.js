@@ -56,6 +56,10 @@ const WIRED = [
   ['recall',          'Conditions',     'the venue is stored and never read back, so the prefill quietly stops working'],
   ['recallNote',      'Conditions',     'the form is prefilled silently and the golfer is never told a value was carried forward'],
   ['forget',          'Conditions',     'erasing device data leaves the remembered venue behind'],
+  ['workedOn',        'PracticeLog',    'the log is written and never read, so the probe keeps asking a recall question it can already answer'],
+  ['EMPTY_NOTE',      'PracticeLog',    'an empty log is left to read as "you skipped it" — the same false attribution with the sign flipped'],
+  ['evidenceFor',     'RetentionProbe', 'the probe never consults the log and settles on memory alone'],
+  ['log',             'PracticeLog',    'nothing can ever be recorded, and the log is a store with no write path'],
 ];
 
 // `ImportFlow.prefillConditions` is deliberately NOT in the list above. It is
