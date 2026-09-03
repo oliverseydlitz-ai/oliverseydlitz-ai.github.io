@@ -2319,3 +2319,22 @@ html.range-open, html.range-open body { overflow: hidden; }
 .rc-end-h{font-size:1.6rem;font-weight:800}
 .rc-end-n{font-size:1.05rem;font-weight:700;color:var(--accent);margin-top:.3rem}
 .rc-end-note{font-size:.85rem;line-height:1.5;color:var(--text-muted);margin:1rem 0 0}
+
+/* ── Since last comparable session ────────────────────────────────
+   Deltas only get a colour when Metrics.changeIsReal says the move
+   cleared the golfer's own spread. `flat` is the default, not the
+   exception — most week-to-week movement is noise. */
+.since-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1rem 1.1rem;margin-bottom:1rem}
+.since-head{font-size:.95rem;font-weight:700;margin-bottom:.7rem}
+.since-rows{display:flex;flex-direction:column;gap:.45rem}
+.since-row{display:grid;grid-template-columns:auto auto 1fr;gap:.5rem;align-items:baseline;
+  font-size:.85rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.since-row:last-child{border-bottom:none;padding-bottom:0}
+.since-label{font-weight:600}
+.since-delta{font-weight:700;font-variant-numeric:tabular-nums;color:var(--text-muted)}
+.since-row.good .since-delta{color:var(--green)}
+.since-row.bad  .since-delta{color:var(--accent)}
+.since-was{font-size:.78rem;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.since-tag{grid-column:1/-1;font-size:.72rem;color:var(--text-muted)}
+.since-note{font-size:.76rem;line-height:1.5;color:var(--text-muted);margin:.7rem 0 0}

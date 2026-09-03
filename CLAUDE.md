@@ -636,6 +636,28 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### What moved since last time (`Features.lastComparable`)
+
+The question a golfer actually has on the way home, answered by `renderSince`
+at the top of the session detail rather than left to be assembled by hand on the Progress tab.
+Two things stop it being a highlight reel:
+
+1. **The session it reads against is picked by conditions, not by date.**
+   `lastComparable()` takes the most recent EARLIER session that passes
+   `Conditions.comparable` **and** shares a club. "The previous session" is the
+   obvious answer and the wrong one — a premium-ball round read against last
+   week's range bucket reports the ball as progress. Nothing comparable returns
+   `null`, and the block says so rather than reaching one further back.
+2. **The arrows come from `Metrics.changeIsReal`, not from the sign of the
+   delta.** `Features.compare(a, b, history)` takes an optional history; with
+   it, each row carries `real` (three-valued) and `good` is withheld when
+   `real === false`. The number is still shown — a golfer is entitled to see
+   what they hit — but a yard of movement gets no colour.
+
+The empty branch distinguishes "you have no earlier sessions" (a fact about the
+account) from "you have some, but none on this ball and surface" (a fact about
+today, which tells the golfer what would make the next one comparable).
+
 ### The range card (`RangeCard`)
 
 The same plan, in the form it is actually used in: one block filling the

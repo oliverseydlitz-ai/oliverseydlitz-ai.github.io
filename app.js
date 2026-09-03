@@ -5988,7 +5988,15 @@ const Features = (() => {
   // The numbers still show — a golfer is entitled to see what they hit — but
   // the VERDICT is withheld on the rows the conditions actually change, which
   // is the same rule the shot table follows: the green arrow is the claim.
-  function compare(a, b) {
+  //
+  // `history` is optional and turns the arrows from a SIGN into a CLAIM.
+  // Without it a row moving 0.3 mph gets a green arrow, which is the same
+  // mistake as reading a personal best off a single reading: the direction of a
+  // number smaller than your own shot-to-shot spread is noise, and colouring it
+  // says otherwise. With it, `Metrics.changeIsReal` decides, and a row that
+  // cannot clear the golfer's own threshold is marked `flat` rather than good
+  // or bad.
+  function compare(a, b, history) {
     try {
       // ONE CLUB, not the bag. `avg(s.shots, 'carryDistance')` over every club
       // in a session is a bag mix: a driver-heavy session against a
@@ -6028,12 +6036,26 @@ const Features = (() => {
         const av = num(a, f), bv = num(b, f);
         const delta = (av!=null && bv!=null) ? av - bv : null;
         const verdictOk = higherBetter != null && (sameConditions || !sensitive);
+        // Is the move bigger than this golfer's own shot-to-shot variation?
+        // null when there is no history to ask, which is not the same as "no",
+        // and is why `real` is three-valued everywhere it is read.
+        let real = null;
+        if (history && history.length && delta != null && club) {
+          try {
+            const v = Metrics.changeIsReal(f, delta, shotsOf(a).length, history, club);
+            real = v ? v.real : null;
+          } catch (_) { real = null; }
+        }
         return {
-          label, unit, sensitive, withheld: sensitive && !sameConditions,
+          label, unit, sensitive, withheld: sensitive && !sameConditions, real,
           a: metric(a, f, dec), b: metric(b, f, dec),
           delta: delta!=null ? fmt(Math.abs(delta), dec) : null,
           dir: delta==null||Math.abs(delta)<1e-9 ? 'flat' : delta>0 ? 'up' : 'down',
-          good: (delta==null || !verdictOk) ? null : (higherBetter ? delta>0 : delta<0),
+          // A verdict is withheld when the conditions differ AND when the move
+          // is smaller than the golfer's own noise. `real === false` is a
+          // finding, not an absence: it says the change is below what this data
+          // can resolve, which is worth showing without a colour on it.
+          good: (delta==null || !verdictOk || real === false) ? null : (higherBetter ? delta>0 : delta<0),
         };
       });
       out.comparable = sameConditions;
@@ -6063,8 +6085,35 @@ const Features = (() => {
           `same thing.`);
       }
       if (!spinBoth) out.caveats.push(Spin.NOT_MEASURED);
+      out.tested = !!(history && history.length);
+      if (out.tested && out.some(r => r.real === false)) out.caveats.push(
+        'Rows marked "within your own variation" moved less than your shot-to-shot spread on this club. ' +
+        'That is not "no improvement" — it is a change too small for this data to resolve, and colouring ' +
+        'it either way would be a claim the numbers do not support.');
       return out;
     } catch (e) { console.error('compare()', e); return []; }
+  }
+
+  // The session this one should be read against: the most recent EARLIER
+  // session on the same ball and surface that shares a club with it.
+  //
+  // "The previous session" is the obvious answer and the wrong one. Conditions
+  // change what the numbers mean, so a premium-ball round read against last
+  // week's range bucket reports the ball as progress. When nothing comparable
+  // exists the honest answer is null — the app says it has nothing to compare
+  // against rather than reaching one session further back and pretending.
+  function lastComparable(session, sessions) {
+    if (!session) return null;
+    const t = new Date(session.date || 0).getTime();
+    const clubsIn = s => new Set((s.shots || []).map(x => x.clubType).filter(Boolean));
+    const mine = clubsIn(session);
+    if (!mine.size) return null;
+    return (sessions || [])
+      .filter(s => s && s.id !== session.id)
+      .filter(s => new Date(s.date || 0).getTime() <= t)
+      .filter(s => Conditions.comparable(session, s))
+      .filter(s => [...clubsIn(s)].some(c => mine.has(c)))
+      .sort((x, y) => new Date(y.date || 0) - new Date(x.date || 0))[0] || null;
   }
 
   // ── 5. Session search/filter helper ────────────────────────────
@@ -6162,7 +6211,7 @@ const Features = (() => {
     } catch (e) { console.error('benchmarks()', e); return {}; }
   }
 
-  return { streak, achievements, focus, compare, searchSessions, goalProgress, performanceAlerts, recommendDrill, benchmarks };
+  return { streak, achievements, focus, compare, lastComparable, searchSessions, goalProgress, performanceAlerts, recommendDrill, benchmarks };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -6887,6 +6936,7 @@ const UI = (() => {
     _predictions = new Map();
     _asking = null;
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
+    renderSince(session).catch(e => console.error('since', e));
     renderRetention(session).catch(e => console.error('retention', e));
     // Opening a probe on the top fault is what makes the NEXT session able to
     // answer whether this one changed anything.
@@ -6940,6 +6990,81 @@ const UI = (() => {
     el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(set)}` +
       (club ? `<div class="traj-note">Your ${Sanitize.escape(clubLabel(club))}, averaged over ${set.length} shots.</div>` : '') +
       `</div>`;
+  }
+
+  // ── What moved since last time ────────────────────────────────
+  // The question a golfer actually has on the way home, answered at the moment
+  // they ask it rather than left to be assembled by hand on the Progress tab.
+  //
+  // Two things make it honest rather than a highlight reel:
+  //   1. The session it reads against is picked by Conditions.comparable, not
+  //      by date. Nothing comparable means it says so and stops.
+  //   2. The arrows come from Metrics.changeIsReal, not from the sign of the
+  //      delta. A row that moved less than this golfer's own spread on this
+  //      club is reported as exactly that.
+  async function renderSince(session) {
+    const el = document.getElementById('sinceHost');
+    if (!el) return;
+    el.hidden = true; el.innerHTML = '';
+    let sessions = [];
+    try { sessions = await Store.getSessions(); } catch (_) { return; }
+    if (!sessions.length) return;
+
+    const prev = Features.lastComparable(session, sessions);
+    const esc = t => Sanitize.escape(String(t == null ? '' : t));
+    const cond = `${Conditions.ball(session).label.toLowerCase()}, ${Conditions.surface(session).label.toLowerCase()}`;
+
+    if (!prev) {
+      // Not an empty state, and the two reasons for it are different answers.
+      // "You have no earlier sessions" is a fact about the account; "you have
+      // some, but none on this ball and surface" is a fact about today, and it
+      // tells the golfer what would make the next one comparable.
+      const t = new Date(session.date || 0).getTime();
+      const earlier = sessions.filter(x => x.id !== session.id &&
+        new Date(x.date || 0).getTime() <= t).length;
+      el.hidden = false;
+      el.innerHTML = `<div class="since-block">
+          <div class="since-head">Nothing to compare this against yet</div>
+          <p class="since-note">${earlier
+            ? `You have ${earlier} earlier session${earlier === 1 ? '' : 's'}, but none on ${esc(cond)}
+               sharing a club with this one. The app will not read a session against one on a different
+               ball or surface — that difference is the equipment as much as you, and it would show up
+               as progress. Hit the same club on ${esc(cond)} again and this fills in.`
+            : `This is your first session, so there is nothing behind it yet. The next one on
+               ${esc(cond)} will be read against this one.`}</p>
+        </div>`;
+      return;
+    }
+
+    const rows = Features.compare(session, prev, sessions);
+    if (!rows || !rows.length) return;
+    const shown = rows.filter(r => r.a !== '—' && r.b !== '—' && r.delta !== null);
+    if (!shown.length) return;
+
+    const gap = Math.max(0, Math.round((new Date(session.date) - new Date(prev.date)) / 864e5));
+    const when = gap === 0 ? 'your last session the same day' : `${gap} day${gap === 1 ? '' : 's'} earlier`;
+
+    el.hidden = false;
+    el.innerHTML = `<div class="since-block">
+        <div class="since-head">Since ${esc(when)}</div>
+        <div class="since-rows">
+          ${shown.map(r => {
+            const cls = r.good === true ? 'good' : r.good === false ? 'bad' : 'flat';
+            const arrow = r.dir === 'up' ? '↑' : r.dir === 'down' ? '↓' : '·';
+            const tag = r.withheld ? 'conditions differ'
+                      : r.real === false ? 'within your own variation'
+                      : r.real === null && rows.tested ? 'not enough history to call it'
+                      : '';
+            return `<div class="since-row ${cls}">
+                <span class="since-label">${esc(r.label)}</span>
+                <span class="since-delta">${arrow} ${esc(r.delta)}${esc(r.unit)}</span>
+                <span class="since-was">${esc(r.b)} → ${esc(r.a)}</span>
+                ${tag ? `<span class="since-tag">${esc(tag)}</span>` : ''}
+              </div>`;
+          }).join('')}
+        </div>
+        ${rows.caveats.map(c => `<p class="since-note">${esc(c)}</p>`).join('')}
+      </div>`;
   }
 
   // ── Insights (coach's notes) ──────────────────────────────────

@@ -61,6 +61,7 @@ const WIRED = [
   ['evidenceFor',     'RetentionProbe', 'the probe never consults the log and settles on memory alone'],
   ['log',             'PracticeLog',    'nothing can ever be recorded, and the log is a store with no write path'],
   ['open',            'RangeCard',      'the range card is built and nothing can launch it'],
+  ['lastComparable',  'Features',       'the since-last block reads against whatever session came last, ball type and all'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];
 
