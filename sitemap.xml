@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One URL, deliberately. ShotLab is a single-page app whose views are hash
+  routes; a crawler cannot address them separately, so listing them would be
+  listing the same page several times. The docs under /docs/ are working notes
+  rather than pages written for a reader, and PRIVACY.md / TERMS.md are served
+  as raw markdown — neither belongs in an index.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://oliverseydlitz-ai.github.io/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

@@ -1,5 +1,6 @@
-const CACHE = 'shotlab-v130';
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg'];
+const CACHE = 'shotlab-v131';
+const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg',
+                '/404.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -25,7 +26,15 @@ self.addEventListener('fetch', e => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy));
         return res;
-      }).catch(() => caches.match(req).then(c => c || caches.match('/index.html')))
+      }).catch(() => caches.match(req).then(c => {
+        if (c) return c;
+        // Only a NAVIGATION falls back to the app shell. This used to hand
+        // index.html to every failed same-origin GET, so an image, a JSON file
+        // or a CSV that was merely offline came back as a page of HTML — which
+        // does not fail loudly, it fails as a parse error somewhere unrelated.
+        if (req.mode === 'navigate') return caches.match('/index.html');
+        return Response.error();
+      }))
     );
   } else {
     // Cross-origin CDN libs: cache-first (they're versioned and rarely change)

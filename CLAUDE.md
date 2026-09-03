@@ -1084,6 +1084,64 @@ deletes only that caller's rows and auth record, service_role never leaves the
 server. `ON DELETE CASCADE` on `user_id` means removing the auth user takes the
 data with it, so the explicit row delete is defence in depth.
 
+## SEO, crawlability and production metadata
+
+Guarded by `test/suites/seo-and-production.js`, because this is the category
+that rots invisibly: nothing renders it, no user reports it, and the only thing
+that reads it has already moved on.
+
+- **One indexable URL.** `sitemap.xml` lists `/` and nothing else. The views are
+  hash routes and crawlers discard everything after the `#`, so listing them
+  would be listing the same page repeatedly. `robots.txt` allows the site,
+  disallows `/test/`, `/node_modules/` and `/supabase/`, and names the sitemap.
+- **`og-image.png` is RENDERED, not hand-cropped** (Playwright, from a template),
+  so it cannot drift from the 1200×630 the meta tags promise. The suite reads
+  the PNG's IHDR and compares it to the tags rather than trusting them.
+- **The JSON-LD has no `aggregateRating` and no `review`.** There are no ratings.
+  Inventing them for a rich snippet is the same fabrication as
+  `CommunityInsights`' fake benchmarks, and it is the single easiest SEO lie to
+  tell. It is a `WebApplication`, not a `LocalBusiness` — there is no premises.
+- **Multiple `<h1>` is correct here.** `.view { display: none }` means only the
+  active view's heading is ever in the accessibility tree, so a heading-navigating
+  screen-reader user gets exactly one per view. What was wrong was the home
+  heading reading "Home", which describes nothing to the crawler that weights it.
+- **`404.html` returns a real 404** (GitHub Pages serves it with that status) and
+  deliberately does **not** redirect. Bouncing every bad URL to the homepage
+  tells a crawler the wrong URL was fine and tells a person nothing.
+- `.nojekyll` makes serving deterministic — Jekyll would otherwise decide which
+  files to process.
+
+### The service worker's offline fallback
+
+It handed `index.html` to **every** failed same-origin GET. An image, a JSON file
+or a CSV that was merely offline came back as a page of HTML, which does not fail
+loudly — it fails as a parse error somewhere unrelated. Only a request whose
+`mode === 'navigate'` falls back to the app shell now; everything else gets
+`Response.error()`.
+
+### No PII in the console (`authLog`)
+
+The auth path logged the signed-in **email address** on every `getUser()` and
+every auth event. That is PII on a surface the privacy policy does not mention,
+which persists in devtools history and rides along in any screen-share or bug
+report. `authLog()` is gated on the same `slDebug` flag as `showDebug`, and it
+never takes an email or a token: a log line that must be redacted before it can
+be pasted anywhere should not exist.
+
+### The auth forms are real `<form>` elements
+
+They were `<div>`s. Without a form ancestor a browser will not reliably offer to
+save or autofill a credential, and Chrome logged "Password field is not contained
+in a form" every time the modal opened. The `autocomplete` tokens
+(`username` / `current-password` / `new-password`) are what actually tell a
+password manager which field is which. Handlers bind to the form's `submit`
+rather than the button's `click`, so the keyboard path and the pointer path run
+identical code instead of Enter quietly doing nothing.
+
+The 8-character check is **a courtesy, not a control** — the server is the
+authority on what it accepts, and anything client-side is bypassed by not using
+this page. It exists to fail fast with a clear message.
+
 ## Features module (`Features` in app.js)
 
 `Features` is one module among the 58 listed in Core Modules above — not the

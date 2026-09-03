@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0c0d" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)">
+  <!-- GitHub Pages serves this file with a real HTTP 404 status for any path it
+       cannot find, so this is a genuine 404 rather than a redirect dressed as
+       one. It deliberately does NOT bounce to the homepage: a silent redirect
+       tells a crawler the wrong URL was fine, and tells a person nothing. -->
+  <title>Page not found — ShotLab TOUR</title>
+  <meta name="description" content="That page does not exist on ShotLab TOUR. The app lives at the homepage — import a Rapsodo CSV to see your yardages, dispersion and recurring faults.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="canonical" href="https://oliverseydlitz-ai.github.io/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <style>
+    :root{--bg:#0c0c0d;--surface:#161618;--border:#26262a;--text:#fafafa;
+          --dim:#a1a1aa;--muted:#71717a;--accent:#dc2626;--radius:12px}
+    @media (prefers-color-scheme: light){
+      :root{--bg:#fafafa;--surface:#fff;--border:#e4e4e7;--text:#18181b;
+            --dim:#52525b;--muted:#71717a}
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:var(--bg);color:var(--text);min-height:100vh;
+      font-family:Outfit,system-ui,-apple-system,"Segoe UI",sans-serif;
+      display:flex;align-items:center;justify-content:center;padding:1.5rem;line-height:1.6}
+    main{max-width:34rem;width:100%}
+    .brand{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:1.05rem;margin-bottom:2rem}
+    .tag{background:var(--accent);color:#fff;font-size:.62rem;font-weight:800;
+      padding:.15rem .4rem;border-radius:4px;letter-spacing:.5px}
+    .code{font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+      color:var(--accent);margin-bottom:.5rem}
+    h1{font-size:1.9rem;font-weight:800;letter-spacing:-1px;line-height:1.15;margin-bottom:.8rem}
+    p{color:var(--dim);font-size:.95rem;margin-bottom:1rem}
+    .path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
+      background:var(--surface);border:1px solid var(--border);border-radius:6px;
+      padding:.15rem .4rem;word-break:break-all;color:var(--text)}
+    .links{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.6rem}
+    a.btn{display:inline-block;text-decoration:none;font-size:.9rem;font-weight:600;
+      padding:.7rem 1.1rem;border-radius:var(--radius);border:1px solid var(--border);
+      background:var(--surface);color:var(--text)}
+    a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .also{margin-top:2rem;padding-top:1.2rem;border-top:1px solid var(--border)}
+    .also-h{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.08em;margin-bottom:.7rem}
+    .also ul{list-style:none;display:flex;flex-direction:column;gap:.5rem}
+    .also a{color:var(--dim);text-decoration:none;font-size:.9rem}
+    .also a:hover{color:var(--accent)}
+    .note{margin-top:1.6rem;font-size:.78rem;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><span aria-hidden="true">⛳</span><span>ShotLab</span><span class="tag">TOUR</span></div>
+    <div class="code">Error 404</div>
+    <h1>That page does not exist.</h1>
+    <p>Nothing is served at <span class="path" id="badPath">this address</span>. It was either
+      mistyped, or it linked to something that has moved.</p>
+    <p>ShotLab is a single page — every view lives inside the app itself, so there is
+      only one address to remember.</p>
+
+    <div class="links">
+      <a class="btn primary" href="/">Open ShotLab</a>
+      <a class="btn" href="/#practice">Practice &amp; drills</a>
+      <a class="btn" href="/#yardages">Yardage book</a>
+    </div>
+
+    <div class="also">
+      <div class="also-h">Also here</div>
+      <ul>
+        <li><a href="/PRIVACY.md">Privacy policy</a></li>
+        <li><a href="/TERMS.md">Terms of use</a></li>
+        <li><a href="/SECURITY.md">Security policy</a></li>
+        <li><a href="/llms.txt">What this app is, in full</a></li>
+      </ul>
+    </div>
+
+    <p class="note">If you followed a link from somewhere on this site and landed here,
+      that is a bug worth reporting on the repository.</p>
+  </main>
+  <script>
+    // Show the path that failed, escaped through textContent so a crafted URL
+    // cannot inject markup into the page that reports it.
+    document.getElementById('badPath').textContent = location.pathname + location.search;
+  </script>
+</body>
+</html>

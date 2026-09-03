@@ -898,6 +898,15 @@ function applyTheme(dark) {
 // version any time from the console with: localStorage.setItem('slDebug','1')
 function showDebug(msg) {
   console.log('[ShotLab]', msg);
+}
+
+// Auth tracing, off unless explicitly switched on. Same flag as showDebug, so
+// there is one way to turn diagnostics on rather than two that can disagree.
+// It never takes an email or a token — a log line that has to be redacted
+// before it can be pasted anywhere is a log line that should not exist.
+function authLog(...parts) {
+  try { if (localStorage.getItem('slDebug') !== '1') return; } catch (_) { return; }
+  console.log('[AUTH]', ...parts);
   if (localStorage.getItem('slDebug') !== '1') return;
   let d = document.getElementById('debugBanner');
   if (!d) {
@@ -942,7 +951,11 @@ const Auth = (() => {
       ? await sb.auth.getUser(explicitToken)
       : await sb.auth.getUser();
     _user = (!error && data?.user) ? data.user : null;
-    console.log('[AUTH] getUser →', _user?.email || '(none)', error ? 'err:'+error.message : '');
+    // The email used to be logged here on every call. That is PII written to a
+    // surface the privacy policy never mentions, which persists in devtools
+    // history and rides along in any screen-share or bug report. The signed-in
+    // state is what a developer actually needs; the address is not.
+    authLog('getUser →', _user ? 'signed in' : '(none)', error ? 'err:' + error.message : '');
     updateUI();
     return _user;
   }
@@ -950,7 +963,7 @@ const Auth = (() => {
   async function init() {
     sb.auth.onAuthStateChange(async (event, session) => {
       const eventUser = session?.user || null;
-      console.log('[AUTH EVENT]', event, '→ session user:', eventUser?.email || '(none)');
+      authLog('EVENT', event, '→', eventUser ? 'a user' : '(none)');
       if (_signingOut) return;
       // While we're deterministically installing a fresh Google login, ignore
       // every background event (INITIAL_SESSION / TOKEN_REFRESHED from any stale
@@ -972,7 +985,7 @@ const Auth = (() => {
       // So: if we already know who's signed in, only accept events for that
       // same user id; ignore anything for a different account.
       if (_user && eventUser && eventUser.id !== _user.id) {
-        console.warn('[AUTH] ignoring event for a different account:', eventUser.email);
+        authLog('ignoring an event for a different account');
         return;
       }
 
@@ -10511,7 +10524,11 @@ async function init() {
   document.getElementById('authSwitchLogin').addEventListener('click', e=>{ e.preventDefault(); Auth.switchToLogin(); });
 
   // Auth form submission
-  document.getElementById('authLoginBtn').addEventListener('click', async () => {
+  // Bound to submit, not to the button's click: the login form is a real form
+  // now, so Enter in either field fires this too. Two entry points running the
+  // same handler beats a keyboard path that quietly does nothing.
+  document.getElementById('authLoginForm').addEventListener('submit', async e => {
+    e.preventDefault();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value.trim();
     if (!email || !password) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
@@ -10525,13 +10542,21 @@ async function init() {
     }
   });
 
-  document.getElementById('authSignupBtn').addEventListener('click', async () => {
+  document.getElementById('authSignupForm').addEventListener('submit', async e => {
+    e.preventDefault();
     const email = document.getElementById('authSignupEmail').value.trim();
     const password = document.getElementById('authSignupPassword').value.trim();
     const confirm = document.getElementById('authSignupConfirm').value.trim();
     if (!email || !password || !confirm) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
     if (password !== confirm) { document.getElementById('authError').textContent = 'Passwords do not match.'; return; }
-    if (password.length < 6) { document.getElementById('authError').textContent = 'Password must be at least 6 characters.'; return; }
+    // Client-side only, and it is a courtesy rather than a control: the server
+    // is the authority on what it accepts (Supabase Auth), and anything here
+    // can be bypassed by not using this page at all. It exists to fail fast
+    // with a clear message instead of a round trip.
+    if (password.length < 8) {
+      document.getElementById('authError').textContent = 'Use at least 8 characters. Length beats symbols — a short password with a "!" on the end is not a strong one.';
+      return;
+    }
     try {
       await Auth.signup(email, password);
       document.getElementById('authSignupEmail').value = '';

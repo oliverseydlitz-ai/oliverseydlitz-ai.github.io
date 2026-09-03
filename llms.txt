@@ -1,0 +1,62 @@
+# ShotLab TOUR
+
+> A golf swing analysis web app. It imports Rapsodo MLM2PRO launch-monitor CSV
+> exports and reports gapping, dispersion, recurring faults, a yardage book and
+> progress trends — with every claim gated by what the device can actually
+> support. Free, no account required, works offline.
+
+The distinguishing feature is what it refuses to say. Consumer launch monitors
+measure some things well and other things badly, and most software treats every
+number on the screen as equally trustworthy. ShotLab does not.
+
+## How it decides what to report
+
+- **Three metric trust tiers.** Ball speed, club speed, smash factor and carry
+  are prescribed from freely. Launch angle, attack angle and club path are shown
+  but never prescribed from. Spin rate, spin axis, launch direction and every
+  modelled output are never used for advice — consumer-radar spin limits of
+  agreement are wider than the entire amateur-to-tour spin gap.
+- **Sample floors.** No club mean under 10 shots, no club-path or attack-angle
+  claim under 15, no dispersion tail under 30.
+- **The golfer's own noise floor.** After a few sessions the app measures each
+  golfer's shot-to-shot variation and reports a change as real only when it
+  clears that. A move smaller than your own spread is reported as exactly that,
+  not as improvement.
+- **Conditions change meaning, not just context.** Ball type and surface are
+  recorded per session. Range balls widen dispersion severalfold and break
+  gapping; mats hide fat strikes. Sessions on different conditions are never
+  compared as if the difference were skill.
+- **The device does not measure face angle.** The app derives it where it must
+  and never states one from a single shot.
+
+## What it does not do
+
+No face angle from one shot. No strokes-gained figure from a club-delivery
+metric. No inference of body positions, kinematic sequence or ground forces from
+ball data. No prescription from spin. No "+N yards per degree" claims. No
+rep-count that "grooves" a change.
+
+## Evidence base
+
+Drills and practice structure come from a documented research base: the guidance
+hypothesis (Winstein & Schmidt), contextual interference, errorless learning,
+external focus of attention, and quiet eye. A 2024 systematic review of 52 RCTs
+underpins the short-game work, with the reviewers' own power limitations carried
+alongside the findings. Benchmarks are TrackMan-published; on-course norms are
+Shot Scope's 90M-shot sample.
+
+## Pages
+
+- [App](https://oliverseydlitz-ai.github.io/): the whole application — import,
+  yardage book, progress, practice, settings.
+- [Privacy policy](https://oliverseydlitz-ai.github.io/PRIVACY.md)
+- [Terms](https://oliverseydlitz-ai.github.io/TERMS.md)
+- [Security policy](https://oliverseydlitz-ai.github.io/SECURITY.md)
+
+## Technical
+
+Static single-page app: vanilla JavaScript, no build step, no framework.
+Installable PWA, works offline via a service worker. Data is stored in the
+browser (IndexedDB, off by default) and optionally synced to Supabase behind
+row-level security for signed-in users. There is no community feature and no
+aggregation across users.

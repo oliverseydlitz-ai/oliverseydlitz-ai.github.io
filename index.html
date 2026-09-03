@@ -20,12 +20,60 @@
   <meta property="og:description" content="Turn Rapsodo launch monitor data into insights: gapping, dispersion, faults, yardages, and trends.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://oliverseydlitz-ai.github.io/">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:site_name" content="ShotLab TOUR">
+  <meta property="og:locale" content="en_GB">
+  <meta property="og:image" content="https://oliverseydlitz-ai.github.io/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ShotLab TOUR — golf swing analysis that says what it cannot measure.">
+  <!-- summary_large_image needs a real 1200x630 asset behind it; og-image.png is
+       rendered from a template rather than hand-cropped, so it cannot drift out
+       of those dimensions. -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ShotLab TOUR — Golf Swing Analysis">
+  <meta name="twitter:description" content="Turn Rapsodo launch monitor data into insights: gapping, dispersion, faults, yardages, and trends.">
+  <meta name="twitter:image" content="https://oliverseydlitz-ai.github.io/og-image.png">
+  <!-- Single-page app: every view is a hash route, which crawlers discard. The
+       canonical is therefore the bare root, and it is the ONLY canonical on the
+       site — see sitemap.xml for why there is one URL. -->
+  <link rel="canonical" href="https://oliverseydlitz-ai.github.io/">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
   <link rel="stylesheet" href="style.css">
+  <!-- Schema.org. Only claims that are visibly true of the app: it is a free
+       web application for analysing golf launch-monitor data, it runs in a
+       browser, and it costs nothing. Deliberately NO aggregateRating and no
+       review markup — there are no ratings, and inventing them to win a rich
+       snippet is the same fabrication the app refuses everywhere else. Not a
+       LocalBusiness: there is no premises, no address and no trading entity. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "ShotLab TOUR",
+    "url": "https://oliverseydlitz-ai.github.io/",
+    "description": "Import Rapsodo launch monitor CSV exports and get club gapping, dispersion, fault detection, a yardage book and progress trends \u2014 with every number gated by what the device can actually measure.",
+    "applicationCategory": "SportsApplication",
+    "operatingSystem": "Any browser. Installable as a PWA on iOS and Android.",
+    "browserRequirements": "Requires JavaScript.",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Rapsodo MLM2PRO CSV import",
+      "Club gapping and yardage book",
+      "Shot dispersion and tail analysis",
+      "Recurring fault detection",
+      "Practice plans and a gated drill library",
+      "Short game and putting logs",
+      "Offline use as an installed PWA"
+    ],
+    "image": "https://oliverseydlitz-ai.github.io/og-image.png",
+    "screenshot": "https://oliverseydlitz-ai.github.io/og-image.png"
+  }
+  </script>
 </head>
 <body>
 
@@ -66,7 +114,13 @@
     <div class="quick-stats-label" id="quickStatsLabel"></div>
 
     <div class="view-header">
-      <h1 class="view-title">Home</h1>
+      <!-- This is the heading a crawler weights for the indexed page, and
+           "Home" describes nothing. It is also the more accurate label for what
+           the view actually shows. The other views keep their own h1 on
+           purpose: `.view { display: none }` means only one is ever in the
+           accessibility tree, so a heading-navigating screen-reader user gets
+           exactly one h1 per view, which is the correct SPA behaviour. -->
+      <h1 class="view-title">Your sessions</h1>
       <button class="btn-icon" id="sessionsImportBtn" aria-label="Import session">+</button>
     </div>
 
@@ -811,35 +865,46 @@
 
     <div class="auth-divider"><span>or use email</span></div>
 
-    <div id="authLoginForm" class="auth-form active">
+    <!-- These are real <form> elements, not divs. Without a form ancestor a
+         browser will not reliably offer to save or autofill a credential, and
+         Chrome logs "Password field is not contained in a form" every time the
+         modal opens. The autocomplete tokens are what actually tell a password
+         manager which field is which. Submission is intercepted in app.js, so
+         the page never navigates. -->
+    <form id="authLoginForm" class="auth-form active" novalidate>
       <div class="form-group">
         <label for="authEmail">Email</label>
-        <input type="email" id="authEmail" placeholder="you@example.com">
+        <input type="email" id="authEmail" name="email" autocomplete="username"
+               placeholder="you@example.com" autocapitalize="none" spellcheck="false">
       </div>
       <div class="form-group">
         <label for="authPassword">Password</label>
-        <input type="password" id="authPassword" placeholder="••••••••">
+        <input type="password" id="authPassword" name="password"
+               autocomplete="current-password" placeholder="••••••••">
       </div>
-      <button class="btn-primary" id="authLoginBtn" style="width:100%">Sign In</button>
+      <button class="btn-primary" type="submit" style="width:100%">Sign In</button>
       <p class="auth-hint">New to ShotLab? <a href="#" id="authSwitchSignup">Create account</a></p>
-    </div>
+    </form>
 
-    <div id="authSignupForm" class="auth-form">
+    <form id="authSignupForm" class="auth-form" novalidate>
       <div class="form-group">
         <label for="authSignupEmail">Email</label>
-        <input type="email" id="authSignupEmail" placeholder="you@example.com">
+        <input type="email" id="authSignupEmail" name="email" autocomplete="username"
+               placeholder="you@example.com" autocapitalize="none" spellcheck="false">
       </div>
       <div class="form-group">
         <label for="authSignupPassword">Password</label>
-        <input type="password" id="authSignupPassword" placeholder="••••••••" minlength="6">
+        <input type="password" id="authSignupPassword" name="new-password"
+               autocomplete="new-password" placeholder="••••••••" minlength="8">
       </div>
       <div class="form-group">
         <label for="authSignupConfirm">Confirm Password</label>
-        <input type="password" id="authSignupConfirm" placeholder="••••••••">
+        <input type="password" id="authSignupConfirm" name="confirm-password"
+               autocomplete="new-password" placeholder="••••••••">
       </div>
-      <button class="btn-primary" id="authSignupBtn" style="width:100%">Create Account</button>
+      <button class="btn-primary" type="submit" style="width:100%">Create Account</button>
       <p class="auth-hint">Already have an account? <a href="#" id="authSwitchLogin">Sign in</a></p>
-    </div>
+    </form>
 
     <p id="authError" class="auth-error"></p>
     <div id="authGuestWrap" class="auth-guest" hidden>

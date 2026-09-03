@@ -1,16 +1,26 @@
 {
-  "name": "ShotLab",
+  "id": "/",
+  "name": "ShotLab TOUR — Golf Swing Analysis",
   "short_name": "ShotLab",
-  "description": "Golf swing analysis powered by your launch monitor data",
+  "description": "Import Rapsodo launch monitor CSV exports and get club gapping, dispersion, fault detection, a yardage book and progress trends — with every number gated by what the device can actually measure.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#edf4ee",
-  "theme_color": "#0b4d2e",
+  "orientation": "portrait",
+  "categories": ["sports", "health", "utilities"],
+  "lang": "en-GB",
+  "dir": "ltr",
+  "background_color": "#0c0c0d",
+  "theme_color": "#0c0c0d",
   "icons": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230b4d2e'/><circle cx='96' cy='96' r='40' fill='white' opacity='0.9'/><circle cx='96' cy='96' r='28' fill='%230b4d2e'/></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Import a session", "short_name": "Import", "url": "/#import" },
+    { "name": "Yardage book", "short_name": "Yardages", "url": "/#yardages" },
+    { "name": "Practice", "short_name": "Practice", "url": "/#practice" }
   ]
 }

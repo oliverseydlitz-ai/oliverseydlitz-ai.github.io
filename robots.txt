@@ -1,0 +1,21 @@
+# ShotLab TOUR — https://oliverseydlitz-ai.github.io/
+#
+# This is a single-page app. Everything a crawler can usefully index lives at
+# the root URL; the in-app views are hash routes (#/yardages, #/practice …) and
+# search engines ignore everything after the '#', so there is nothing to list
+# beyond '/' and nothing that needs blocking for privacy.
+#
+# There are no admin paths, no login endpoints served from this origin, and no
+# per-user URLs. Authentication happens against Supabase, on a different origin.
+# A golfer's sessions are never addressable by URL — they live in IndexedDB and
+# behind row-level security — so there is no private area here to disallow.
+
+User-agent: *
+Allow: /
+
+# Build and test scaffolding: not content, and not useful in an index.
+Disallow: /test/
+Disallow: /node_modules/
+Disallow: /supabase/
+
+Sitemap: https://oliverseydlitz-ai.github.io/sitemap.xml
