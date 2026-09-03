@@ -9069,45 +9069,45 @@ async function init() {
   document.getElementById('showLearningBtn')?.addEventListener('click', async () => {
     document.getElementById('learningModal')?.remove();
     const sessions = await Store.getSessions();
+    const esc = t => Sanitize.escape(String(t));
     const path = LearningPath.generatePath(sessions);
-    const tips = ContentLibrary.getContentFor('Consistency');
+
+    const module = m => `
+      <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);
+                  border-left:3px solid ${m.status === 'open' ? '#4ade80' : 'var(--yellow)'}">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;margin-bottom:.4rem">
+          <div style="font-weight:600">${esc(m.id)} · ${esc(m.title)}</div>
+          <div style="font-size:.72rem;white-space:nowrap;color:var(--text-dim)">
+            ${m.status === 'open' ? `${m.open} of ${m.total} open` : 'locked'}</div>
+        </div>
+        <div style="font-size:.82rem;line-height:1.5;color:var(--text-dim)">${esc(m.why)}</div>
+        <div style="font-size:.78rem;line-height:1.45;color:var(--text-muted);margin-top:.4rem">
+          <strong>How it is run.</strong> ${esc(m.structure)}</div>
+        ${m.lockedNote ? `<div style="font-size:.78rem;line-height:1.45;color:var(--text-muted);margin-top:.4rem">
+          ${esc(m.lockedNote)}</div>` : ''}
+      </div>`;
 
     const html = `
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
-            📚 Learning Library
+          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
+            📚 What you can work on
             <button data-close="learningModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
-          ${path ? `
-            <div style="margin-bottom:1.5rem">
-              <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.6rem">Your Skill Level: <strong>${path.skillLevel.toUpperCase()}</strong></div>
-              <div style="display:grid;gap:.8rem">
-                ${path.modules.map((m, i) => `
-                  <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,.1);opacity:${m.status==='locked'?'0.5':'1'}">
-                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.4rem">
-                      <div style="flex:1">
-                        <div style="font-weight:600;margin-bottom:.2rem">${m.icon} ${m.title}</div>
-                        <div style="font-size:.85rem;color:var(--text-dim)">${m.description}</div>
-                      </div>
-                      <div style="font-size:.75rem;background:${m.status==='in-progress'?'rgba(74,222,128,.2)':m.status==='recommended'?'rgba(251,146,60,.2)':'rgba(107,114,128,.2)'};color:${m.status==='in-progress'?'#4ade80':m.status==='recommended'?'#fb923c':'#9ca3af'};padding:.3rem .6rem;border-radius:3px;white-space:nowrap;margin-left:.5rem">${m.status}</div>
-                    </div>
-                    <div style="font-size:.8rem;color:var(--text-dim)">${m.lessons} lessons</div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-          <div style="border-top:1px solid rgba(255,255,255,.1);padding-top:1rem;margin-top:1rem">
-            <div style="font-weight:600;margin-bottom:.8rem">💡 Recommended Content</div>
-            <div style="display:grid;gap:.6rem">
-              ${tips.slice(0, 3).map(t => `
-                <div style="padding:.8rem;background:rgba(96,165,250,.1);border-left:3px solid #60a5fa;border-radius:4px">
-                  <div style="font-weight:600;font-size:.95rem">${t.title}</div>
-                  <div style="font-size:.8rem;color:var(--text-dim);margin-top:.3rem">${t.duration} • ${t.level}</div>
-                </div>
-              `).join('')}
-            </div>
+          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
+            ${path.club ? `Gated against your ${esc(clubLabel(path.club))}` : 'Nothing imported yet, so every gate reads as closed'}
+          </div>
+          <div style="display:grid;gap:.8rem">
+            ${path.modules.map(module).join('')}
+            ${path.wrappers ? `
+              <div style="padding:1rem;background:rgba(96,165,250,.08);border-radius:var(--radius-sm);border-left:3px solid #60a5fa">
+                <div style="font-weight:600;margin-bottom:.4rem">${esc(path.wrappers.id)} · ${esc(path.wrappers.title)}</div>
+                <div style="font-size:.82rem;line-height:1.5;color:var(--text-dim)">${esc(path.wrappers.why)}</div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:.4rem">
+                  These are applied <strong>over</strong> a drill, never instead of one — and on the evidence
+                  they matter more than which drill you picked.</div>
+              </div>` : ''}
+            <div class="tail-note">${esc(path.note)}</div>
           </div>
         </div>
       </div>`;
@@ -10232,39 +10232,37 @@ const AnalyticsHub = (() => {
 // ContentLibrary — Video/article references for improvement
 // ════════════════════════════════════════════════════════════════
 const ContentLibrary = (() => {
-  const contents = {
-    'Slice': [
-      { title: 'Fix Your Slice Forever', duration: '12 min', type: 'video', level: 'beginner' },
-      { title: 'Inside-Out Swing Path Drill', duration: '8 min', type: 'video', level: 'intermediate' },
-      { title: 'Grip Pressure Fundamentals', duration: '6 min', type: 'video', level: 'beginner' },
-    ],
-    'Hook': [
-      { title: 'Stop the Hook: Complete Guide', duration: '15 min', type: 'video', level: 'beginner' },
-      { title: 'Club Face Control Drills', duration: '10 min', type: 'video', level: 'intermediate' },
-      { title: 'Stance & Alignment Secrets', duration: '7 min', type: 'video', level: 'beginner' },
-    ],
-    'Consistency': [
-      { title: 'The Key to Repeatable Swings', duration: '14 min', type: 'video', level: 'all' },
-      { title: 'Tempo Training for Better Control', duration: '9 min', type: 'video', level: 'intermediate' },
-      { title: 'Pre-Shot Routine Mastery', duration: '5 min', type: 'video', level: 'beginner' },
-    ],
-    'Distance': [
-      { title: 'Unlock Hidden Distance', duration: '13 min', type: 'video', level: 'all' },
-      { title: 'Smash Factor Optimization', duration: '8 min', type: 'video', level: 'intermediate' },
-      { title: 'Lag & Release Secrets', duration: '11 min', type: 'video', level: 'intermediate' },
-    ],
-  };
-
-  function getContentFor(topic) {
-    return contents[topic] || contents['Consistency'] || [];
+  // This listed VIDEOS THAT DO NOT EXIST — "Fix Your Slice Forever, 12 min,
+  // video", "Lag & Release Secrets, 11 min" — with durations and levels, under
+  // a heading that read "Recommended Content". There is no video content in
+  // this app, there never has been, and nothing happened when you tapped one.
+  // Several of the invented titles were body-cue coaching of exactly the kind
+  // `splitDrills` exists to keep out.
+  //
+  // What the app actually has for a fault is the evidence behind the drill
+  // section that fault maps to — written, cited, and already in
+  // `DrillLibrary.SECTIONS[x].why`. That is the reading material.
+  function forFault(faultId) {
+    const secId = DrillLibrary.FAULT_SECTION[faultId];
+    const sec = secId && DrillLibrary.SECTIONS[secId];
+    if (!sec) return null;
+    return { section: sec.id, title: sec.name, why: sec.why, structure: sec.structure, drills: sec.count };
   }
 
-  function getByLevel(level) {
-    const allContent = Object.values(contents).flat();
-    return allContent.filter(c => c.level === 'all' || c.level === level);
+  // Kept for callers that ask by topic rather than by fault id. It resolves
+  // through the same table rather than inventing a parallel one.
+  function getContentFor(faultIdOrName) {
+    const direct = forFault(faultIdOrName);
+    if (direct) return [direct];
+    const key = String(faultIdOrName || '').toLowerCase();
+    const hit = Object.keys(DrillLibrary.FAULT_SECTION).find(id => id.includes(key));
+    const viaFault = hit ? forFault(hit) : null;
+    if (viaFault) return [viaFault];
+    // No mapping, no content — rather than a default topic's worth of it.
+    return [];
   }
 
-  return { getContentFor, getByLevel };
+  return { forFault, getContentFor };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -10343,84 +10341,71 @@ const CommunityInsights = (() => {
 // LearningPath — Personalized improvement curriculum
 // ════════════════════════════════════════════════════════════════
 const LearningPath = (() => {
+  // What was here promised a curriculum that does not exist: "⛳ Fundamentals —
+  // 6 lessons", "🔄 The Swing — 8 lessons", with `status: 'locked'` badges on
+  // modules that would never unlock, because there are no lessons anywhere in
+  // this app and never have been. Tapping one did nothing, by necessity.
+  //
+  // There IS a real library — 104 drills across nine sections, each carrying
+  // the evidence it rests on (`SECTIONS[x].why`), the measurement it needs
+  // (`gate`) and how it is meant to be run (`structure`). That is the
+  // curriculum, it is cited, and its locks are real: a section is locked
+  // because the golfer's data cannot support it yet, and `admissible()` says
+  // exactly why.
   function generatePath(sessions) {
-    if (!sessions.length) return null;
+    const list = sessions || [];
+    const latest = list[0] || null;
+    const shots = (latest && latest.shots) || [];
 
-    // Latest session with its own conditions. Flattening every session ever
-    // logged into one call pooled ball types AND made the path react to shots
-    // from months ago as if they were today's.
-    const faults = FaultEngine.detectFaults((sessions[0] || {}).shots || [], sessions[0] || null);
-    const topFaults = faults.slice(0, 3);
-    const skillLevel = CommunityInsights.estimateSkillLevel(sessions);
+    // Gate against the club with the most shots in the latest session — the
+    // one actually worked on — the same anchor the drills view uses.
+    const counts = {};
+    shots.forEach(s => { if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+    const ctx = { shots, clubType: club, sessions: list.length };
 
-    const modules = [];
+    // Section I are wrappers applied OVER a drill rather than instead of one,
+    // so they are not a step in a sequence and sit at the end as what they are.
+    const ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const modules = ORDER.map(id => {
+      const sec = DrillLibrary.SECTIONS[id];
+      if (!sec) return null;
+      let rows = [];
+      try { rows = DrillLibrary.forSection(id, ctx); } catch (_) {}
+      const open = rows.filter(r => r.ok);
+      return {
+        id, title: sec.name, count: sec.count,
+        open: open.length, total: rows.length || sec.count,
+        // The evidence for the section IS the lesson. It is already written,
+        // already cited, and it is what a golfer should read before choosing.
+        why: sec.why,
+        structure: sec.structure,
+        status: open.length ? 'open' : 'locked',
+        // A locked section shows its reason rather than being hidden — the
+        // same rule `admissible()` follows drill by drill.
+        lockedNote: open.length ? null : ((rows[0] && rows[0].reasons && rows[0].reasons[0]) ||
+          'Needs measurements this session did not provide.'),
+      };
+    }).filter(Boolean);
 
-    if (skillLevel === 'beginner') {
-      modules.push({
-        level: 1,
-        title: '⛳ Fundamentals',
-        description: 'Master grip, stance, and alignment',
-        lessons: 6,
-        icon: '🎯',
-        status: 'in-progress',
-      });
-      modules.push({
-        level: 2,
-        title: '🔄 The Swing',
-        description: 'Build a repeatable swing motion',
-        lessons: 8,
-        icon: '🔄',
-        status: 'locked',
-      });
-    } else if (skillLevel === 'intermediate') {
-      modules.push({
-        level: 1,
-        title: '⚡ Ball Striking',
-        description: 'Improve contact consistency',
-        lessons: 7,
-        icon: '⚡',
-        status: 'in-progress',
-      });
-      modules.push({
-        level: 2,
-        title: '📊 Swing Patterns',
-        description: 'Understand your swing characteristics',
-        lessons: 5,
-        icon: '📊',
-        status: 'in-progress',
-      });
-    } else {
-      modules.push({
-        level: 1,
-        title: '🎨 Shot Shaping',
-        description: 'Master curve and trajectory control',
-        lessons: 6,
-        icon: '🎨',
-        status: 'in-progress',
-      });
-      modules.push({
-        level: 2,
-        title: '💪 Swing Speed',
-        description: 'Optimize tempo and acceleration',
-        lessons: 5,
-        icon: '💪',
-        status: 'available',
-      });
-    }
+    // Open sections first — those are the ones a golfer can act on today — but
+    // locked ones are kept, with their reason, because "why can I not do this
+    // yet" is the more useful half of a path.
+    const ordered = [...modules.filter(m => m.status === 'open'),
+                     ...modules.filter(m => m.status !== 'open')];
 
-    const faultCourses = topFaults.map(f => ({
-      level: 'priority',
-      title: `Fix ${f.name}`,
-      description: `Target your #${faults.indexOf(f)+1} fault`,
-      lessons: 4,
-      icon: f.icon,
-      status: 'recommended',
-    }));
+    const wrappers = DrillLibrary.SECTIONS.I ? {
+      id: 'I', title: DrillLibrary.SECTIONS.I.name, why: DrillLibrary.SECTIONS.I.why,
+      structure: DrillLibrary.SECTIONS.I.structure,
+    } : null;
 
     return {
-      skillLevel,
-      modules: [...modules, ...faultCourses],
-      nextUp: modules.find(m => m.status === 'in-progress') || modules[0],
+      modules: ordered,
+      wrappers,
+      club,
+      nextUp: ordered.find(m => m.status === 'open') || null,
+      note: 'Every section here is 104 drills\' worth of the research base, and every lock is a measurement ' +
+            'your data has not produced yet rather than a paywall.',
     };
   }
 
