@@ -6067,15 +6067,18 @@ const UI = (() => {
                   <div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${grade.overall}/100</div>
                 </div>
                 <div style="background:rgba(255,255,255,.05);padding:.8rem;border-radius:var(--radius-sm)">
-                  <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Next Goal</div>
+                  <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Next gate</div>
                   <div style="font-size:1rem;margin-bottom:.3rem">${coach.nextMilestone.progress}%</div>
                   <div style="background:rgba(0,0,0,.2);height:4px;border-radius:2px;overflow:hidden">
                     <div style="background:#4ade80;height:100%;width:${coach.nextMilestone.progress}%"></div>
                   </div>
+                  <!-- The message was computed and never rendered, so the tile
+                       was a bare percentage of an unstated target. -->
+                  <div style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem;line-height:1.4">${Sanitize.escape(coach.nextMilestone.message || '')}</div>
                 </div>
               </div>
               <div style="font-size:.9rem;padding:.8rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);margin-bottom:.8rem">
-                <strong>💡 Focus:</strong> ${coach.topFocus?.name || 'Consistency'} — ${coach.drillRecommendation}
+                <strong>💡 Focus:</strong> ${Sanitize.escape(coach.topFocus?.name || 'Nothing recurring')} — ${Sanitize.escape(coach.drillRecommendation)}
               </div>
               <div style="font-size:.85rem;color:#a3e635;font-weight:600">${coach.motivationalMessage}</div>
             </div>` : '';
@@ -10000,12 +10003,16 @@ const PersonalCoach = (() => {
     if (!sessions.length) return null;
 
     const recent = sessions.slice(0, 5);
-    const allShots = recent.flatMap(s => s.shots);
-    const faults = FaultEngine.detectFaults(allShots);
+    // Faults from the LATEST session with that session's own conditions.
+    // `detectFaults(allShots)` flattened five sessions together and passed no
+    // session at all, so the condition gating inside the engine received
+    // nothing and a range-ball session was pooled in with the rest.
+    const latest = sessions[0];
+    const faults = FaultEngine.detectFaults(latest.shots, latest);
     const topFault = faults[0];
 
     const coachingPlan = {
-      greeting: getGreeting(),
+      greeting: getGreeting(sessions),
       assessment: generateAssessment(recent),
       topFocus: topFault,
       tips: CoachingMode.getTips(topFault?.name),
@@ -10017,7 +10024,12 @@ const PersonalCoach = (() => {
     return coachingPlan;
   }
 
-  function getGreeting() {
+  // Deterministic, keyed on the latest session. `Math.random()` re-rolled this
+  // on every re-render of the same data — the home view re-renders on a tab
+  // change — so the card greeted you differently for a session that had not
+  // changed. `FeedbackEngine.fadedReveal` was made deterministic for exactly
+  // this reason: something that changes when you look at it is not a reading.
+  function getGreeting(sessions) {
     const greetings = [
       '🎯 Ready to improve your game?',
       '⛳ Let\'s work on your consistency!',
@@ -10025,7 +10037,10 @@ const PersonalCoach = (() => {
       '💪 Keep grinding — you\'re getting better!',
       '📈 Progress is the priority.',
     ];
-    return greetings[Math.floor(Math.random() * greetings.length)];
+    const key = String((sessions && sessions[0] && (sessions[0].id || sessions[0].date)) || '');
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return greetings[h % greetings.length];
   }
 
   function generateAssessment(recentSessions) {
@@ -10048,20 +10063,23 @@ const PersonalCoach = (() => {
     return '🔧 Widely varied distances. Look club by club before reading anything into it.';
   }
 
+  // The drill comes from the gated library, not from here. This module kept a
+  // private map of four — "swing keeping your hands ahead at impact", "4
+  // o'clock to 10 o'clock feeling" — which are body-position cues that bypass
+  // `splitDrills` entirely, and which fired on a fault name rather than on
+  // anything the session measured.
   function generateDrillRecommendation(fault, sessions) {
-    const clubsUsed = new Set(sessions.flatMap(s => s.shots.map(sh => sh.clubType)));
-    const clubList = Array.from(clubsUsed).map(clubLabel).join(' & ');
-
-    if (!fault) return `Practice with your ${clubList} to build consistency.`;
-
-    const drills = {
-      'Slice': 'Inside-out drill: Swing from 4 o\'clock to 10 o\'clock feeling.',
-      'Hook': 'Outside-in feel: Exaggerate an out-to-in swing path.',
-      'Thin': 'Tee drill: Hit tees on the ground, contact after the tee.',
-      'Fat': 'Single-plane drill: Swing keeping your hands ahead at impact.',
-    };
-
-    return drills[fault.name] || `Work on ${fault.name.toLowerCase()} awareness with focused practice.`;
+    const latest = (sessions && sessions[0]) || null;
+    if (!fault || !latest) {
+      return 'Nothing recurred often enough to prescribe against. The transfer block in Practice is the ' +
+             'one most golfers skip.';
+    }
+    const lib = PracticePlan.libraryDrill(fault, latest.shots, latest);
+    if (lib.libraryDrill) return `${lib.libraryDrill.name}: ${lib.libraryDrill.desc}`;
+    if (lib.lockedNote) return lib.lockedNote;
+    const { checkable, feel } = FaultEngine.splitDrills(fault.drills);
+    const d = checkable[0] || feel[0];
+    return d ? `${d.name}: ${d.desc}` : `No drill for ${fault.name.toLowerCase()} can be run on what this session measured.`;
   }
 
   function getMotivation(sessions) {
@@ -10079,20 +10097,48 @@ const PersonalCoach = (() => {
     return messages[grade.grade] || 'Keep practicing — progress takes time!';
   }
 
+  // Round-number shot milestones said "250 shots unlocks new insights!" and
+  // nothing happens at 250 shots. The app does have real thresholds, though,
+  // and they are worth counting toward because crossing one genuinely changes
+  // what it can tell you.
   function calculateNextMilestone(sessions) {
-    const shotCount = sessions.flatMap(s => s.shots).length;
-    const milestones = [100, 250, 500, 1000, 2500, 5000];
-    const nextMilestone = milestones.find(m => m > shotCount);
-
-    if (!nextMilestone) return { milestone: 10000, progress: 'You\'ve logged 5000+ shots! Legend status.' };
-
-    const progress = Math.round((shotCount / nextMilestone) * 100);
-    return {
-      milestone: nextMilestone,
-      current: shotCount,
-      progress,
-      message: `${nextMilestone} shots unlocks new insights!`,
+    const list = sessions || [];
+    // Per club WITHIN A SESSION, not pooled across them. The dispersion tail
+    // needs 30 usable shots of one club in one sitting — pooling three
+    // twenty-shot sessions into sixty would have reported that gate as passed
+    // when no single session could produce a tail.
+    const bestIn = sn => {
+      const c = {};
+      (sn.shots || []).forEach(s => { if (s.clubType) c[s.clubType] = (c[s.clubType] || 0) + 1; });
+      return Math.max(0, ...Object.values(c));
     };
+    const best = Math.max(0, ...list.map(bestIn));
+
+    // 1. Ten shots of one club — the floor under every club mean in the app.
+    if (best < Metrics.MIN_SHOTS_REPORT) return {
+      milestone: Metrics.MIN_SHOTS_REPORT, current: best,
+      progress: Math.round((best / Metrics.MIN_SHOTS_REPORT) * 100),
+      message: `${Metrics.MIN_SHOTS_REPORT - best} more shots of one club and it gets a mean with an interval.` };
+
+    // 2. Three sessions — `Metrics.typicalError` stops using the published
+    //    table and starts using this golfer's own noise floor, which is the
+    //    single biggest change in what the app can say.
+    if (list.length < 3) return {
+      milestone: 3, current: list.length, progress: Math.round((list.length / 3) * 100),
+      message: `${3 - list.length} more session${list.length === 2 ? '' : 's'} and "is this a real change?" ` +
+               `gets answered from your own shot-to-shot spread instead of a published average.` };
+
+    // 3. Thirty shots of one club on your own ball — the dispersion tail, and
+    //    the only strokes figure in the app.
+    if (best < Metrics.MIN_SHOTS_TAIL) return {
+      milestone: Metrics.MIN_SHOTS_TAIL, current: best,
+      progress: Math.round((best / Metrics.MIN_SHOTS_TAIL) * 100),
+      message: `${Metrics.MIN_SHOTS_TAIL - best} more of one club on a premium or RPT ball unlocks the ` +
+               `dispersion tail — the app's only strokes-gained number.` };
+
+    return { milestone: null, current: best, progress: 100,
+      message: 'Every gate in the app is open on your data. What is left is the retention probe, which ' +
+               'only time answers.' };
   }
 
   return { analyzeSessions };
