@@ -309,13 +309,26 @@ button {
 .form-group input, .form-group textarea, .form-group select {
   background: var(--surface); border: 1.5px solid var(--border-hi);
   border-radius: var(--radius-sm); color: var(--text);
-  padding: .7rem 1rem; font-family: var(--font-body); font-size: .9rem; outline: none;
+  /* 16px, not .9rem. Safari on iOS zooms the whole page when a focused field is
+     under 16px and does NOT zoom back out afterwards, so every tap on a form
+     left the app scaled up and scrolled sideways. This is the single most
+     common reason a decent layout "feels broken" on an iPhone. */
+  padding: .7rem 1rem; font-family: var(--font-body); font-size: 16px; outline: none;
+  max-width: 100%;
   transition: border-color .15s, box-shadow .15s;
 }
 .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
   border-color: var(--pine); box-shadow: 0 0 0 3px rgba(220,38,38,.08);
 }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+/* A grid item's default `min-width: auto` means it refuses to shrink below its
+   content — so a <select> with a long option, or an input with a wide
+   placeholder, forced its column past the 1fr track and pushed the whole import
+   form to 496px on a 393px phone. `minmax(0, 1fr)` lets the track actually
+   shrink; `min-width: 0` on the child does the same for its own contents. */
+.form-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; }
+.form-row > .form-group { min-width: 0; }
+/* Under ~380px two columns of a labelled input are unreadable anyway. */
+@media (max-width: 380px) { .form-row { grid-template-columns: minmax(0, 1fr); } }
 textarea { resize: vertical; }
 
 /* ── Score banner ──────────────────────────────────────── */
@@ -2248,6 +2261,10 @@ canvas {
    else in the app — this is the one surface read from a metre away with
    a club in one hand. */
 html.range-open, html.range-open body { overflow: hidden; }
+
+/* iOS paints a translucent grey rectangle over anything tappable on touch.
+   The app has its own :active states, so the default just reads as a smudge. */
+a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-color: transparent; }
 .range-card{
   position:fixed;inset:0;z-index:1200;background:var(--bg);
   display:flex;align-items:stretch;justify-content:center;
@@ -2423,3 +2440,31 @@ html.range-open, html.range-open body { overflow: hidden; }
 .sg-dist-yd{font-weight:600}
 .sg-dist-rate{font-weight:700;font-variant-numeric:tabular-nums}
 .sg-dist-n{font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+
+/* ── iOS: never let a focusable text control fall under 16px ──────────
+   Safari on iOS zooms the whole page when a focused field is smaller than
+   16px, and it does not zoom back out — so one tap on a dropdown leaves the
+   app scaled up and scrolling sideways for the rest of the visit. This is the
+   single most common reason a sound layout "feels broken" on an iPhone.
+
+   Keyed on WIDTH rather than `pointer: coarse`: the pointer media feature is
+   not reliably emulated by headless Chromium, so a rule written against it
+   cannot be verified by the browser checks in test/browser — and an unverifiable
+   fix for a bug you cannot reproduce is a guess. Phone widths are where the zoom
+   happens anyway. Last in the file so it beats the per-component rules that set
+   .88rem. Checkboxes, radios and file inputs are excluded: they never trigger
+   the zoom, and a file input's font-size drives its button size. */
+@media (max-width: 640px) {
+  /* !important is deliberate and is the right tool here. This is a platform
+     constraint, not a design preference: component rules legitimately set their
+     own type scale (there are two separate `.form-group select` rules alone,
+     which is how the first attempt at this silently lost), and a bare element
+     selector can never outrank a class no matter where it sits in the file.
+     Anything that must hold across every component regardless of what that
+     component wants is exactly what this is for. */
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+    font-size: 16px !important;
+  }
+}

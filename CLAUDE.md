@@ -1084,6 +1084,45 @@ deletes only that caller's rows and auth record, service_role never leaves the
 server. `ON DELETE CASCADE` on `user_id` means removing the auth user takes the
 data with it, so the explicit row delete is defence in depth.
 
+## Phone layout — the bug that made it "look shit on iPhone"
+
+Three block elements (`#sinceHost`, `#retentionHost`, `#conditionCaveats`) sat
+**inside** `.view-header`, which is `display: flex; flex-wrap: nowrap`. Blocks
+dropped into a nowrap flex row do not stack under it — they become flex items
+*beside* the title and the delete button, and with nothing able to wrap the
+session view rendered **605px wide in a 393px viewport**. The whole page then
+scrolled sideways with body text crushed into ~90px columns.
+
+They are now siblings below the header, above the content they qualify.
+
+Two other iOS-specific fixes, both in `style.css`:
+
+- **Every focusable text control is ≥16px under 640px wide.** Safari on iOS
+  zooms the page when a focused field is smaller than that and **does not zoom
+  back out**, so one tap on a dropdown left the app scaled up and scrolling
+  sideways for the rest of the visit. The rule is keyed on **width, not
+  `pointer: coarse`** — the pointer media feature is not reliably emulated by
+  headless Chromium, so a rule written against it cannot be verified by the
+  browser checks. It uses `!important` deliberately: there are two separate
+  `.form-group select` rules, the first attempt silently lost to the later one,
+  and a bare element selector can never outrank a class.
+- **`.form-row` uses `minmax(0, 1fr)`.** A grid item's default `min-width: auto`
+  means it refuses to shrink below its content, so a `<select>` with a long
+  option pushed the import form to 496px.
+
+### `render-scan.js` now fails, and measures width
+
+It previously **only printed** — its exit status was 0 whatever it found, so
+every "render scan clean" was really "the scan ran". It now exits non-zero on
+text findings, page errors *or* horizontal overflow.
+
+The width check runs at the point a golfer actually lands on the session detail
+(straight after an import), not only via `Router.showDetail()` — the latter does
+not reproduce the same DOM and missed the bug entirely. **Verified against the
+real defect**: with all three hosts put back in the header it reports 605px and
+686px and exits 1; with one host it does not reproduce, because a single flex
+item shrinks enough to fit. That is why the control has to restore all three.
+
 ## SEO, crawlability and production metadata
 
 Guarded by `test/suites/seo-and-production.js`, because this is the category
@@ -1119,12 +1158,12 @@ loudly — it fails as a parse error somewhere unrelated. Only a request whose
 `mode === 'navigate'` falls back to the app shell now; everything else gets
 `Response.error()`.
 
-### No PII in the console (`authLog`)
+### No PII in the console
 
 The auth path logged the signed-in **email address** on every `getUser()` and
 every auth event. That is PII on a surface the privacy policy does not mention,
 which persists in devtools history and rides along in any screen-share or bug
-report. `authLog()` is gated on the same `slDebug` flag as `showDebug`, and it
+report. The `authLog()` helper is gated on the same `slDebug` flag as `showDebug`, and it
 never takes an email or a token: a log line that must be redacted before it can
 be pasted anywhere should not exist.
 

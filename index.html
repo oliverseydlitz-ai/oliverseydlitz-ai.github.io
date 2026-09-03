@@ -273,15 +273,6 @@
         <h1 class="view-title" id="detailTitle">Session</h1>
         <p class="detail-notes" id="detailNotes"></p>
       </div>
-
-    <!-- Measurement caveats — shown above any prescription -->
-    <!-- What moved since the last session under the SAME conditions. Auto-picked,
-         because "the previous session" is the obvious answer and the wrong one:
-         a premium-ball round read against last week's range bucket reports the
-         ball as progress. -->
-    <div id="sinceHost" hidden></div>
-    <div id="retentionHost" hidden></div>
-    <div id="conditionCaveats" hidden></div>
       <button class="btn-icon btn-danger" id="deleteSessionBtn" aria-label="Delete session">🗑</button>
     </div>
 
@@ -296,6 +287,19 @@
       <a class="subnav-link" data-target="secBench">Bench</a>
       <a class="subnav-link" data-target="secShots">Shots</a>
     </nav>
+
+    <!-- These three were inside .view-header, which is `display:flex` with
+         `flex-wrap:nowrap`. Block elements dropped into a nowrap flex row do not
+         stack under it — they become flex items ALONGSIDE the title and the
+         delete button, and because they cannot wrap they pushed the page to
+         605px wide on a 393px phone. The whole session view then scrolled
+         sideways with the text crushed into ~90px columns.
+         They belong here: full-width blocks, in the flow, above the content
+         they qualify. Measurement caveats come first — they change whether the
+         numbers below are admissible at all. -->
+    <div id="sinceHost" hidden></div>
+    <div id="retentionHost" hidden></div>
+    <div id="conditionCaveats" hidden></div>
 
     <!-- Coach's notes -->
     <div id="insightsCard" class="insights-card"></div>
