@@ -5661,10 +5661,19 @@ const Features = (() => {
   function achievements(sessions) {
     try {
       const all = sessions.flatMap(s => s.shots);
-      const bests = Analytics.personalBests(sessions);
-      const carry = Math.max(0, ...all.map(s => s.carryDistance || 0));
-      const ball  = Math.max(0, ...all.map(s => s.ballSpeed || 0));
-      const smash = Math.max(0, ...all.map(s => s.smashFactor || 0));
+      // A badge unlocked by the single highest reading is unlocked by the
+      // reading most likely to be wrong. "Pure Contact — hit 1.45+ smash"
+      // fired on one glitched 1.71, which is past what a legal clubface can
+      // produce. Same screen as the goals and the personal bests; carry and
+      // ball speed stay unscreened for the same reason as there.
+      const peak = (field) => {
+        const cap = Metrics.CEILING[field] ?? Infinity;
+        const vals = all.map(s => s[field]).filter(v => v > 0 && v <= cap);
+        return vals.length ? Math.max(...vals) : 0;
+      };
+      const carry = peak('carryDistance');
+      const ball  = peak('ballSpeed');
+      const smash = peak('smashFactor');
       const clubs = sortedClubs(all).length;
       const st = streak(sessions);
       const defs = [
@@ -9822,21 +9831,39 @@ const CoachingMode = (() => {
 // ════════════════════════════════════════════════════════════════
 const SessionSnapshot = (() => {
   function create(session) {
-    const shots = session.shots;
+    const shots = session.shots || [];
     const scores = shots.map(ShotScorer.score).filter(x=>x!==null);
     const avg_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     const grade = ShotScorer.grade(avg_score);
-    const faults = FaultEngine.detectFaults(shots, session).slice(0, 3);
+    // Detected once. It was called twice with identical arguments, and the
+    // engine walks every rule against every shot.
+    const allFaults = FaultEngine.detectFaults(shots, session);
+    const faults = allFaults.slice(0, 3);
+
+    // Carry, for ONE named club. A snapshot goes into text a golfer sends to
+    // other people, and "Avg Carry: 199 yds" for a session of drivers and
+    // wedges is a number describing no club anyone owns.
+    const counts = {};
+    shots.forEach(s => { if (s.clubType && s.carryDistance > 0) counts[s.clubType] = (counts[s.clubType]||0)+1; });
+    const club = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0] || null;
+    const cs = club ? shots.filter(s => s.clubType === club) : [];
+    const enough = cs.length >= Metrics.MIN_SHOTS_REPORT;
+    const iv = enough ? Metrics.interval(cs.map(s=>s.carryDistance).filter(v=>v>0), '', 0) : null;
+    const ball = Conditions.ball(session);
 
     return {
       date: formatDate(session.date),
       shotCount: shots.length,
       formScore: avg_score,
       grade: grade.letter,
-      avgCarry: fmt(avg(shots, 'carryDistance'), 0),
+      club: club ? clubLabel(club) : null,
+      clubShots: cs.length,
+      carry: iv,                                  // null below the floor
+      ballLabel: ball.label,
+      gappingValid: ball.gappingValid,
       avgBallSpeed: fmt(avg(shots, 'ballSpeed'), 1),
       topFault: faults[0]?.name || 'None',
-      faultCount: FaultEngine.detectFaults(shots, session).length,
+      faultCount: allFaults.length,
       clubs: sortedClubs(shots).map(clubLabel).join(', '),
       notes: session.notes || '',
       summary: `${shots.length} shots | Form: ${avg_score}/100 (${grade.letter}) | ${session.notes || 'Range session'}`
@@ -9844,11 +9871,18 @@ const SessionSnapshot = (() => {
   }
 
   function toShareText(snapshot) {
+    // Named club, an interval, and the ball it was hit with — the three things
+    // that decide whether the number means anything to whoever reads it.
+    const carryLine = snapshot.carry
+      ? `${snapshot.club} carry: ${fmt(snapshot.carry.mean,0)} ± ${fmt(snapshot.carry.ci,0)} yds ` +
+        `(${snapshot.carry.n} shots)\n`
+      : `No club reached ${Metrics.MIN_SHOTS_REPORT} shots, so no carry figure\n`;
     return `📊 ShotLab Session Summary\n\n` +
       `Date: ${snapshot.date}\n` +
       `Score: ${snapshot.formScore}/100 (${snapshot.grade})\n` +
       `Shots: ${snapshot.shotCount}\n` +
-      `Avg Carry: ${snapshot.avgCarry} yds\n` +
+      carryLine +
+      `Ball: ${snapshot.ballLabel}${snapshot.gappingValid ? '' : ' — distances are indicative only'}\n` +
       `Top Issue: ${snapshot.topFault}\n` +
       `\n${snapshot.summary}\n\n` +
       `Tracked with ShotLab 🎯`;
