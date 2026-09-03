@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~10,700 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 55 feature modules
+- **app.js** (~10,700 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 54 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -78,7 +78,7 @@ to hand someone starting cold.
    `ContentLibrary`
 
 6. **Dashboard / UX layer** — `QuickStats`, `Features` (see its own section
-   below), `ViewPrefs`, `EnhancedMetricsWidget`, `ResponsiveEnhancements`,
+   below), `ViewPrefs`, `EnhancedMetricsWidget`,
    `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
 
 7. **Reporting** — `PerformanceGrade`, `PerformanceAlerts`, `AnalyticsHub`,
@@ -705,7 +705,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 55 listed in Core Modules above — not the
+`Features` is one module among the 54 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -755,6 +755,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-55 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
+54 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.

@@ -9640,7 +9640,6 @@ async function init() {
   try { AccessibilityEnhancements.init(); } catch(e){ console.error('accessibility',e); }
 
   // Initialize responsive UX enhancements
-  try { ResponsiveEnhancements.enhanceMobileUX(); } catch(e){ console.error('responsive',e); }
 
   // Show welcome message with tips
   console.log('%cWelcome to ShotLab v3.0 🏌️', 'font-size:16px;font-weight:bold;color:#0070f3');
@@ -10588,42 +10587,15 @@ const PerformanceAlerts = (() => {
 // ════════════════════════════════════════════════════════════════
 // ResponsiveEnhancements — Mobile-first UX optimizations
 // ════════════════════════════════════════════════════════════════
-const ResponsiveEnhancements = (() => {
-  function enhanceMobileUX() {
-    // Add swipe support for session cards
-    let touchStartX = 0;
-    document.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-    }, { passive: true });
-
-    document.addEventListener('touchend', (e) => {
-      const touchEndX = e.changedTouches[0].clientX;
-      const diff = touchStartX - touchEndX;
-      if (Math.abs(diff) > 100) {
-        const card = e.target.closest('.session-card');
-        if (card && diff > 0) {
-          // Swiped left — show more actions
-          card.style.transform = 'translateX(-20px)';
-          setTimeout(() => card.style.transform = '', 300);
-        }
-      }
-    }, { passive: true });
-  }
-
-  function getViewportSize() {
-    return {
-      isPhone: window.innerWidth < 480,
-      isTablet: window.innerWidth >= 480 && window.innerWidth < 1024,
-      isDesktop: window.innerWidth >= 1024,
-    };
-  }
-
-  function addOrientationListener(callback) {
-    window.addEventListener('orientationchange', callback);
-  }
-
-  return { enhanceMobileUX, getViewportSize, addOrientationListener };
-})();
+// ResponsiveEnhancements is gone. Its one wired function attached two
+// document-level touch listeners so that a left-swipe on a session card would
+// nudge it 20px and spring back — under a comment reading "Swiped left — show
+// more actions". There were no more actions. A gesture that promises an
+// interaction and delivers a twitch is worse than no gesture, and it cost
+// every touch on the page a pair of handlers.
+//
+// Its other two exports, `getViewportSize` and `addOrientationListener`, were
+// never called by anything; the media queries in style.css do that work.
 
 // ════════════════════════════════════════════════════════════════
 // ClubAnalyzer — Deep-dive club-by-club performance
@@ -10816,7 +10788,8 @@ const EnhancedMetricsWidget = (() => {
     return {
       grade: grade.letter,
       score: avgScore,
-      carry: Math.round(avg(allShots, 'carryDistance') || 0),
+      // No `carry` here. It was a bag-pooled mean, it was never rendered by
+      // `renderWidget`, and a pooled carry is a number for a bag nobody owns.
       consistency,
       sessions: sessions.length,
       shots: allShots.length,
