@@ -5595,16 +5595,50 @@ const Goals = (() => {
 // ViewPrefs — customizable dashboard and view settings
 // ════════════════════════════════════════════════════════════════
 const ViewPrefs = (() => {
+  // Five toggles in Settings that did nothing.
+  //
+  // They flipped a checkmark, wrote to localStorage, and NOTHING EVER READ THE
+  // VALUE: `getPrefs()` was called in exactly one place, to paint the
+  // checkmarks on the toggles themselves. A golfer turning off "Show fault
+  // detection" saw fault detection. Two of the five named features that had
+  // been deleted in the unreachable-module cleanup, so they could not have
+  // worked even in principle.
+  //
+  // Each pref now puts a class on <html> and CSS does the hiding. That is the
+  // part that matters: a re-render cannot undo a class on the root element,
+  // whereas anything that sets `hidden` on a section gets wiped by the next
+  // `innerHTML =` and the setting quietly stops working again.
   const STORAGE_KEY = 'slViewPrefs';
 
   const defaults = {
     showHeatmap: true,
     showFaults: true,
-    showClubBreakdown: true,
-    showTrendChart: true,
+    showGapping: true,
     showComparison: true,
     densityMode: false,
   };
+
+  // pref -> the class that hides what it names. Every entry points at a
+  // section that exists; `showTrendChart` and `showClubBreakdown` did not and
+  // are gone.
+  const CLASS = {
+    showHeatmap:    'pref-no-heatmap',
+    showFaults:     'pref-no-faults',
+    showGapping:    'pref-no-gapping',
+    showComparison: 'pref-no-comparison',
+    densityMode:    'pref-dense',
+  };
+
+  function apply() {
+    const p = getPrefs();
+    const root = document.documentElement;
+    if (!root) return;
+    Object.entries(CLASS).forEach(([key, cls]) => {
+      // densityMode is the one that adds a class when ON; the rest hide.
+      const on = !!p[key];
+      root.classList.toggle(cls, key === 'densityMode' ? on : !on);
+    });
+  }
 
   function getPrefs() {
     try {
@@ -5617,16 +5651,18 @@ const ViewPrefs = (() => {
     const prefs = getPrefs();
     prefs[key] = value;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch (_) {}
+    apply();
   }
 
   function togglePref(key) {
     const prefs = getPrefs();
     prefs[key] = !prefs[key];
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch (_) {}
+    apply();
     return prefs[key];
   }
 
-  return { getPrefs, setPref, togglePref };
+  return { getPrefs, setPref, togglePref, apply, CLASS };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -9422,23 +9458,33 @@ async function init() {
   console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages | Ctrl+?: Help');
 
   // View preferences toggles
-  const prefs = ViewPrefs.getPrefs();
-  ['Heatmap','Faults','ClubBreak','Comparison','Density'].forEach(name => {
-    const key = name.charAt(0).toLowerCase() + name.slice(1);
-    const storageKey = 'show' + name[0].toUpperCase() + name.slice(1);
-    const btn = document.getElementById('pref' + name);
-    const toggle = document.getElementById('pref' + name + 'Toggle');
-    if (btn && toggle) {
-      btn.addEventListener('click', () => {
-        const newVal = ViewPrefs.togglePref(storageKey === 'showDensity' ? 'densityMode' : storageKey);
-        toggle.textContent = newVal ? '✓' : '';
-        toggle.style.color = newVal ? 'var(--pine)' : 'var(--text-dim)';
-      });
-      const isOn = prefs[storageKey === 'showDensity' ? 'densityMode' : storageKey];
-      toggle.textContent = isOn ? '✓' : '';
-      toggle.style.color = isOn ? 'var(--pine)' : 'var(--text-dim)';
-    }
-  });
+  // Element id -> pref key, stated rather than derived. The old version built
+  // the key with `'show' + name` and then special-cased Density back out of
+  // it, which is how `showClubBreak` came to be stored while the defaults
+  // called it `showClubBreakdown` — a pref that could never match its default.
+  const PREF_BUTTONS = {
+    prefHeatmap:    'showHeatmap',
+    prefFaults:     'showFaults',
+    prefClubBreak:  'showGapping',
+    prefComparison: 'showComparison',
+    prefDensity:    'densityMode',
+  };
+  const paintPref = (id, on) => {
+    const toggle = document.getElementById(id + 'Toggle');
+    if (!toggle) return;
+    toggle.textContent = on ? '✓' : '';
+    toggle.style.color = on ? 'var(--pine)' : 'var(--text-dim)';
+  };
+  {
+    const prefs = ViewPrefs.getPrefs();
+    Object.entries(PREF_BUTTONS).forEach(([id, key]) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      paintPref(id, !!prefs[key]);
+      btn.addEventListener('click', () => paintPref(id, ViewPrefs.togglePref(key)));
+    });
+    ViewPrefs.apply();
+  }
 
   // Device storage — off by default, and the note under it always says what
   // the current state actually means rather than what the switch is called.
