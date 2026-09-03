@@ -5589,13 +5589,25 @@ const Goals = (() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(goals)); } catch (_) {}
   }
 
+  // A goal measured against a single maximum is measured against the reading
+  // most likely to be a misread — the extreme value of the distribution, on a
+  // device that has logged a 147 mph swing next to a 0 mph one. A smash goal
+  // of 1.50 was "achieved" by one glitched 1.71, which is past what a legal
+  // clubface can produce. `Metrics.CEILING` is the same screen the personal
+  // bests use.
+  function best(all, field) {
+    const cap = Metrics.CEILING[field] ?? Infinity;
+    const vals = all.map(s => s[field]).filter(v => v > 0 && v <= cap);
+    return vals.length ? Math.max(...vals) : 0;
+  }
+
   function getProgress(metric, sessions) {
-    const all = sessions.flatMap(s => s.shots);
+    const all = (sessions || []).flatMap(s => s.shots || []);
     let current = null;
     switch(metric) {
-      case 'carry':      current = Math.max(0, ...all.map(s => s.carryDistance || 0)); break;
-      case 'ball_speed': current = Math.max(0, ...all.map(s => s.ballSpeed || 0)); break;
-      case 'smash':      current = Math.max(0, ...all.map(s => s.smashFactor || 0)); break;
+      case 'carry':      current = best(all, 'carryDistance'); break;
+      case 'ball_speed': current = best(all, 'ballSpeed'); break;
+      case 'smash':      current = best(all, 'smashFactor'); break;
       case 'sessions':   current = sessions.length; break;
       case 'score':      {
         const scores = sessions.slice(0,3).map(s => {
@@ -8984,7 +8996,7 @@ async function init() {
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Launch Angle</div>
               <div style="font-size:1.5rem;font-weight:800">${metrics.launchAngleAvg}°</div>
-              <div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Range: ${metrics.launchAngleRange[0].toFixed(1)}° - ${metrics.launchAngleRange[1].toFixed(1)}°</div>
+              ${metrics.launchAngleRange ? `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Range: ${metrics.launchAngleRange[0].toFixed(1)}° - ${metrics.launchAngleRange[1].toFixed(1)}°</div>` : ''}
             </div>
             <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Practice Frequency</div>
@@ -10162,7 +10174,9 @@ const AnalyticsHub = (() => {
     const allShots = sessions.flatMap(s => s.shots);
     const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
     const ballSpeeds = allShots.map(s => s.ballSpeed || 0).filter(b => b > 0);
-    const launchAngles = allShots.map(s => s.launchAngle || 0);
+    // `|| 0` turned every missing launch angle into a 0° reading, so the
+    // range always started at 0 — a launch nobody has ever produced.
+    const launchAngles = allShots.map(s => s.launchAngle).filter(Number.isFinite);
 
     return {
       totalSessions: sessions.length,
@@ -10172,7 +10186,7 @@ const AnalyticsHub = (() => {
       ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
       ballSpeedMax: Math.max(...ballSpeeds),
       launchAngleAvg: fmt(avg(allShots, 'launchAngle'), 1),
-      launchAngleRange: [Math.min(...launchAngles), Math.max(...launchAngles)],
+      launchAngleRange: launchAngles.length ? [Math.min(...launchAngles), Math.max(...launchAngles)] : null,
       sessionFrequency: calculateFrequency(sessions),
       improvementTrend: calculateTrend(sessions),
       topPerformers: getTopClubs(allShots),
@@ -10181,11 +10195,17 @@ const AnalyticsHub = (() => {
 
   function calculateFrequency(sessions) {
     if (sessions.length < 2) return 'Starting';
-    const oldest = new Date(sessions[sessions.length-1].date);
-    const newest = new Date(sessions[0].date);
-    const days = Math.ceil((newest - oldest) / (1000*60*60*24));
-    const sessionsPerWeek = (sessions.length / days * 7).toFixed(1);
-    return `${sessionsPerWeek} sessions/week`;
+    const oldest = new Date(sessions[sessions.length-1].date).getTime();
+    const newest = new Date(sessions[0].date).getTime();
+    if (!Number.isFinite(oldest) || !Number.isFinite(newest)) return 'Dates not recorded';
+    const days = Math.ceil((newest - oldest) / 864e5);
+    // Every session on the same day gives days = 0 and `n / 0 * 7` is
+    // Infinity — the modal read "Infinity sessions/week".
+    if (days < 1) return `${sessions.length} sessions, all one day`;
+    // And a rate off a span shorter than a week is arithmetic, not a habit:
+    // two sessions two days apart is not "7.0 sessions/week".
+    if (days < 7) return `${sessions.length} sessions over ${days} day${days === 1 ? '' : 's'}`;
+    return `${(sessions.length / days * 7).toFixed(1)} sessions/week`;
   }
 
   function calculateTrend(sessions) {
