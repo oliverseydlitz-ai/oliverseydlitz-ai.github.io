@@ -849,6 +849,10 @@ body.modal-open { overflow: hidden; }
   color:var(--text-muted);text-transform:uppercase}
 .quick-stat-wide{flex:3 1 auto}
 .quick-stat-note{font-size:.7rem;line-height:1.45;color:var(--text-muted);text-wrap:pretty;text-align:left}
+/* A flight with no launch reading is not drawn at all — an invented 12° with
+   "12.0° launch" written under it is a measurement that does not exist. */
+.traj-none{padding:1rem;font-size:.8rem;line-height:1.5;color:var(--text-muted);text-align:center;text-wrap:pretty}
+.traj-note{margin-top:.3rem;font-size:.68rem;line-height:1.4;color:var(--text-muted);text-align:center;text-wrap:pretty}
 .fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;

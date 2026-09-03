@@ -5882,10 +5882,22 @@ const Features = (() => {
 // Trajectory — SVG side-profile ball flight
 // ────────────────────────────────────────────────────────────────
 const Trajectory = (() => {
+  // The ball-flight drawing. Two things it must not do, and did:
+  //
+  //   1. `launch = launch > 0 ? launch : 12` substituted an invented 12 degrees
+  //      when there was no reading — and then LABELLED IT, so a shot the
+  //      device gave no launch angle for was drawn with "12.0 deg launch"
+  //      written under it. That is stating a measurement that does not exist.
+  //   2. Apex and descent are tier-3 modelled outputs, not measurements. The
+  //      picture is fine to show; it just has to say what it is.
+  //
+  // With no launch or no descent there is no flight to draw, so it says so.
   function arc(launch, apexFt, carryYds, descent, opts={}) {
     const W=opts.w||340, H=opts.h||170, pad=opts.pad||26;
-    launch  = launch  > 0 ? launch  : 12;
-    descent = descent > 0 ? descent : 40;
+    if (!(launch > 0) || !(descent > 0)) {
+      return `<div class="traj-none">No ball flight to draw — this ` +
+        `${!(launch > 0) ? 'shot has no launch angle' : 'shot has no descent angle'} recorded.</div>`;
+    }
     const tl=Math.tan(launch*Math.PI/180), td=Math.tan(descent*Math.PI/180);
     let frac = td/(tl+td);
     if (!isFinite(frac) || frac<=0.05 || frac>=0.95) frac=0.6;
@@ -5912,9 +5924,13 @@ const Trajectory = (() => {
         <text x="${ax}" y="${ay-7}" text-anchor="middle" class="traj-lbl">${fmt(apexFt,0)} ft</text>
         <text x="${gx0}" y="${gy+15}" text-anchor="start" class="traj-lbl">${fmt(launch,1)}° launch</text>
         <text x="${gx1}" y="${gy+15}" text-anchor="end" class="traj-lbl">${fmt(carryYds,0)} yds carry</text>
-      </svg>`;
+      </svg>
+      <div class="traj-note">Apex, carry and descent are computed by the monitor from launch conditions,
+      not measured. The shape is indicative.</div>`;
   }
   const shot = s => arc(s.launchAngle, s.apex, s.carryDistance, s.descentAngle);
+  // A mean of a field the parser never filled is null, not a number, so the
+  // averaged flight refuses on the same terms as a single shot does.
   const avgFlight = shots => shots.length
     ? arc(avg(shots,'launchAngle'), avg(shots,'apex'), avg(shots,'carryDistance'), avg(shots,'descentAngle'))
     : '';
