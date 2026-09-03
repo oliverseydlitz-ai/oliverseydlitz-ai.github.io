@@ -191,6 +191,55 @@ console.log('— and no module keeps its own copy of a launch-metric threshold �
      'and no private copy of the amateur smash rows — Benchmarks.get(club).am.sf has them per club');
 }
 
+console.log('— and every fault detection is handed its session —');
+// `detectFaults(shots, session)` reads ball type, surface and alignment off
+// the session. Called with one argument it gets `null` and NO CONDITION GATE
+// APPLIES — a range-ball session is graded exactly like a premium one, which
+// is the comparison the rest of the app refuses everywhere.
+//
+// Eleven call sites dropped it, including `renderFaultCards` (the session
+// detail's main analysis surface) and `renderPracticePlan` (the headline
+// practice feature). It kept happening because the one-argument form is
+// perfectly valid JavaScript and the output looks right.
+{
+  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  // Balanced-paren scan, not a regex. The regex version reported
+  // `detectFaults((sessions[0] || {}).shots || [], sessions[0] || null)` as
+  // taking one argument, because a non-greedy `[^;]*?` stops at the first
+  // closing paren — which here is the one inside the first argument. Counting
+  // arguments in a language with nested calls is not a regular-expression job.
+  const argsOf = (text, needle) => {
+    const out = [];
+    let i = 0;
+    while ((i = text.indexOf(needle, i)) !== -1) {
+      let depth = 0, j = i + needle.length - 1, top = [], cur = '';
+      for (; j < text.length; j++) {
+        const c = text[j];
+        if (c === '(' || c === '[' || c === '{') { depth++; if (depth === 1) continue; }
+        else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) { top.push(cur); break; } }
+        else if (c === ',' && depth === 1) { top.push(cur); cur = ''; continue; }
+        cur += c;
+      }
+      out.push({ index: i, args: top.filter(a2 => a2.trim() !== '').length });
+      i = j;
+    }
+    return out;
+  };
+  const calls = argsOf(bare, 'FaultEngine.detectFaults(');
+  ok(calls.length >= 10, `found ${calls.length} detectFaults call sites to check`);
+  const oneArg = calls.filter(c => c.args < 2)
+    .map(c => `line ${bare.slice(0, c.index).split('\n').length}`);
+  ok(oneArg.length === 0,
+     `every call passes its session${oneArg.length ? ' — not ' + oneArg.join(', ') : ''}`);
+
+  // Same shape, same reason: generate(shots, totalMin, session). Passing the
+  // session as `totalMin` made every block's minutes and balls NaN.
+  const badGen = argsOf(bare, 'PracticePlan.generate(').filter(c => c.args < 3)
+    .map(c => `line ${bare.slice(0, c.index).split('\n').length}`);
+  ok(badGen.length === 0,
+     `every PracticePlan.generate passes shots, minutes AND session${badGen.length ? ' — not ' + badGen.join(', ') : ''}`);
+}
+
 // A check that cannot fail proves nothing, and this one is a string search —
 // exactly the shape that quietly stops discriminating. `ViewPrefs.setPref` is
 // confirmed dead and deliberately left in place (HANDOVER lists it), so it is

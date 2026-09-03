@@ -4977,13 +4977,13 @@ const Insights = (() => {
     }).filter(c => c.count >= 2).sort((a,b)=>b.score-a.score);
   }
 
-  function generate(shots) {
+  function generate(shots, session) {
     if (!shots.length) return null;
     const scores = shots.map(ShotScorer.score).filter(x=>x!==null);
     const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     const grade = ShotScorer.grade(avgScore);
     const cq = clubQuality(shots);
-    const faults = FaultEngine.detectFaults(shots);
+    const faults = FaultEngine.detectFaults(shots, session);
     const highFaults = faults.filter(f=>f.severity==='high');
 
     const strengths = [], improvements = [];
@@ -5516,7 +5516,7 @@ const SmartRecommendations = (() => {
 const PracticePlans = (() => {
   function generatePlan(sessions) {
     if (!sessions.length) return null;
-    const faults = FaultEngine.detectFaults(sessions[0].shots);
+    const faults = FaultEngine.detectFaults(sessions[0].shots, sessions[0]);
     const st = Features.streak(sessions);
 
     const plans = [];
@@ -5716,10 +5716,14 @@ const Features = (() => {
   // Aggregates fault frequency across recent sessions into one clear priority.
   function focus(sessions) {
     try {
+      // Per session, then pooled — not five sessions flattened into one call.
+      // Flattening dropped the session entirely, so `detectFaults` could apply
+      // no condition gate at all and a range-ball session counted the same as
+      // a premium one.
       const recent = sessions.slice(0, 5);
       const shots = recent.flatMap(s => s.shots);
       if (shots.length < 5) return null;
-      const faults = FaultEngine.detectFaults(shots);
+      const faults = recent.flatMap(sn => FaultEngine.detectFaults(sn.shots, sn));
       if (!faults.length) return { clean: true };
       const ranked = [...faults].sort((a,b) =>
         (b.severity==='high'?2:b.severity==='low'?0:1) - (a.severity==='high'?2:a.severity==='low'?0:1)
@@ -5838,7 +5842,7 @@ const Features = (() => {
       if (recentScore > prevScore + 10) alerts.push({ type: 'improvement', msg: `+${Math.round(recentScore-prevScore)} pts! Keep it up!` });
       if (recentScore < prevScore - 10) alerts.push({ type: 'decline', msg: `Session was -${Math.round(prevScore-recentScore)} pts. Check your setup.` });
 
-      const faults = FaultEngine.detectFaults(recent.shots);
+      const faults = FaultEngine.detectFaults(recent.shots, recent);
       if (faults.some(f=>f.severity==='high')) alerts.push({ type: 'fault', msg: `${faults[0].name} detected. Want to drill it?` });
 
       return alerts;
@@ -6215,7 +6219,7 @@ const UI = (() => {
     const longest=bests.find(b=>b.label==='Longest Carry');
     const topBall=bests.find(b=>b.label==='Top Ball Speed');
     const last=sessions[0];
-    const lastFaults=FaultEngine.detectFaults(last.shots);
+    const lastFaults=FaultEngine.detectFaults(last.shots, last);
     const topFault=lastFaults.find(f=>f.severity==='high')||lastFaults[0];
 
     dash.innerHTML = `
@@ -6288,7 +6292,7 @@ const UI = (() => {
     empty.style.display='none'; el.hidden=false;
 
     el.innerHTML = sessions.map(s => {
-      const faults = FaultEngine.detectFaults(s.shots);
+      const faults = FaultEngine.detectFaults(s.shots, s);
       const scores = s.shots.map(ShotScorer.score).filter(x=>x!==null);
       const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
       const grade = avgScore ? ShotScorer.grade(avgScore) : null;
@@ -6424,7 +6428,7 @@ const UI = (() => {
     renderBallFlight(shots);
     renderGapping(_session.shots, _session);
     renderLaunchWindows(shots);
-    renderFaultCards(shots);
+    renderFaultCards(shots, _session);
     renderPracticePlan(shots, _session);
     renderBenchTable(shots);
     renderShotTable(shots);
@@ -6532,7 +6536,7 @@ const UI = (() => {
   function renderInsights(shots) {
     const el = document.getElementById('insightsCard');
     if (!el) return;
-    const ins = Insights.generate(shots);
+    const ins = Insights.generate(shots, _session);
     if (!ins) { el.innerHTML=''; return; }
     el.innerHTML = `
       <div class="insights-head">
@@ -7081,8 +7085,8 @@ const UI = (() => {
   }
 
   // ── Fault cards ───────────────────────────────────────────────
-  function renderFaultCards(shots) {
-    const faults = FaultEngine.detectFaults(shots);
+  function renderFaultCards(shots, session) {
+    const faults = FaultEngine.detectFaults(shots, session);
     const el = document.getElementById('faultList');
     if (!faults.length) {
       el.innerHTML=`<div class="no-faults">✅ No faults detected in this selection. Keep it up!</div>`; return;
@@ -7376,7 +7380,9 @@ const UI = (() => {
     if (!modal || !shot) return;
     const sc = ShotScorer.score(shot);
     const g = sc!==null ? ShotScorer.grade(sc) : null;
-    const faults = FaultEngine.detectFaults([shot]);
+    // One shot, but still with the session's conditions — the gates inside
+    // the engine key off ball and surface, not off how many shots there are.
+    const faults = FaultEngine.detectFaults([shot], _session);
 
     const cmp = (field, dec) => {
       const v = shot[field], a = avg(sessionShots, field);
@@ -9831,7 +9837,7 @@ const SessionSnapshot = (() => {
     const scores = shots.map(ShotScorer.score).filter(x=>x!==null);
     const avg_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
     const grade = ShotScorer.grade(avg_score);
-    const faults = FaultEngine.detectFaults(shots).slice(0, 3);
+    const faults = FaultEngine.detectFaults(shots, session).slice(0, 3);
 
     return {
       date: formatDate(session.date),
@@ -9841,7 +9847,7 @@ const SessionSnapshot = (() => {
       avgCarry: fmt(avg(shots, 'carryDistance'), 0),
       avgBallSpeed: fmt(avg(shots, 'ballSpeed'), 1),
       topFault: faults[0]?.name || 'None',
-      faultCount: FaultEngine.detectFaults(shots).length,
+      faultCount: FaultEngine.detectFaults(shots, session).length,
       clubs: sortedClubs(shots).map(clubLabel).join(', '),
       notes: session.notes || '',
       summary: `${shots.length} shots | Form: ${avg_score}/100 (${grade.letter}) | ${session.notes || 'Range session'}`
@@ -10340,7 +10346,10 @@ const LearningPath = (() => {
   function generatePath(sessions) {
     if (!sessions.length) return null;
 
-    const faults = FaultEngine.detectFaults(sessions.flatMap(s => s.shots));
+    // Latest session with its own conditions. Flattening every session ever
+    // logged into one call pooled ball types AND made the path react to shots
+    // from months ago as if they were today's.
+    const faults = FaultEngine.detectFaults((sessions[0] || {}).shots || [], sessions[0] || null);
     const topFaults = faults.slice(0, 3);
     const skillLevel = CommunityInsights.estimateSkillLevel(sessions);
 
