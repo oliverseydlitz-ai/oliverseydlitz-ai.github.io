@@ -8911,6 +8911,73 @@ async function init() {
   document.getElementById('exportCsvBtn')?.addEventListener('click', exportAs('csv'));
   document.getElementById('exportJsonBtn')?.addEventListener('click', exportAs('json'));
 
+  // ── Restore from a backup ────────────────────────────────────
+  // Two steps on purpose, the same shape as the CSV import: read and show what
+  // is in the file, then write only when the golfer says so. A restore that
+  // starts writing the moment a file is picked gives nobody a chance to notice
+  // they chose the wrong one.
+  {
+    const btn = document.getElementById('restoreBtn');
+    const input = document.getElementById('restoreInput');
+    const host = document.getElementById('restoreHost');
+    const esc = t => Sanitize.escape(String(t));
+    let pending = null;
+
+    btn?.addEventListener('click', () => { if (host) host.innerHTML = ''; input?.click(); });
+
+    input?.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.value = '';                       // so the same file can be picked twice
+      if (!file || !host) return;
+      let text = '';
+      try { text = await file.text(); }
+      catch (e) { host.innerHTML = `<div class="tail-note">Could not read that file.</div>`; return; }
+
+      const parsed = SessionSharing.readBackup(text);
+      if (!parsed.ok) {
+        pending = null;
+        host.innerHTML = `<div class="tail-note"><strong>Not restored.</strong> ${esc(parsed.why)}</div>`;
+        return;
+      }
+      pending = parsed;
+      const existing = await Store.getSessions();
+      const have = new Set(existing.map(s => s.id));
+      const fresh = parsed.sessions.filter(s => !have.has(s.id)).length;
+      const dup = parsed.sessions.length - fresh;
+      const span = parsed.from && parsed.to
+        ? `${formatDate(parsed.from)} to ${formatDate(parsed.to)}` : 'dates not recorded';
+
+      host.innerHTML = `
+        <div class="tail-note">
+          <strong>${parsed.sessions.length} session${parsed.sessions.length === 1 ? '' : 's'}</strong>
+          in that file — ${parsed.shots} shots, ${esc(span)}.
+          ${dup ? `${dup} of them ${dup === 1 ? 'is' : 'are'} already on this device and will be left alone:
+                   the copy here may have notes or conditions added since the backup was taken.` : ''}
+          ${parsed.rejected && parsed.rejected.length
+            ? `<br>${parsed.rejected.length} entr${parsed.rejected.length === 1 ? 'y was' : 'ies were'} skipped —
+               ${esc(parsed.rejected.slice(0, 3).join('; '))}${parsed.rejected.length > 3 ? '…' : ''}.` : ''}
+        </div>
+        ${fresh
+          ? `<button class="btn-primary btn-sm" id="restoreGo" style="margin:.4rem 0 .2rem">
+               Restore ${fresh} session${fresh === 1 ? '' : 's'}</button>`
+          : `<div class="tail-note">Everything in that backup is already here. Nothing to restore.</div>`}`;
+
+      document.getElementById('restoreGo')?.addEventListener('click', async () => {
+        const go = document.getElementById('restoreGo');
+        if (!pending || !go) return;
+        go.disabled = true; go.textContent = 'Restoring…';
+        const res = await SessionSharing.restore(pending, await Store.getSessions());
+        host.innerHTML = `<div class="tail-note"><strong>Restored ${res.saved}
+          session${res.saved === 1 ? '' : 's'}.</strong>
+          ${res.skipped ? `${res.skipped} already here and untouched. ` : ''}
+          ${res.failed ? `${res.failed} could not be written — see the console.` : ''}</div>`;
+        pending = null;
+        toast(`📥 Restored ${res.saved} session${res.saved === 1 ? '' : 's'}`);
+        try { await Router.showSessions(); } catch (_) {}
+      });
+    });
+  }
+
   // Delete account (authenticated users only)
   document.getElementById('deleteAccountBtn')?.addEventListener('click', ()=>{
     const user = Auth.getUser();
@@ -10136,7 +10203,70 @@ const SessionSharing = (() => {
     return `${window.location.origin}?shared=${encoded}`;
   }
 
-  return { shareText, copyToClipboard, exportAsJSON, exportAsCSV, createShareLink, toCSV, csvCell };
+  // ── Restore ───────────────────────────────────────────────────
+  // The export writes `shotlab-backup-2026-09-03.json` and nothing could read
+  // it back. A backup you cannot restore from is a download, and the filename
+  // was making a promise the app had no way to keep.
+  //
+  // Read at the door, like the CSV parser: a file that is not a ShotLab backup
+  // is refused with the reason rather than imported as a session of nothing.
+  const BACKUP_SHAPE =
+    'A ShotLab backup is a JSON array of sessions, each with an id, a date and a shots array.';
+
+  function readBackup(text) {
+    let data;
+    try { data = JSON.parse(text); }
+    catch (e) { return { ok: false, why: `That file is not valid JSON. ${BACKUP_SHAPE}` }; }
+    if (!Array.isArray(data)) {
+      return { ok: false, why: `That file holds a ${typeof data}, not a list of sessions. ${BACKUP_SHAPE}` };
+    }
+    if (!data.length) return { ok: false, why: 'That backup is empty — there are no sessions in it.' };
+
+    const good = [], bad = [];
+    data.forEach((s, i) => {
+      if (!s || typeof s !== 'object') { bad.push(`entry ${i + 1} is not a session`); return; }
+      if (!s.id || typeof s.id !== 'string') { bad.push(`entry ${i + 1} has no id`); return; }
+      if (!s.date) { bad.push(`session ${s.id} has no date`); return; }
+      if (!Array.isArray(s.shots)) { bad.push(`session ${s.id} has no shots array`); return; }
+      // A session of nothing is the case the CSV importer refuses at the door,
+      // and a backup can carry one just as easily.
+      if (!s.shots.length) { bad.push(`session ${s.id} has no shots in it`); return; }
+      if (!s.shots.some(x => x && x.clubType)) {
+        bad.push(`session ${s.id} has shots with no club on any of them`); return;
+      }
+      good.push(s);
+    });
+    if (!good.length) {
+      return { ok: false, why: `Nothing in that file is a session. ${BACKUP_SHAPE}`, rejected: bad };
+    }
+
+    const dates = good.map(s => new Date(s.date).getTime()).filter(Number.isFinite).sort();
+    return {
+      ok: true, sessions: good, rejected: bad,
+      shots: good.reduce((n, s) => n + s.shots.length, 0),
+      from: dates.length ? new Date(dates[0]).toISOString() : null,
+      to:   dates.length ? new Date(dates[dates.length - 1]).toISOString() : null,
+    };
+  }
+
+  // Merge, never clobber. A session already on this device wins: the copy here
+  // may have notes or conditions added since the backup was taken, and a
+  // restore that silently overwrote them would be a data-loss bug wearing the
+  // word "restore".
+  async function restore(parsed, existing) {
+    const have = new Set((existing || []).map(s => s.id));
+    const fresh = parsed.sessions.filter(s => !have.has(s.id));
+    const skipped = parsed.sessions.length - fresh.length;
+    let saved = 0;
+    for (const s of fresh) {
+      try { await Store.saveSession(Store.stamp({ ...s, restoredAt: Date.now() })); saved++; }
+      catch (e) { console.error('restore', s.id, e); }
+    }
+    return { saved, skipped, failed: fresh.length - saved };
+  }
+
+  return { shareText, copyToClipboard, exportAsJSON, exportAsCSV, createShareLink, toCSV, csvCell,
+           readBackup, restore, BACKUP_SHAPE };
 })();
 
 // ════════════════════════════════════════════════════════════════

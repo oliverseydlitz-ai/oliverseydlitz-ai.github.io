@@ -556,6 +556,14 @@
           <span>Export all data as JSON</span>
           <span class="settings-arrow">→</span>
         </button>
+        <!-- The JSON export is named "backup" and nothing could read it back.
+             This is the other half of that. -->
+        <button class="settings-row" id="restoreBtn">
+          <span>Restore from a backup file</span>
+          <span class="settings-arrow">→</span>
+        </button>
+        <input type="file" id="restoreInput" accept="application/json,.json" hidden>
+        <div id="restoreHost" style="padding:0 .85rem"></div>
         <button class="settings-row" id="showAnalyticsBtn" style="cursor:pointer">
           <span>📊 View Analytics</span>
           <span class="settings-arrow">→</span>

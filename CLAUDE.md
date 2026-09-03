@@ -634,6 +634,28 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### Backup and restore (`SessionSharing`)
+
+`exportAsJSON` writes `shotlab-backup-<date>.json` and, for as long as it
+existed, **nothing could read it back**. A backup you cannot restore from is a
+download, and the filename was making a promise the app had no way to keep.
+
+`readBackup(text)` refuses at the door, the same discipline `CSVParser` uses
+on a non-Rapsodo file: not JSON, not an array, empty, or entries with no id /
+no date / no shots array / no shots / no club on any shot. Each refusal names
+what was wrong. A partly-broken file keeps the good sessions and reports what
+it dropped rather than failing whole.
+
+`restore(parsed, existing)` **merges and never overwrites.** A session already
+on the device wins, because the copy here may have notes or conditions added
+since the backup was taken — a restore that silently replaced them is a
+data-loss bug wearing the word "restore". It is idempotent: restoring the same
+file twice adds nothing the second time.
+
+The UI is two steps on purpose, like the CSV import: read the file and show
+what is in it (sessions, shots, date range, how many are already here), then
+write only on an explicit press.
+
 ## Tests — run these before every push
 
 ```bash
