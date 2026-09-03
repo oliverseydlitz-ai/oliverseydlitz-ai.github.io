@@ -587,7 +587,7 @@ and is the only "lesson" this app has ever had.
 **Before adding any number to a screen, ask where it comes from.** If the
 answer is a constant somebody typed, it does not go in.
 
-### Passing the session (`detectFaults`, `PracticePlan.generate`)
+### Passing the session into `FaultEngine` and `PracticePlan`
 
 `FaultEngine.detectFaults(shots, session)` reads ball type, surface and
 alignment off the session. **Called with one argument it gets `null` and no
