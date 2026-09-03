@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 56 feature modules
+- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 57 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -80,7 +80,7 @@ to hand someone starting cold.
    `ContentLibrary`
 
 6. **Dashboard / UX layer** — `QuickStats`, `Features` (see its own section
-   below), `ViewPrefs`, `EnhancedMetricsWidget`,
+   below), `SessionTags` (a finder, never a variable), `ViewPrefs`, `EnhancedMetricsWidget`,
    `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
 
 7. **Reporting** — `PerformanceGrade`, `PerformanceAlerts`, `AnalyticsHub`,
@@ -554,6 +554,32 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
   session's conditions (they answer "how am I hitting it now"). A test pins
   that they disagree on the same data.
 
+### Session tags (`SessionTags`) — a finder, never a variable
+
+The session search filters notes as free text, which answers "the one where I
+wrote about the shaft" only if you remember the words you used. A `#tag` is the
+same note with a handle on it.
+
+**They live inside the notes field on purpose.** A separate tags array would be
+a schema change, a migration, a second thing to sync and another field the
+backup format has to carry — for something the golfer is already typing.
+Sessions imported before this existed simply have no tags, which is correct.
+
+**`NOT_A_VARIABLE` is the rule.** "Your #newshaft sessions carry 8 yards
+further" is exactly the uncontrolled comparison the app refuses everywhere else:
+the golfer chose which sessions to tag, nothing was randomised, and nothing
+holds ball, surface, club mix or form constant across it. So tags filter the
+list and feed the search box, and **no module computes a statistic per tag**.
+The suite counts the call sites so a per-tag number would show up as a pile of
+them.
+
+Smaller decisions, each with a reason: two-character minimum (`#1` is a shot
+number); an over-long token is **not a tag at all** rather than truncated into
+one nobody typed; a card tag calls `stopPropagation` so the tap filters instead
+of opening the session underneath it; chips set the search box rather than
+filtering directly, so there is one filter state instead of two that can
+disagree.
+
 ### The trend column in the yardage book (`Analytics.clubSeries`)
 
 The book says what you carry; the question straight after it is whether that is
@@ -886,7 +912,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 56 listed in Core Modules above — not the
+`Features` is one module among the 57 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -936,6 +962,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-56 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
+57 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.

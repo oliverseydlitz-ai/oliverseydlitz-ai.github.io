@@ -2356,3 +2356,17 @@ html.range-open, html.range-open body { overflow: hidden; }
 .yard-spark{display:block;margin-bottom:.15rem}
 .yard-trend-label{display:block;font-weight:600}
 .yard-trend-n{display:block;color:var(--text-muted);font-weight:400;font-size:.7rem}
+
+/* ── Session tags ─────────────────────────────────────────────────
+   A finder, not a variable — see SessionTags. They look like chips
+   rather than badges so nothing reads them as a verdict on a session. */
+.tag-row{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0 .9rem}
+.tag-chip{padding:.3rem .6rem;font:inherit;font-size:.75rem;font-weight:600;border:1px solid var(--border);
+  border-radius:999px;background:var(--surface);color:var(--text-dim);cursor:pointer}
+.tag-chip.on{border-color:var(--accent);color:var(--accent)}
+.tag-n{margin-left:.3rem;color:var(--text-muted);font-weight:400}
+.tag-note{flex-basis:100%;font-size:.72rem;line-height:1.45;color:var(--text-muted);margin-top:.2rem}
+.session-tags{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.55rem}
+.session-tag{padding:.15rem .45rem;font:inherit;font-size:.7rem;font-weight:600;border:1px solid var(--border);
+  border-radius:999px;background:transparent;color:var(--text-muted);cursor:pointer}
+.session-tag:hover{border-color:var(--accent);color:var(--accent)}

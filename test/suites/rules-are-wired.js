@@ -67,6 +67,8 @@ const WIRED = [
   ['deadline',        'RetentionProbe', 'a task that expires never says so'],
   ['expired',         'RetentionProbe', 'lapsed probes are recorded and never surfaced — a hit rate that only counts the checks you answered'],
   ['clubSeries',      'Analytics',      'the yardage book says what you carry and never whether it is moving'],
+  ['NOT_A_VARIABLE',  'SessionTags',    'tags look like a dimension the app analyses, which is an uncontrolled comparison it refuses everywhere else'],
+  ['of',              'SessionTags',    'tags are parsed and nothing reads them, so no card and no search ever sees one'],
   ['calculateClubTrend','ClubAnalyzer', 'a second trend calculator grows beside it, the way the target bands did'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];

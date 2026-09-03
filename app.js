@@ -6248,6 +6248,8 @@ const Features = (() => {
           formatDate(s.date),
           s.notes || '',
           s.conditions?.wind || '', s.conditions?.temp || '',
+          // Tags without their hash, so typing "newshaft" finds #newshaft.
+          ...SessionTags.of(s),
           ...new Set(s.shots.map(sh => clubLabel(sh.clubType))),
         ].join(' ').toLowerCase();
         return hay.includes(q);
@@ -6423,6 +6425,80 @@ function applyPaywall(el, cta) {
   el.querySelector('.paywall-btn').addEventListener('click', () => Auth.showAuth(false));
   return true;
 }
+
+// ────────────────────────────────────────────────────────────────
+// SessionTags — finding sessions, and nothing else
+// ────────────────────────────────────────────────────────────────
+// The session search filters notes as free text, which answers "the one where
+// I wrote about the shaft" only if you remember the exact words you used.
+// A tag is the same note with a handle on it: "#newshaft" typed once per
+// session makes "every session on the new shaft" a question the list can
+// answer.
+//
+// They live INSIDE the notes field on purpose. A separate tags array would be
+// a schema change, a migration, a second thing to sync, and another field the
+// backup format has to carry — for something the golfer is already typing.
+// Sessions with no hashtags simply have no tags, which is the correct
+// behaviour for every session imported before this existed.
+//
+// THEY ARE A FINDER, NOT A VARIABLE. "Your #newshaft sessions carry 8 yards
+// further" is exactly the uncontrolled comparison this app refuses everywhere
+// else: the golfer chose which sessions to tag, the tag is not randomised, and
+// nothing holds ball, surface, club mix or form constant across it. So tags
+// filter the list and feed the search box, and no module computes a statistic
+// per tag. NOT_A_VARIABLE is the sentence that says so.
+const SessionTags = (() => {
+  // Letters, digits, hyphen and underscore, 2-24 characters. Deliberately
+  // narrow: "#1" is a shot number, and a tag that can be a whole sentence is
+  // just the notes field again.
+  const RX = /#([a-z0-9][a-z0-9_-]{1,23})\b/gi;
+  const MAX_PER_SESSION = 8;
+
+  function parse(notes) {
+    const out = [];
+    const seen = new Set();
+    let m;
+    RX.lastIndex = 0;
+    while ((m = RX.exec(String(notes || ''))) !== null) {
+      const t = m[1].toLowerCase();
+      if (seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+      if (out.length >= MAX_PER_SESSION) break;
+    }
+    return out;
+  }
+
+  const of = session => parse(session && session.notes);
+
+  // Every tag in use, most-used first, then alphabetically so the order is
+  // stable between renders rather than depending on object insertion.
+  function all(sessions) {
+    const counts = new Map();
+    (sessions || []).forEach(s => of(s).forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  }
+
+  function filter(sessions, tag) {
+    const t = String(tag || '').replace(/^#/, '').toLowerCase();
+    if (!t) return sessions || [];
+    return (sessions || []).filter(s => of(s).includes(t));
+  }
+
+  // The notes text with the tags stripped, for anywhere that shows the note as
+  // prose. The tags are rendered as chips there instead, so leaving them in
+  // the sentence would print them twice.
+  const stripped = notes => String(notes || '').replace(RX, '').replace(/\s{2,}/g, ' ').trim();
+
+  const NOT_A_VARIABLE =
+    'Tags find sessions. They are not a variable: you chose which sessions to tag, nothing was randomised, ' +
+    'and nothing holds the ball, the surface or the club mix constant across them — so the app will not ' +
+    'compute a number per tag. Compare tagged sessions the same way as any others, on the same conditions.';
+
+  return { parse, of, all, filter, stripped, NOT_A_VARIABLE, MAX_PER_SESSION };
+})();
 
 // ────────────────────────────────────────────────────────────────
 // RangeCard — the plan, at the mat
@@ -6852,6 +6928,27 @@ const UI = (() => {
       // keep focus after re-render of the list (list is a sibling, not replaced)
       input.focus();
     });
+
+    // The tags in use, so the feature is discoverable rather than a convention
+    // a golfer has to be told about. They set the search box rather than
+    // filtering directly, so there is one filter state, not two that can
+    // disagree about what the list is showing.
+    const tags = SessionTags.all(sessions);
+    if (!tags.length) return;
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = tags.slice(0, 12).map(t =>
+      `<button class="tag-chip" data-tag="${Sanitize.escape(t.tag)}">#${Sanitize.escape(t.tag)}
+         <span class="tag-n">${t.count}</span></button>`).join('') +
+      `<div class="tag-note">${Sanitize.escape(SessionTags.NOT_A_VARIABLE)}</div>`;
+    bar.parentNode.insertBefore(row, bar.nextSibling);
+    row.querySelectorAll('.tag-chip').forEach(chip => chip.addEventListener('click', () => {
+      const on = chip.classList.contains('on');
+      row.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('on'));
+      if (!on) chip.classList.add('on');
+      input.value = on ? '' : chip.dataset.tag;
+      input.dispatchEvent(new Event('input'));
+    }));
   }
 
   function sessionScore(s) {
@@ -6985,6 +7082,13 @@ const UI = (() => {
                   <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' launch' : 'Launch'}</div>
                 </div>
               </div>
+              ${(() => {
+                const tags = SessionTags.of(s);
+                return tags.length
+                  ? `<div class="session-tags">${tags.map(t =>
+                      `<button class="session-tag" data-tag="${Sanitize.escape(t)}">#${Sanitize.escape(t)}</button>`).join('')}</div>`
+                  : '';
+              })()}
               <div class="session-card-badges">
                 ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
                 ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${f.icon} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
@@ -7017,6 +7121,17 @@ const UI = (() => {
     el.querySelectorAll('.session-card').forEach(c => {
       c.addEventListener('click', () => Router.showDetail(c.dataset.id));
     });
+
+    // A tag on a card is a shortcut to "the other sessions like this one". It
+    // stops the click before the card's own handler sees it — otherwise the
+    // session opens under the filter and the tap looks like it did nothing.
+    el.querySelectorAll('.session-tag').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const input = document.getElementById('sessionSearch');
+      if (input) { input.value = btn.dataset.tag; input.dispatchEvent(new Event('input')); }
+      else Store.getSessions().then(all => renderSessionList(SessionTags.filter(all, btn.dataset.tag)))
+        .catch(err => console.error('tag filter', err));
+    }));
 
     // Share and export button handlers
     el.querySelectorAll('[data-share]').forEach(btn => {

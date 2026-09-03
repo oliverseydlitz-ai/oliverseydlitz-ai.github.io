@@ -64,7 +64,7 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   const EXPORTS = ['Sanitize','CookieConsent','Agreement','DB','MemDB','Metrics','Store','CSVParser',
     'FeedbackEngine','Conditions','Spin','Dispersion','Strike','QuietEye','ShortGame','Rounds','DrillLibrary','LocalDB','SetupGuide','MeasurementReference','FaultEngine','ShotScorer',
     'SwingDNA','Benchmarks','Insights','InsightEngine','PerformanceAlerts','PerformanceGrade','SessionSnapshot','PersonalCoach','PracticeEfficiency','LearningPath','AnalyticsHub','ClubAnalyzer','ContentLibrary','CommunityInsights','QuickStats','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
-    'ImportFlow','Features','CloudDB','SmartRecommendations','Goals','SessionSharing','RetentionProbe','PracticeLog','RangeCard','consistencyScore','bagConsistency','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
+    'ImportFlow','Features','CloudDB','SmartRecommendations','Goals','SessionSharing','RetentionProbe','PracticeLog','RangeCard','SessionTags','consistencyScore','bagConsistency','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
     'curveYards','gearEffectSuspected','gearResidual','gearThreshold','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',
     'isShort','isMid','CLUB_ORDER'];
   try {
