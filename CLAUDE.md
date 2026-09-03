@@ -603,6 +603,37 @@ the output looks right: no error, just a gate that never fires.
 a regex: a non-greedy `[^;]*?` stops at the first closing paren, which for
 `detectFaults((x || {}).shots, y)` is the one inside the first argument.
 
+### View preferences (`ViewPrefs`)
+
+Five toggles in Settings that did nothing for as long as they existed: they
+flipped a checkmark, wrote to localStorage, and **nothing read the value**.
+
+They work by putting a class on `<html>`, and CSS hides the section. **Keep it
+that way.** Anything that sets `hidden` on a section is wiped by the next
+`innerHTML =` on its parent, and the setting silently stops working — which is
+the most likely way these died in the first place. A class on the root element
+survives every re-render.
+
+The element-id → pref-key mapping (`PREF_BUTTONS`) is **stated, not derived**.
+The old code built `'show' + name` and special-cased Density back out of it,
+which is how `showClubBreak` came to be written to storage while the defaults
+declared `showClubBreakdown` — a preference that could never match its default.
+
+### `test/suites/dom-ids.js` — the pre-push step, as a test
+
+"Confirm `index.html` IDs referenced by JS exist" was a manual line in the
+workflow above, which means it never ran. **A missing id is not an error**:
+`getElementById` returns null, the `if (!el) return` guard fires, the feature
+is simply absent, and nothing logs — the same way `Router.showPractice`
+rendered nothing for as long as it did.
+
+Both directions. Every id `app.js` reaches for must resolve, in the markup or
+at runtime. And every id the markup declares must be reachable — that half is
+necessarily weaker, since an id can be built as `` `view-${name}` `` or mapped
+as a bare object key, so the markup-only ones are **listed by name with the
+reason**. The suite fails on a new name, and on a stale exemption, so the list
+cannot rot.
+
 ## Tests — run these before every push
 
 ```bash

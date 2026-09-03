@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 32 suites, 1,058 assertions.
+  jsdom) then 36 suites, 1,145 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -1224,6 +1224,100 @@ twenty-shot sessions as sixty.
 
 ---
 
+## 18. The last modules, and four more copies of the bands `bc21d3c` → `b745559`
+
+### 18.1 A second practice plan `bc21d3c`
+
+The Practice view rendered `PracticePlans` (plural), which shared nothing with
+`PracticePlan` (singular) — no severity weighting, no ball counts, no gated
+drill, no conditions. Invented durations of 20/30/45 minutes, Easy/Medium/Hard
+off no scale, "Hit 10 shots with each club" as a drill, a card whose
+description repeated its own title, and **a Start button that called a stub
+which toasted and did nothing.** A golfer on that screen saw a plan, and it
+was not the plan. `module-map.js` caught the deletion, which is the check
+working.
+
+### 18.2 A snapshot people send to other people `0541a71`
+
+The shared session text said `Avg Carry: {bag mean}` — a number describing no
+club anyone owns — with no mention of the ball. It names one club, gives an
+interval, states the ball, and says "indicative only" off range balls, in the
+line someone will actually read. Below the floor it declines rather than
+rounding one up.
+
+And "Pure Contact — hit 1.45+ smash" unlocked off one glitched 1.71.
+
+### 18.3 One implementation of "take a maximum" `57f91ed`
+
+Four call sites had each grown their own `CEILING[field] ?? Infinity` + filter
++ `Math.max`. That is the second-copy shape that has caused most of the real
+bugs in this file, and it had started again **inside the fix for it**.
+`Metrics.peak()` returns **null** for nothing rather than `-Infinity` or `0` —
+the distinction that matters at the render, because no reading is not a
+reading of zero.
+
+### 18.4 A ball flight drawn from an invented launch angle `01274fd`
+
+`Trajectory.arc` opened with `launch = launch > 0 ? launch : 12`, and the SVG
+writes `${fmt(launch,1)}° launch` under the curve. A shot with no launch angle
+was drawn as a specific flight **labelled "12.0° launch"** — a measurement
+that does not exist, rendered as one. A drawing may be indicative; a label is
+a claim. It refuses now, and the picture says that apex, carry and descent are
+all modelled rather than measured.
+
+### 18.5 The eleventh and twelfth copies of the bands `1231cd6`
+
+`optimalRange` is the "Target:" line under every fault card. It states a
+target, which is `Benchmarks`' job — and it is not a fault trigger, so the
+FaultEngine exemption in the single-copy check did not reach it. Ten of
+eighteen restated a band as a literal, and two were wrong:
+
+- **Face-to-path said ±5°. `TARGET.faceToPath` is ±2°** — the card called a
+  golfer on target at more than twice the tolerance used everywhere else.
+- **The driver launch band never fired.** `optimalRange` is called with a CLUB
+  TYPE, and this one compared it to a club speed: `'d' > 105` is false,
+  `'d' > 95` is false, so the "speed-dependent" band always returned the
+  loosest of three more private copies. Dead code, inside the function whose
+  entire job is to state the target.
+
+### 18.6 "Improving" off three shots and three yards `422a7b2`
+
+`ClubAnalyzer.calculateClubTrend` compared the first three shots of a
+flattened array against shots four to six — not a chronology, just wherever
+`flatMap` put them — and printed "📈 Improving" in green above a 3-yard
+difference. Carry's minimum detectable change is **13 yards at ten shots**.
+Session to session now, per club, same ball, judged against the golfer's own
+spread, and it reports a delta in yards rather than the word: a delta is a
+measurement, "Improving" is a verdict on a person.
+
+### 18.7 Five settings toggles that did nothing `b745559`
+
+Show practice heatmap · show fault detection · show club breakdown · show
+session comparison · compact view. All five flipped a checkmark, wrote to
+localStorage, and **nothing ever read the value** — `getPrefs()` was called in
+one place, to paint the checkmarks on the toggles themselves. Two named
+features deleted in the unreachable-module cleanup.
+
+They set a class on `<html>` and CSS hides the sections. That is the load-
+bearing part: anything setting `hidden` on a section is wiped by the next
+`innerHTML =`, which is plausibly how they died the first time. Verified that
+the state survives both a re-render and a reload.
+
+The mapping is stated rather than derived — the old code built `'show' + name`
+and special-cased Density back out of it, which is how `showClubBreak` came to
+be stored while the defaults declared `showClubBreakdown`: a preference that
+could never match its own default.
+
+**`test/suites/dom-ids.js`** turns CLAUDE.md's pre-push step — "confirm
+index.html IDs referenced by JS exist" — into something that runs. A missing
+id is not an error: `getElementById` returns null, the guard fires, the
+feature is absent, nothing logs. All 201 resolve. The reverse direction names
+every markup-only id with its reason and fails on a new one, or on a stale
+exemption.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -1320,6 +1414,23 @@ same as it executing. An export nothing calls is the cheapest tell.
 thorough suite and no caller. The tests all passed, the function was correct,
 and no user ever saw its output. Coverage answers "does this work", never "is
 this reached".
+
+**A setting that stores a value nobody reads is the same defect as a rule
+nobody runs, and it looks even more finished.** Five toggles in Settings
+flipped a checkmark, wrote to localStorage and changed nothing; two of them
+named features that had been deleted. The tell was identical to every other
+instance: `getPrefs()` called in exactly one place, and that place was the
+code painting the checkmarks.
+
+**A pipeline's exit code is the last command's.** I pushed a commit with the
+suite red because `npm test 2>&1 | tail -2 && git add` succeeds whenever
+`tail` does. Read the output, not the `&&`.
+
+**A regex is the wrong tool for counting arguments, and for reading prose.**
+Three separate checks in this pass tripped on it: `[^;]*?` stopped at the
+paren inside a nested call and reported a two-argument call as one-argument; a
+source scan matched the comment explaining the very thing it forbids, twice.
+Strip the prose, balance the parens, or use a different tool.
 
 **The modules with no section in CLAUDE.md were the broken ones**, and that is
 not a coincidence — writing the section is what forces someone to read the
@@ -1499,6 +1610,15 @@ Every commit in the session, and the section that explains it.
 | `7bad727` | 17.2 | Delete a curriculum and a video library that never existed |
 | `71fc98c` | 17.5 | Three arithmetic bugs: an impossible goal, Infinity a week, a phantom 0° |
 | `a83f9e3` | 17.5 | Sweep out the phantom zeros and the sentinel values |
+| `11bb3c2` | — | docs: record the module-by-module pass |
+| `d6bd624` | — | Fix a CLAUDE.md header my own module-map check rejected |
+| `bc21d3c` | 18.1 | Delete the second practice plan that sat beside the real one |
+| `0541a71` | 18.2 | Stop a snapshot and a badge claiming things the data does not support |
+| `57f91ed` | 18.3 | Give "take a maximum" one implementation |
+| `01274fd` | 18.4 | Stop drawing a ball flight for a shot that has no launch angle |
+| `1231cd6` | 18.5 | Route the fault targets through Benchmarks, and fix one that never fired |
+| `422a7b2` | 18.6 | Stop calling a club "Improving" off three shots and three yards |
+| `b745559` | 18.7 | Make the five View Preferences toggles do something |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty
