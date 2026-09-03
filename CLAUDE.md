@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 57 feature modules
+- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 58 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -80,7 +80,8 @@ to hand someone starting cold.
    `ContentLibrary`
 
 6. **Dashboard / UX layer** — `QuickStats`, `Features` (see its own section
-   below), `SessionTags` (a finder, never a variable), `ViewPrefs`, `EnhancedMetricsWidget`,
+   below), `SessionTags` (a finder, never a variable), `FirstRun` (the method,
+   stated before there is data), `ViewPrefs`, `EnhancedMetricsWidget`,
    `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
 
 7. **Reporting** — `PerformanceGrade`, `PerformanceAlerts`, `AnalyticsHub`,
@@ -554,6 +555,36 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
   session's conditions (they answer "how am I hitting it now"). A test pins
   that they disagree on the same data.
 
+### First run (`FirstRun`) — the method, stated before there is data
+
+A new account landed on a home screen with seven empty insight surfaces and an
+import button. The thing that distinguishes this app — that it withholds most
+of what a launch monitor appears to offer, and says why — was **invisible until
+there was data**, and by then the impression is formed. The empty state
+meanwhile promised "swing metrics, faults, and improvement trends", two thirds
+of which are gated behind floors and conditions nobody had been told about, so
+the first session read as the app being broken rather than careful.
+
+**Every number and claim in it is read from the module that owns it** —
+`Metrics.TIER` (all three tiers, enumerated from the table), the sample floors,
+`FeedbackEngine.MODES[getMode()]` (the mode actually set, in its own words),
+`Conditions.BALLS`, `RetentionProbe.MAX_GAP_DAYS`, `ShortGame.ALL.length`. Not
+one is typed into the module. An orientation screen is the **easiest place in a
+codebase to ship a fabricated constant**: nothing downstream consumes the text,
+so a wrong figure would never surface anywhere else. The suite asserts every
+metric in `TIER` is placed, so a metric that changes tier moves this screen with
+it.
+
+- **Deferred, never marked seen, when something blocking is already up.** The
+  agreement gate and the sign-in modal open at boot on the same tick as the
+  first home render; an orientation stacked on either swallows the button
+  underneath and a new user cannot get past sign-in. Found by the browser scan —
+  every module involved was correct on its own.
+- **Re-openable from Settings.** A one-shot screen closed on day one and never
+  findable again is a worse place to keep the method than the docs.
+- It ends on the day-one answer (the off-device short game), the same branch
+  `getNextStep` takes with nothing imported.
+
 ### The printed yardage card (`@media print`, `#yardagePrintHead`)
 
 A yardage card lives in a golf bag and **outlives the screen it came from**, so
@@ -957,7 +988,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 57 listed in Core Modules above — not the
+`Features` is one module among the 58 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -1007,6 +1038,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-57 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
+58 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.

@@ -73,7 +73,13 @@
     <div id="sessions-empty" class="empty-state">
       <div class="empty-icon">📊</div>
       <h2>No sessions yet</h2>
-      <p>Upload a Rapsodo CSV to start analyzing your swing metrics, faults, and improvement trends.</p>
+      <!-- This used to promise "swing metrics, faults, and improvement trends",
+           two thirds of which are gated behind sample floors and conditions
+           nobody had been told about — so the first session read as the app
+           being broken rather than as the app being careful. -->
+      <p>Import a Rapsodo CSV and you will get strike quality, per-club carry and recurring faults —
+        most of it once a club has 10 shots behind it. The short game and the quiet-eye protocol need no
+        launch monitor and work right now.</p>
       <div class="empty-cta-group">
         <button class="btn-primary" id="emptyCTA">📤 Import First Session</button>
       </div>
@@ -512,6 +518,10 @@
 
       <h2 class="settings-section-title">Launch monitor</h2>
       <div class="settings-group">
+        <button class="settings-row" id="introBtn">
+          <span>How this app reads your data</span>
+          <span class="settings-arrow">→</span>
+        </button>
         <button class="settings-row" id="setupGuideBtn">
           <span>How to set up &amp; align your monitor</span>
           <span class="settings-arrow">→</span>

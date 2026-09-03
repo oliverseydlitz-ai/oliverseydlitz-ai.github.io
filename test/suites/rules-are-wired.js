@@ -70,6 +70,7 @@ const WIRED = [
   ['NOT_A_VARIABLE',  'SessionTags',    'tags look like a dimension the app analyses, which is an uncontrolled comparison it refuses everywhere else'],
   ['of',              'SessionTags',    'tags are parsed and nothing reads them, so no card and no search ever sees one'],
   ['setAlignment',    'Store',          'the alignment caveat names what it withholds and offers no way to answer it'],
+  ['maybeShow',       'FirstRun',       'a new account never sees what the app will and will not tell it'],
   ['calculateClubTrend','ClubAnalyzer', 'a second trend calculator grows beside it, the way the target bands did'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];

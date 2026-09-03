@@ -6449,6 +6449,159 @@ function applyPaywall(el, cta) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// FirstRun — what this app will and will not tell you
+// ────────────────────────────────────────────────────────────────
+// A new account lands on a home screen with seven insight surfaces, all empty,
+// and an import button. The thing that actually distinguishes this app — that
+// it withholds most of what a launch monitor appears to offer, and says why —
+// is invisible until there is data, and by then the impression is formed.
+// Meanwhile the empty state promised "swing metrics, faults, and improvement
+// trends", two thirds of which are gated behind sample floors and conditions
+// the golfer has not been told about.
+//
+// EVERY NUMBER AND CLAIM HERE IS READ FROM THE MODULE THAT OWNS IT. Not one is
+// typed into this file. That is the rule that caught the three modules shipping
+// fabricated content, and an orientation screen is the single easiest place in
+// a codebase to break it: nothing downstream consumes the text, so a wrong
+// figure here would never surface anywhere else.
+//
+// It is dismissible and re-openable from Settings. A one-shot screen a golfer
+// closed on day one and can never find again is a worse place to keep the
+// method than the docs.
+const FirstRun = (() => {
+  const KEY = 'slSeenIntro';
+
+  const seen = () => { try { return localStorage.getItem(KEY) === '1'; } catch (_) { return true; } };
+  const markSeen = () => { try { localStorage.setItem(KEY, '1'); } catch (_) {} };
+  const reset = () => { try { localStorage.removeItem(KEY); } catch (_) {} };
+
+  // The metrics the app will prescribe from, named from the tier table itself.
+  const LABEL = {
+    ballSpeed: 'ball speed', clubSpeed: 'club speed', smashFactor: 'smash factor',
+    carryDistance: 'carry', launchAngle: 'launch angle', attackAngle: 'attack angle',
+    clubPath: 'club path', spinRate: 'spin rate', spinAxis: 'spin axis',
+    launchDirection: 'start direction', totalDistance: 'total distance',
+    sideCarry: 'side carry', apex: 'apex', descentAngle: 'descent angle',
+  };
+  const atTier = n => Object.keys(Metrics.TIER)
+    .filter(m => Metrics.TIER[m] === n)
+    .map(m => LABEL[m] || m);
+
+  function content() {
+    const mode = FeedbackEngine.MODES[FeedbackEngine.getMode()] || FeedbackEngine.MODES.onRequest;
+    return {
+      tier1: atTier(1),
+      tier2: atTier(2),
+      tier3: atTier(3),
+      floor: Metrics.MIN_SHOTS_REPORT,
+      tailFloor: Metrics.MIN_SHOTS_TAIL,
+      probeDays: RetentionProbe.MAX_GAP_DAYS,
+      modeLabel: mode.label,
+      modeBlurb: mode.blurb,
+      balls: Object.values(Conditions.BALLS).filter(b => b.id !== 'unknown').map(b => b.label),
+      drills: DrillLibrary.ALL ? DrillLibrary.ALL.length : null,
+      shortGame: ShortGame.ALL ? ShortGame.ALL.length : null,
+    };
+  }
+
+  function show(opts) {
+    const c = content();
+    const esc = t => Sanitize.escape(String(t == null ? '' : t));
+    document.getElementById('firstRunModal')?.remove();
+    const m = document.createElement('div');
+    m.className = 'modal-overlay';
+    m.id = 'firstRunModal';
+    m.innerHTML = `
+      <div class="modal modal-wide">
+        <div class="modal-head">
+          <h2 class="modal-title">How this app reads your data</h2>
+          <button class="modal-close" data-fr="close" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body intro-body">
+          <p class="intro-lead">Most launch-monitor apps show you every number the device produces and
+            treat them all the same. This one does not, and the difference is the whole product — so it is
+            worth two minutes before you import anything.</p>
+
+          <h3 class="intro-h">Three tiers, not one</h3>
+          <p class="intro-p"><strong>Prescribed freely:</strong> ${esc(c.tier1.join(', '))}. These are the
+            readings the device measures directly and repeatably.</p>
+          <p class="intro-p"><strong>Shown, never prescribed from:</strong> ${esc(c.tier2.join(', '))}.
+            Real readings, but the device's error is close to the size of the thing being judged.</p>
+          <p class="intro-p"><strong>Never used for advice:</strong> ${esc(c.tier3.join(', '))}. Some are
+            not measured at all without the right ball; the rest are models, not measurements. You will see
+            them and the app will not build a drill on them.</p>
+
+          <h3 class="intro-h">Numbers arrive late, on purpose</h3>
+          <p class="intro-p">No club shows a mean until ${esc(c.floor)} shots, and a dispersion tail needs
+            ${esc(c.tailFloor)}. Below that you get a row telling you what it still needs rather than a
+            number that would read like a yardage.</p>
+          <p class="intro-p">Feedback is set to <strong>${esc(c.modeLabel)}</strong>. ${esc(c.modeBlurb)}
+            You can change it in Settings, and it is the most consequential setting here: the evidence says
+            constant feedback and faded feedback look identical during a session and differ by 35% a day
+            later, which is the only window that matters.</p>
+
+          <h3 class="intro-h">Conditions change the meaning, not just the context</h3>
+          <p class="intro-p">Every import asks which ball and what you hit off — ${esc(c.balls.join(', '))},
+            grass or mat. Range balls widen dispersion severalfold and break gapping; mats hide fat strikes.
+            Sessions on different conditions are never compared as if the difference were skill.</p>
+
+          <h3 class="intro-h">What you can do today, with no device at all</h3>
+          <p class="intro-p">${c.shortGame ? esc(c.shortGame) + ' putting and chipping drills' : 'The short game'}
+            and the quiet-eye protocol need no launch monitor and work on a brand-new account. The
+            best-evidenced intervention in the whole research base is a putting one.</p>
+          <p class="intro-p">When you do import, the app opens a retention check: come back between a day
+            and ${esc(c.probeDays)} days later, hit the same club, and it will tell you whether the change
+            actually held. That is the only evidence this app can produce that anything worked, and
+            within-session numbers cannot give it to you.</p>
+
+          <div class="intro-actions">
+            <button class="btn-primary" data-fr="shortgame">Start with the short game</button>
+            <button class="btn-secondary" data-fr="close">I will look around</button>
+          </div>
+          <p class="intro-foot">You can reopen this from Settings at any time.</p>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    markSeen();
+    const close = () => m.remove();
+    m.addEventListener('click', e => {
+      if (e.target === m) return close();
+      const btn = e.target.closest('[data-fr]');
+      if (!btn) return;
+      if (btn.dataset.fr === 'shortgame') { close(); Router.show('practice'); }
+      else close();
+    });
+    return m;
+  }
+
+  // Is something blocking already on screen? The agreement gate and the sign-in
+  // modal both open at boot, on the same tick as the first home render, and an
+  // orientation stacked on top of either swallows the button underneath it —
+  // which is how a new user ends up unable to get past the sign-in screen at
+  // all. Found by the browser scan, not by any unit test: every module involved
+  // was behaving correctly on its own.
+  function blocked() {
+    return [...document.querySelectorAll('.modal-overlay, .agreement-gate')]
+      .some(el => el.id !== 'firstRunModal' && !el.hidden &&
+                  (el.offsetParent !== null || el.getClientRects().length > 0));
+  }
+
+  // Only on a genuinely new account, and never on top of something blocking.
+  // NOT marked as seen when it is deferred — the golfer has not seen it, and
+  // marking it here is how an orientation silently never appears for anyone
+  // whose sign-in modal happened to still be up.
+  function maybeShow(sessions) {
+    if (seen()) return false;
+    if ((sessions || []).length) { markSeen(); return false; }
+    if (blocked()) return false;
+    show();
+    return true;
+  }
+
+  return { show, maybeShow, seen, reset, content };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // SessionTags — finding sessions, and nothing else
 // ────────────────────────────────────────────────────────────────
 // The session search filters notes as free text, which answers "the one where
@@ -9537,6 +9690,11 @@ const Router = (() => {
   async function showSessions() {
     const sessions = await Store.getSessions();
     safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
+    // Only on a genuinely new account, and only after the home view has
+    // rendered — an orientation over a blank page is a wall of text with no
+    // context, and over the agreement gate it would be a second modal on top
+    // of a blocking one.
+    try { FirstRun.maybeShow(sessions); } catch (e) { console.error('intro', e); }
   }
 
   async function showPractice() {
@@ -10688,6 +10846,9 @@ async function init() {
   document.getElementById('setupGuideLink')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('setupGuideLink2')?.addEventListener('click', () => SetupGuide.show());
   document.getElementById('measRefBtn')?.addEventListener('click', () => MeasurementReference.show());
+  // Re-openable on purpose. A one-shot orientation a golfer closed on day one
+  // and can never find again is a worse place to keep the method than the docs.
+  document.getElementById('introBtn')?.addEventListener('click', () => FirstRun.show());
 
   // Feedback-schedule picker — the app's most consequential setting.
   const renderFeedbackModes = () => {

@@ -2409,3 +2409,13 @@ html.range-open, html.range-open body { overflow: hidden; }
   .yardage-intro, .yardage-meta { font-size: 9pt; }
   @page { margin: 12mm; }
 }
+
+/* ── First-run orientation ────────────────────────────────────────
+   Long-form on purpose: it is a statement of method, not a tour. */
+.intro-body{max-height:70vh;overflow-y:auto}
+.intro-lead{font-size:.92rem;line-height:1.6;margin:0 0 1.1rem}
+.intro-h{font-size:.88rem;font-weight:700;margin:1.3rem 0 .45rem;color:var(--accent)}
+.intro-p{font-size:.84rem;line-height:1.6;color:var(--text-dim);margin:0 0 .55rem}
+.intro-p strong{color:var(--text)}
+.intro-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.4rem}
+.intro-foot{font-size:.75rem;color:var(--text-muted);margin:.8rem 0 0}

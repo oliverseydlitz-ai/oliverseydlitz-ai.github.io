@@ -25,6 +25,10 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     await p.check('#agreementCheckbox'); await p.click('#agreementAcceptBtn'); await p.waitForTimeout(400); }
   await p.waitForSelector('#authGuestWrap button',{state:'visible',timeout:8000}).catch(()=>{});
   await p.click('#authGuestWrap button').catch(()=>{}); await p.waitForTimeout(600);
+  // A brand-new account gets the FirstRun orientation over the home view. It is
+  // a modal, so it intercepts every click after it — dismiss it the way a real
+  // new user would before scanning anything.
+  await p.click('#firstRunModal [data-fr="close"]').catch(()=>{}); await p.waitForTimeout(300);
 
   const imp = async (file, ball) => {
     await p.click('.bottom-nav-item[data-view="import"]'); await p.waitForTimeout(250);
