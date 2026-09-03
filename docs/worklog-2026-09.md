@@ -11,7 +11,7 @@ layer underneath rather than adding features on top of it.
 ## Where it stands right now
 
 - **`main` is green.** `npm test` runs a load gate (executes `app.js` whole in
-  jsdom) then 25 suites, 913 assertions.
+  jsdom) then 32 suites, 1,058 assertions.
 - **Every ± the app shows is the golfer's own shots.** No population constant
   reaches a displayed number; the published rates live in
   Settings → Measurement reference.
@@ -1110,6 +1110,120 @@ well-formed object and the defect existed only at the point of render.
 
 ---
 
+## 17. The modules nobody had read `2a36574` → `a83f9e3`
+
+§16 went through the screens. This went through the modules behind them —
+the ones with no section in CLAUDE.md, which turned out to be why.
+
+### 17.1 The module map was wrong in both directions `2a36574`
+
+The Core Modules list is the first thing anyone starting cold reads. It named
+**17 modules that do not exist** — deleted in the 17-unreachable-modules
+cleanup and never removed from the doc — and **omitted the ten that matter
+most**: `Metrics`, `Conditions`, `FeedbackEngine`, `RetentionProbe`, `Rounds`,
+`ShortGame`, `Spin`, `LocalDB`, `MeasurementReference`, `SetupGuide`.
+
+A map that sends you looking for `WeeklySummary` and never mentions `Metrics`
+is worse than no map, because it reads as surveyed. `module-map.js` checks it
+both ways now, plus the count and every module named in a section header.
+
+### 17.2 Things the app promised that do not exist `7bad727`
+
+**`LearningPath`** listed "⛳ Fundamentals — 6 lessons", "🔄 The Swing — 8
+lessons", with `locked` badges on modules that would never unlock. There are
+no lessons anywhere in this app.
+
+**`ContentLibrary`** was worse: twelve **videos**, with durations and skill
+levels — "Fix Your Slice Forever, 12 min", "Lag & Release Secrets, 11 min" —
+under a heading reading "💡 Recommended Content". There is no video content,
+there never has been, and several invented titles were body-cue coaching of
+exactly the kind `splitDrills` exists to keep out.
+
+Both now use the library that does exist: 104 drills across nine sections,
+each already carrying its evidence, its gate and how it is meant to be run.
+Open sections lead; locked ones keep their reason, because "why can I not do
+this yet" is the more useful half. That is a real curriculum and it was
+already written.
+
+**A test assertion of mine was wrong and the code was right.** With nothing
+imported, sections A, G and H stay open — quiet eye needs no launch monitor,
+speed work is gym work, and A has one no-device drill. Same day-one answer
+`getNextStep` gives, reached independently through the gates.
+
+### 17.3 A score that could only say "Low" `fb1faea`
+
+`PracticeEfficiency` computed `(quality/100) * (shots/(sessions*60))` and
+tested it against 80 / 60 / 40. Quality over 100 is at most 1 and
+shots-per-minute is well under 1, so the ratio rounded to 0 or 1 and **every
+golfer got "Low"** — at 2rem, in green, including one striking it at 96/100.
+The hours it divided by were invented: the app has never recorded a duration.
+
+Efficiency needs a clock. What the app has instead, on every shot, is the club
+and the order it was hit in — the contextual-interference variable, one of the
+three methods the 2024 review named superior, and nothing else here computed
+it. `structure()` reads blocked / mixed / varied off the hit order and carries
+the finding as stated: a blocked session feels better at the time and tested
+worse a day later, which is the same effect the feedback schedule rests on.
+
+### 17.4 Eleven call sites dropped the session `a35c6ff`
+
+`detectFaults(shots, session)` reads ball type, surface and alignment off the
+session. Called with one argument it gets `null` and **no condition gate
+applies at all**. Eleven call sites did that, including `renderFaultCards` —
+the session detail's main analysis surface — and `renderPracticePlan`, the
+headline practice feature. Three also flattened several sessions into one
+call, pooling ball types on top of losing the gate.
+
+It kept happening because the one-argument form is valid JavaScript and the
+output looks right: no error, just a gate that silently never fires. Now
+asserted, along with `PracticePlan.generate`'s three arguments — passing the
+session as its `totalMin` made every block's minutes and balls **NaN**, and
+`drill-focus.js` had that same mistake in its fixture and still passed,
+because it only asserted on the drills.
+
+**That check needed a balanced-paren scan, not a regex.** The first version
+read `detectFaults((sessions[0] || {}).shots || [], sessions[0] || null)` as
+one-argument, because a non-greedy `[^;]*?` stops at the first closing paren —
+the one inside the first argument. Counting arguments in a language with
+nested calls is not a regular-expression job.
+
+### 17.5 Arithmetic `71fc98c` `a83f9e3`
+
+- **A goal achieved by a misread.** `Goals.getProgress` took `Math.max` over
+  every reading ever — the value most likely to be wrong. A smash goal of 1.50
+  was met by one glitched 1.71.
+- **Infinity sessions a week.** `sessions.length / days * 7` with every
+  session on the same day divides by zero, and the modal rendered it.
+- **A phantom 0° launch.** `s.launchAngle || 0` turned every missing reading
+  into a 0° launch, so the reported range always started at 0.
+- **Phantom zero carries**, in two places, averaged in: a club with three
+  missing readings out of ten came out 30% short.
+- **Sentinels that were the bug.** `Math.min(...carries, 1000)` reported a
+  worst carry of **1000 yards** and a range of **−1000** when there were no
+  carries. `Math.max(...ballSpeeds)` of nothing is −Infinity, rendered as
+  "−Infinity mph".
+
+The other eight `|| 0` hits in that sweep are followed immediately by
+`.filter(v => v > 0)` and are fine. Telling those apart was the work; a
+blanket rewrite would have churned eight harmless lines to fix three real ones.
+
+### 17.6 `PersonalCoach` `7104bea`
+
+The largest card on the home screen, never brought in line with anything: its
+own map of four body-cue drills keyed on a fault name, `detectFaults` across
+five flattened sessions, "250 shots unlocks new insights!" when nothing
+happens at 250 shots, and a `Math.random()` greeting that changed every time
+the view re-rendered — the same flaw `fadedReveal` was made deterministic for.
+
+It counts toward the three gates that are real now: ten shots of a club, three
+sessions before `typicalError` switches to the golfer's own noise floor, and
+thirty shots for the dispersion tail. **Writing that test found a bug in it:**
+the tail gate is per session, and counting pooled would have read three
+twenty-shot sessions as sixty.
+
+
+---
+
 ## Still open
 
 **The §10 build order is finished — all eight steps.** What is left is
@@ -1206,6 +1320,22 @@ same as it executing. An export nothing calls is the cheapest tell.
 thorough suite and no caller. The tests all passed, the function was correct,
 and no user ever saw its output. Coverage answers "does this work", never "is
 this reached".
+
+**The modules with no section in CLAUDE.md were the broken ones**, and that is
+not a coincidence — writing the section is what forces someone to read the
+code. Every module that had one was roughly sound; of the ones that did not,
+`PracticeEfficiency` could only ever say "Low", `ContentLibrary` listed videos
+that do not exist, `LearningPath` promised lessons that do not exist, and
+`PersonalCoach` kept its own body-cue drills. Undocumented is a decent proxy
+for unexamined.
+
+**An app that invents content is a different failure from one that miscounts.**
+Three separate modules shipped fabrications — simulated community averages, a
+curriculum of lessons, a library of videos with runtimes — each with a small
+disclaimer or none. Every one was easy to write and impossible to notice from
+the inside, because the code is perfectly correct at rendering a made-up
+constant. The check is not a test; it is asking "where would this number come
+from" of every number on the screen.
 
 **A half-applied fix is worse than no fix.** `consistencyScore()` was written
 to replace `100 - stdDev(carries)` and documented as such; three call sites
@@ -1357,6 +1487,18 @@ Every commit in the session, and the section that explains it.
 | `a16ea84` | 16.4 | Fix the red alert box, which was rendering "NaN% of recent shots" |
 | `6592a21` | 16.5 | Finish a fix that was only ever half applied |
 | `7bf8340` | 16.6 | Catch the half-applied fix and the render-only bug mechanically |
+| `f39c6d8` | — | docs: record the pass across every screen, and three lessons from it |
+| `a7642c9` | 16.4 | Delete the invented community averages, and compare against real data |
+| `522efd2` | 16.6 | Make the committed browser check actually runnable |
+| `847590d` | 16.3 | Rewrite SwingDNA, which was the app arguing with itself |
+| `df69783` | 16.3 | Find the ninth and tenth copies of the bands, and make an eleventh impossible |
+| `2a36574` | 17.1 | Fix the module map, which was wrong in both directions |
+| `7104bea` | 17.6 | Put the coaching card on the gated path, and count toward gates that exist |
+| `fb1faea` | 17.3 | Replace an efficiency score that could only say "Low" |
+| `a35c6ff` | 17.4 | Hand every fault detection its session — eleven call sites were not |
+| `7bad727` | 17.2 | Delete a curriculum and a video library that never existed |
+| `71fc98c` | 17.5 | Three arithmetic bugs: an impossible goal, Infinity a week, a phantom 0° |
+| `a83f9e3` | 17.5 | Sweep out the phantom zeros and the sentinel values |
 
 Sections 1–7 above are in narrative order, which is roughly chronological. The
 run from `f425e9e` to `b30bc93` is one continuous correction of the uncertainty

@@ -563,6 +563,46 @@ deliberately unscreened — a long drive is unusual, not impossible. **Do not ad
 a ceiling without a citable physical bound.** A MAD trim does not work here:
 with one outlier among tied values it becomes its own scale and passes.
 
+### Where numbers come from (the question that found the most)
+
+Three modules shipped **fabricated content**, each easy to write and
+impossible to notice from the inside, because code that renders a made-up
+constant is perfectly correct code:
+
+- `CommunityInsights` — "simulated benchmark data (would be real in
+  production)", rendered as "Avg" with green "↑ Above average" verdicts, and a
+  promise of real community data the app cannot keep. **There is no
+  community**: sessions are per user behind row-level security and nothing
+  aggregates them.
+- `LearningPath` — "⛳ Fundamentals — 6 lessons", with locked badges. There
+  are no lessons.
+- `ContentLibrary` — twelve **videos** with runtimes and skill levels. There
+  is no video content.
+
+All three now read from the data that does exist and is cited:
+`Benchmarks.DATA` (TrackMan), `Rounds.NORMS` (Shot Scope, 90M+ shots), and
+`DrillLibrary.SECTIONS` — whose `why` field is the evidence for each section
+and is the only "lesson" this app has ever had.
+
+**Before adding any number to a screen, ask where it comes from.** If the
+answer is a constant somebody typed, it does not go in.
+
+### Passing the session (`detectFaults`, `PracticePlan.generate`)
+
+`FaultEngine.detectFaults(shots, session)` reads ball type, surface and
+alignment off the session. **Called with one argument it gets `null` and no
+condition gate applies at all** — a range-ball session grades exactly like a
+premium one. Eleven call sites did that, including `renderFaultCards` and
+`renderPracticePlan`, because the one-argument form is valid JavaScript and
+the output looks right: no error, just a gate that never fires.
+
+`PracticePlan.generate(shots, totalMin, session)` — passing the session as
+`totalMin` makes every block's minutes and balls **NaN**.
+
+`rules-are-wired.js` asserts both, with a **balanced-paren scan** rather than
+a regex: a non-greedy `[^;]*?` stops at the first closing paren, which for
+`detectFaults((x || {}).shots, y)` is the one inside the first argument.
+
 ## Tests — run these before every push
 
 ```bash
