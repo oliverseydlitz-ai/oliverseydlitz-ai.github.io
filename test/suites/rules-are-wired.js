@@ -154,6 +154,15 @@ console.log('— and no replaced formula is still in use anywhere —');
     // `CEILING[field]`, and that one is the point. A check that fires on the
     // function it is protecting gets deleted.
     ['Metrics.CEILING[', 'Metrics.peak() — four call sites had grown their own copy of this screen'],
+    // Bag-pooled carry, the single most repeated defect in this file — ten
+    // instances across the yardage book, QuickStats, the insight box, the
+    // letter grade, the snapshot, the Progress trend, the session comparison,
+    // the session card, the analytics tile and the ball-flight drawing. These
+    // are the exact forms that were wrong; a carry figure has to come from one
+    // named club.
+    ['avg(allShots, \'carryDistance\')', 'one named club — a bag mean moves with which clubs you hit'],
+    ['avg(s.shots,\'carryDistance\')',   'the same'],
+    ['avg(sessions.flatMap', 'the same — flattening sessions pools ball types as well as clubs'],
   ];
   for (const [dead, instead] of ZOMBIES) {
     const n = code.split(dead).length - 1;
@@ -177,6 +186,21 @@ console.log('— and no replaced formula is still in use anywhere —');
   ok(f && typeof f.rate === 'number', 'it has `rate`, which is what a percentage should come from');
   ok(f && typeof f.count === 'number' && typeof f.total === 'number',
      'plus the raw counts, so a message can say "N of M" instead of a bare percentage');
+}
+
+console.log('— the two surviving pooled-carry calls are per club by construction —');
+{
+  // `avg(shots,'carryDistance')` is still correct in two places: a fault's
+  // `description`, which receives only the affected shots OF ONE CLUB, and
+  // `Trajectory.avgFlight`, which its caller now filters to one club first.
+  // Naming them is the point — an eleventh instance somewhere else is what
+  // this is watching for.
+  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const n = bare.split("avg(shots,'carryDistance')").length - 1;
+  ok(n === 2, `exactly two remain (${n}) — a fault description and the averaged flight`);
+  const faults = bare.slice(bare.indexOf('const FaultEngine'), bare.indexOf('\nconst ', bare.indexOf('const FaultEngine') + 10));
+  ok(faults.includes("avg(shots,'carryDistance')"), 'one is inside FaultEngine, where shots are one club');
+  ok(bare.includes("arc(avg(shots,'launchAngle')"), 'the other is avgFlight, whose caller filters first');
 }
 
 console.log('— and no module keeps its own copy of a launch-metric threshold —');
