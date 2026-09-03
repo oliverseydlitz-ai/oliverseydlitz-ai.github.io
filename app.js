@@ -5517,60 +5517,16 @@ const SmartRecommendations = (() => {
 // ════════════════════════════════════════════════════════════════
 // PracticePlans — AI-generated practice routines
 // ════════════════════════════════════════════════════════════════
-const PracticePlans = (() => {
-  function generatePlan(sessions) {
-    if (!sessions.length) return null;
-    const faults = FaultEngine.detectFaults(sessions[0].shots, sessions[0]);
-    const st = Features.streak(sessions);
-
-    const plans = [];
-
-    // Consistency drill
-    plans.push({
-      name: '⏱️ Consistency Drill',
-      duration: 20,
-      desc: 'Hit 10 shots with each club, focusing on repeatable swing',
-      focus: 'Rhythm',
-      difficulty: 'Easy'
-    });
-
-    // Distance control
-    if (faults.length > 0) {
-      plans.push({
-        name: `🎯 ${faults[0].name} Drill`,
-        duration: 30,
-        desc: `Target your #1 issue: ${faults[0].name}`,
-        focus: 'Technique',
-        difficulty: 'Hard'
-      });
-    }
-
-    // Course simulation
-    plans.push({
-      name: '⛳ Course Simulation',
-      duration: 45,
-      desc: 'Simulate 9 holes - pick clubs like you would on course',
-      focus: 'Pressure',
-      difficulty: 'Hard'
-    });
-
-    // Short game if irons present
-    const hasIrons = sessions.flatMap(s=>s.shots).some(sh=>isIron(sh.clubType) && sh.carryDistance<150);
-    if (hasIrons) {
-      plans.push({
-        name: '🎪 Short Game Focus',
-        duration: 25,
-        desc: 'Drill approach shots and wedges for accuracy',
-        focus: 'Accuracy',
-        difficulty: 'Medium'
-      });
-    }
-
-    return plans;
-  }
-
-  return { generatePlan };
-})();
+// PracticePlans (plural) is gone. It was a SECOND practice plan, rendered on
+// the Practice view beside the real one, sharing nothing with `PracticePlan` —
+// no severity weighting, no scoring weight, no ball counts, no gated library
+// drill, no transfer block. What it had instead was invented: durations of
+// 20/30/45 minutes attached to nothing, difficulty labels of Easy/Medium/Hard
+// off no scale, "Hit 10 shots with each club, focusing on repeatable swing" as
+// a drill, and a card whose description repeated its own title. Its Start
+// button called a stub that toasted and did nothing.
+//
+// The Practice view renders the real plan now.
 const Goals = (() => {
   const STORAGE_KEY = 'slGoals';
 
@@ -8142,19 +8098,37 @@ const UI = (() => {
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
-    const plans = PracticePlans.generatePlan(sessions);
     const grid = document.getElementById('practiceGrid');
-    if (!grid || !plans) return;
+    if (!grid) return;
+    const latest = sessions[0];
+    const esc = t => Sanitize.escape(String(t));
+    let plan = null;
+    try { plan = PracticePlan.generate(latest.shots, 45, latest); } catch (e) { console.error('plan', e); }
 
-    grid.innerHTML = plans.map((p,i) => `
-      <div class="drill-card" style="padding:1rem;cursor:pointer;text-align:center">
-        <div style="font-size:2rem;margin-bottom:.4rem">${p.name.split(' ')[0]}</div>
-        <div class="drill-title" style="font-size:.9rem">${p.name.substring(p.name.indexOf(' ')+1)}</div>
-        <div class="drill-time" style="margin-top:.5rem">${p.duration} min</div>
-        <div style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem">${p.difficulty}</div>
-        <button class="btn-primary" data-start-plan="${Sanitize.escape(p.name)}" style="width:100%;margin-top:.6rem;padding:.4rem;font-size:.75rem">Start</button>
-      </div>`
-    ).join('');
+    if (!plan || !plan.length) {
+      grid.innerHTML = `<div class="tail-note" style="grid-column:1/-1">Nothing recurred often enough in your
+        last session to prescribe against — which is a result, not an empty screen. The drill library below is
+        open on whatever your data supports, and the short-game work above needs no launch monitor.</div>`;
+      return;
+    }
+
+    // Weighted minutes and ball counts, and the drill from the gated library —
+    // the same plan the session detail shows, because there is only one.
+    grid.innerHTML = `<div class="tail-note" style="grid-column:1/-1;margin-bottom:.2rem">Built from your last
+        session on ${esc(Conditions.ball(latest).label.toLowerCase())}. Time is weighted by how much each fault
+        is likely costing you, and each block counts balls as well as minutes — volume past attention is
+        exercise rather than practice.</div>` +
+      plan.map(p => `
+      <div class="drill-card" style="padding:1rem">
+        <div style="font-size:1.6rem;margin-bottom:.3rem">${p.icon || '&#9971;'}</div>
+        <div class="drill-title" style="font-size:.9rem">${esc(p.name)}</div>
+        <div class="drill-time" style="margin-top:.4rem">${p.minutes} min &middot; ${p.balls} balls</div>
+        <div style="font-size:.75rem;line-height:1.4;color:var(--text-dim);margin-top:.5rem">
+          ${p.libraryDrill
+            ? `<strong>${esc(p.libraryDrill.name)}</strong>`
+            : esc((p.drill && p.drill.name) || p.lockedNote || '')}</div>
+        ${p.drillIsFeel ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem">A feel &mdash; nothing measures whether it happened.</div>` : ''}
+      </div>`).join('');
   }
 
   // ── Drill library ─────────────────────────────────────────────
@@ -8725,7 +8699,7 @@ async function init() {
   // script-src 'unsafe-inline') while still wiring up elements created later.
   document.addEventListener('click', async e => {
     const t = e.target.closest(
-      '[data-route],[data-start-plan],[data-close],[data-close-modal],[data-export-close],[data-del-goal]'
+      '[data-route],[data-close],[data-close-modal],[data-export-close],[data-del-goal]'
     );
     if (!t) return;
 
@@ -8750,11 +8724,6 @@ async function init() {
     if (t.hasAttribute('data-del-goal')) {
       try { Goals.deleteGoal(t.getAttribute('data-del-goal')); } catch (_) {}
       location.reload();
-      return;
-    }
-    // Practice-plan "Start" stub
-    if (t.hasAttribute('data-start-plan')) {
-      toast(t.getAttribute('data-start-plan') + ' session started!');
       return;
     }
     // Route to a view (same logic as the data-view nav delegator)
