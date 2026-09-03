@@ -26,63 +26,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~6000 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, ~55 feature modules
+- **app.js** (~10,700 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 56 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
 
 The file is built from self-contained IIFE modules (`const X = (() => {...})()`),
-stacked in file order as features were added. Grouped by role:
+stacked in file order as features were added. **This list is checked against the
+source by `test/suites/module-map.js`** — an earlier version named 17 modules
+that had been deleted and omitted the ten that matter most, which is a bad map
+to hand someone starting cold.
 
-1. **Utilities & Club Data**
-   - `CLUB_ORDER`, `CLUB_COLORS`, `CLUB_LABELS` — Golf equipment reference tables
-   - Club type checkers: `isWood()`, `isIron()`, `isHybrid()`, etc.
-   - Stats: `avg()`, `stdDev()`, `fmt()` for formatting numbers
-   - Geometry: `facePath(shot)` calculates face-to-path angle (D-Plane concept)
+1. **Utilities (not modules — top-level functions and tables)**
+   - `CLUB_ORDER`, `CLUB_COLORS`, `CLUB_LABELS` — equipment reference tables
+   - Club type checkers: `isWood()`, `isIron()`, `isHybrid()`, `isShort()`, `isMid()`
+   - Stats: `avg()`, `mean()`, `stdDev()`, `fmt()`, `consistencyScore()`,
+     `bagConsistency()` (per club — never pool a bag; see below)
+   - Geometry: `facePath()`, `faceAngle()`, `spinLoft()`, `curveYards()`,
+     `gearEffectSuspected()`
 
-2. **Core infra** — `Sanitize`, `CookieConsent`, `Agreement`, `DB`, `MemDB`,
-   `_oauthTokens`, `Auth`, `CloudDB`, `Store`, `CSVParser`, `Router`,
-   `ImportFlow`, `UI`
-   - `DB` — IndexedDB via idb-keyval; `getSessions()`, `getSession(id)`,
-     `saveSession()`, `deleteSession()`. Guests use ephemeral `MemDB`
-     (cleared on page close).
-   - `Auth` — Supabase OAuth + password auth; `getUser()` is the
-     server-validated source of truth (see Auth & Cloud Sync below).
-   - `CSVParser` — Rapsodo format → normalized shot objects (club type,
-     ball speed, smash factor, launch angle, spin rate, carry, total, etc.)
-   - `Router` — views `sessions` (home), `yardages`, `progress`, `settings`;
-     `Router.showView()` toggles visibility; URL hash routing (`#sessions`).
+2. **Measurement foundation** — `Metrics` (trust tiers, sample floors,
+   `interval()`, `typicalError()`, `changeIsReal()`, `CEILING`), `Conditions`
+   (ball + surface, and what they invalidate), `Spin` (suppressed without an
+   RPT ball), `FeedbackEngine` (the guidance-hypothesis schedule),
+   `RetentionProbe` (the app's only efficacy metric), `MeasurementReference`,
+   `SetupGuide`
 
-3. **Scoring / analysis engines** — `FaultEngine`, `ShotScorer`, `SwingDNA`,
-   `Benchmarks`, `Insights`, `Analytics`, `SwingAnalytics`, `InsightEngine`,
-   `Trajectory`, `ClubAnalyzer`, `GapAnalysis`, `FormQualityTimeline`,
-   `Dispersion` (tail engine + the only strokes valuation — see below),
-   `Strike` (smash/strike-quality track), `QuietEye` (putting, no device),
-   `DrillLibrary` (104 drills + their gates)
+3. **Core infra** — `Sanitize`, `CookieConsent`, `Agreement`, `DB`, `MemDB`,
+   `LocalDB`, `Auth`, `CloudDB`, `Store`, `CSVParser`, `Router`, `ImportFlow`,
+   `UI`
+   - `DB` — IndexedDB via idb-keyval, reachable behind `LocalDB`'s explicit
+     opt-in. Guests read through `MemDB`, the single synchronous read path.
+   - `Auth` — Supabase OAuth + password; `getUser()` is the server-validated
+     source of truth (see Auth & Cloud Sync below).
+   - `CSVParser` — Rapsodo format → normalised shot objects; refuses a
+     non-Rapsodo CSV at the door rather than importing it as nothing.
+   - `Router` — views `sessions` (home), `yardages`, `progress`, `practice`,
+     `settings`; hash routing.
 
-4. **Coaching / practice** — `PracticePlan`, `PracticePlans`, `CoachingMode`,
-   `PersonalCoach`, `DrillTracker`, `PracticeEfficiency`,
-   `SmartRecommendations`
+4. **Scoring / analysis engines** — `FaultEngine` (gates, `splitCauses`,
+   `splitDrills`), `ShotScorer`, `SwingDNA`, `Benchmarks` (the only copy of the
+   target bands), `Insights`, `InsightEngine`, `Analytics` (yardage book +
+   `conditionGroups`), `Trajectory`, `ClubAnalyzer`, `Dispersion` (tail engine
+   and the app's only strokes valuation), `Strike` (smash / strike quality),
+   `QuietEye` (putting, no device), `DrillLibrary` (104 gated drills),
+   `ShortGame` (20 putting and chipping drills), `Rounds` (on-course data)
 
-5. **Session tooling** — `SessionFeedback`, `SessionCategories`,
-   `SessionSnapshot`, `SessionSharing`, `SessionNotes`, `SessionComparison`,
-   `ClubComparison`
+5. **Coaching / practice** — `PracticePlan`, `PracticePlans`, `CoachingMode`,
+   `PersonalCoach`, `PracticeEfficiency`, `SmartRecommendations`
+   (`getNextStep`, the one ranked recommendation), `LearningPath`,
+   `ContentLibrary`
 
-6. **Dashboard / UX layer** — `QuickStats`, `Features` (see dedicated
-   section below), `ViewPrefs`, `UICustomizer`, `EnhancedMetricsWidget`,
-   `QuickActions`, `AdvancedFilters`, `ResponsiveEnhancements`,
-   `AccessibilityEnhancements`, `PerformanceOptimizations`
+6. **Dashboard / UX layer** — `QuickStats`, `Features` (see its own section
+   below), `ViewPrefs`, `EnhancedMetricsWidget`, `ResponsiveEnhancements`,
+   `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
 
-7. **Insights / social / reporting** — `PerformanceGrade`,
-   `PerformanceAlerts`, `PerformanceTimeline`, `AnalyticsHub`,
-   `CommunityInsights`, `ContentLibrary`, `LearningPath`, `WeeklySummary`,
-   `NotificationCenter`, `Goals`, `DocumentationCenter`
+7. **Reporting** — `PerformanceGrade`, `PerformanceAlerts`, `AnalyticsHub`,
+   `CommunityInsights` (published data only — **there is no community**, see
+   below)
 
 8. **UI Rendering** (`UI` module)
-   - Dashboard cards (each session → card with summary stats)
-   - Charts: distance distributions, consistency metrics, club heatmaps (Chart.js)
-   - Modals: import dialog, session detail, settings, and the ~6 dynamically
-     injected modals (`analyticsModal`, `benchmarkModal`, `clubModal`,
+   - Session cards, the session detail view, and every chart (Chart.js)
+   - Modals: import, session detail, settings, plus the ~6 dynamically
+     injected ones (`analyticsModal`, `benchmarkModal`, `clubModal`,
      `efficiencyModal`, `learningModal`, `shortcutsModal`) built via
      `innerHTML` at runtime rather than living in `index.html`
 
@@ -628,7 +634,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the ~55 listed in Core Modules above — not the
+`Features` is one module among the 56 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -678,6 +684,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-~55 modules across scoring/coaching/session/dashboard/reporting, dark mode).
+56 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.
