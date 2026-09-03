@@ -92,6 +92,11 @@ CREATE OR REPLACE FUNCTION public.touch_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 BEGIN NEW.updated_at := now(); RETURN NEW; END; $$;
 
+-- The live project already carries an equivalent trigger under an older name.
+-- Drop BOTH names before creating, or running this script on that project
+-- leaves two triggers doing the same job — the exact drift this file is
+-- supposed to prevent.
+DROP TRIGGER IF EXISTS sessions_updated_at       ON public.sessions;
 DROP TRIGGER IF EXISTS sessions_touch_updated_at ON public.sessions;
 CREATE TRIGGER sessions_touch_updated_at
   BEFORE UPDATE ON public.sessions FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
