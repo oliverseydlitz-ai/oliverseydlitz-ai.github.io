@@ -53,5 +53,20 @@ ok(badge('speed').got === true, 'and ball speed likewise');
 ok(badge('first').got === true, 'session-count badges are unaffected');
 ok(a.total === a.defs.length && a.unlocked <= a.total, 'and the counts stay coherent');
 
+console.log('— and there is one implementation of "take a maximum" —');
+// Four call sites had grown their own copy of `CEILING[field] ?? Infinity`
+// plus a filter, which is the second-copy shape that has caused most of the
+// real bugs in this file.
+const vals = [1.40, 1.44, 1.71, 0, -3, NaN];
+ok(Metrics.peak(vals, 'smashFactor') === 1.44, 'it screens through the ceiling');
+ok(Metrics.peak(vals, 'carryDistance') === 1.71,
+   'an unscreened field keeps its maximum — the ceiling table is per field');
+ok(Metrics.peak([], 'smashFactor') === null, 'nothing in, null out — not -Infinity, not 0');
+ok(Metrics.peak(null, 'smashFactor') === null, 'and null in is not a crash');
+ok(Metrics.peak([{ smashFactor: 1.42 }, { smashFactor: 1.71 }], 'smashFactor') === 1.42,
+   'it takes shots as well as bare numbers');
+ok(Metrics.peak([{ smashFactor: 0 }], 'smashFactor') === null,
+   'a zero reading is absent, not a maximum of zero');
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

@@ -527,6 +527,19 @@ const Metrics = (() => {
   // of unsourced constant the rest of this module refuses.
   const CEILING = { smashFactor: 1.55 };
 
+  // The one way to take a maximum. Three call sites had grown their own copy
+  // of `CEILING[field] ?? Infinity` plus a filter, which is the second-copy
+  // shape that has caused most of the real bugs in this file.
+  //
+  // `values` may be shots or bare numbers.
+  function peak(items, field) {
+    const cap = CEILING[field] ?? Infinity;
+    const vals = (items || [])
+      .map(x => (x && typeof x === 'object') ? x[field] : x)
+      .filter(v => Number.isFinite(v) && v > 0 && v <= cap);
+    return vals.length ? Math.max(...vals) : null;
+  }
+
   // Sample floors before a mean may be reported at all.
   const MIN_SHOTS_REPORT  = 10;  // any club mean
   const MIN_SHOTS_DELIVERY = 15; // club path / attack angle change claims
@@ -610,7 +623,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, CEILING,
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, CEILING, peak,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval };
 })();
@@ -5284,12 +5297,12 @@ const Analytics = (() => {
       if (!vals.length) return null;
       // Impossible readings only — see Metrics.CEILING for why this screens
       // smash factor and nothing else.
-      const cap = Metrics.CEILING[field] ?? Infinity;
+      const ceiling = Metrics.peak(vals, field);
       const rawMax = Math.max(...vals);
       let best = null;
-      all.forEach(s => { if (s[field] > 0 && s[field] <= cap && (!best || s[field] > best[field])) best = s; });
+      all.forEach(s => { if (s[field] > 0 && s[field] <= ceiling && (!best || s[field] > best[field])) best = s; });
       if (!best) return null;
-      const excluded = rawMax > cap ? rawMax : null;
+      const excluded = rawMax > ceiling ? rawMax : null;
       return { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType),
                date: formatDate(best._date),
                note: excluded === null ? null
@@ -5379,8 +5392,7 @@ const QuickStats = (() => {
 
     const carries = shots.filter(s => s.clubType === club).map(s => s.carryDistance).filter(v => v > 0);
     const iv = Metrics.interval(carries, '', 0);
-    const cap = Metrics.CEILING.carryDistance ?? Infinity;
-    const best = Math.max(...carries.filter(v => v <= cap));
+    const best = Metrics.peak(carries, 'carryDistance');
     const cons = consistencyScore(carries);
 
     host.innerHTML = `
@@ -5389,7 +5401,7 @@ const QuickStats = (() => {
         <div class="quick-stat-label">Form</div>
       </div>
       <div class="quick-stat">
-        <div class="quick-stat-value">${Math.round(best)}</div>
+        <div class="quick-stat-value">${best === null ? '—' : Math.round(best)}</div>
         <div class="quick-stat-label">Best</div>
       </div>
       <div class="quick-stat">
@@ -5555,19 +5567,14 @@ const Goals = (() => {
   // of 1.50 was "achieved" by one glitched 1.71, which is past what a legal
   // clubface can produce. `Metrics.CEILING` is the same screen the personal
   // bests use.
-  function best(all, field) {
-    const cap = Metrics.CEILING[field] ?? Infinity;
-    const vals = all.map(s => s[field]).filter(v => v > 0 && v <= cap);
-    return vals.length ? Math.max(...vals) : 0;
-  }
 
   function getProgress(metric, sessions) {
     const all = (sessions || []).flatMap(s => s.shots || []);
     let current = null;
     switch(metric) {
-      case 'carry':      current = best(all, 'carryDistance'); break;
-      case 'ball_speed': current = best(all, 'ballSpeed'); break;
-      case 'smash':      current = best(all, 'smashFactor'); break;
+      case 'carry':      current = Metrics.peak(all, 'carryDistance') || 0; break;
+      case 'ball_speed': current = Metrics.peak(all, 'ballSpeed') || 0; break;
+      case 'smash':      current = Metrics.peak(all, 'smashFactor') || 0; break;
       case 'sessions':   current = sessions.length; break;
       case 'score':      {
         const scores = sessions.slice(0,3).map(s => {
@@ -5666,14 +5673,9 @@ const Features = (() => {
       // fired on one glitched 1.71, which is past what a legal clubface can
       // produce. Same screen as the goals and the personal bests; carry and
       // ball speed stay unscreened for the same reason as there.
-      const peak = (field) => {
-        const cap = Metrics.CEILING[field] ?? Infinity;
-        const vals = all.map(s => s[field]).filter(v => v > 0 && v <= cap);
-        return vals.length ? Math.max(...vals) : 0;
-      };
-      const carry = peak('carryDistance');
-      const ball  = peak('ballSpeed');
-      const smash = peak('smashFactor');
+      const carry = Metrics.peak(all, 'carryDistance') || 0;
+      const ball  = Metrics.peak(all, 'ballSpeed') || 0;
+      const smash = Metrics.peak(all, 'smashFactor') || 0;
       const clubs = sortedClubs(all).length;
       const st = streak(sessions);
       const defs = [

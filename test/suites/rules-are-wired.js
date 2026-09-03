@@ -46,6 +46,7 @@ const WIRED = [
   ['transferBlock',   'PracticePlan',   'no plan ends with the block that transfers'],
   ['conditionGroups', 'Analytics',      'the yardage book pools across ball types again'],
   ['MIN_SHOTS_DELIVERY','Metrics',      'the four tier-2 fault rules keep their own copy of the 15-shot floor'],
+  ['peak',            'Metrics',        'a record unlocks off a device misread again'],
   ['BALLS',           'Conditions',     'the import menu becomes a second hand-maintained copy of the ball list'],
   ['SURFACES',        'Conditions',     'the same, for the surface list'],
   ['movedToward',     'Benchmarks',     'the progress trend grades an angle on a fixed sign again'],
@@ -132,6 +133,10 @@ console.log('— and no replaced formula is still in use anywhere —');
     ['100-stdDev',    'the same, unspaced'],
     ['faults[0].pct', 'a fault carries `rate`, not `pct` — this rendered as NaN in a red alert'],
     ['minShots: 15',  'Metrics.MIN_SHOTS_DELIVERY — four rules kept private copies of the 15'],
+    // Qualified form only: inside Metrics the implementation refers to a bare
+    // `CEILING[field]`, and that one is the point. A check that fires on the
+    // function it is protecting gets deleted.
+    ['Metrics.CEILING[', 'Metrics.peak() — four call sites had grown their own copy of this screen'],
   ];
   for (const [dead, instead] of ZOMBIES) {
     const n = code.split(dead).length - 1;
