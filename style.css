@@ -2377,3 +2377,35 @@ html.range-open, html.range-open body { overflow: hidden; }
    claim about what happened, not a setting to flip. */
 .caveat-fix{margin-top:.7rem}
 .caveat-fix .link-btn{font-size:.78rem}
+
+/* ── The printed yardage card ─────────────────────────────────────
+   A card lives in a golf bag and outlives the screen it came from, so
+   the caveats print WITH it. Anything not on the paper is gone: on
+   screen a caveat is a paragraph you can scroll back to, on paper it
+   either printed or it did not. */
+.print-only { display: none; }
+@media print {
+  /* Nothing but the book. Nav, other views, the drill finder, the
+     records grid and every control are screen furniture. */
+  .bottom-nav, .top-bar, .view-header, .no-print, .modal-overlay, .cookie-consent,
+  #drillFinderHost, #recordsGrid, #yardages-empty, .paywall-overlay,
+  .tag-row, .search-bar, .range-card { display: none !important; }
+  .view:not(#view-yardages) { display: none !important; }
+  #view-yardages { display: block !important; padding: 0 !important; }
+  .print-only { display: block; }
+
+  /* Print in ink on paper, whatever theme the screen was in. A dark
+     theme sent to a printer is a solid black page. */
+  html, body, #view-yardages { background: #fff !important; color: #000 !important; }
+  * { color: #000 !important; box-shadow: none !important; }
+  .table-wrap { overflow: visible !important; }
+  #yardageTable { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  #yardageTable th, #yardageTable td { border-bottom: 1px solid #999; padding: .35rem .3rem; text-align: left; }
+  .yard-spark { display: none; }          /* a sparkline is meaningless in one ink colour */
+  .club-dot { display: none; }            /* so is a colour key */
+  .print-title { font-size: 18pt; font-weight: 800; margin-bottom: .2rem; }
+  .print-sub { font-size: 9pt; margin-bottom: .15rem; }
+  .print-caveat { font-size: 8.5pt; line-height: 1.4; margin: .5rem 0 .8rem; }
+  .yardage-intro, .yardage-meta { font-size: 9pt; }
+  @page { margin: 12mm; }
+}

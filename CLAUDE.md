@@ -554,6 +554,29 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
   session's conditions (they answer "how am I hitting it now"). A test pins
   that they disagree on the same data.
 
+### The printed yardage card (`@media print`, `#yardagePrintHead`)
+
+A yardage card lives in a golf bag and **outlives the screen it came from**, so
+the caveats have to travel with it. On screen a caveat is a paragraph you can
+scroll back to; on paper it either printed or it is gone. A card reading
+"230 · 7i" with nothing about the ball it was measured on is exactly the
+artefact the rest of this codebase spends its time refusing to produce.
+
+`#yardagePrintHead` is built at render time — never hand-written markup — so
+its conditions line cannot drift from the table beneath it. It carries the ball
+and surface, the session and shot count, the date range, the print date, the
+modelled-carry note, the sample floor, and off range balls the "order real,
+distances indicative" line.
+
+- **Everything but the book is hidden**, including every other view — printing
+  a single-page app otherwise prints all of it.
+- **It forces ink on paper.** A dark theme sent to a printer is a solid black
+  page.
+- **The sparkline and the club colour dots are dropped**: neither means anything
+  in one ink colour, and the trend verdict is already there as text.
+- **Clubs under the floor keep their row.** On paper a missing row reads as a
+  club you do not own; the row saying what it needs is the more useful artefact.
+
 ### Correcting the alignment flag (`Store.setAlignment`)
 
 The alignment checkbox only exists during import, so a golfer who levelled the

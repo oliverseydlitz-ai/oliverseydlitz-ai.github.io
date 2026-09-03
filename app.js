@@ -8626,6 +8626,38 @@ const UI = (() => {
       the same way by the eye whatever the caption says, so a change the app has decided is inside your own
       noise does not get drawn as a direction.</div>`;
 
+    // ── The printed card ──────────────────────────────────────
+    // A yardage card lives in a golf bag and outlives the screen it came from,
+    // so the caveats have to travel WITH it. On screen they are a paragraph
+    // above the table the golfer can scroll back to; on paper, anything not
+    // printed is gone. A card that says "230 · 7i" and nothing about the ball
+    // it was measured on is exactly the artefact this app spends the rest of
+    // its code refusing to produce.
+    const printHead = document.getElementById('yardagePrintHead');
+    if (printHead) {
+      const label = !main ? 'conditions not recorded'
+        : main.surface.id === 'unknown' ? `${main.ball.label}, surface not recorded`
+        : `${main.ball.label}, ${main.surface.label.toLowerCase()}`;
+      const span = (() => {
+        const ds = used.map(x => new Date(x.date || 0)).filter(d => !isNaN(d)).sort((a, b) => a - b);
+        if (!ds.length) return '';
+        const from = formatDate(ds[0].toISOString());
+        const to = formatDate(ds[ds.length - 1].toISOString());
+        return from === to ? from : `${from} – ${to}`;
+      })();
+      printHead.innerHTML = `
+        <div class="print-title">Yardage card</div>
+        <div class="print-sub">${Sanitize.escape(label)} · ${used.length} session${used.length > 1 ? 's' : ''}
+          · ${totalShots} shots${span ? ` · ${Sanitize.escape(span)}` : ''}</div>
+        <div class="print-sub">Printed ${Sanitize.escape(formatDate(new Date().toISOString()))}</div>
+        <div class="print-caveat">Carry is modelled by the monitor from launch conditions, not measured. No club
+          shows a number until it has ${Metrics.MIN_SHOTS_REPORT} shots in these conditions.${
+          main && !main.ball.dispersionValid
+            ? ' These were not your own ball — read the ORDER of the clubs as real and the distances as indicative.'
+            : ''}</div>`;
+    }
+    document.getElementById('printYardages')?.addEventListener('click', () => window.print());
+
     const bests = Analytics.personalBests(sessions);
     document.getElementById('recordsGrid').innerHTML = bests.map(b=>`
       <div class="record-card">

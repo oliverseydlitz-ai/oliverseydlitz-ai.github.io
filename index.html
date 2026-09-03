@@ -432,7 +432,13 @@
       <!-- Drill recommendations -->
       <div id="drillFinderHost" style="margin-bottom:1.5rem"></div>
 
+      <!-- The printed card. Built at render time so its conditions line can
+           never drift from the table it sits above — a card in a golf bag has
+           no tooltip and will be read six months after it was printed. -->
+      <div id="yardagePrintHead" class="print-only"></div>
+
       <p class="yardage-intro">Your stock carry per club — use this for club selection on the course. <span id="yardageMeta" class="yardage-meta"></span></p>
+      <button class="btn-secondary no-print" id="printYardages" style="margin-bottom:.8rem">🖨 Print / save as PDF</button>
       <div id="yardageConditions" style="margin-bottom:.8rem"></div>
       <div class="table-wrap">
         <table id="yardageTable"></table>
