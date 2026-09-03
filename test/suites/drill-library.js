@@ -136,15 +136,18 @@ ok(Object.keys(P.libraryDrill({ id: 'not-a-fault', drills: [] }, mk(20))).length
    'an unmapped fault falls back to the fault\'s own drill rather than guessing');
 
 console.log('— and every plan carries the wrapper that decides whether it transfers —');
-for (const m of ['faded','bandwidth','onRequest','always']) {
-  FE.setMode(m);
-  const w = P.wrapperFor(m);
-  ok(w && w.section === 'I', `${m} maps to a section-I wrapper (${w && w.name})`);
+// This used to be keyed off a display setting in the app, which was the wrong
+// variable entirely: how a golfer reads their data afterwards says nothing
+// about how they ran the session. It is now the range default.
+ok(P.wrapperFor().section === 'I', 'the default wrapper is a section-I one');
+ok(P.wrapperFor().id === FE.DEFAULT_WRAPPER, 'and it is the faded session the research base names');
+for (const id of ['i95','i96','i97','i98']) {
+  ok(P.wrapperFor(id).id === id, `${id} can still be asked for by name`);
 }
-ok(/argues against/.test(P.wrapperFor('always').note),
-   'and "show every number" is told it is the setting the evidence argues against');
-ok(/matters more than/.test(P.wrapperFor('faded').note),
-   'while the rest are told the wrapper outranks the drill choice');
+ok(P.wrapperFor('nonsense').id === FE.DEFAULT_WRAPPER, 'and an unknown one falls back rather than returning null');
+ok(/matters more than/.test(P.wrapperFor().note), 'the wrapper outranks the drill choice');
+ok(/rule for the mat/i.test(P.wrapperFor().note),
+   'and it says it is a rule for the range, not for what this app displays');
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

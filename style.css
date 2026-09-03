@@ -749,18 +749,6 @@ tr:hover td { background: var(--surface2); }
   margin:-.3rem 0 .8rem; font-size:.75rem; line-height:1.45; color:var(--text-muted);
 }
 
-/* Feedback-schedule picker (Settings) */
-.fb-option{
-  display:block; width:100%; text-align:left; cursor:pointer;
-  padding:.7rem .85rem; margin-bottom:.5rem;
-  background:var(--surface2); border:1px solid var(--border);
-  border-radius:var(--radius-sm); color:var(--text);
-}
-.fb-option.on{border-color:var(--pine); background:var(--surface3)}
-.fb-option-label{font-weight:650; font-size:.88rem; display:flex; justify-content:space-between; gap:.5rem}
-.fb-option-blurb{font-size:.75rem; line-height:1.45; color:var(--text-muted); margin-top:.25rem}
-.fb-check{color:var(--pine); font-weight:700}
-
 .sm-pm{color:var(--text-muted); font-size:.78em; font-variant-numeric:tabular-nums}
 .sm-warn{color:var(--yellow); font-size:.72rem; font-weight:600}
 .sm-note{color:var(--text-muted); font-size:.72rem; font-style:italic}
@@ -827,11 +815,6 @@ body.modal-open { overflow: hidden; }
 .import-error{margin:.75rem 0 .25rem;padding:.7rem .85rem;font-size:.83rem;line-height:1.55;
   color:var(--text);background:var(--surface2);border-left:3px solid var(--red);
   border-radius:var(--radius-sm);text-wrap:pretty}
-/* Feedback schedule. A hidden number has to look deliberate, not broken —
-   hence a visible placeholder and a caption saying what is happening. */
-.fb-hidden{color:var(--text-muted);opacity:.45;text-align:center;letter-spacing:.2em}
-.fb-row-hidden{cursor:pointer}
-.fb-row-hidden:hover td{background:var(--surface2)}
 .fault-causes-body li{color:var(--text-muted)}
 /* Drills that are body feels get the same visual demotion the body causes get:
    still there, plainly less load-bearing than the ones the ball checks. */
@@ -889,26 +872,6 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .plan-locked{margin-top:.4rem;padding-left:.7rem;border-left:2px solid var(--yellow);
   font-size:.75rem;line-height:1.5;color:var(--text-dim)}
 .plan-item.plan-wrapper{border-left-color:var(--pine)}
-.fb-cal{margin-top:.45rem;padding-left:.7rem;border-left:2px solid var(--pine);
-  font-size:.75rem;line-height:1.5;color:var(--text-dim)}
-.fb-cal.pending{border-left-color:var(--text-muted);color:var(--text-muted)}
-.fb-ask-row td{padding:.6rem .7rem;background:var(--surface2);border-left:3px solid var(--yellow)}
-.fb-ask{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
-.fb-ask-q{flex:1 1 100%;font-size:.8rem;line-height:1.45;color:var(--text)}
-.fb-ask-in{width:6rem;padding:.4rem .55rem;font-size:.9rem;font-variant-numeric:tabular-nums;
-  background:var(--surface);color:var(--text);border:1.5px solid var(--border);border-radius:var(--radius-sm)}
-.fb-ask-in:focus{border-color:var(--pine);outline:none}
-.fb-guess-row td{padding:.35rem .7rem;background:var(--surface2)}
-.fb-guess{font-size:.75rem;line-height:1.45;color:var(--text-muted)}
-.fb-caption{text-align:left;padding:.6rem .8rem .7rem;margin:0 0 .6rem;
-  font-size:.75rem;line-height:1.5;color:var(--text-muted);background:var(--surface2);
-  border-left:3px solid var(--pine);border-radius:var(--radius-sm)}
-.fb-caption-head{display:block;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;
-  font-weight:700;color:var(--text-dim);margin-bottom:.3rem}
-.fb-caption-btn{margin-top:.45rem;padding:.3rem .65rem;font-size:.72rem;font-weight:600;
-  cursor:pointer;background:var(--surface);color:var(--text);border:1.5px solid var(--border);
-  border-radius:var(--radius-sm)}
-.fb-caption-btn:hover{border-color:var(--pine)}
 .drill-tabs{display:flex;gap:.35rem;overflow-x:auto;padding-bottom:.4rem;margin-bottom:.6rem;
   scrollbar-width:none}
 .drill-tabs::-webkit-scrollbar{display:none}
@@ -2429,3 +2392,34 @@ html.range-open, html.range-open body { overflow: hidden; }
 .sync-warn-p{font-size:.83rem;line-height:1.55;margin:0 0 .5rem}
 .sync-warn-why{font-size:.74rem;color:var(--text-muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
   margin:.6rem 0 .8rem;word-break:break-word}
+
+/* ── Drill library groups ─────────────────────────────────────────
+   The list was 104 entries all called drills, a quarter of which were
+   not. Grouping is the fix: the range work reads as the list, and the
+   screen-reads and gym sessions read as what they are. */
+.drill-group-head{margin:1.4rem 0 .5rem;padding-top:.9rem;border-top:1px solid var(--border)}
+.drill-group-name{display:block;font-size:.85rem;font-weight:700;color:var(--text)}
+.drill-group-blurb{display:block;font-size:.76rem;line-height:1.5;color:var(--text-muted);margin-top:.25rem}
+/* Not range work — visually stepped back so it cannot be mistaken for it. */
+.drill-group-review .drill-row,
+.drill-group-fitness .drill-row,
+.drill-group-equipment .drill-row{opacity:.82}
+
+/* ── Chipping logger ──────────────────────────────────────────────
+   Distance and lie are set once; the rest is two big targets you can
+   hit standing on a green without looking at the phone properly. */
+.sg-setup{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.sg-tap{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.8rem 0 .6rem}
+.sg-tap-btn{padding:1.1rem .6rem;font:inherit;font-size:1rem;font-weight:700;cursor:pointer;
+  border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.sg-tap-btn.yes{border-color:var(--green);color:var(--green)}
+.sg-tap-btn.no{border-color:var(--accent);color:var(--accent)}
+.sg-tap-btn:active{transform:scale(.97)}
+.sg-dist-rows{margin-top:.8rem;display:flex;flex-direction:column;gap:.35rem}
+.sg-dist-row{display:grid;grid-template-columns:5rem 4rem 1fr;gap:.5rem;align-items:baseline;
+  font-size:.82rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)}
+.sg-dist-row:last-child{border-bottom:none}
+.sg-dist-row.thin{opacity:.6}
+.sg-dist-yd{font-weight:600}
+.sg-dist-rate{font-weight:700;font-variant-numeric:tabular-nums}
+.sg-dist-n{font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums}

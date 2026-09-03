@@ -58,14 +58,14 @@ ok(few2.source==='population', 'falls back to population defaults under 3 sessio
 const many=M.Metrics.typicalError([sess(),sess(),sess(),sess(),sess()],'clubSpeed','d');
 ok(many.source==='personal'&&many.value>0, 'switches to the golfer\'s own error once there is history');
 
-console.log('— §5.9 feedback engine —');
-ok(M.FeedbackEngine.getMode()==='onRequest', 'defaults to tap-to-reveal, not every shot');
-ok(M.FeedbackEngine.shouldReveal({mode:'onRequest'}).reveal===false, 'onRequest hides by default');
-ok(M.FeedbackEngine.shouldReveal({mode:'bandwidth',outsideBand:false}).reveal===false, 'bandwidth stays silent inside tolerance');
-ok(M.FeedbackEngine.shouldReveal({mode:'bandwidth',outsideBand:true}).reveal===true, 'bandwidth speaks outside it');
-ok(M.FeedbackEngine.fadedFrequency(0,50) > M.FeedbackEngine.fadedFrequency(45,50), 'faded schedule decays across session');
-ok(M.FeedbackEngine.shouldAskPrediction(5)&&!M.FeedbackEngine.shouldAskPrediction(1), 'prompts prediction periodically');
-ok(/240/.test(M.FeedbackEngine.volumeAdvice(160)||''), 'warns on marathon sessions');
+console.log('— §5.9 feedback: an instruction for the range, not a display setting —');
+// The reveal schedule used to hide this app's OWN numbers. The guidance
+// hypothesis is about knowledge of results while the reps happen, and a
+// session reaches this app after it is over — see test/suites/feedback-placement.js.
+ok(M.FeedbackEngine.getMode===undefined, 'there is no display mode to read');
+ok(M.FeedbackEngine.shouldReveal===undefined, 'and nothing decides whether to show a shot');
+ok(/240/.test(M.FeedbackEngine.volumeAdvice(160)||''),
+   'volume advice stays — it is about the session you had, which IS this app\'s business');
 
 console.log('— §1.5/1.6 ball and surface —');
 const range={conditions:{ball:'range',surface:'mat'},shots:[]};

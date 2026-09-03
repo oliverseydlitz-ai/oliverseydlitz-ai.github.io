@@ -237,32 +237,38 @@ carry as a measurement (it is a model output) · never claim a rep/week count to
 "groove" a change · never claim the app builds automaticity or rewires motor
 patterns.
 
-### `FeedbackEngine` — enforced, not just offered
+### `FeedbackEngine` — a range instruction, NOT a display setting
 
-The schedule drives the **shot table**, which is the app's only per-shot
-knowledge-of-results surface. `plan(shots)` returns a per-shot decision;
-`explain(mode, n)` is the sentence shown above the table.
+The guidance hypothesis is the strongest evidence in the base and it is not in
+doubt. Winstein & Schmidt (n=240): constant vs faded feedback was
+**indistinguishable during acquisition and at 5–10 minutes**, but at 24 hours
+the faded group had **35% less error**.
 
-- **Faded is deterministic** (`fadedReveal`), not sampled. The table re-renders
-  on every sort, and a schedule that changes when you look at it is not one.
-- **The band is per club and 1.5 SD.** Pooled across a bag it measures the
-  driver-to-wedge gap; at 1 SD it fires on a third of shots by construction.
-- **Hidden rows lose their verdict colour too.** A green/red edge is a
-  judgement, so it is feedback exactly as much as the number is.
-- **Session aggregates are never faded** — a mean with an interval is the
-  summary the retention literature wants a learner to have.
-- `calibration(calls, shots)` scores predict-before-reveal against the golfer's
-  own spread.
+**What was wrong was where it was applied.** The app owned a setting called
+"when to show your numbers" that hid the figures in its own shot table until you
+tapped each row. That does not implement the guidance hypothesis: the mechanism
+is knowledge of results **during acquisition**, while the reps are happening. By
+the time a shot reaches this app it was hit at a range, in front of a monitor
+that displayed every number on the spot, and the session is over. Hiding it
+afterwards reduced nothing except the golfer's ability to read their own data —
+the only thing this app does.
 
-### `FeedbackEngine` — why numbers are hidden by default
+A real finding wired to the wrong moment is **harder to catch than a made-up
+number**, because everything about it is true except the place it was put.
 
-The guidance hypothesis is the strongest evidence in the base and it indicts
-this product category. Winstein & Schmidt (n=240): constant vs faded feedback
-was **indistinguishable during acquisition and at 5–10 minutes**, but at 24
-hours the faded group had **35% less error**. An app that measures itself on
-within-session improvement cannot see the damage it does. Default mode is
-`onRequest` (tap to reveal). **Never evaluate a drill by within-session
-improvement** — the retention probe is the efficacy metric.
+So: the app shows everything (`FeedbackEngine.WHY_SHOWN` says why, and is
+rendered in Settings and in `FirstRun` rather than restated). The schedule lives
+where it can operate — the section-I wrappers (`i95` faded, `i96` bandwidth,
+`i97` prediction, `i98` self-selected), which instruct a golfer how to use the
+monitor **in front of them**, and `RetentionProbe`, which is the only thing here
+that can measure whether any of it worked. `PracticePlan.wrapperFor()` defaults
+to `FeedbackEngine.DEFAULT_WRAPPER` (`i95`) instead of keying off a display
+setting, which was the wrong variable entirely: how a golfer reads their data
+afterwards says nothing about how they ran the session.
+
+`volumeAdvice` stays — it is about the session you had, which is this app's
+business. `test/suites/feedback-placement.js` pins that nothing hides a number
+again.
 
 ## Swing-mechanics constants (do not change casually)
 
@@ -389,17 +395,41 @@ learning, contextual interference (random order), and external focus.
 - **The session builder puts errorless BEFORE random.** That order is the
   finding — random order before anything is repeatable is just missing in a
   varied sequence.
-- **Chipping is scored on proximity, median AND mean.** Strokes gained around
-  the green is a function of lie and proximity, not of holing out. The gap
-  between median and mean *is* the chunk rate in feet.
+- **Chipping is scored on a rate, not on eyeballed feet.** It used to ask for
+  the leave in feet per chip, typed into a phone. Nobody standing on a green
+  reliably tells 5 ft from 7 ft, and the median-vs-mean machinery built on it —
+  a "blow-up" at three times the median — needed a precision the input never
+  had. Estimating a thing and reporting it to one decimal place is the error
+  this app polices everywhere else. Now: set the distance once, then one tap per
+  chip, inside `ShortGame.INSIDE_FT` (3 ft) or not. It is a proportion, so it
+  gets `QuietEye.wilson` — the same implementation, not a second copy, because
+  at ten-from-ten the normal approximation claims certainty.
+- **Distances are never pooled.** Chipping from 5 yards and 40 yards are
+  different skills; pooling them measures which distances you chose to practise.
+  Each bucket carries its own rate and its own floor.
 - **It says putting is the cheapest fix, not the biggest hole** — a 90-shooter
   loses ~6 strokes to approach + short game and only ~2 to putting.
 
 ### Drill library (`DrillLibrary`)
 
-All 104 drills from §8, each carrying its section's gate. `admissible(drill,
+All 104 entries from §8, each carrying its section's gate. `admissible(drill,
 ctx)` returns `{ok, reasons}` — **a locked drill is shown with its reason, never
 filtered out.** Section I are wrappers applied *over* a drill, never instead.
+
+**Not all 104 are drills, and the list used to pretend they were.** A quarter
+of it was something else: eight entries told the golfer to read a screen this
+app already renders ("trend across five sessions with a band" *is* the Progress
+tab), six were gym sessions, two were equipment checks, nine were measurement
+sessions where nothing is trained. Listed together with "hit ten shots through
+a gate", the real drills were buried in the noise.
+
+Every entry now declares a `kind` — `drill` (79), `measure` (9), `fitness` (6),
+`equipment` (2), `review` (8) — and `DrillLibrary.KINDS` carries the sentence
+explaining each. The render groups them, **range work first**, with no heading
+on the drills themselves (they are what the section is) and a heading on
+everything else (because it is not what it looks like). Nothing was deleted: a
+trend review and a med-ball throw are both worth doing, they are just not range
+work, and a list that says they are is lying about what it offers.
 
 ### The inference boundary (`FaultEngine.splitCauses`)
 

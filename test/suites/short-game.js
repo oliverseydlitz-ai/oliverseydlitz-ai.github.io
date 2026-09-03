@@ -50,31 +50,66 @@ ok(SG.session(30, 'putting').blocks.every(b => SG.PUTTING.includes(b.drill)), 'a
 ok(SG.session(30, 'chipping').blocks.every(b => SG.CHIPPING.includes(b.drill)), 'and a chipping-only one does not wander');
 ok(s.minutes >= 20, 'the total is a real number of minutes');
 
-console.log('— chipping is scored on proximity, because that is what strokes gained uses —');
-const chips = fts => ({ chips: fts.map(f => ({ leaveFt: f })) });
-ok(SG.proximity([]) === null, 'nothing to score with no chips');
-ok(SG.proximity(chips([3,4,5]).chips) !== null, 'three is enough to compute');
-ok(SG.proximity(chips([3,4,5]).chips).enough === false, `but under ${SG.MIN_CHIPS} it is not called a measurement`);
+console.log('— chipping is scored on a rate you can actually observe —');
+// It used to ask for the leave in FEET, per chip, typed into a phone. Nobody
+// standing on a green reliably tells 5 ft from 7 ft, and the median-vs-mean
+// machinery on top of it — a "blow-up" at three times the median — needed a
+// precision the input never had. Estimating a thing and then reporting it to
+// one decimal place is the error this app polices everywhere else.
+const chips = (outcomes, yards = 10) =>
+  outcomes.map(inside => ({ inside, yards, lie: 'fairway' }));
 
-const tidy = SG.proximity(chips([2,3,3,4,4,5,5,6,7,8]).chips);
-ok(tidy.enough === true && tidy.disasters === 0, 'a clean set has no blow-ups');
-ok(Math.abs(tidy.mean - tidy.median) < 1, 'and its mean and median agree');
-ok(/describes your chipping rather than one bad contact/.test(SG.describe(tidy)), 'which the wording says');
+ok(SG.rate([]) === null, 'nothing to score with no chips');
+ok(SG.rate([{ leaveFt: 4 }]) === null,
+   'and an old feet-only entry scores nothing rather than being silently reinterpreted');
 
-// One chunk in ten drags a mean four feet. The median does not move.
-const chunked = SG.proximity(chips([2,3,3,4,4,5,5,6,7,45]).chips);
-ok(chunked.median === tidy.median || Math.abs(chunked.median - 4.5) < 1, 'a single chunk barely moves the median');
-ok(chunked.mean > tidy.mean + 3, 'while it drags the mean several feet');
-ok(chunked.disasters === 1, 'and is counted as a blow-up');
-ok(/that is where the strokes went/.test(SG.describe(chunked)),
-   'the description points at the bad one rather than the average');
-ok(/work on is the bad one, not the standard one/.test(SG.describe(chunked)), 'and says which to fix');
-ok(SG.proximity(chips([0,0,3,4,5,5,6,6,7,8]).chips).holed === 2, 'holed chips are counted, at zero feet');
+const few = SG.rate(chips([true, false, true]));
+ok(few !== null && few.n === 3, 'three chips compute');
+ok(few.enough === false, `but under ${SG.MIN_CHIPS} it is not called a rate`);
+ok(/impression rather than a rate/i.test(SG.describe(few)), 'and the wording says so');
+ok(/most of the range there is/i.test(SG.describe(few)),
+   'naming how wide the interval still is, rather than printing a bare percentage');
+
+const solid = SG.rate(chips([true,true,true,false,true,false,true,true,false,true]));
+ok(solid.enough === true && solid.n === 10, 'ten is enough');
+ok(solid.inside === 7, 'the count is right');
+ok(Math.abs(solid.overall.p - 0.7) < 1e-9, 'and so is the rate');
+
+console.log('— it is a proportion, so it gets a Wilson interval —');
+ok(solid.overall.lo > 0 && solid.overall.hi <= 1, 'the interval is inside [0,1]');
+const perfect = SG.rate(chips(Array.from({ length: 10 }, () => true)));
+ok(perfect.overall.p === 1, 'ten from ten reads as 100%');
+ok(perfect.overall.lo < 1,
+   'but the lower bound is NOT 1 — the normal approximation claims certainty here, which is why QuietEye\'s Wilson is reused rather than a second one written');
+ok(perfect.overall.lo > 0.6, 'while still being a useful bound');
+
+console.log('— distances are not pooled, because they are different skills —');
+const mixed = SG.rate([
+  ...chips([true,true,true,true,true,true,true,true,true,true], 5),
+  ...chips([false,false,false,false,false,false,false,false,false,true], 40),
+]);
+ok(mixed.distances.length === 2, 'the two distances are reported apart');
+ok(mixed.distances[0].yards === 5 && mixed.distances[1].yards === 40, 'in order, nearest first');
+ok(mixed.distances[0].wilson.p === 1 && mixed.distances[1].wilson.p === 0.1,
+   'each with its own rate — pooling these would report 55% and describe neither');
+ok(mixed.distances.every(d => d.enough), 'both above the floor here');
+ok(/different skill/i.test(SG.describe(mixed)), 'and the description says why they are kept apart');
+
+const thin = SG.rate([...chips([true,true,true,true,true,true,true,true,true,true], 5),
+                      ...chips([true, false], 40)]);
+ok(thin.distances.find(d => d.yards === 40).enough === false,
+   'a distance under the floor is flagged rather than dropped — the row says what it still needs');
+
+console.log('— the distance a golfer picked is bucketed, not stored raw —');
+ok(SG.distanceBucket(11) === 10 && SG.distanceBucket(38) === 40, 'to the nearest offered distance');
+ok(SG.distanceBucket('nonsense') === null, 'and nonsense buckets to nothing');
+ok(SG.DISTANCES.length >= 3 && SG.DISTANCES.every(Number.isFinite), 'the offered distances are real numbers');
+ok(SG.INSIDE_FT === 3, 'and "inside" means 3 feet, stated once rather than typed into the copy');
 
 console.log('— logging round-trips —');
 SG.clear();
 ok(SG.record({ chips: [] }) === null, 'an empty log records nothing');
-ok(SG.record({ chips: [{ leaveFt: 4 }, { leaveFt: 9 }], lie: 'rough' }) !== null, 'a real one records');
+ok(SG.record({ chips: chips([true, false]), lie: 'rough' }) !== null, 'a real one records');
 ok(SG.all().length === 1 && SG.all()[0].lie === 'rough', 'and the lie travels with it');
 ok(SG.all()[0].chips.length === 2, 'with the chips intact');
 SG.clear();

@@ -72,6 +72,10 @@ const WIRED = [
   ['setAlignment',    'Store',          'the alignment caveat names what it withholds and offers no way to answer it'],
   ['maybeShow',       'FirstRun',       'a new account never sees what the app will and will not tell it'],
   ['cloudStatus',     'Store',          'a signed-in user sees a partial account as if it were the whole one'],
+  ['kindOf',          'DrillLibrary',   'the drill list goes back to one flat pile with gym sessions and screen-reads in it'],
+  ['KINDS',           'DrillLibrary',   'the groups lose the sentence saying what each one actually is'],
+  ['INSIDE_FT',       'ShortGame',      'the chip logger hardcodes what "inside" means instead of reading it'],
+  ['DISTANCES',       'ShortGame',      'the chipping distances become a second hand-maintained list in the UI'],
   ['calculateClubTrend','ClubAnalyzer', 'a second trend calculator grows beside it, the way the target bands did'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];

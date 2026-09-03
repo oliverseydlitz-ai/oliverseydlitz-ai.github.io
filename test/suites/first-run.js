@@ -23,8 +23,8 @@ ok(c.floor === Metrics.MIN_SHOTS_REPORT, 'the sample floor comes from Metrics');
 ok(c.tailFloor === Metrics.MIN_SHOTS_TAIL, 'so does the tail floor');
 ok(c.probeDays === RP.MAX_GAP_DAYS, 'the retention window comes from RetentionProbe');
 ok(c.shortGame === ShortGame.ALL.length, 'the short-game drill count is counted, not typed');
-ok(c.modeLabel === FE.MODES[FE.getMode()].label, 'the feedback mode is the one actually set');
-ok(c.modeBlurb === FE.MODES[FE.getMode()].blurb, 'with its own words, not a paraphrase');
+ok(c.whyShown === FE.WHY_SHOWN,
+   'the "why we show everything" text is the module\'s own words, not a paraphrase that can drift from it');
 ok(c.balls.every(l => Object.values(C.BALLS).some(b => b.label === l)),
    'the ball list comes from Conditions.BALLS');
 ok(!c.balls.includes('Not recorded'), 'minus "not recorded", which is not a ball you can choose to play');
@@ -91,6 +91,8 @@ ok(doc.querySelector('[data-fr="shortgame"]') !== null, 'with a button that goes
 ok(/retention check/i.test(text) && /within-session numbers cannot/i.test(text),
    'and it explains the retention check before the golfer meets one');
 ok(new RegExp(String(Metrics.MIN_SHOTS_REPORT)).test(text), 'the sample floor is on screen');
+ok(/already saw all of it on the monitor/i.test(text),
+   'and it explains why the app shows every number rather than offering to hide them');
 ok(new RegExp(String(RP.MAX_GAP_DAYS)).test(text), 'so is the probe window');
 FR.show().remove();
 

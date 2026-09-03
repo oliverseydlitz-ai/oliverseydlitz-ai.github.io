@@ -1387,233 +1387,52 @@ const Store = (() => {
 })();
 
 // ────────────────────────────────────────────────────────────────
-// FeedbackEngine — how numbers are scheduled, not which drill is chosen
+// FeedbackEngine — a range-session instruction, NOT a display setting
 // ────────────────────────────────────────────────────────────────
-// The guidance hypothesis is the strongest evidence in the research base and
-// it indicts this entire product category. Winstein & Schmidt (1990), three
-// experiments, n=240: constant feedback and faded feedback were
-// INDISTINGUISHABLE during acquisition and at 5-10 minutes. At 24 hours the
-// faded group had 35% less error (6.5 vs 10.0 RMS, p<.01). Butki & Hoffman
-// (n=78) and Smith et al. (n=48, 10% bandwidth) corroborate it in golf.
+// The guidance hypothesis is the strongest evidence in the research base.
+// Winstein & Schmidt (1990), three experiments, n=240: constant feedback and
+// faded feedback were INDISTINGUISHABLE during acquisition and at 5-10
+// minutes. At 24 hours the faded group had 35% less error (6.5 vs 10.0 RMS,
+// p<.01). Butki & Hoffman (n=78) and Smith et al. (n=48, 10% bandwidth)
+// corroborate it in golf. None of that is in doubt.
 //
-// The implication is precise and uncomfortable: showing a number after every
-// shot inflates in-session performance while degrading next-day retention,
-// and an app that measures itself on within-session improvement CANNOT SEE
-// THE DAMAGE IT IS DOING. Every launch monitor on the market shows numbers
-// after every shot. This module is the deliberate departure.
+// WHAT WAS WRONG WAS WHERE IT WAS APPLIED. This app used to own a setting
+// called "when to show your numbers" that hid the figures in its own shot
+// table until you tapped each row. That does not implement the guidance
+// hypothesis, because the mechanism is about knowledge of results DURING
+// ACQUISITION — while the reps are happening. By the time a shot reaches this
+// app it was hit at a range, in front of a launch monitor that displayed every
+// number on the spot, and the session is over. The feedback already happened.
+// Hiding it afterwards reduces nothing except the golfer's ability to read
+// their own data, which is the only thing this app does.
+//
+// A real finding wired to the wrong moment is still wrong, and it is a harder
+// error to see than a made-up number, because everything about it is true
+// except the place it was put.
+//
+// So the schedule lives where it can actually operate: on the range session
+// itself, as the section-I wrappers in DrillLibrary (i95 faded, i96 bandwidth,
+// i97 prediction, i98 self-selected) which tell a golfer how to use the
+// monitor IN FRONT OF THEM — and in RetentionProbe, which is the only thing
+// here that can measure whether any of it worked. This module keeps the
+// evidence and the session-volume advice. It no longer decides what this app
+// is allowed to show you.
 const FeedbackEngine = (() => {
-  const KEY = 'slFeedbackMode';
+  // Why the app shows everything, said once, where anything that needs to
+  // explain itself can read it rather than restating it.
+  const WHY_SHOWN =
+    'This app shows every number it has. The evidence for hiding feedback is about the moment you are ' +
+    'hitting balls — a shot, then a number, then the next shot — and by the time a session reaches here ' +
+    'it is over and you already saw all of it on the monitor. Withholding it now would not train anything; ' +
+    'it would just make your own data harder to read. How much you look at the monitor WHILE you practise ' +
+    'is the decision that matters, and the session wrappers in the drill library are where that lives.';
 
-  const MODES = {
-    // Default. Numbers hidden; the golfer taps to reveal. Self-controlled
-    // feedback is contested as a mechanism but reliably produces sub-100%
-    // frequency, which is the part that works — and it is far more palatable
-    // than the app unilaterally hiding data.
-    onRequest: {
-      id: 'onRequest', label: 'Tap to reveal (recommended)',
-      blurb: 'Numbers stay hidden until you ask. You keep control, and you naturally look less often — which is the part the evidence supports.',
-    },
-    // Silence inside tolerance, report only outside it. Silence acts as
-    // implicit positive feedback and self-reduces as the player improves.
-    bandwidth: {
-      id: 'bandwidth', label: 'Only tell me when I miss',
-      blurb: 'Nothing shown when the shot is inside your tolerance band. You only hear about the misses, and the app goes quieter as you get better.',
-    },
-    // High early, progressively reduced across the session.
-    faded: {
-      id: 'faded', label: 'Fade out across the session',
-      blurb: 'Frequent feedback while you warm up, tapering to almost none by the end. This is the exact schedule from the retention studies.',
-    },
-    // The industry default, offered honestly labelled.
-    always: {
-      id: 'always', label: 'Every shot (not recommended)',
-      blurb: 'What every other launch monitor does. Feels better in the moment and measurably costs you next-day retention.',
-    },
-  };
+  // The wrapper a golfer should run at the range. i95 is the faded session,
+  // which the research base names as the default session type.
+  const DEFAULT_WRAPPER = 'i95';
 
-  function getMode() {
-    try { return MODES[localStorage.getItem(KEY)] ? localStorage.getItem(KEY) : 'onRequest'; }
-    catch (_) { return 'onRequest'; }
-  }
-  function setMode(m) { try { if (MODES[m]) localStorage.setItem(KEY, m); } catch (_) {} }
-
-  // Faded schedule: ~100% over the first fifth, decaying to ~20% by the end.
-  function fadedFrequency(idx, total) {
-    if (!total || total < 5) return 1;
-    const p = idx / total;
-    return Math.max(0.2, 1 - p * 1.1);
-  }
-
-  // WHICH shots the faded schedule reveals, and it has to be deterministic.
-  // The first version drew Math.random() per shot, which is defensible as a
-  // sampling scheme and wrong as a UI: the shot table re-renders on every sort,
-  // so the same shot would hide and reveal itself as the golfer clicked column
-  // headers. A schedule that changes when you look at it is not a schedule.
-  //
-  // Fixed quarters instead of a random draw — 100% over the first fifth, then
-  // every second shot, then every third, then every fifth. That lands in the
-  // 33–50% average band the retention studies used, fades monotonically, and
-  // is explainable in one sentence to the golfer, which a random draw is not.
-  function fadedReveal(idx, total) {
-    if (!total || total < 5) return true;
-    const p = idx / total;
-    if (p < 0.2) return true;
-    if (p < 0.5) return idx % 2 === 0;
-    if (p < 0.8) return idx % 3 === 0;
-    return idx % 5 === 0;
-  }
-
-  // Is this shot inside the golfer's own tolerance band? Bandwidth feedback
-  // stays silent when it is. Tolerance is the golfer's own typical error, not
-  // a population constant — so the band tightens as they get more consistent.
-  function insideBand(shot, metric, target, tolerance) {
-    const v = shot[metric];
-    if (!Number.isFinite(v) || !Number.isFinite(target)) return true;
-    return Math.abs(v - target) <= tolerance;
-  }
-
-  // The decision the UI asks on every shot.
-  function shouldReveal(ctx) {
-    const { index = 0, total = 0, mode = getMode(), outsideBand = false } = ctx || {};
-    switch (mode) {
-      case 'always':    return { reveal: true,  reason: 'every shot' };
-      case 'faded':     return { reveal: fadedReveal(index, total),
-                                 reason: `faded (${Math.round(fadedFrequency(index, total) * 100)}% here)` };
-      case 'bandwidth': return { reveal: outsideBand, reason: outsideBand ? 'outside your band' : 'inside your band — the silence is the feedback' };
-      default:          return { reveal: false, reason: 'tap to reveal' };
-    }
-  }
-
-  // Error estimation preserves the intrinsic error-detection process that
-  // constant feedback displaces. Ask before showing, on a sample of shots.
-  function shouldAskPrediction(index) { return index > 0 && index % 5 === 0; }
-
-  // The tolerance band for bandwidth feedback, from THIS golfer's own spread —
-  // never a published figure. A band borrowed from other people would go quiet
-  // on shots that are unusual for this golfer and shout about shots that are
-  // not, which is the opposite of what bandwidth feedback is for. It also
-  // tightens on its own as they get more consistent, which is the property that
-  // makes the mode self-reducing.
-  // 1.5 rather than 1 standard deviation, and the reason is arithmetic. One SD
-  // puts about a third of a normal distribution outside it BY CONSTRUCTION, so
-  // a band at 1 SD breaks silence on one shot in three no matter how well the
-  // golfer is striking it. That is not a miss, that is ordinary variation with
-  // an alarm on it, and it would train someone to ignore the alarm. At 1.5 SD
-  // roughly one shot in eight is reported, which is a miss.
-  const BAND_K = 1.5;
-  function tolerance(shots, metric, clubType) {
-    const sd = Metrics.shotSpread(shots, metric, clubType);
-    return Number.isFinite(sd) && sd > 0 ? BAND_K * sd : null;
-  }
-
-  // The whole schedule for a set of shots, in the order they were hit.
-  //
-  // WHAT THIS DOES AND DOES NOT CLAIM. The guidance hypothesis is about
-  // knowledge of results during acquisition — the number that appears after
-  // each swing. This app cannot control that: the golfer was looking at a
-  // Rapsodo screen at the time, and by the time a CSV is imported the session
-  // is over. What it controls is its OWN per-shot surface, which for anyone
-  // reviewing mid-session is the same loop, and whether it asks for an error
-  // estimate before it reveals anything.
-  //
-  // Session AGGREGATES are deliberately never faded. A mean with an interval
-  // is not per-trial feedback, it is the summary the retention literature
-  // actively wants a learner to have. Hiding it would be copying the shape of
-  // the finding rather than the finding.
-  function plan(shots, opts = {}) {
-    const list = shots || [];
-    const mode = opts.mode || getMode();
-    const metric = opts.metric || 'smashFactor';
-
-    // The band is computed PER CLUB. Pooled across a mixed session it measures
-    // the gap between a driver and a wedge rather than anything about the
-    // strike: tour smash runs 1.48 at driver and 1.20 at lob wedge, so a
-    // single band over both leaves most shots "outside" it and the mode
-    // degrades into showing almost everything. On a real 74-shot two-club
-    // session that was 53% reported, which is not bandwidth feedback.
-    const bands = new Map();
-    const bandFor = club => {
-      if (bands.has(club)) return bands.get(club);
-      const vals = list.filter(s => s.clubType === club).map(s => s[metric]);
-      const { kept } = Metrics.trimOutliers(vals);
-      const band = { centre: kept.length ? mean(kept) : null,
-                     tol: opts.tolerance ?? tolerance(list, metric, club) };
-      bands.set(club, band);
-      return band;
-    };
-
-    return list.map((shot, index) => {
-      const { centre, tol } = opts.clubType || opts.target !== undefined
-        ? { centre: opts.target ?? bandFor(shot.clubType).centre, tol: opts.tolerance ?? bandFor(shot.clubType).tol }
-        : bandFor(shot.clubType);
-      const outsideBand = (tol === null || centre === null)
-        ? true                       // no band yet: cannot stay silent about a shot it cannot judge
-        : !insideBand(shot, metric, centre, tol);
-      const d = shouldReveal({ index, total: list.length, mode, outsideBand });
-      return { index, shot, ...d, predict: shouldAskPrediction(index), outsideBand };
-    });
-  }
-
-  // How well the golfer can call their own strike, from the estimates they have
-  // made. This is the point of asking: error estimation trains the internal
-  // error-detection process that constant feedback displaces, and the size of
-  // the gap between what they called and what happened IS the thing being
-  // trained. Judged against their own shot-to-shot spread, because being out
-  // by 0.03 means something different to someone whose strike varies by 0.01
-  // than to someone whose varies by 0.05.
-  const MIN_CALLS = 3;
-  function calibration(calls, shots, metric = 'smashFactor', clubType = null) {
-    const pairs = (calls || []).filter(c => Number.isFinite(c.called) && Number.isFinite(c.actual));
-    if (pairs.length < MIN_CALLS) {
-      return { ok: false, n: pairs.length, need: MIN_CALLS - pairs.length,
-               note: `Call ${MIN_CALLS - pairs.length} more before you look and the app can tell you how well ` +
-                     `you read your own strike.` };
-    }
-    const errs = pairs.map(c => Math.abs(c.called - c.actual));
-    const mae = mean(errs);
-    const bias = mean(pairs.map(c => c.called - c.actual));
-    const spread = Metrics.shotSpread(shots, metric, clubType);
-    const ratio = Number.isFinite(spread) && spread > 0 ? mae / spread : null;
-    return {
-      ok: true, n: pairs.length, mae, bias, spread, ratio,
-      note: ratio === null
-        ? `Your calls are out by ${fmt(mae, 3)} on average across ${pairs.length}.`
-        : ratio <= 1
-          ? `Across ${pairs.length} calls you are out by ${fmt(mae, 3)} on average, which is inside your own ` +
-            `shot-to-shot spread of ${fmt(spread, 3)}. You can feel this shot before you see it — that is the ` +
-            `error detection the numbers displace when they arrive first.`
-          : `Across ${pairs.length} calls you are out by ${fmt(mae, 3)}, against a shot-to-shot spread of ` +
-            `${fmt(spread, 3)}. You cannot read this one yet by feel, which is exactly what calling it before ` +
-            `you look is training` +
-            (Math.abs(bias) > mae * 0.6
-              ? `, and you lean ${bias > 0 ? 'high' : 'low'} rather than scattering — a systematic read, not noise.`
-              : '.'),
-    };
-  }
-
-  // One line explaining what the golfer is looking at, because a table full of
-  // hidden numbers with no explanation reads as a broken app rather than as a
-  // deliberate schedule.
-  function explain(mode = getMode(), n = 0) {
-    switch (mode) {
-      case 'always':
-        return 'Every number shown, which is what every other launch monitor does. It feels better now and ' +
-               'measurably costs you next-day retention — the setting to change it is in Settings.';
-      case 'faded':
-        return `Numbers fade across the ${n} shots: all of them early, then every second, third and fifth as ` +
-               'you go. This is the schedule from the retention studies, not a sample — the same shot always ' +
-               'shows the same way.';
-      case 'bandwidth':
-        return 'Only shots outside your own tolerance band are shown, and the band is worked out separately ' +
-               'for each club from your own shot-to-shot spread. It tightens as you get more consistent, and ' +
-               'the silence on everything else is the feedback.';
-      default:
-        return 'Numbers are hidden until you tap a row. Looking less often is the part of this the evidence ' +
-               'supports, and you keep the choice of when.';
-    }
-  }
-
-  // Volume distribution: 4 x 60 beats 1 x 240. Warn on marathons.
+  // Volume distribution: 4 x 60 beats 1 x 240. Warn on marathons. This one is
+  // about the session you already had, so it is still this app's business.
   function volumeAdvice(shotCount) {
     if (shotCount >= 150) {
       return 'That is a long session. Four 60-ball sessions beat one 240-ball session — ' +
@@ -1623,8 +1442,7 @@ const FeedbackEngine = (() => {
     return null;
   }
 
-  return { MODES, getMode, setMode, shouldReveal, shouldAskPrediction, BAND_K, MIN_CALLS,
-           insideBand, fadedFrequency, fadedReveal, tolerance, plan, explain, calibration, volumeAdvice };
+  return { WHY_SHOWN, DEFAULT_WRAPPER, volumeAdvice };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2767,13 +2585,45 @@ const DrillLibrary = (() => {
          structure: 'Applied over any drill above, never instead of one.' },
   };
 
+  // ── What each entry actually IS ───────────────────────────────
+  // The library was one flat list of 104 things called drills, and a quarter
+  // of them were not drills. Eight were instructions to read a screen this app
+  // already renders ("trend across five sessions with a band" — that IS the
+  // Progress tab). Six were gym sessions. Two were equipment checks. Nine were
+  // measurement sessions where nothing is being trained. Listed together with
+  // "hit ten shots through a gate", the whole thing reads as noise, and the
+  // real drills are buried in it.
+  //
+  // Nothing is deleted: a trend review and a med-ball throw are both worth
+  // doing. They are just not range work, and a list that says they are is
+  // lying about what it is offering.
+  const KINDS = {
+    drill:     { id:'drill',     label:'Drill',
+                 blurb:'Range or green work: a club, some balls, and something that gives you feedback.' },
+    measure:   { id:'measure',   label:'Measurement',
+                 blurb:'You hit balls and log them, but nothing is being trained. These establish what your ' +
+                       'numbers ARE, so a later change has something to be measured against. Expect no ' +
+                       'improvement from one — that is not what it is for.' },
+    fitness:   { id:'fitness',   label:'Off the course',
+                 blurb:'Gym and load work. Well evidenced, and not something you do in a bay — it needs a ' +
+                       'different place, a different day and a different kind of planning.' },
+    equipment: { id:'equipment', label:'Equipment check',
+                 blurb:'Kit, not technique. Worth ruling out before you practise against a problem your ' +
+                       'gear is causing.' },
+    review:    { id:'review',    label:'Already in this app',
+                 blurb:'This is not practice — it is reading a number, and this app computes it for you. ' +
+                       'Listed so the habit is not forgotten, not because you should do it by hand.' },
+  };
+  const kindOf = d => (d && KINDS[d.kind] ? d.kind : 'drill');
+
   // n = the number in the research base, kept so a drill can be traced back.
   const D = (n, section, name, desc, extra = {}) => ({ n, section, name, desc, ...extra,
+    kind: extra.kind || 'drill',
     id: section.toLowerCase() + n });
 
   const ALL = [
     // ── A. Strike quality (18) ──
-    D(1,'A','Smash Baseline Audit','20 shots, log the mean AND the spread. A measurement session, not a training one — nothing later can claim a change without it.'),
+    D(1,'A','Smash Baseline Audit','20 shots, log the mean AND the spread. A measurement session, not a training one — nothing later can claim a change without it.',{kind:'measure'}),
     D(2,'A','Face-tape strike map','Impact tape or foot spray, 10 shots, photograph the pattern. The only direct strike-location data the MLM2PRO cannot give you.',{noDevice:true}),
     D(3,'A','Centre-strike block, tee height fixed','Remove tee-height variance before blaming the swing for strike scatter.'),
     D(4,'A','Errorless distance ladder','Start at 40% effort where centre contact is near-guaranteed; add 10% per successful block of five.'),
@@ -2788,15 +2638,15 @@ const DrillLibrary = (() => {
     D(10,'A','Half-speed proprioception reps','Ten swings at 50%, predicting the strike location before the reveal.',{prediction:true}),
     D(11,'A','Eyes-closed strike feel','Five shots, call the strike location before looking. Error estimation.',{prediction:true}),
     D(12,'A','Progressive difficulty ladder','Tee → mat → tight lie. Strike quality that only survives an easy lie is not strike quality.'),
-    D(13,'A','Club-by-club smash audit','Ten shots each across the bag. Strike quality is rarely uniform; find the weak link.'),
+    D(13,'A','Club-by-club smash audit','Ten shots each across the bag. Strike quality is rarely uniform; find the weak link.',{kind:'measure'}),
     D(14,'A','Smash-vs-speed scatter session','Vary effort 60/80/100% and plot smash against club speed. Finds the personal speed at which strike degrades.',{shots:15}),
     D(15,'A','One-club fatigue probe','Smash in the first ten against the last ten of a long block.',{shots:15}),
     D(16,'A','Ball-position sweep','Three positions, ten shots each, smash logged per position.'),
     D(17,'A','Strike-first-then-speed sequencing','Ten strike-focused, then ten speed-focused. Tests whether speed intent costs strike.'),
-    D(18,'A','Weekly smash trend review','Trend across five or more sessions with a band — never a paired comparison.',{sessions:5}),
+    D(18,'A','Weekly smash trend review','Trend across five or more sessions with a band — never a paired comparison.',{kind:'review',sessions:5}),
 
     // ── B. Dispersion tails (14) ──
-    D(19,'B','Tail Audit','30+ shots; compute p90 and p95 absolute offline. The single most diagnostic session in the app.'),
+    D(19,'B','Tail Audit','30+ shots; compute p90 and p95 absolute offline. The single most diagnostic session in the app.',{kind:'measure'}),
     D(20,'B','Two-sided miss census','Classify every miss left or right. A two-way miss is a different problem needing different work.'),
     D(21,'B','Worst-shot scoring game','Score the session on its worst three shots only. Trains the tail directly.'),
     D(22,'B','Penalty-simulation block','Define out-of-bounds corridors and count violations. Converts dispersion into the currency that costs strokes.'),
@@ -2809,11 +2659,11 @@ const DrillLibrary = (() => {
     D(29,'B','Pressure tail block','A consequence attached — restart the count on a tail miss.'),
     D(30,'B','Target-change block','A new target every three balls.'),
     D(31,'B','Wind-visualisation block','Nominate an imagined crosswind, adjust the shape, log the offline.'),
-    D(32,'B','Tail trend review','p95 across five or more sessions with a confidence band.',{sessions:5}),
+    D(32,'B','Tail trend review','p95 across five or more sessions with a confidence band.',{kind:'review',sessions:5}),
 
     // ── C. Start-line control (10) ──
     D(33,'C','Start-line gate','Alignment sticks forming a gate 3–4 m ahead. Physical feedback beats numeric feedback here.'),
-    D(34,'C','Alignment audit','Sticks on stance and target line. Rule out setup before diagnosing the swing.'),
+    D(34,'C','Alignment audit','Sticks on stance and target line. Rule out setup before diagnosing the swing.',{kind:'equipment'}),
     D(35,'C','Blind alignment probe','Set up, close your eyes, then look at the actual launch direction. Separates aim error from delivery error.'),
     D(36,'C','Gate progression','Start at a gate width you pass 90% of the time and narrow it. Errorless.'),
     D(37,'C','Two-target alternation','Alternate targets 20° apart every ball.'),
@@ -2821,10 +2671,10 @@ const DrillLibrary = (() => {
     D(39,'C','Club-varied start-line block','Same drill across driver, 7-iron and wedge. The face contribution changes with loft, so the feel required genuinely differs — this is physics, not variety for its own sake.'),
     D(40,'C','Routine-consistency block','Log launch-direction spread with and without a fixed routine.'),
     D(41,'C','Narrow-fairway simulation','Start line and shape target combined.'),
-    D(42,'C','Start-line trend review','Spread across sessions with a band.',{sessions:5}),
+    D(42,'C','Start-line trend review','Spread across sessions with a band.',{kind:'review',sessions:5}),
 
     // ── D. Face-to-path control (10) ──
-    D(43,'D','Face-to-path baseline','20 shots, mean with an interval. If the interval spans zero the answer is "no consistent tendency", not a drill.',{shots:20}),
+    D(43,'D','Face-to-path baseline','20 shots, mean with an interval. If the interval spans zero the answer is "no consistent tendency", not a drill.',{kind:'measure',shots:20}),
     D(44,'D','True-zero calibration','Bracket deliberately closed and open to find your personal neutral. Required before any shaping work.',{shots:20}),
     D(45,'D','Draw-bias bracket','Target −2° face-to-path, 15 shots.'),
     D(46,'D','Fade-bias bracket','Target +2° face-to-path, 15 shots.'),
@@ -2833,12 +2683,12 @@ const DrillLibrary = (() => {
     D(49,'D','Big-curve command','8–12° for shaping around trouble. A course-management skill, not a fault fix.'),
     D(50,'D','Strike-location cross-check','Before blaming the face for a spin-axis change, check the strike map — gear effect produces the same change with a perfect face.'),
     D(51,'D','Club-contrast block','Same face-to-path on driver and 6-iron. The driver punishes it about 1.7× harder, which is why the same small error costs more.'),
-    D(52,'D','Face-to-path trend review','Mean and interval across five or more sessions.',{sessions:5}),
+    D(52,'D','Face-to-path trend review','Mean and interval across five or more sessions.',{kind:'review',sessions:5}),
 
     // ── E. Low point and strike height (12) ──
     D(53,'E','Divot-line drill','A line just ahead of the ball; the divot must start past it. Physical feedback where the metric is unreliable.'),
     D(54,'E','Towel behind the ball','Penalty feedback for a low point too far back.'),
-    D(55,'E','Attack-angle baseline by club','15 shots each with driver, 7-iron and wedge. Confirms club-appropriate delivery.'),
+    D(55,'E','Attack-angle baseline by club','15 shots each with driver, 7-iron and wedge. Confirms club-appropriate delivery.',{kind:'measure'}),
     D(56,'E','Tee-height ladder (driver)','Attack angle logged per height to find your personal window.'),
     D(57,'E','Ball-position sweep (irons)','Three positions; attack angle and strike quality at each.'),
     D(58,'E','Weight-forward block','75% on the lead side at impact; attack angle and smash read together.'),
@@ -2847,36 +2697,36 @@ const DrillLibrary = (() => {
     D(61,'E','Lie-variation block','Fairway, light rough, tight lie, upslope.'),
     D(62,'E','Speed-ladder low point','50/75/100% effort; low-point consistency at each.'),
     D(63,'E','Kneeling strike drill','Removes leg drive to isolate hand and arm control of the low point.'),
-    D(64,'E','Low-point trend review','Attack-angle spread across sessions.',{sessions:5}),
+    D(64,'E','Low-point trend review','Attack-angle spread across sessions.',{kind:'review',sessions:5}),
 
     // ── F. Distance control and gapping (12) ──
-    D(65,'F','Full-bag gapping matrix','Ten shots per club on premium balls; log mean and spread. The output is your real yardage chart.'),
+    D(65,'F','Full-bag gapping matrix','Ten shots per club on premium balls; log mean and spread. The output is your real yardage chart.',{kind:'measure'}),
     D(66,'F','Overlap detection','Flag clubs whose carry distributions overlap by more than half. That is a gapping problem, not a swing problem.'),
-    D(67,'F','Wedge matrix','Three wedges × three swing lengths × eight shots. Your personal wedge chart.'),
+    D(67,'F','Wedge matrix','Three wedges × three swing lengths × eight shots. Your personal wedge chart.',{kind:'measure'}),
     D(68,'F','Three-quarter ladder','Carry per swing length, one club.'),
     D(69,'F','Clock-face wedge system','9, 10 and 11 o\'clock backswing lengths; carry logged per position.'),
     D(70,'F','Landing-window drill','Nominate a carry window and score in or out. Bandwidth feedback.'),
     D(71,'F','Descending-target ladder','60, 70, 80, 90 yards in sequence. The hardest distance-control test in golf.'),
     D(72,'F','Random-distance call','A random carry number called out, which you then have to produce.'),
-    D(73,'F','Groove-condition check','A sudden unexplained spin drop: rule out equipment. Worn grooves cost up to 47% of spin and triple the shot-to-shot spin spread.'),
+    D(73,'F','Groove-condition check','A sudden unexplained spin drop: rule out equipment. Worn grooves cost up to 47% of spin and triple the shot-to-shot spin spread.',{kind:'equipment'}),
     D(74,'F','Uphill/downhill adjustment','If you are outdoors with slopes available.'),
     D(75,'F','Fatigue distance probe','Carry spread in the first ten against the last ten.',{shots:20}),
-    D(76,'F','Gapping trend review','Re-run the matrix quarterly. Equipment and technique both drift.',{sessions:3}),
+    D(76,'F','Gapping trend review','Re-run the matrix quarterly. Equipment and technique both drift.',{kind:'review',sessions:3}),
 
     // ── G. Speed development (10) ──
-    D(77,'G','Speed baseline','Ten max-effort swings, mean and spread. Establishes your personal noise floor.'),
-    D(78,'G','Jump-impulse assessment','The strongest physical correlate of club speed, around r = 0.68. Track it alongside.',{noDevice:true}),
-    D(79,'G','Med-ball rotational throw block','Explosive strength — the second-strongest correlate.',{noDevice:true}),
-    D(80,'G','Lower-body force block','Squat, deadlift and jump progression, two or three times a week.',{noDevice:true}),
-    D(81,'G','Upper-body explosive block','The r = 0.58 correlate.',{noDevice:true}),
+    D(77,'G','Speed baseline','Ten max-effort swings, mean and spread. Establishes your personal noise floor.',{kind:'measure'}),
+    D(78,'G','Jump-impulse assessment','The strongest physical correlate of club speed, around r = 0.68. Track it alongside.',{kind:'fitness',noDevice:true}),
+    D(79,'G','Med-ball rotational throw block','Explosive strength — the second-strongest correlate.',{kind:'fitness',noDevice:true}),
+    D(80,'G','Lower-body force block','Squat, deadlift and jump progression, two or three times a week.',{kind:'fitness',noDevice:true}),
+    D(81,'G','Upper-body explosive block','The r = 0.58 correlate.',{kind:'fitness',noDevice:true}),
     D(82,'G','Overspeed block, ~30 swings','An implement within 10–12% of your driver. Volume plateaus early — 100-swing protocols are not supported.',{noDevice:true}),
-    D(83,'G','Bodyweight plyometric block','The active comparator that matched speed sticks exactly. Free, and equally supported.',{noDevice:true}),
+    D(83,'G','Bodyweight plyometric block','The active comparator that matched speed sticks exactly. Free, and equally supported.',{kind:'fitness',noDevice:true}),
     D(84,'G','Speed-with-smash guard','Pair every speed session with a smash check. Going 100 to 105 mph gained only 2 yards because spin rose — speed bought out of strike is a net loss.'),
-    D(85,'G','12-week trend block','A regression slope with a band across eight or more sessions. The only honest way to detect a speed change.',{sessions:8}),
-    D(86,'G','Junior swing-volume monitor','Cap and log maximal-effort swings per week. For a growing spine the load that matters is rotational swing volume, not barbell load.',{noDevice:true}),
+    D(85,'G','12-week trend block','A regression slope with a band across eight or more sessions. The only honest way to detect a speed change.',{kind:'review',sessions:8}),
+    D(86,'G','Junior swing-volume monitor','Cap and log maximal-effort swings per week. For a growing spine the load that matters is rotational swing volume, not barbell load.',{kind:'fitness',noDevice:true}),
 
     // ── H. Quiet eye and putting (8) ──
-    D(87,'H','Quiet-eye baseline (video)','Record gaze and head stability over 20 putts.',{noDevice:true}),
+    D(87,'H','Quiet-eye baseline (video)','Record gaze and head stability over 20 putts.',{kind:'measure',noDevice:true}),
     D(88,'H','Quiet-eye training protocol','Fixate the back of the ball 2–3 s before the stroke; hold the gaze 200–300 ms after impact. A single 20-putt session produced the published result.',{noDevice:true}),
     D(89,'H','Quiet eye under pressure','The same protocol with a consequence. Untrained golfers collapse from 2,794 ms of quiet eye to 1,405 ms under pressure.',{noDevice:true}),
     D(90,'H','Errorless putting ladder','Three feet outward, expanding only after near-total success.',{noDevice:true}),
@@ -2895,7 +2745,7 @@ const DrillLibrary = (() => {
     D(101,'I','Distributed-volume plan','4 × 60 balls rather than 1 × 240.'),
     D(102,'I','Differential-learning block','Vary grip pressure, stance width, tempo and ball position every rep, never repeating. Optional and advanced — the evidence is promising and heterogeneous.',{optional:true}),
     D(103,'I','Representative-constraint wrapper','A nominated target and shape before every ball, a scoring consequence, an enforced routine, and no two identical consecutive shots.'),
-    D(104,'I','Session-noise report','Every session ends with your own typical error per metric, so you learn what size of change is real.'),
+    D(104,'I','Session-noise report','Every session ends with your own typical error per metric, so you learn what size of change is real.',{kind:'review'}),
   ];
 
   const byId = id => ALL.find(d => d.id === id) || null;
@@ -2979,7 +2829,7 @@ const DrillLibrary = (() => {
 
   const count = () => ALL.length;
 
-  return { SECTIONS, ALL, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
+  return { SECTIONS, ALL, KINDS, kindOf, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
            admissible, forSection, count };
 })();
 
@@ -3276,7 +3126,13 @@ const ShortGame = (() => {
     try { localStorage.setItem(KEY, JSON.stringify(list.slice(-200))); } catch (_) {}
   }
   function record(entry) {
-    const chips = (entry?.chips || []).filter(c => Number.isFinite(c.leaveFt) && c.leaveFt >= 0);
+    // A chip is now a yes/no call plus the distance it was played from. The
+    // old shape was a leave in feet; entries in that shape are DROPPED rather
+    // than reinterpreted, because there is no honest conversion from "7 ft" to
+    // "inside 3 ft or not" and guessing one would invent the very precision
+    // this change removed.
+    const chips = (entry?.chips || []).filter(c =>
+      c && typeof c.inside === 'boolean' && Number.isFinite(c.yards));
     if (!chips.length) return null;
     const row = {
       id: (crypto.randomUUID ? crypto.randomUUID() : 'sg-' + Date.now()),
@@ -3291,46 +3147,81 @@ const ShortGame = (() => {
 
   const MIN_CHIPS = 10;
 
-  // Median as well as mean, and the median is the one to read. A single
-  // chunked chip that finishes 40 feet away drags a ten-shot mean by four feet
-  // — which is real, but it describes that one shot rather than the standard.
-  // Both are shown so a large gap between them is visible, because that gap IS
-  // the chunk rate.
-  function proximity(chips) {
-    const v = (chips || []).map(c => c.leaveFt).filter(Number.isFinite).sort((a, b) => a - b);
-    if (v.length < 3) return null;
-    const mid = Math.floor(v.length / 2);
-    const median = v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
-    const avg = mean(v);
+  // ── What a golfer can actually observe ────────────────────────
+  // This used to ask for the leave in FEET, per chip, typed into a phone. That
+  // is a guess wearing a measurement's clothes: nobody standing on a green
+  // reliably distinguishes 5 ft from 7 ft, and the median-versus-mean machinery
+  // built on top of it — a "blow-up" defined as three times the median — needed
+  // a precision the input never had. Estimating the thing and then computing
+  // to one decimal place is the exact error this app polices everywhere else.
+  //
+  // "Did it finish inside a makeable range" is a judgement a golfer makes
+  // correctly from where they stand. It is binary, it takes one tap, and it is
+  // a PROPORTION — so it gets a Wilson interval, the same treatment QuietEye
+  // already gives putts holed, off the same implementation.
+  const INSIDE_FT = 3;
+
+  // Distance is set once per block rather than per shot, because chipping from
+  // 10 yards and from 40 yards are different skills and pooling them measures
+  // which distances you chose to practise. Yards, because that is how a golfer
+  // paces a chip.
+  const DISTANCES = [5, 10, 20, 30, 40];
+  const distanceBucket = yd => {
+    const v = Number(yd);
+    if (!Number.isFinite(v)) return null;
+    return DISTANCES.reduce((best, d) =>
+      Math.abs(d - v) < Math.abs(best - v) ? d : best, DISTANCES[0]);
+  };
+
+  // The rate of chips finishing inside the makeable range, overall and per
+  // distance. A proportion, with a Wilson interval — QuietEye's, not a second
+  // copy: at small n the normal approximation returns a negative lower bound
+  // and claims certainty at ten-from-ten.
+  function rate(chips) {
+    const list = (chips || []).filter(c => c && typeof c.inside === 'boolean');
+    if (!list.length) return null;
+    const inside = list.filter(c => c.inside).length;
+    const byDist = {};
+    list.forEach(c => {
+      const d = distanceBucket(c.yards);
+      if (d == null) return;
+      (byDist[d] = byDist[d] || []).push(c);
+    });
     return {
-      n: v.length, mean: avg, median, best: v[0], worst: v[v.length - 1],
-      holed: v.filter(x => x === 0).length,
-      // A "disaster" is a chip that leaves you a putt you were never going to
-      // hole. Three times the median is a scale-free way of saying that.
-      disasters: v.filter(x => x > Math.max(15, median * 3)).length,
-      enough: v.length >= MIN_CHIPS,
+      n: list.length, inside,
+      overall: QuietEye.wilson(inside, list.length),
+      enough: list.length >= MIN_CHIPS,
+      // Per distance, and only where there is enough to say anything. Pooling
+      // 5-yard and 40-yard chips measures which distances you chose to hit.
+      distances: Object.keys(byDist).map(Number).sort((a, b) => a - b).map(d => ({
+        yards: d, n: byDist[d].length,
+        inside: byDist[d].filter(c => c.inside).length,
+        wilson: QuietEye.wilson(byDist[d].filter(c => c.inside).length, byDist[d].length),
+        enough: byDist[d].length >= MIN_CHIPS,
+      })),
     };
   }
 
-  function describe(p) {
-    if (!p) return 'Log at least three chips and this will tell you something.';
-    const gap = p.mean - p.median;
-    const base = `${p.n} chips: typical leave ${fmt(p.median, 1)} ft, average ${fmt(p.mean, 1)} ft.`;
-    if (!p.enough) {
-      return `${base} Under ${MIN_CHIPS} chips this is an impression rather than a measurement.`;
+  function describe(r) {
+    if (!r) return `Log a few chips and this will tell you what share of them finish inside ${INSIDE_FT} feet.`;
+    const pct = n => `${Math.round(n * 100)}%`;
+    const base = `${r.inside} of ${r.n} finished inside ${INSIDE_FT} ft — ${pct(r.overall.p)}`;
+    if (!r.enough) {
+      return `${base}. Under ${MIN_CHIPS} chips that is an impression rather than a rate: the interval ` +
+             `runs ${pct(r.overall.lo)} to ${pct(r.overall.hi)}, which is most of the range there is.`;
     }
-    if (p.disasters > 0) {
-      return `${base} ${p.disasters} of them finished a long way out — and that is where the strokes went. ` +
-             `Your average sits ${fmt(gap, 1)} ft above your typical chip because of them, so the thing to ` +
-             `work on is the bad one, not the standard one.`;
-    }
-    return `${base} No blow-ups in this set, and the average and the typical chip are within ` +
-           `${fmt(Math.abs(gap), 1)} ft of each other — which means the number above describes your ` +
-           `chipping rather than one bad contact.`;
+    const solid = r.distances.filter(d => d.enough);
+    const spread = solid.length > 1
+      ? ` Your rate is ${pct(solid[0].wilson.p)} from ${solid[0].yards} yards and ` +
+        `${pct(solid[solid.length - 1].wilson.p)} from ${solid[solid.length - 1].yards} — ` +
+        `chipping from different distances is a different skill, which is why they are not pooled.`
+      : '';
+    return `${base}, and with this many the true rate is somewhere between ${pct(r.overall.lo)} and ` +
+           `${pct(r.overall.hi)}.${spread}`;
   }
 
   return { KEY, STRUCTURES, TOUR, PUTTING, CHIPPING, ALL, byId, structuresFor,
-           session, all, record, clear, proximity, describe, MIN_CHIPS };
+           session, all, record, clear, rate, describe, MIN_CHIPS, INSIDE_FT, DISTANCES, distanceBucket };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5527,17 +5418,19 @@ const PracticePlan = (() => {
   // are the highest-evidence items in the research base and they apply over
   // whatever drill is running, so a plan that lists drills without one is
   // missing the part that decides whether any of it transfers.
-  function wrapperFor(mode = FeedbackEngine.getMode()) {
-    const byMode = { faded: 'i95', bandwidth: 'i96', onRequest: 'i98', always: 'i95' };
-    const d = DrillLibrary.byId(byMode[mode] || 'i95');
+  // This used to key off a display setting in THIS app, which was the wrong
+  // variable: how a golfer reads their data afterwards says nothing about how
+  // they ran the session. The wrapper is an instruction for the range, so it
+  // is the range default — the faded session the research base names as the
+  // one to run.
+  function wrapperFor(id = FeedbackEngine.DEFAULT_WRAPPER) {
+    const d = DrillLibrary.byId(id) || DrillLibrary.byId(FeedbackEngine.DEFAULT_WRAPPER);
     if (!d) return null;
     return {
       ...d,
-      note: mode === 'always'
-        ? 'Your feedback is set to show every number, which is the one setting the evidence argues against. ' +
-          'Run this wrapper over the session and change the setting when you are ready.'
-        : 'This is how the session is run, not what is in it — and on the evidence it matters more than ' +
-          'which drill above you pick.',
+      note: 'This is how the session is run, not what is in it — and on the evidence it matters more than ' +
+            'which drill above you pick. It is a rule for the mat, where the monitor is showing you a ' +
+            'number after every shot; it is not about what this app displays afterwards.',
     };
   }
 
@@ -6506,7 +6399,6 @@ const FirstRun = (() => {
     .map(m => LABEL[m] || m);
 
   function content() {
-    const mode = FeedbackEngine.MODES[FeedbackEngine.getMode()] || FeedbackEngine.MODES.onRequest;
     return {
       tier1: atTier(1),
       tier2: atTier(2),
@@ -6514,8 +6406,7 @@ const FirstRun = (() => {
       floor: Metrics.MIN_SHOTS_REPORT,
       tailFloor: Metrics.MIN_SHOTS_TAIL,
       probeDays: RetentionProbe.MAX_GAP_DAYS,
-      modeLabel: mode.label,
-      modeBlurb: mode.blurb,
+      whyShown: FeedbackEngine.WHY_SHOWN,
       balls: Object.values(Conditions.BALLS).filter(b => b.id !== 'unknown').map(b => b.label),
       drills: DrillLibrary.ALL ? DrillLibrary.ALL.length : null,
       shortGame: ShortGame.ALL ? ShortGame.ALL.length : null,
@@ -6553,10 +6444,7 @@ const FirstRun = (() => {
           <p class="intro-p">No club shows a mean until ${esc(c.floor)} shots, and a dispersion tail needs
             ${esc(c.tailFloor)}. Below that you get a row telling you what it still needs rather than a
             number that would read like a yardage.</p>
-          <p class="intro-p">Feedback is set to <strong>${esc(c.modeLabel)}</strong>. ${esc(c.modeBlurb)}
-            You can change it in Settings, and it is the most consequential setting here: the evidence says
-            constant feedback and faded feedback look identical during a session and differ by 35% a day
-            later, which is the only window that matters.</p>
+          <p class="intro-p">${esc(c.whyShown)}</p>
 
           <h3 class="intro-h">Conditions change the meaning, not just the context</h3>
           <p class="intro-p">Every import asks which ball and what you hit off — ${esc(c.balls.join(', '))},
@@ -7398,9 +7286,6 @@ const UI = (() => {
   function renderDetail(session) {
     _session = session;
     _clubFilter = 'all';
-    _revealed = new Set();
-    _predictions = new Map();
-    _asking = null;
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
     renderSince(session).catch(e => console.error('since', e));
     renderRetention(session).catch(e => console.error('retention', e));
@@ -8429,16 +8314,6 @@ const UI = (() => {
   // ── Shot log (sortable, colour-coded) ─────────────────────────
   let _sortField=null, _sortDir=1;
 
-  // Rows the golfer has chosen to open, by the index the shot was HIT at.
-  // Cleared when a different session is opened — a reveal is a choice about
-  // these shots, not a global preference.
-  let _revealed = new Set();
-  // Estimates called before a reveal, same key. Kept so the comparison survives
-  // a re-sort, and so a golfer cannot quietly re-guess after seeing the answer.
-  let _predictions = new Map();
-  // The row currently being asked about, if any.
-  let _asking = null;
-
   function renderShotTable(shots, sortField, sortDir) {
     if (sortField!==undefined) { _sortField=sortField; _sortDir=sortDir; }
     const sorted = [...shots];
@@ -8468,109 +8343,19 @@ const UI = (() => {
       return `<th ${c.field?`data-field="${c.field}"`:''}>${c.label}${arrow}</th>`;
     }).join('');
 
-    // The feedback schedule, applied to the one surface in this app that is
-    // per-shot knowledge of results. It is keyed on the order the shots were
-    // HIT, not the order they are currently sorted in — a faded schedule that
-    // re-decided itself when you clicked a column header would not be a
-    // schedule. `_revealed` carries the rows the golfer has chosen to open,
-    // and survives sorting for the same reason.
-    const order = new Map(shots.map((s, i) => [s, i]));
-    const decisions = new Map();
-    FeedbackEngine.plan(shots).forEach(d => decisions.set(d.shot, d));
-
+    // Every shot, every number. See FeedbackEngine.WHY_SHOWN: the guidance
+    // hypothesis is about knowledge of results while you are hitting, and by
+    // the time a session is in this table it is over and the monitor already
+    // showed you all of it. Hiding it here trained nothing and made the data
+    // harder to read.
     const body = sorted.map((s,i) => {
-      const hit = order.get(s) ?? i;
-      const d = decisions.get(s);
-      const open = !d || d.reveal || _revealed.has(hit);
-      // The green/amber/red edge is a VERDICT on the shot, so it is feedback
-      // just as much as the numbers are. Leaving it on a hidden row meant the
-      // schedule hid the figures and told the golfer whether the shot was good
-      // anyway — which is the whole thing it exists to prevent. It comes off
-      // with them, and comes back when the row is opened.
-      const sc = open ? ShotScorer.score(s) : null;
+      const sc = ShotScorer.score(s);
       const rowCls = sc===null?'': sc>=75?'row-good': sc>=50?'row-ok':'row-bad';
-      const cells = COLS.map(c => {
-        // The index column and the club stay visible whatever the schedule
-        // says: knowing WHICH shot you are looking at is not feedback about it.
-        if (open || c.field === null && c.label === '#') return `<td>${c.render(s,i)}</td>`;
-        if (c.field === 'clubType') return `<td>${c.render(s,i)}</td>`;
-        return `<td class="fb-hidden">·</td>`;
-      }).join('');
-      // Error estimation, Tier A rule 3: calling the number before it appears
-      // preserves the intrinsic error-detection process that constant feedback
-      // displaces. Asked on a sample of shots, not all of them — asking every
-      // time is its own burden and stops being a probe.
-      if (_asking === hit && !open) {
-        return `<tr class="fb-ask-row" data-hit="${hit}"><td colspan="${COLS.length}">
-            <div class="fb-ask">
-              <span class="fb-ask-q">Shot ${hit + 1}. Call your smash factor before you look.</span>
-              <input class="fb-ask-in" id="fbAskInput" type="number" step="0.01" min="0.5" max="2" placeholder="1.40" inputmode="decimal">
-              <button class="probe-btn" id="fbAskGo">Reveal</button>
-              <button class="probe-btn ghost" id="fbAskSkip">Just show me</button>
-            </div></td></tr>`;
-      }
-      const guess = _predictions.get(hit);
-      const guessRow = (open && guess !== undefined && Number.isFinite(s.smashFactor))
-        ? `<tr class="fb-guess-row"><td colspan="${COLS.length}">
-             <span class="fb-guess">You called ${fmt(guess, 2)}, it was ${fmt(s.smashFactor, 2)} —
-               out by ${fmt(Math.abs(guess - s.smashFactor), 2)}.</span></td></tr>`
-        : '';
-      return `<tr class="${rowCls} shot-row${open ? '' : ' fb-row-hidden'}" data-idx="${i}" data-hit="${hit}">${cells}</tr>${guessRow}`;
+      const cells = COLS.map(c => `<td>${c.render(s,i)}</td>`).join('');
+      return `<tr class="${rowCls} shot-row" data-idx="${i}">${cells}</tr>`;
     }).join('');
 
-    const mode = FeedbackEngine.getMode();
-    const shown = sorted.filter(s => { const d = decisions.get(s); return !d || d.reveal || _revealed.has(order.get(s)); }).length;
-    // Rendered ABOVE the table rather than as a <caption>. A caption is as wide
-    // as the table it belongs to, and this table scrolls horizontally inside
-    // .table-wrap — so the explanation for why the numbers are hidden was
-    // itself hidden off the right edge on a phone.
-    const noteHost = document.getElementById('shotFeedbackNote');
-    if (noteHost) {
-      const calls = [..._predictions.entries()]
-        .map(([hit, called]) => ({ called, actual: shots[hit] && shots[hit].smashFactor }));
-      const cal = calls.length ? FeedbackEngine.calibration(calls, shots) : null;
-      noteHost.innerHTML = mode === 'always' ? '' : `<div class="fb-caption">
-          <span class="fb-caption-head">${shown} of ${sorted.length} shown · ${Sanitize.escape(FeedbackEngine.MODES[mode].label)}</span>
-          ${Sanitize.escape(FeedbackEngine.explain(mode, sorted.length))}
-          ${cal ? `<div class="fb-cal${cal.ok ? '' : ' pending'}">${Sanitize.escape(cal.note)}</div>` : ''}
-          ${shown < sorted.length ? '<button class="fb-caption-btn" id="fbRevealAll">Show them all</button>' : ''}</div>`;
-    }
-
     el.innerHTML=`<thead><tr>${heads}</tr></thead><tbody>${body}</tbody>`;
-    // Tapping a hidden row opens that shot only. That is the whole of
-    // self-selected feedback: the golfer keeps the choice, and choosing costs
-    // them a deliberate action rather than happening by default.
-    el.querySelectorAll('tr.fb-row-hidden').forEach(tr => tr.addEventListener('click', e => {
-      e.stopPropagation();
-      const hit = Number(tr.dataset.hit);
-      const d = decisions.get(shots[hit]);
-      // Ask for the estimate first, on the shots the schedule marks — but only
-      // once per shot, and never after the answer has already been seen.
-      if (d && d.predict && !_predictions.has(hit)) { _asking = hit; renderShotTable(shots); return; }
-      _revealed.add(hit);
-      renderShotTable(shots);
-    }, { capture: true }));
-
-    const answer = keep => {
-      const hit = _asking;
-      if (hit === null) return;
-      const v = parseFloat(document.getElementById('fbAskInput')?.value);
-      if (keep && Number.isFinite(v)) _predictions.set(hit, v);
-      _asking = null;
-      _revealed.add(hit);
-      renderShotTable(shots);
-    };
-    document.getElementById('fbAskGo')?.addEventListener('click', () => answer(true));
-    document.getElementById('fbAskSkip')?.addEventListener('click', () => answer(false));
-    document.getElementById('fbAskInput')?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); answer(true); }
-    });
-    document.getElementById('fbAskInput')?.focus();
-    document.getElementById('fbRevealAll')?.addEventListener('click', () => {
-      _asking = null;
-      shots.forEach((_, i) => _revealed.add(i));
-      renderShotTable(shots);
-    });
     el.querySelectorAll('th[data-field]').forEach(th=>{
       th.addEventListener('click',()=>{
         const f=th.dataset.field;
@@ -9482,16 +9267,37 @@ const UI = (() => {
         <div class="tail-item">${esc(sc.why)}</div>
         <div class="tail-note"><strong>How this section is run.</strong> ${esc(sc.structure)}</div>
       </div>
-      ${rows.map(r => `
-        <div class="drill-row${r.ok ? '' : ' locked'}${r.flaggedOnly ? ' flagged' : ''}">
-          <div class="drill-row-head">
-            <span class="drill-row-name">${r.drill.n}. ${esc(r.drill.name)}</span>
-            <span class="drill-row-state">${r.offDevice ? 'no device needed' : r.ok ? (r.flaggedOnly ? 'open · flagged' : 'open') : 'locked'}</span>
-          </div>
-          <div class="drill-row-desc">${esc(r.drill.desc)}</div>
-          ${r.drill.feel ? `<div class="drill-row-why">${esc(FaultEngine.FEEL_CAVEAT)}</div>` : ''}
-          ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
-        </div>`).join('')}
+      ${(() => {
+        // Grouped by what each entry actually IS. The list was 104 things all
+        // called drills, a quarter of which were not — screen-reads, gym
+        // sessions, equipment checks — and the real drills were buried in
+        // among them. Order is deliberate: the range work first, because that
+        // is what someone opening this screen came for.
+        const ORDER = ['drill', 'measure', 'equipment', 'fitness', 'review'];
+        const row = r => `
+          <div class="drill-row${r.ok ? '' : ' locked'}${r.flaggedOnly ? ' flagged' : ''}">
+            <div class="drill-row-head">
+              <span class="drill-row-name">${r.drill.n}. ${esc(r.drill.name)}</span>
+              <span class="drill-row-state">${r.offDevice ? 'no device needed' : r.ok ? (r.flaggedOnly ? 'open · flagged' : 'open') : 'locked'}</span>
+            </div>
+            <div class="drill-row-desc">${esc(r.drill.desc)}</div>
+            ${r.drill.feel ? `<div class="drill-row-why">${esc(FaultEngine.FEEL_CAVEAT)}</div>` : ''}
+            ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
+          </div>`;
+        return ORDER.map(k => {
+          const group = rows.filter(r => DrillLibrary.kindOf(r.drill) === k);
+          if (!group.length) return '';
+          const meta = DrillLibrary.KINDS[k];
+          // The drills themselves need no heading — they are what the section
+          // is. Everything else does, because it is not what it looks like.
+          const head = k === 'drill' ? '' : `
+            <div class="drill-group-head">
+              <span class="drill-group-name">${esc(meta.label)} · ${group.length}</span>
+              <span class="drill-group-blurb">${esc(meta.blurb)}</span>
+            </div>`;
+          return head + `<div class="drill-group drill-group-${k}">${group.map(row).join('')}</div>`;
+        }).join('');
+      })()}
       ${_drillSection === 'I' ? '' : `<div class="tail-note" style="margin-top:.6rem">Whichever of these you
         pick, the wrappers in section I decide how much of it transfers — when the numbers appear, how the
         blocks are ordered, and whether anything checks a day later. Those matter more than the choice above.</div>`}`;
@@ -9505,6 +9311,10 @@ const UI = (() => {
   // ── Short game ────────────────────────────────────────────────
   let _sgTab = 'putting';
   let _chipBuffer = [];
+  // Block settings, not per-shot ones. Held here so a re-render after each tap
+  // does not reset them — the golfer sets the distance once and then taps.
+  let _chipYards = 10;
+  let _chipLie = 'fairway';
   function renderShortGame() {
     const el = document.getElementById('shortGameHost');
     if (!el) return;
@@ -9514,7 +9324,7 @@ const UI = (() => {
     const plan = S.session(30, _sgTab);
     const log = S.all();
     const allChips = log.flatMap(r => r.chips || []);
-    const prox = S.proximity(allChips);
+    const prox = S.rate(allChips);
 
     const tierChip = t => `<span class="sg-tier sg-tier-${t}">${t === 'strong' ? 'trial evidence'
       : t === 'moderate' ? 'supported' : 'no trial'}</span>`;
@@ -9564,54 +9374,84 @@ const UI = (() => {
       <div class="tail-block">
         <div class="tail-head">Log a chip <span class="tail-n">${allChips.length} logged</span></div>
         <div class="qe-form">
-          <label class="qe-field"><span>How far it finished from the hole (ft) — 0 if holed</span>
-            <input type="number" id="sgLeave" min="0" max="200" step="1" placeholder="6" inputmode="decimal"></label>
-          <label class="qe-field"><span>Lie</span>
-            <select id="sgLie">
-              <option value="fairway">Fairway / tight</option>
-              <option value="rough">Rough</option>
-              <option value="bare">Bare or downslope</option>
-              <option value="bunker">Bunker</option>
-            </select></label>
-          <div class="probe-btns">
-            <button class="probe-btn" id="sgAdd">Add chip</button>
-            <button class="probe-btn ghost" id="sgSave">Save session (${_chipBuffer.length})</button>
+          <div class="sg-setup">
+            <label class="qe-field"><span>Chipping from</span>
+              <select id="sgYards">
+                ${S.DISTANCES.map(d => `<option value="${d}"${d === _chipYards ? ' selected' : ''}>${d} yards</option>`).join('')}
+              </select></label>
+            <label class="qe-field"><span>Lie</span>
+              <select id="sgLie">
+                <option value="fairway"${_chipLie === 'fairway' ? ' selected' : ''}>Fairway / tight</option>
+                <option value="rough"${_chipLie === 'rough' ? ' selected' : ''}>Rough</option>
+                <option value="bare"${_chipLie === 'bare' ? ' selected' : ''}>Bare or downslope</option>
+                <option value="bunker"${_chipLie === 'bunker' ? ' selected' : ''}>Bunker</option>
+              </select></label>
           </div>
-          <div class="tail-note" id="sgBufNote"></div>
+          <p class="tail-note">Set those once, then one tap per chip. It asks whether the ball finished
+            inside ${S.INSIDE_FT} feet rather than how far out it was, because that is a call you can make
+            from where you are standing — an estimate in feet is a guess with a decimal point on it.</p>
+          <div class="sg-tap">
+            <button class="sg-tap-btn yes" id="sgIn">Inside ${S.INSIDE_FT} ft ✓</button>
+            <button class="sg-tap-btn no" id="sgOut">Outside ✗</button>
+          </div>
+          <div class="tail-note" id="sgBufNote">${_chipBuffer.length
+            ? `${_chipBuffer.filter(c => c.inside).length} of ${_chipBuffer.length} inside so far.`
+            : ''}</div>
+          <div class="probe-btns">
+            <button class="probe-btn ghost" id="sgUndo"${_chipBuffer.length ? '' : ' disabled'}>Undo last</button>
+            <button class="probe-btn" id="sgSave"${_chipBuffer.length ? '' : ' disabled'}>Save block (${_chipBuffer.length})</button>
+          </div>
         </div>
       </div>
 
       <div class="tail-block${prox ? '' : ' pending'}">
         <div class="tail-head">Your chipping</div>
         ${prox ? `<div class="tail-stats">
-            <div class="disp-stat"><div class="disp-stat-val">${fmt(prox.median, 1)} ft</div>
-              <div class="disp-stat-label">Typical leave</div></div>
-            <div class="disp-stat"><div class="disp-stat-val">${fmt(prox.mean, 1)} ft</div>
-              <div class="disp-stat-label">Average</div></div>
-            <div class="disp-stat"><div class="disp-stat-val">${prox.disasters}</div>
-              <div class="disp-stat-label">Blow-ups</div></div>
+            <div class="disp-stat"><div class="disp-stat-val">${Math.round(prox.overall.p * 100)}%</div>
+              <div class="disp-stat-label">Inside ${S.INSIDE_FT} ft</div></div>
+            <div class="disp-stat"><div class="disp-stat-val">${Math.round(prox.overall.lo * 100)}–${Math.round(prox.overall.hi * 100)}%</div>
+              <div class="disp-stat-label">True rate is in here</div></div>
+            <div class="disp-stat"><div class="disp-stat-val">${prox.n}</div>
+              <div class="disp-stat-label">Chips logged</div></div>
           </div>` : ''}
         <div class="tail-item">${esc(S.describe(prox))}</div>
+        ${prox && prox.distances.length > 1 ? `
+          <div class="sg-dist-rows">
+            ${prox.distances.map(d => `
+              <div class="sg-dist-row${d.enough ? '' : ' thin'}">
+                <span class="sg-dist-yd">${d.yards} yds</span>
+                <span class="sg-dist-rate">${Math.round(d.wilson.p * 100)}%</span>
+                <span class="sg-dist-n">${d.inside}/${d.n}${d.enough ? '' : ` · needs ${S.MIN_CHIPS}`}</span>
+              </div>`).join('')}
+          </div>` : ''}
         <div class="tail-note">${esc(S.TOUR.note)}</div>
       </div>`;
 
     el.querySelectorAll('[data-sg]').forEach(b => b.addEventListener('click', () => {
       _sgTab = b.dataset.sg; renderShortGame();
     }));
-    document.getElementById('sgAdd')?.addEventListener('click', () => {
-      const v = parseFloat(document.getElementById('sgLeave').value);
-      if (!Number.isFinite(v) || v < 0) { toast('Enter how far it finished from the hole.'); return; }
-      _chipBuffer.push({ leaveFt: v, lie: document.getElementById('sgLie').value });
-      document.getElementById('sgLeave').value = '';
-      const note = document.getElementById('sgBufNote');
-      if (note) note.textContent = `${_chipBuffer.length} chip${_chipBuffer.length === 1 ? '' : 's'} this session. ` +
-        `${ShortGame.MIN_CHIPS} is where the average starts describing you rather than the last one.`;
-      document.getElementById('sgSave').textContent = `Save session (${_chipBuffer.length})`;
+    // Distance and lie are block settings, held across re-renders so the golfer
+    // sets them once and then only taps.
+    document.getElementById('sgYards')?.addEventListener('change', e => { _chipYards = Number(e.target.value); });
+    document.getElementById('sgLie')?.addEventListener('change', e => { _chipLie = e.target.value; });
+
+    const tap = inside => {
+      _chipBuffer.push({ inside, yards: _chipYards, lie: _chipLie });
+      renderShortGame();
+    };
+    document.getElementById('sgIn')?.addEventListener('click', () => tap(true));
+    document.getElementById('sgOut')?.addEventListener('click', () => tap(false));
+    // A mis-tap on a one-tap logger is the obvious failure, so it is one tap
+    // to undo rather than a lost block.
+    document.getElementById('sgUndo')?.addEventListener('click', () => {
+      if (!_chipBuffer.length) return;
+      _chipBuffer.pop();
+      renderShortGame();
     });
     document.getElementById('sgSave')?.addEventListener('click', () => {
-      if (!_chipBuffer.length) { toast('Add a chip first.'); return; }
+      if (!_chipBuffer.length) { toast('Log a chip first.'); return; }
       const n = _chipBuffer.length;
-      ShortGame.record({ chips: _chipBuffer.slice(), lie: _chipBuffer[0].lie });
+      ShortGame.record({ chips: _chipBuffer.slice(), lie: _chipLie });
       _chipBuffer = [];
       toast(`Saved ${n} chip${n === 1 ? '' : 's'}.`);
       renderShortGame();
@@ -10904,25 +10744,19 @@ async function init() {
   // and can never find again is a worse place to keep the method than the docs.
   document.getElementById('introBtn')?.addEventListener('click', () => FirstRun.show());
 
-  // Feedback-schedule picker — the app's most consequential setting.
-  const renderFeedbackModes = () => {
-    const host = document.getElementById('feedbackModes');
-    if (!host) return;
-    const cur = FeedbackEngine.getMode();
-    host.innerHTML = Object.values(FeedbackEngine.MODES).map(m => `
-      <button class="fb-option${m.id === cur ? ' on' : ''}" data-fb="${Sanitize.escape(m.id)}">
-        <span class="fb-option-label">${Sanitize.escape(m.label)}${m.id === cur ? '<span class="fb-check">✓</span>' : ''}</span>
-        <span class="fb-option-blurb">${Sanitize.escape(m.blurb)}</span>
-      </button>`).join('');
-  };
-  document.getElementById('feedbackModes')?.addEventListener('click', e => {
-    const btn = e.target.closest('[data-fb]');
-    if (!btn) return;
-    FeedbackEngine.setMode(btn.getAttribute('data-fb'));
-    renderFeedbackModes();
-    toast('Feedback schedule updated');
+  // Where the feedback schedule went, and why. This replaced a picker that let
+  // a golfer hide this app's own numbers — see FeedbackEngine's header.
+  const noteHost = document.getElementById('feedbackNote');
+  if (noteHost) noteHost.textContent = FeedbackEngine.WHY_SHOWN;
+  document.getElementById('rangeWrapperBtn')?.addEventListener('click', () => {
+    const w = DrillLibrary.byId(FeedbackEngine.DEFAULT_WRAPPER);
+    if (!w) { Router.show('practice'); return; }
+    showConfirm(`${w.name}`,
+      `${w.desc}\n\nThis and the other session wrappers are in the drill library, section I. ` +
+      `They are the highest-evidence items in the research base and they apply over whatever drill ` +
+      `you are running.`,
+      () => Router.show('practice'));
   });
-  renderFeedbackModes();
 
   // Goals management
   const renderGoals = async () => {
