@@ -636,6 +636,28 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### The probe window (`RetentionProbe.windowState` / `deadline` / `expired`)
+
+A probe is answerable between `MIN_GAP_HOURS` (20) and `MAX_GAP_DAYS` (10).
+That window was written down correctly in `due()` and **never applied to
+`openProbes()`** — so a probe nothing could settle sat permanently at the top of
+`getNextStep`, the app's one ranked card, asking for a re-test in a window that
+had already closed. The usual defect here: a rule with working code that the
+surface a golfer reads never reaches.
+
+`windowState()` is three-valued and **`early` is not a failure** — the gap *is*
+the method, and 24 hours is the whole point of the retention literature. So
+`getNextStep` ranks a probe only when it is `open`, soonest deadline first
+(they expire independently), and prints the countdown in the title and on the
+card. `daysLeft()` rounds **up**: with 30 hours to go the golfer has today and
+tomorrow, and "1 day left" would send them home.
+
+**An expired probe is kept and shown, never deleted.** An efficacy metric that
+silently drops its own misses reports a better hit rate than it earned — the
+exact failure this module exists to prevent, one level up. `expireStale()` marks
+them, `expired()` returns them, and the session detail names them without
+scolding.
+
 ### What moved since last time (`Features.lastComparable`)
 
 The question a golfer actually has on the way home, answered by `renderSince`

@@ -4049,11 +4049,89 @@ const RetentionProbe = (() => {
     };
   }
 
-  function openProbes() { return all().filter(p => p.status === 'open'); }
+  // ── The window, and what happens when it closes ───────────────
+  // A probe is answerable between MIN_GAP_HOURS and MAX_GAP_DAYS. Outside that
+  // it is not a task, and `openProbes()` returned every open probe regardless —
+  // so a probe that could no longer be answered by anything sat permanently at
+  // the top of the app's one ranked recommendation, telling the golfer to go
+  // and re-test a club in a window that had already closed. Written down
+  // correctly in `due()`, and never applied to the surface a golfer actually
+  // reads. The usual failure here.
+  //
+  // Three-valued on purpose:
+  //   'early'   — opened too recently. Not a failure; the gap IS the method,
+  //               and 24 hours is the whole point of the retention literature.
+  //   'open'    — answerable now.
+  //   'expired' — the window closed. Too much else has happened in between for
+  //               the comparison to be about the drill.
+  function windowState(probe, now = Date.now()) {
+    if (!probe || !Number.isFinite(probe.openedAt)) return 'expired';
+    const gapH = (now - probe.openedAt) / 36e5;
+    if (gapH < MIN_GAP_HOURS) return 'early';
+    if (gapH > MAX_GAP_DAYS * 24) return 'expired';
+    return 'open';
+  }
+
+  // Whole days left before the window shuts. Rounded UP: with 30 hours to go a
+  // golfer has today and tomorrow, and "1 day left" would send them home.
+  function daysLeft(probe, now = Date.now()) {
+    if (!probe || !Number.isFinite(probe.openedAt)) return 0;
+    const msLeft = (probe.openedAt + MAX_GAP_DAYS * 864e5) - now;
+    return Math.max(0, Math.ceil(msLeft / 864e5));
+  }
+
+  // Hours until it CAN be answered, for the 'early' case.
+  function hoursUntilOpen(probe, now = Date.now()) {
+    if (!probe || !Number.isFinite(probe.openedAt)) return 0;
+    return Math.max(0, Math.ceil((probe.openedAt + MIN_GAP_HOURS * 36e5 - now) / 36e5));
+  }
+
+  // Close the window on anything past it. An expired probe is kept, not
+  // deleted: a probe that opened and was never answered is a real thing that
+  // happened to this golfer's practice, and an efficacy metric that silently
+  // drops its own misses is the failure this whole module exists to prevent.
+  function expireStale(now = Date.now()) {
+    const list = all();
+    let n = 0;
+    const next = list.map(p => {
+      if (p.status !== 'open' || windowState(p, now) !== 'expired') return p;
+      n++;
+      return { ...p, status: 'expired', expiredAt: now };
+    });
+    if (n) save(next);
+    return n;
+  }
+
+  // Open probes that are still inside their window. This is what a UI should
+  // ask for; `allOpen()` is there for the rare caller that genuinely wants the
+  // unfiltered list.
+  function openProbes(now = Date.now()) {
+    expireStale(now);
+    return all().filter(p => p.status === 'open' && windowState(p, now) !== 'expired');
+  }
+  function allOpen()    { return all().filter(p => p.status === 'open'); }
+  function expired()    { return all().filter(p => p.status === 'expired'); }
   function settled()    { return all().filter(p => p.status === 'settled'); }
   function clear()      { save([]); }
 
-  return { open, due, settle, describe, evidenceFor, openProbes, settled, all, clear,
+  // The deadline, in words. Shown wherever a probe is offered, because a task
+  // that expires and does not say so is a task the golfer will miss.
+  function deadline(probe, now = Date.now()) {
+    const st = windowState(probe, now);
+    if (st === 'expired') return 'This one has expired — too much else has happened for the comparison to be about the drill.';
+    if (st === 'early') {
+      const h = hoursUntilOpen(probe, now);
+      return `Not yet — a retention check needs a day's gap, which is the entire point of it. ` +
+             `Answerable in about ${h} hour${h === 1 ? '' : 's'}.`;
+    }
+    const d = daysLeft(probe, now);
+    return d <= 1
+      ? 'Last day to answer this one.'
+      : `${d} days left to answer this one.`;
+  }
+
+  return { open, due, settle, describe, evidenceFor, openProbes, allOpen, expired, settled, all, clear,
+           windowState, daysLeft, hoursUntilOpen, expireStale, deadline,
            MIN_GAP_HOURS, MAX_GAP_DAYS, MIN_SHOTS };
 })();
 
@@ -5665,16 +5743,29 @@ const SmartRecommendations = (() => {
     //    is the only thing in the app that can tell you whether the LAST piece
     //    of work actually held. Nothing outranks that.
     try {
-      const due = RetentionProbe.openProbes();
-      if (due.length) return {
-        type: 'probe',
-        title: `Re-test your ${clubLabel(due[0].clubType)}`,
-        desc: `Hit ${RetentionProbe.MIN_SHOTS}+ ${clubLabel(due[0].clubType)} and import it. ` +
-              `That settles whether ${due[0].faultName || 'the last drill'} actually held.`,
-        why: 'Ranked first because it expires. A probe can only be answered between a day and ten days ' +
-             'after it opened, and whether a change held is the only efficacy evidence this app can produce.',
-        icon: '🔁', action: 'import',
-      };
+      // Only probes still inside their window. openProbes() used to return
+      // every open probe, so one whose window had closed sat here permanently,
+      // asking for a re-test that nothing could settle. The soonest deadline
+      // first: they expire independently.
+      const due = RetentionProbe.openProbes()
+        .filter(p => RetentionProbe.windowState(p) === 'open')
+        .sort((a, b) => RetentionProbe.daysLeft(a) - RetentionProbe.daysLeft(b));
+      if (due.length) {
+        const p = due[0];
+        const left = RetentionProbe.daysLeft(p);
+        return {
+          type: 'probe',
+          title: left <= 1
+            ? `Last day: re-test your ${clubLabel(p.clubType)}`
+            : `Re-test your ${clubLabel(p.clubType)} — ${left} days left`,
+          desc: `Hit ${RetentionProbe.MIN_SHOTS}+ ${clubLabel(p.clubType)} and import it. ` +
+                `That settles whether ${p.faultName || 'the last drill'} actually held.`,
+          why: 'Ranked first because it expires. A probe can only be answered between a day and ' +
+               `${RetentionProbe.MAX_GAP_DAYS} days after it opened, and whether a change held is the ` +
+               'only efficacy evidence this app can produce.',
+          icon: '🔁', action: 'import', deadline: RetentionProbe.deadline(p),
+        };
+      }
     } catch (_) {}
 
     // 2. Nothing imported. The honest day-one answer is not "go buy a launch
@@ -6544,10 +6635,11 @@ const UI = (() => {
       if (nextHost) {
         const next = SmartRecommendations.getNextStep(sessions);
         nextHost.innerHTML = `
-          <div class="drill-card next-step" data-route="${Sanitize.escape(next.action)}">
+          <div class="drill-card next-step${next.deadline ? ' has-deadline' : ''}" data-route="${Sanitize.escape(next.action)}">
             <div class="drill-icon">${next.icon}</div>
             <div class="drill-title">${Sanitize.escape(next.title)}</div>
             <div class="drill-desc">${Sanitize.escape(next.desc)}</div>
+            ${next.deadline ? `<div class="next-deadline">${Sanitize.escape(next.deadline)}</div>` : ''}
             ${next.why ? `<div class="next-why">${Sanitize.escape(next.why)}</div>` : ''}
             <div class="drill-time">→ Tap to go</div>
           </div>`;
@@ -7129,15 +7221,33 @@ const UI = (() => {
 
     const results = RetentionProbe.settled()
       .filter(r => r.probeSessionId === session.id);
+
+    // Probes that opened and were never answered in time. Kept and SHOWN, not
+    // quietly dropped: an efficacy metric that hides its own misses reports a
+    // better hit rate than it earned, which is the exact failure this module
+    // exists to prevent, one level up. Only the recent ones — this is a nudge,
+    // not a permanent record of every missed window.
+    const lapsed = RetentionProbe.expired()
+      .filter(p => Date.now() - (p.expiredAt || p.openedAt) < 30 * 864e5);
+    const lapsedNote = lapsed.length
+      ? `<div class="probe-block lapsed"><div class="probe-head">
+           ${lapsed.length} retention check${lapsed.length === 1 ? '' : 's'} expired unanswered</div>
+           <div class="probe-item">${lapsed.map(p => Sanitize.escape(clubLabel(p.clubType))).join(', ')} —
+             the window is a day to ${RetentionProbe.MAX_GAP_DAYS} days, and after that too much else has
+             happened for the comparison to be about the drill. Not a telling-off: it is counted here
+             because a hit rate that only counts the checks you answered is not a hit rate.</div></div>`
+      : '';
+
     if (!results.length) {
       const open = RetentionProbe.openProbes();
-      el.innerHTML = open.length
+      el.hidden = !(open.length || lapsed.length);
+      el.innerHTML = (open.length
         ? `<div class="probe-block pending"><div class="probe-head">Retention check pending</div>
              <div class="probe-item">Come back at least a day later and hit
              ${open.map(p => `${RetentionProbe.MIN_SHOTS}+ ${Sanitize.escape(clubLabel(p.clubType))}`).join(' and ')}
-             to find out whether ${open.length === 1 ? 'it' : 'they'} held. Within-session numbers cannot tell you.</div></div>`
-        : '';
-      el.hidden = !open.length;
+             to find out whether ${open.length === 1 ? 'it' : 'they'} held. Within-session numbers cannot tell you.</div>
+             ${open.map(p => `<div class="probe-deadline">${Sanitize.escape(RetentionProbe.deadline(p))}</div>`).join('')}</div>`
+        : '') + lapsedNote;
       return;
     }
     el.hidden = false;
@@ -7145,7 +7255,7 @@ const UI = (() => {
         <div class="probe-head">Did it hold?</div>
         ${results.map(r => `<div class="probe-item outcome-${r.outcome}">
             <span class="probe-dot"></span>${Sanitize.escape(RetentionProbe.describe(r))}</div>`).join('')}
-      </div>`;
+      </div>` + lapsedNote;
   }
 
   function renderConditionCaveats(session) {

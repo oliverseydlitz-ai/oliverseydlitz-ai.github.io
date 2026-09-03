@@ -62,6 +62,10 @@ const WIRED = [
   ['log',             'PracticeLog',    'nothing can ever be recorded, and the log is a store with no write path'],
   ['open',            'RangeCard',      'the range card is built and nothing can launch it'],
   ['lastComparable',  'Features',       'the since-last block reads against whatever session came last, ball type and all'],
+  ['windowState',     'RetentionProbe', 'a probe nothing can settle sits at the top of the one ranked card forever'],
+  ['daysLeft',        'RetentionProbe', 'the countdown is computed and never shown, so the golfer misses the window'],
+  ['deadline',        'RetentionProbe', 'a task that expires never says so'],
+  ['expired',         'RetentionProbe', 'lapsed probes are recorded and never surfaced — a hit rate that only counts the checks you answered'],
   ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];
 

@@ -2338,3 +2338,11 @@ html.range-open, html.range-open body { overflow: hidden; }
 .since-was{font-size:.78rem;color:var(--text-dim);font-variant-numeric:tabular-nums}
 .since-tag{grid-column:1/-1;font-size:.72rem;color:var(--text-muted)}
 .since-note{font-size:.76rem;line-height:1.5;color:var(--text-muted);margin:.7rem 0 0}
+
+/* ── Probe deadlines ──────────────────────────────────────────────
+   A task that expires and does not say so is a task the golfer misses. */
+.next-deadline{margin-top:.5rem;font-size:.78rem;font-weight:700;color:var(--accent)}
+.drill-card.next-step.has-deadline{border-left:3px solid var(--accent)}
+.probe-deadline{margin-top:.45rem;font-size:.78rem;font-weight:700;color:var(--accent)}
+.probe-block.lapsed{opacity:.9}
+.probe-block.lapsed .probe-head{color:var(--text-muted)}
