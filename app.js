@@ -5770,8 +5770,26 @@ const Features = (() => {
   // is the same rule the shot table follows: the green arrow is the claim.
   function compare(a, b) {
     try {
-      const metric = (s, f, dec=0) => fmt(avg(s.shots, f), dec);
-      const num = (s, f) => avg(s.shots, f);
+      // ONE CLUB, not the bag. `avg(s.shots, 'carryDistance')` over every club
+      // in a session is a bag mix: a driver-heavy session against a
+      // wedge-heavy one reported "Avg carry −60 yds" as a decline, when the
+      // golfer had simply hit different clubs. The club compared is the one
+      // both sessions hit most, and the table names it.
+      const countOf = s => {
+        const c = {};
+        (s.shots || []).forEach(x => { if (x.clubType) c[x.clubType] = (c[x.clubType] || 0) + 1; });
+        return c;
+      };
+      const ca = countOf(a), cb = countOf(b);
+      const shared = Object.keys(ca).filter(k => cb[k])
+        .sort((x, y) => Math.min(cb[y], ca[y]) - Math.min(cb[x], ca[x]));
+      const club = shared[0] || null;
+      const enough = club &&
+        Math.min(ca[club], cb[club]) >= Metrics.MIN_SHOTS_REPORT;
+      const shotsOf = s => club ? (s.shots || []).filter(x => x.clubType === club) : (s.shots || []);
+
+      const metric = (s, f, dec=0) => fmt(avg(shotsOf(s), f), dec);
+      const num = (s, f) => avg(shotsOf(s), f);
       const sameConditions = Conditions.comparable(a, b);
       const spinBoth = Spin.measured(a) && Spin.measured(b);
       const rows = [
@@ -5799,7 +5817,19 @@ const Features = (() => {
         };
       });
       out.comparable = sameConditions;
+      out.club = club;
+      out.clubShots = club ? Math.min(ca[club], cb[club]) : 0;
+      out.enough = !!enough;
       out.caveats = [];
+      if (!club) {
+        out.caveats.push('These two sessions share no club, so there is nothing to compare directly.');
+      } else if (!enough) {
+        out.caveats.push(`Compared on your ${clubLabel(club)}, the club both sessions hit most — but one of ` +
+          `them has under ${Metrics.MIN_SHOTS_REPORT} of it, so read the rows as a look rather than a result.`);
+      } else {
+        out.caveats.push(`Compared on your ${clubLabel(club)} only — ${out.clubShots}+ shots in each session. ` +
+          `A bag-wide average moves with which clubs you happened to hit, not with how you hit them.`);
+      }
       if (!sameConditions) {
         const ba = Conditions.ball(a), bb = Conditions.ball(b);
         const sa = Conditions.surface(a), sb = Conditions.surface(b);
