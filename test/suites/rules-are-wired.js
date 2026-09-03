@@ -60,6 +60,8 @@ const WIRED = [
   ['EMPTY_NOTE',      'PracticeLog',    'an empty log is left to read as "you skipped it" — the same false attribution with the sign flipped'],
   ['evidenceFor',     'RetentionProbe', 'the probe never consults the log and settles on memory alone'],
   ['log',             'PracticeLog',    'nothing can ever be recorded, and the log is a store with no write path'],
+  ['open',            'RangeCard',      'the range card is built and nothing can launch it'],
+  ['transferBlock',   'PracticePlan',   'the range card ends on the last fault instead of on the block that transfers'],
 ];
 
 // `ImportFlow.prefillConditions` is deliberately NOT in the list above. It is

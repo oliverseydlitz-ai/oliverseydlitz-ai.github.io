@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** — Main structure; nav, views, modals, toast system (~700 lines)
-- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 55 feature modules
+- **app.js** (~11,400 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 56 feature modules
 - **style.css** (~2100 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -74,7 +74,8 @@ to hand someone starting cold.
    `ShortGame` (20 putting and chipping drills), `Rounds` (on-course data)
 
 5. **Coaching / practice** — `PracticePlan`, `CoachingMode`,
-   `PersonalCoach`, `PracticeEfficiency`, `SmartRecommendations`
+   `PersonalCoach`, `PracticeEfficiency`, `RangeCard` (the plan at the mat),
+   `SmartRecommendations`
    (`getNextStep`, the one ranked recommendation), `LearningPath`,
    `ContentLibrary`
 
@@ -635,6 +636,31 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### The range card (`RangeCard`)
+
+The same plan, in the form it is actually used in: one block filling the
+screen, readable at arm's length with a club in the other hand. Launched from
+the session-detail plan and the Practice view.
+
+**One block at a time is the rule, not the styling.** Rule 9 of the research
+base is one cue and never a checklist — the same reason `getNextStep` renders a
+single card. A range card showing five blocks at once is exactly the checklist
+the app refuses everywhere else, printed larger.
+
+- **It invents nothing.** Every number, drill and caveat comes from the plan
+  `PracticePlan` already generated. A feel drill keeps `FEEL_CAVEAT`'s point and
+  a locked section keeps its reason — a small screen is not a licence to drop
+  the part that says what the data cannot support.
+- Ticking a block writes to `PracticeLog` with the join keys, which is what
+  lets a later retention check credit the drill.
+- The end screen counts what was **logged**, not what was shown, and prints
+  `EMPTY_NOTE` only when something was left un-ticked. A caveat with no referent
+  reads as a reproach.
+- The scroll lock is a class on `<html>` (`range-open`), for the same reason
+  `ViewPrefs` is: a class survives a re-render, `hidden` does not.
+- `wakeLock` is best-effort and silent on failure — absent on most desktop
+  browsers, and it rejects outright when the page is not visible.
+
 ### The practice log (`PracticeLog`) — and the asymmetry that defines it
 
 `RetentionProbe.settle` takes a `practised` argument, and its only source was a
@@ -796,7 +822,7 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 55 listed in Core Modules above — not the
+`Features` is one module among the 56 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -846,6 +872,6 @@ to re-enable the on-screen banner.
   which is how the tour average and the target got conflated the first time.
 
 **Last updated:** September 2026 — ShotLab v3 (deterministic auth, cloud sync,
-55 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
+56 modules across measurement/scoring/coaching/dashboard/reporting, dark mode).
 Repo audited end-to-end: no stray files, no non-golf content, only `main` +
 active branches exist.

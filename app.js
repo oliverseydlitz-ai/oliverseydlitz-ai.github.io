@@ -6255,6 +6255,189 @@ function applyPaywall(el, cta) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// RangeCard — the plan, at the mat
+// ────────────────────────────────────────────────────────────────
+// A practice plan you have to pinch-zoom on a phone between shots is a plan
+// that gets read once and then ignored. This is the same plan, in the form it
+// is actually used in: one block filling the screen, at arm's length, with the
+// ball count and the cue and nothing else.
+//
+// ONE BLOCK AT A TIME IS NOT A STYLING CHOICE. Rule 9 of the research base is
+// one cue and never a checklist — the same reason SmartRecommendations renders
+// a single card. A range card showing five blocks at once is exactly the
+// checklist the app refuses to give anywhere else, just printed larger.
+//
+// It invents nothing. Every number, drill and caveat comes from the plan
+// PracticePlan already generated; a feel drill keeps its caveat and a locked
+// section keeps its reason, because a small screen is not a licence to drop
+// the part that says what the number cannot support. Ticking a block writes to
+// PracticeLog, which is what lets a retention check credit the drill later.
+const RangeCard = (() => {
+  let _blocks = null, _session = null, _i = 0, _wake = null, _logged = null;
+
+  // A screen that sleeps between shots is a card nobody reads. Best-effort
+  // only: the API is absent on most desktop browsers and rejects outright when
+  // the page is not visible, and neither is worth a message to the golfer.
+  async function keepAwake() {
+    try {
+      if (navigator.wakeLock && !_wake) _wake = await navigator.wakeLock.request('screen');
+    } catch (_) { _wake = null; }
+  }
+  function releaseWake() {
+    try { if (_wake) _wake.release(); } catch (_) {}
+    _wake = null;
+  }
+
+  // The one line of instruction for a block, taken from the plan rather than
+  // written here. The library drill wins when the gate passed, because it is
+  // the one whose measurement the session actually supports.
+  function cueFor(b) {
+    const d = b.libraryDrill || b.drill;
+    if (!d) return { name: b.lockedNote ? 'Nothing here can be run on this session' : b.name, desc: b.lockedNote || '' };
+    return { name: d.name, desc: d.desc || '' };
+  }
+
+  // Everything the block cannot support, kept verbatim from the plan. A card
+  // that drops these is a card that promises more than the data does.
+  function notesFor(b) {
+    const out = [];
+    if (b.libraryDrill && b.libraryDrill.feel) out.push('A feel — nothing measures whether it happened.');
+    if (!b.libraryDrill && b.drillIsFeel) out.push('A feel — nothing measures whether it happened. Every drill for this fault is one.');
+    if (b.lockedNote) out.push(b.lockedNote);
+    return out;
+  }
+
+  function open(blocks, session) {
+    const list = (blocks || []).filter(Boolean);
+    if (!list.length) return false;
+    _blocks = list; _session = session || null; _i = 0; _logged = new Set();
+    document.getElementById('rangeCard')?.remove();
+    const m = document.createElement('div');
+    m.className = 'range-card';
+    m.id = 'rangeCard';
+    document.body.appendChild(m);
+    document.documentElement.classList.add('range-open');
+    m.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey);
+    keepAwake();
+    paint();
+    return true;
+  }
+
+  function close() {
+    document.getElementById('rangeCard')?.remove();
+    document.documentElement.classList.remove('range-open');
+    document.removeEventListener('keydown', onKey);
+    releaseWake();
+    _blocks = null; _session = null; _logged = null;
+  }
+
+  const isOpen = () => !!document.getElementById('rangeCard');
+
+  function go(n) {
+    if (!_blocks) return;
+    _i = Math.max(0, Math.min(_blocks.length, n));
+    paint();
+  }
+
+  function logCurrent() {
+    const b = _blocks && _blocks[_i];
+    if (!b || !b.faultId || _logged.has(_i)) return false;
+    const rec = PracticeLog.log({
+      faultId: b.faultId, clubType: b.clubType || null,
+      drill: (b.libraryDrill || b.drill || {}).name || null,
+      balls: b.balls || null, minutes: b.minutes || null, source: 'plan',
+    });
+    if (!rec) { toast('Could not save that — this browser is blocking storage.'); return false; }
+    _logged.add(_i);
+    return true;
+  }
+
+  function onKey(e) {
+    if (!isOpen()) return;
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(_i + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(_i - 1); }
+  }
+
+  function onClick(e) {
+    const btn = e.target.closest('[data-rc]');
+    if (!btn) return;
+    switch (btn.dataset.rc) {
+      case 'close': close(); break;
+      case 'next':  go(_i + 1); break;
+      case 'prev':  go(_i - 1); break;
+      case 'done':  logCurrent(); go(_i + 1); break;
+      case 'jump':  go(Number(btn.dataset.i) || 0); break;
+    }
+  }
+
+  function paint() {
+    const m = document.getElementById('rangeCard');
+    if (!m || !_blocks) return;
+    const esc = t => Sanitize.escape(String(t == null ? '' : t));
+    const n = _blocks.length;
+
+    // Past the last block: the summary. It reports what was ticked, and says
+    // plainly that an un-ticked block is not recorded as skipped — the same
+    // rule PracticeLog itself follows.
+    if (_i >= n) {
+      const done = _logged.size;
+      const balls = [..._logged].reduce((a, i) => a + (_blocks[i].balls || 0), 0);
+      m.innerHTML = `
+        <div class="rc-shell">
+          <button class="rc-x" data-rc="close" aria-label="Close">✕</button>
+          <div class="rc-body rc-end">
+            <div class="rc-end-h">Session logged</div>
+            <div class="rc-end-n">${done} of ${n} block${n === 1 ? '' : 's'}${balls ? ` · ${balls} balls` : ''}</div>
+            ${done < n ? `<p class="rc-end-note">${esc(PracticeLog.EMPTY_NOTE)}</p>` : ''}
+            <p class="rc-end-note">Import the session when you get home. A retention check needs a
+              later session on the same club to say whether any of this held — within-session numbers
+              cannot tell you.</p>
+          </div>
+          <div class="rc-foot">
+            <button class="rc-btn ghost" data-rc="prev">← Back</button>
+            <button class="rc-btn" data-rc="close">Close</button>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const b = _blocks[_i];
+    const cue = cueFor(b);
+    const notes = notesFor(b);
+    const ticked = _logged.has(_i);
+    m.innerHTML = `
+      <div class="rc-shell">
+        <button class="rc-x" data-rc="close" aria-label="Close">✕</button>
+        <div class="rc-dots">${_blocks.map((_, i) =>
+          `<button class="rc-dot${i === _i ? ' on' : ''}${_logged.has(i) ? ' done' : ''}"
+             data-rc="jump" data-i="${i}" aria-label="Block ${i + 1}"></button>`).join('')}</div>
+        <div class="rc-body">
+          <div class="rc-step">Block ${_i + 1} of ${n}</div>
+          <div class="rc-name">${esc(b.icon || '')} ${esc(b.name)}</div>
+          <div class="rc-count">${b.balls ? `${b.balls} balls` : ''}${b.balls && b.minutes ? ' · ' : ''}${b.minutes ? `${b.minutes} min` : ''}</div>
+          <div class="rc-cue">
+            <div class="rc-cue-name">${esc(cue.name)}</div>
+            ${cue.desc ? `<p class="rc-cue-desc">${esc(cue.desc)}</p>` : ''}
+          </div>
+          ${notes.map(t => `<p class="rc-note">${esc(t)}</p>`).join('')}
+          <p class="rc-space">Leave 20 seconds between shots.</p>
+        </div>
+        <div class="rc-foot">
+          <button class="rc-btn ghost" data-rc="prev"${_i === 0 ? ' disabled' : ''}>←</button>
+          ${b.faultId
+            ? `<button class="rc-btn primary${ticked ? ' logged' : ''}" data-rc="done">${ticked ? 'Logged ✓' : 'Done ✓'}</button>`
+            : `<button class="rc-btn" data-rc="next">Next</button>`}
+          <button class="rc-btn ghost" data-rc="next">→</button>
+        </div>
+      </div>`;
+  }
+
+  return { open, close, isOpen, paint, cueFor, notesFor };
+})();
+
+// ────────────────────────────────────────────────────────────────
 // UI
 // ────────────────────────────────────────────────────────────────
 const UI = (() => {
@@ -7118,6 +7301,7 @@ const UI = (() => {
           </div>
         </div>` : ''}
       <div class="plan-note">${Sanitize.escape(CoachingMode.PROTOCOL.note)}</div>
+      <button class="btn-secondary plan-range">Take this to the range →</button>
       <div class="plan-note">Ticking a block off records that you did it. That is what lets a retention
         check credit the drill instead of asking you to remember a week later —
         and the app will never read an un-ticked block as work you skipped.</div>`;
@@ -7126,6 +7310,10 @@ const UI = (() => {
     // throw the tick-off listeners away, leaving a guest with buttons that
     // look live and record nothing.
     if (applyPaywall(el, "Sign in to unlock your personalised practice plan")) return;
+
+    // Same plan, read at the mat. `blocks` includes the transfer block, so the
+    // card ends on it exactly as the list does.
+    el.querySelector('.plan-range')?.addEventListener('click', () => RangeCard.open(blocks, session));
 
     // The write path for PracticeLog. Nothing else in the app records what the
     // golfer actually DID, which is why RetentionProbe had to ask.
@@ -8521,7 +8709,14 @@ const UI = (() => {
             ? `<strong>${esc(p.libraryDrill.name)}</strong>`
             : esc((p.drill && p.drill.name) || p.lockedNote || '')}</div>
         ${p.drillIsFeel ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem">A feel &mdash; nothing measures whether it happened.</div>` : ''}
-      </div>`).join('');
+      </div>`).join('') +
+      `<button class="btn-primary practice-range" style="grid-column:1/-1">Take this to the range →</button>`;
+
+    // The same plan, one block at a time, sized to be read from a metre away
+    // with a club in the other hand. The transfer block is appended here for
+    // the same reason PracticePlan appends it to every plan.
+    const forCard = [...plan, PracticePlan.transferBlock()];
+    grid.querySelector('.practice-range')?.addEventListener('click', () => RangeCard.open(forCard, latest));
   }
 
   // ── Drill library ─────────────────────────────────────────────

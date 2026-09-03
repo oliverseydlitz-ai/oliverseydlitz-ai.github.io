@@ -2278,3 +2278,44 @@ canvas {
     opacity: 1;
   }
 }
+
+/* ── Range card ───────────────────────────────────────────────────
+   The plan at the mat: one block filling the screen, readable at arm's
+   length in daylight. Sizes here are deliberately larger than anywhere
+   else in the app — this is the one surface read from a metre away with
+   a club in one hand. */
+html.range-open, html.range-open body { overflow: hidden; }
+.range-card{
+  position:fixed;inset:0;z-index:1200;background:var(--bg);
+  display:flex;align-items:stretch;justify-content:center;
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);
+}
+.rc-shell{display:flex;flex-direction:column;width:100%;max-width:560px;padding:1rem 1.2rem 1.2rem}
+.rc-x{position:absolute;top:.8rem;right:.9rem;width:2.4rem;height:2.4rem;border:none;border-radius:50%;
+  background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer}
+.rc-dots{display:flex;gap:.4rem;justify-content:center;margin:.4rem 0 1.2rem}
+.rc-dot{width:.6rem;height:.6rem;padding:0;border:none;border-radius:50%;background:var(--border);cursor:pointer}
+.rc-dot.on{background:var(--accent);transform:scale(1.35)}
+.rc-dot.done{background:var(--green)}
+.rc-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.5rem;min-height:0;overflow-y:auto}
+.rc-step{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.rc-name{font-size:1.75rem;font-weight:800;line-height:1.15}
+.rc-count{font-size:1.15rem;font-weight:700;color:var(--accent)}
+.rc-cue{margin-top:.8rem;padding:.9rem 1rem;border-radius:var(--radius);background:var(--surface);
+  border:1px solid var(--border)}
+.rc-cue-name{font-size:1.05rem;font-weight:700;margin-bottom:.35rem}
+.rc-cue-desc{font-size:.95rem;line-height:1.5;color:var(--text-dim);margin:0}
+.rc-note{font-size:.82rem;line-height:1.45;color:var(--text-muted);margin:.5rem 0 0}
+.rc-space{font-size:.82rem;color:var(--text-muted);margin-top:.9rem}
+.rc-foot{display:flex;gap:.6rem;align-items:center;padding-top:1rem}
+.rc-btn{flex:0 0 auto;padding:.9rem 1.1rem;font:inherit;font-size:1rem;font-weight:600;
+  border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);
+  color:var(--text);cursor:pointer;min-width:3.4rem}
+.rc-btn.primary{flex:1;background:var(--accent);border-color:var(--accent);color:#fff}
+.rc-btn.primary.logged{background:var(--green);border-color:var(--green)}
+.rc-btn.ghost{color:var(--text-muted)}
+.rc-btn[disabled]{opacity:.35;cursor:default}
+.rc-end{text-align:center}
+.rc-end-h{font-size:1.6rem;font-weight:800}
+.rc-end-n{font-size:1.05rem;font-weight:700;color:var(--accent);margin-top:.3rem}
+.rc-end-note{font-size:.85rem;line-height:1.5;color:var(--text-muted);margin:1rem 0 0}
