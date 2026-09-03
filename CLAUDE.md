@@ -634,6 +634,35 @@ as a bare object key, so the markup-only ones are **listed by name with the
 reason**. The suite fails on a new name, and on a stale exemption, so the list
 cannot rot.
 
+### Remembering the venue (`Conditions.remember` / `recall`)
+
+Ball type and surface are the two inputs every condition gate hangs off, and
+the import form asked for both from a blank slate every time. **"Not recorded"
+is not a neutral default** — it fails `dispersionValid` and `gappingValid`, so
+the cheapest answer to give is the one that silently switches off the gapping
+sizes, the tail engine and the fault condition gates. A golfer who plays the
+same mat bay every week and leaves the menus alone is the most likely way this
+app produces a wrong answer.
+
+`remember()` stores ball + surface on save; `prefillConditions()` applies them
+on every entry to the meta step (not once at boot — a second import in the same
+page life would otherwise show what the menus held at load).
+
+- **Alignment is deliberately NOT remembered, and the box is actively cleared.**
+  Ball and surface are properties of the venue; alignment is an *action taken on
+  the day* ("I levelled and aligned the unit **this session**"). Carrying it
+  forward would assert something the golfer did not do and unlock the tighter
+  start-line floor on the strength of it — and bias is exactly the error more
+  shots cannot remove.
+- **An all-unknown session is not stored**, because the prefill note would then
+  claim a choice was carried forward when the form is sitting on its default.
+- **The prefill is announced** (`recallNote`, `#conditionsRecall`). A prefill
+  nobody can see is the same failure as a blank form: both end with a session
+  stamped with conditions nobody chose.
+- Corrupt or foreign storage reads as **no recall**, never as a made-up ball type.
+- Erasing device storage calls `forget()` — the recall is derived from imported
+  sessions, so it goes with them.
+
 ### Backup and restore (`SessionSharing`)
 
 `exportAsJSON` writes `shotlab-backup-<date>.json` and, for as long as it

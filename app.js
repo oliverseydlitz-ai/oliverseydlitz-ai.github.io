@@ -1661,7 +1661,67 @@ const Conditions = (() => {
     return ball(a).id === ball(b2).id && surface(a).id === surface(b2).id;
   }
 
-  return { BALLS, SURFACES, ball, surface, aligned, startLineFloor, caveats, comparable };
+  // ── Remembering the venue ──────────────────────────────────────
+  // Ball type and surface are facts about WHERE you hit, and that changes
+  // between venues, not between imports. Asking for both from a blank form
+  // every single time makes 'Not recorded' the cheapest answer to give — and
+  // 'Not recorded' is not a neutral default. It fails dispersionValid and
+  // gappingValid, so it silently switches off the gapping sizes, the tail
+  // engine and every condition-dependent fault gate. The most common way this
+  // app produces a wrong answer is a golfer who plays the same mat bay every
+  // week and left the menus alone.
+  //
+  // Alignment is deliberately NOT remembered, and that asymmetry is the whole
+  // point. Ball and surface are properties of the venue; alignment is an
+  // ACTION taken on the day — the label says "I levelled and aligned the unit
+  // this session". Carrying it forward would have the app assert something the
+  // golfer did not do, and unlock the tighter start-line floor on the strength
+  // of it. Bias is exactly the error that more shots cannot remove, so a
+  // falsely-remembered alignment is the most expensive wrong flag in the file.
+  const RECALL_KEY = 'slLastConditions';
+
+  function remember(conditions) {
+    const b = BALLS[conditions && conditions.ball];
+    const s = SURFACES[conditions && conditions.surface];
+    // Nothing to remember if the golfer told us nothing. Storing 'unknown'
+    // would make the prefill hint claim a choice was carried forward when the
+    // form is simply sitting on its default.
+    if ((!b || b.id === 'unknown') && (!s || s.id === 'unknown')) return null;
+    const rec = { ball: b ? b.id : 'unknown', surface: s ? s.id : 'unknown', at: Date.now() };
+    try { localStorage.setItem(RECALL_KEY, JSON.stringify(rec)); } catch (e) { return null; }
+    return rec;
+  }
+
+  function recall() {
+    let raw = null;
+    try { raw = localStorage.getItem(RECALL_KEY); } catch (e) { return null; }
+    if (!raw) return null;
+    let rec = null;
+    try { rec = JSON.parse(raw); } catch (e) { return null; }
+    if (!rec || typeof rec !== 'object') return null;
+    const b = BALLS[rec.ball], s = SURFACES[rec.surface];
+    if (!b && !s) return null;
+    return { ball: b ? b.id : 'unknown', surface: s ? s.id : 'unknown', at: Number(rec.at) || null };
+  }
+
+  function forget() {
+    try { localStorage.removeItem(RECALL_KEY); } catch (e) { /* nothing to do */ }
+  }
+
+  // A prefill the golfer cannot see is the same failure as a blank form: both
+  // end with a session stamped with conditions nobody chose. This is the
+  // sentence shown beside the menus whenever a value was carried forward.
+  function recallNote(rec) {
+    if (!rec) return null;
+    const parts = [];
+    if (rec.ball && rec.ball !== 'unknown') parts.push(BALLS[rec.ball].label);
+    if (rec.surface && rec.surface !== 'unknown') parts.push(SURFACES[rec.surface].label.toLowerCase());
+    if (!parts.length) return null;
+    return 'Filled in from your last import (' + parts.join(', ') + '). Change them if today was different.';
+  }
+
+  return { BALLS, SURFACES, ball, surface, aligned, startLineFloor, caveats, comparable,
+           remember, recall, forget, recallNote };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -8567,6 +8627,31 @@ const ImportFlow = (() => {
   function goStep(id) {
     document.querySelectorAll('.import-step').forEach(s=>s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    if (id === 'step-meta') prefillConditions();
+  }
+
+  // Carry the last venue forward, and say so. This runs on every entry to the
+  // meta step rather than once at init, because a second import in the same
+  // page life would otherwise still show what the menus held at boot.
+  //
+  // The alignment box is explicitly CLEARED here for the same reason it is not
+  // remembered: it is a claim about today. Leaving it ticked from the previous
+  // import would carry a confirmation the golfer never gave into the session's
+  // start-line gate.
+  function prefillConditions() {
+    const rec = Conditions.recall();
+    const aligned = document.getElementById('metaAligned');
+    if (aligned) aligned.checked = false;
+    const note = document.getElementById('conditionsRecall');
+    const text = rec ? Conditions.recallNote(rec) : null;
+    if (!rec || !text) { if (note) { note.textContent = ''; note.hidden = true; } return; }
+    const set = (id, val) => {
+      const sel = document.getElementById(id);
+      if (sel && val && [...sel.options].some(o => o.value === val)) sel.value = val;
+    };
+    set('metaBall', rec.ball);
+    set('metaSurface', rec.surface);
+    if (note) { note.textContent = text; note.hidden = false; }
   }
 
   // A Rapsodo session is a hundred rows or so, which parses far too fast to
@@ -8649,6 +8734,10 @@ const ImportFlow = (() => {
       id: crypto.randomUUID(), date: date||new Date().toISOString().slice(0,10),
       notes, conditions:{wind,temp,ball,surface,alignment}, shots:_shots, createdAt:Date.now(),
     };
+    // Remember the venue for the next import — ball and surface only; see the
+    // asymmetry note in Conditions. Never let a storage failure here stop a
+    // session being saved: the recall is a convenience, the session is the data.
+    try { Conditions.remember(session.conditions); } catch (e) { /* convenience only */ }
     // Stamp measurement context before anything renders. The import path
     // bypasses Store.getSessions(), so without this a just-imported session
     // has unstamped shots and every ball-type gate silently reads "unknown".
@@ -8671,7 +8760,7 @@ const ImportFlow = (() => {
     }
   }
 
-  return { goStep, handleFile, save };
+  return { goStep, handleFile, save, prefillConditions };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -9626,6 +9715,10 @@ async function init() {
     }
     keepBtn.disabled = true;
     const r = await LocalDB.setEnabled(turningOn);
+    // Erasing the device copy erases the remembered venue with it. The recall
+    // is derived from imported sessions, so leaving it behind would prefill
+    // the next import from data the golfer just asked the app to forget.
+    if (!turningOn) Conditions.forget();
     keepBtn.disabled = false;
     paintKeepLocal();
     if (r.on) toast(r.saved ? `Kept on this device (${r.saved} session${r.saved === 1 ? '' : 's'})` : 'Kept on this device');

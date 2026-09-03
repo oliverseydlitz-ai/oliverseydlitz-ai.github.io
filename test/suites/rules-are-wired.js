@@ -3,6 +3,7 @@ const path = require('path');
 let fail = 0; const ok = (c, m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c) fail++; };
 const M = require('../harness.js').load();
 const src = fs.readFileSync(path.join(__dirname, '..', '..', 'app.js'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
 
 // The single most repeated defect in this codebase is not a wrong number. It is
 // a rule that is written down, has correct working code, and is never run:
@@ -51,7 +52,26 @@ const WIRED = [
   ['SURFACES',        'Conditions',     'the same, for the surface list'],
   ['movedToward',     'Benchmarks',     'the progress trend grades an angle on a fixed sign again'],
   ['changeIsReal',    'Metrics',        'a 1% move gets an arrow and a colour'],
+  ['remember',        'Conditions',     'the venue is never stored and every import starts from a blank form again'],
+  ['recall',          'Conditions',     'the venue is stored and never read back, so the prefill quietly stops working'],
+  ['recallNote',      'Conditions',     'the form is prefilled silently and the golfer is never told a value was carried forward'],
+  ['forget',          'Conditions',     'erasing device data leaves the remembered venue behind'],
 ];
+
+// `ImportFlow.prefillConditions` is deliberately NOT in the list above. It is
+// reached through `goStep('step-meta')` rather than by name from outside, which
+// is false-positive mode 1 below — so it gets its own check on the actual
+// route: the step handler must run it, and the button must reach the step.
+console.log('— the import meta step is prefilled on the way in —');
+{
+  const body = moduleBody('ImportFlow') || '';
+  ok(/id === 'step-meta'[^\n]*prefillConditions|prefillConditions\(\)/.test(body),
+     'goStep runs prefillConditions — otherwise the remembered venue is stored and never shown');
+  ok(/goStep\('step-meta'\)/.test(src),
+     "something navigates to 'step-meta' — otherwise the prefill route is never taken");
+  ok(/conditionsRecall/.test(html),
+     'the recall note has an element to render into — a missing id is silent, the note simply never appears');
+}
 
 console.log('— every gate the app defines is read by something outside its module —');
 for (const [id, mod, consequence] of WIRED) {
