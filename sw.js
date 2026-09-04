@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v139';
+const CACHE = 'shotlab-v140';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by

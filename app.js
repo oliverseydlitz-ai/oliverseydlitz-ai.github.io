@@ -2342,7 +2342,8 @@ const QuietEye = (() => {
               'duration predicted 43% of the variance in putting performance in the original study.' },
     { n: 3, title: 'Hold the gaze 200–300 ms after impact',
       detail: 'Roughly a quarter of a second on the spot where the ball was. Looking up early is what ' +
-              'collapses under pressure — untrained golfers dropped from 2,794 ms of quiet eye to 1,405 ms.' },
+              'collapses under pressure: under a consequence, untrained golfers hold about 1,405 ms of quiet ' +
+              'eye against roughly 2,794 ms for trained ones — the gap the training closes.' },
     { n: 4, title: 'Twenty putts is the whole intervention',
       detail: 'A single 20-putt session with video feedback produced the result. This is not a programme ' +
               'that needs months; it needs a phone on a tripod and one honest session.' },
@@ -4393,7 +4394,8 @@ const FaultEngine = (() => {
         const a = avg(shots,'smashFactor');
         return `Average smash factor ${fmt(a,2)} — below the ${fmt(smashMin(shots[0]?.clubType),2)} minimum threshold. ` +
           `Energy transfer from clubhead to ball is suboptimal, indicating off-centre contact. ` +
-          `Each 0.01 drop in smash factor typically costs 1–2 mph of ball speed and ~3–5 yards of carry.`;
+          `Each 0.01 of smash is worth about 1 mph of ball speed, which off a driver is a couple of yards ` +
+          `of carry — less with the shorter clubs.`;
       },
       causes:['Ball position too far back in stance','Early extension / coming out of posture',
         'Lateral slide instead of rotational power transfer','Tension in forearms and hands',
@@ -4431,8 +4433,10 @@ const FaultEngine = (() => {
         const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
         const sc = avg(shots,'sideCarry');
         return `Face is open to path by ~${fmt(afp,1)}° (D-Plane). Ball is starting toward the open face ` +
-          `then curving further right due to clockwise spin axis. Average side carry: +${fmt(sc,1)} yds right. ` +
-          `Under modern D-Plane physics, ~75% of starting direction is determined by face angle at impact.`;
+          `then curving further right due to clockwise spin axis. Average side carry (a modelled figure, ` +
+          `not measured): +${fmt(sc,1)} yds right. ` +
+          `Start direction is mostly face — about 84% for a driver, 78% for a mid-iron, 71% for a wedge — ` +
+          `and the rest is path. The "75% face" rule taught everywhere is loft-dependent, not universal.`;
       },
       causes:['Weak/neutral grip causing face to open at impact','Over-the-top swing path (outside-in)',
         'Early forearm rotation causing "chicken wing" through impact',
@@ -4452,7 +4456,7 @@ const FaultEngine = (() => {
       description: shots => {
         const sc = avg(shots,'sideCarry');
         return `Face is closed to path. Ball is starting left and curving further left due to counter-clockwise spin. ` +
-          `Average side carry: ${fmt(sc,1)} yds left. Strong hooks cost significant distance and are hard to control under pressure.`;
+          `Average side carry (modelled, not measured): ${fmt(sc,1)} yds left. Strong hooks cost distance and are hard to control under pressure.`;
       },
       causes:['Grip too strong (hands rotated too far right)','Excessive forearm rotation (rolling over) through impact',
         'Inside-out path combined with closed face','Trail shoulder dropping too low in downswing'],
@@ -4580,10 +4584,15 @@ const FaultEngine = (() => {
       test: s => s.clubType === 'd' && Number.isFinite(s.launchAngle) && s.launchAngle < 9,
       description: shots => {
         const la = avg(shots,'launchAngle');
-        const cs = avg(shots,'clubSpeed');
-        const ideal = cs > 105 ? '10–12°' : cs > 95 ? '11–13°' : '12–15°';
-        return `Launch angle of ${fmt(la,1)}° is below optimal for your club speed (${fmt(cs,0)} mph). ` +
-          `Optimal window for your speed is approximately ${ideal}. Low launch = reduced carry and poor descent angle for roll.`;
+        // The band comes from Benchmarks.TARGET, like optimalRange below — this
+        // used to compute `cs > 105 ? '10–12°' : ...` inline, a private launch
+        // table that disagreed with TARGET (10–15°) and with the research base
+        // (10–16° at tour speed). The research base is also explicit that a
+        // launch window keyed off club speed alone is the wrong shape — it
+        // depends on attack angle and strike pattern too — so the speed
+        // framing is gone with it.
+        return `Launch angle of ${fmt(la,1)}° on driver is below the ${Benchmarks.targetsFor('d').launch.label} ` +
+          `window. Low launch means reduced carry and a descent angle too shallow to hold much roll.`;
       },
       causes:['Negative attack angle (see above)','Dynamic loft too low — shaft leaning too far forward',
         'Tee too low','Hitting too far out on toe (reduces effective loft)'],
@@ -4706,7 +4715,9 @@ const FaultEngine = (() => {
       id:'low-spin-axis', name:'High Draw/Hook Spin', icon:'🔄', category:'Spin', severity:'medium',
       test: s => Spin.measured(s) && s.spinAxis && s.spinAxis < -15,
       description: shots => `Spin axis tilted ${fmt(avg(shots,'spinAxis'),1)}° counter-clockwise — significant draw/hook spin. ` +
-        `While a slight draw is often desirable (+5–10 yards distance), excessive hook spin costs control.`,
+        `A small amount of draw spin is controllable and fine; this much curvature is hard to command under pressure ` +
+        `and the ball runs out unpredictably on landing. (The "a draw goes further" belief is mostly a myth — any ` +
+        `distance difference comes from lower spin loft on that strike pattern, not the curve direction.)`,
       causes:['Face closed to path','Strong grip','Excessive forearm rotation through impact'],
       drills:[
         {name:'Face-to-path relationship',desc:'See Hook fault for specific drills. Goal is to reduce face-to-path gap from >15° to the 0–8° range for a controllable draw.',focus:'external'},
@@ -4764,8 +4775,9 @@ const FaultEngine = (() => {
         const best = Math.max(...vals);
         const worst = Math.min(...vals);
         return `Smash factor standard deviation of ${fmt(sd,3)} is above the 0.08 threshold (Tour: ~0.02). ` +
-          `Range from ${fmt(worst,2)} to ${fmt(best,2)} — ${fmt((best-worst)*100,0)}% swing in contact quality within the session. ` +
-          `This is costing you 10–20 yards on your worst shots vs best shots.`;
+          `Range from ${fmt(worst,2)} to ${fmt(best,2)} within the session. ` +
+          `Ball speed tracks smash almost linearly, so that spread is roughly a ${fmt((best-worst)/1.4*100,0)}% ` +
+          `ball-speed swing between your best and worst strike — the carry cost of that depends on the club and is not quoted here.`;
       },
       causes:['No consistent pre-shot routine','Ball position varying shot-to-shot','Setup changes (grip, stance width)',
         'Fatigue or mental drift during session'],
@@ -4830,9 +4842,10 @@ const FaultEngine = (() => {
         const sd = stdDev(vals);
         const leftMost = vals.length ? Math.min(...vals) : null;
         const rightMost = vals.length ? Math.max(...vals) : null;
-        return `Side carry standard deviation of ${fmt(sd,1)} yards. Left-right spread: ${fmt(leftMost,1)} to +${fmt(rightMost,1)} yards. ` +
-          `Total dispersion width of ${fmt(rightMost-leftMost,0)} yards. Tour players average <25 yard dispersion. ` +
-          `Wide dispersion = difficult course management and pressure situations.`;
+        return `Side carry standard deviation of ${fmt(sd,1)} yards (side carry is a modelled figure, not measured). ` +
+          `Left-right spread: ${fmt(leftMost,1)} to +${fmt(rightMost,1)} yards, a total width of ${fmt(rightMost-leftMost,0)} yards. ` +
+          `What actually costs strokes is the tail of that spread — the occasional big miss — more than the average width, ` +
+          `so treat the widest one or two shots as the thing to work on.`;
       },
       causes:['Face angle variability','Path inconsistency','Contact quality variation'],
       drills:[
