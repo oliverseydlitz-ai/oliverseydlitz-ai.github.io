@@ -61,6 +61,7 @@ const MARKUP_ONLY = {
   'view-import':         'the same',
   'view-progress':       'the same',
   'view-practice':       'the same',
+  'view-drills':         'the same — the drill library split out of Practice into its own view',
   // 'view-yardages' is deliberately NOT here: the print stylesheet targets it
   // by id, so it is explained by CSS rather than by an exemption. If that rule
   // is ever removed, this suite will flag it as unexplained again — which is

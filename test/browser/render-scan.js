@@ -85,7 +85,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     return hits.length;
   };
   let total = 0;
-  for (const v of ['sessions','yardages','progress','practice','settings']) {
+  for (const v of ['sessions','yardages','progress','practice','drills','settings']) {
     await p.click(`.bottom-nav-item[data-view="${v}"]`).catch(()=>{});
     await p.waitForTimeout(1600);
     total += scan(v, await p.evaluate(() => document.body.innerText));
@@ -99,7 +99,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   total += scan('session detail', await p.evaluate(() => document.body.innerText));
   await widthCheck('session detail');
   // every drill-library tab
-  await p.click('.bottom-nav-item[data-view="practice"]'); await p.waitForTimeout(1200);
+  await p.click('.bottom-nav-item[data-view="drills"]'); await p.waitForTimeout(1200);
   for (const s of ['A','B','C','D','E','F','G','H','I']) {
     await p.evaluate(sec => { const b=[...document.querySelectorAll('[data-drill-sec]')].find(x=>x.dataset.drillSec===sec); b&&b.click(); }, s);
     await p.waitForTimeout(350);

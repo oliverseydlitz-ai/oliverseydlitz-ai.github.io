@@ -94,6 +94,7 @@
     <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
     <a href="#" class="nav-link" data-view="yardages">Yardages</a>
     <a href="#" class="nav-link" data-view="practice">Practice</a>
+    <a href="#" class="nav-link" data-view="drills">Drills</a>
     <a href="#" class="nav-link" data-view="progress">Progress</a>
     <a href="#" class="nav-link" data-view="settings">Settings</a>
     <button class="btn-primary btn-sm" id="topImportBtn">+ Import</button>
@@ -459,14 +460,9 @@
     </div>
     <div id="practice-content" hidden>
       <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:.9rem">Smart routines personalized to your swing. Pick one and dive in.</p>
-      <div id="practiceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-bottom:2rem"></div>
-    </div>
-
-    <!-- The full drill library, each drill shown with whether its measurement
-         gate is met and, when it is not, what would meet it. -->
-    <div class="section-block" id="secDrills">
-      <h2 class="section-title">Drill Library <span class="section-sub">and what each one needs before it means anything</span></h2>
-      <div id="drillHost"></div>
+      <div id="practiceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-bottom:1.4rem"></div>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:2rem">Looking for a specific drill rather than a plan?
+        <a href="#" data-view="drills" style="color:var(--pine);font-weight:600">Open the drill library →</a></p>
     </div>
 
     <!-- Short game — putting and chipping. No launch-monitor data at all, so
@@ -481,6 +477,21 @@
     <div class="section-block" id="secQuietEye">
       <h2 class="section-title">Quiet Eye <span class="section-sub">putting — the best-evidenced drill in golf</span></h2>
       <div id="quietEyeHost"></div>
+    </div>
+  </section>
+
+  <!-- ── Drill Library ───────────────────────
+       Its own view, not a section of Practice. Practice is the plan built from
+       your last session; this is the full catalogue, each drill shown with
+       whether its measurement gate is met and, when it is not, what would meet
+       it. It renders on a brand-new account — every lock is a next step. -->
+  <section class="view" id="view-drills">
+    <div class="view-header">
+      <h1 class="view-title">Drill Library</h1>
+    </div>
+    <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:.9rem">Every drill in the research base, grouped by what it trains. A locked drill stays on screen with the reason and what would unlock it — the lock is the next step, not a wall.</p>
+    <div class="section-block" id="secDrills">
+      <div id="drillHost"></div>
     </div>
   </section>
 
@@ -726,6 +737,10 @@
   <button class="bottom-nav-item" data-view="practice">
     <span class="bnav-icon">🎯</span>
     <span class="bnav-label">Practice</span>
+  </button>
+  <button class="bottom-nav-item" data-view="drills">
+    <span class="bnav-icon">📖</span>
+    <span class="bnav-label">Drills</span>
   </button>
   <button class="bottom-nav-item" data-view="progress">
     <span class="bnav-icon">📈</span>

@@ -14,6 +14,7 @@ const doc = w.document;
 console.log('— hashView maps only the known views —');
 const at = h => { w.location.hash = h; return Router.hashView(); };
 ok(at('#practice') === 'practice', '#practice');
+ok(at('#drills') === 'drills', '#drills — the drill library, split out of Practice into its own view');
 ok(at('#/yardages') === 'yardages', '#/yardages — a leading slash is accepted, because the docs write them that way');
 ok(at('#IMPORT') === 'import', 'case-insensitive');
 ok(at('#progress') === 'progress' && at('#settings') === 'settings' && at('#sessions') === 'sessions',
@@ -41,6 +42,14 @@ console.log('— applyHash actually switches the view —');
   Router.applyHash();
   await new Promise(r => setTimeout(r, 20));
   ok(doc.getElementById('view-yardages').classList.contains('active'), 'and it works a second time');
+
+  w.location.hash = '#drills';
+  Router.applyHash();
+  await new Promise(r => setTimeout(r, 20));
+  ok(doc.getElementById('view-drills').classList.contains('active'),
+     'the drill library is its own view, reachable by hash like the rest');
+  ok(!doc.getElementById('view-practice').classList.contains('active'),
+     'and it is no longer part of Practice');
 
   w.location.hash = '#nonsense';
   const before = [...doc.querySelectorAll('.view.active')].map(v => v.id);

@@ -64,7 +64,8 @@ to hand someone starting cold.
    - `CSVParser` — Rapsodo format → normalised shot objects; refuses a
      non-Rapsodo CSV at the door rather than importing it as nothing.
    - `Router` — views `sessions` (home), `yardages`, `progress`, `practice`,
-     `settings`; hash routing.
+     `drills` (the drill library, its own view — Practice is the plan, this is
+     the catalogue), `settings`; hash routing.
 
 4. **Scoring / analysis engines** — `FaultEngine` (gates, `splitCauses`,
    `splitDrills`), `ShotScorer`, `SwingDNA`, `Benchmarks` (the only copy of the

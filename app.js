@@ -9235,7 +9235,6 @@ const UI = (() => {
     // dead end into the one thing a new user can actually do today.
     try { renderShortGame(); } catch (e) { console.error('short game', e); }
     try { renderQuietEye(); } catch (e) { console.error('quiet eye', e); }
-    try { renderDrills(sessions); } catch (e) { console.error('drills', e); }
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
@@ -9248,8 +9247,8 @@ const UI = (() => {
 
     if (!plan || !plan.length) {
       grid.innerHTML = `<div class="tail-note" style="grid-column:1/-1">Nothing recurred often enough in your
-        last session to prescribe against — which is a result, not an empty screen. The drill library below is
-        open on whatever your data supports, and the short-game work above needs no launch monitor.</div>`;
+        last session to prescribe against — which is a result, not an empty screen. The Drills tab is open on
+        whatever your data supports, and the short-game work below needs no launch monitor.</div>`;
       return;
     }
 
@@ -9644,6 +9643,15 @@ const Router = (() => {
     safeRender('practice', () => UI.renderPractice(sessions), 'practice');
   }
 
+  // The drill library is its own view now, not a section of Practice: Practice
+  // is the plan built from the last session, this is the whole catalogue.
+  // Renders on a brand-new account — `renderDrills` gates each entry and shows
+  // the locked ones with their reason.
+  async function showDrills() {
+    const sessions = await Store.getSessions();
+    safeRender('drills', () => UI.renderDrills(sessions), 'drills');
+  }
+
   function showImport() {
     document.querySelectorAll('.import-step').forEach(s=>s.classList.remove('active'));
     document.getElementById('step-pick').classList.add('active');
@@ -9660,6 +9668,7 @@ const Router = (() => {
       case 'progress': await showProgress(); return;
       case 'yardages': await showYardages(); return;
       case 'practice': await showPractice(); return;
+      case 'drills':   await showDrills(); return;
       case 'sessions':
       case 'drill':    await showSessions(); return;
       default:         show(name);
@@ -9671,7 +9680,7 @@ const Router = (() => {
   // every one of those opened the default view. Accept a leading slash too
   // (#/yardages) because the docs write them that way. Anything not on this
   // list — including an OAuth #access_token — is left for the code that owns it.
-  const HASH_VIEWS = { sessions:1, import:1, yardages:1, practice:1, progress:1, settings:1 };
+  const HASH_VIEWS = { sessions:1, import:1, yardages:1, practice:1, drills:1, progress:1, settings:1 };
   function hashView() {
     const h = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0].toLowerCase();
     return HASH_VIEWS[h] ? h : null;
@@ -9682,7 +9691,7 @@ const Router = (() => {
     return !!v;
   }
 
-  return { show, go, showDetail, showProgress, showYardages, showSessions, showPractice, showImport,
+  return { show, go, showDetail, showProgress, showYardages, showSessions, showPractice, showDrills, showImport,
            hashView, applyHash };
 })();
 
