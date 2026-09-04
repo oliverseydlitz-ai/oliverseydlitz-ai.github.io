@@ -2566,7 +2566,9 @@ const DrillLibrary = (() => {
          gate: { shots: 30, ball: 'premium', metric: 'sideCarry' },
          structure: 'Track p90 and p95 absolute offline, never SD alone. Blocked → serial → random.' },
     C: { id: 'C', name: 'Start-line control', count: 10,
-         why: 'Face contributes 76–84% of start direction with a driver, falling to about 71% for a wedge.',
+         why: 'Face contributes about 84% of start direction with a driver, falling to about 71% for a ' +
+              'wedge (PING 2020 / TrackMan, the anchors R_ANCHORS uses) — path\'s share roughly doubles ' +
+              'as loft rises.',
          gate: { shots: 15, metric: 'launchDirection', alignment: true },
          structure: 'Bandwidth feedback at ±2° tolerance.' },
     D: { id: 'D', name: 'Face-to-path control', count: 10,
@@ -2746,7 +2748,7 @@ const DrillLibrary = (() => {
     // ── H. Quiet eye and putting (8) ──
     D(87,'H','Quiet-eye baseline (video)','Record gaze and head stability over 20 putts.',{kind:'measure',noDevice:true}),
     D(88,'H','Quiet-eye training protocol','Fixate the back of the ball 2–3 s before the stroke; hold the gaze 200–300 ms after impact. A single 20-putt session produced the published result.',{noDevice:true}),
-    D(89,'H','Quiet eye under pressure','The same protocol with a consequence. Untrained golfers collapse from 2,794 ms of quiet eye to 1,405 ms under pressure.',{noDevice:true}),
+    D(89,'H','Quiet eye under pressure','The same protocol with a consequence. Under pressure an untrained golfer\'s quiet eye runs about 1,405 ms against 2,794 ms for a trained one — the gap the training closes.',{noDevice:true}),
     D(90,'H','Errorless putting ladder','Three feet outward, expanding only after near-total success.',{noDevice:true}),
     D(91,'H','6–10 ft focus block','The range where the training produced its +5%.',{noDevice:true}),
     D(92,'H','Three-putt-avoidance lag block','From 30 ft and beyond, scored on proximity rather than on holing.',{noDevice:true}),
