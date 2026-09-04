@@ -1,0 +1,12 @@
+# The site is served byte-for-byte by GitHub Pages and has no build step, so
+# every checkout must be identical. Without this, a Windows machine with
+# core.autocrlf=true silently rewrites every file to CRLF on checkout — which
+# (a) changes what GitHub Pages serves and (b) breaks the source-scanning test
+# suites, whose comment-stripping regex cannot span a trailing \r, so the old
+# buggy code quoted inside comments trips every "no live copy of X" assertion.
+* text=auto eol=lf
+
+# Binary assets: never touch these.
+*.png binary
+*.svg -text
+*.ico binary
