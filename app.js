@@ -9624,7 +9624,39 @@ const Router = (() => {
     show('import');
   }
 
-  return { show, showDetail, showProgress, showYardages, showSessions, showPractice, showImport };
+  // One place that maps a view name to its loader. Both click delegators and
+  // the hash router go through here — the switch used to be copy-pasted in
+  // three spots and drift was inevitable.
+  async function go(name) {
+    switch (name) {
+      case 'import':   showImport(); return;
+      case 'progress': await showProgress(); return;
+      case 'yardages': await showYardages(); return;
+      case 'practice': await showPractice(); return;
+      case 'sessions':
+      case 'drill':    await showSessions(); return;
+      default:         show(name);
+    }
+  }
+
+  // Hash deep links. manifest.json's PWA shortcuts and the marketing copy point
+  // at #import / #yardages / #practice, and nothing ever read location.hash, so
+  // every one of those opened the default view. Accept a leading slash too
+  // (#/yardages) because the docs write them that way. Anything not on this
+  // list — including an OAuth #access_token — is left for the code that owns it.
+  const HASH_VIEWS = { sessions:1, import:1, yardages:1, practice:1, progress:1, settings:1 };
+  function hashView() {
+    const h = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0].toLowerCase();
+    return HASH_VIEWS[h] ? h : null;
+  }
+  function applyHash() {
+    const v = hashView();
+    if (v) go(v).catch(err => console.error('hash route:', err));
+    return !!v;
+  }
+
+  return { show, go, showDetail, showProgress, showYardages, showSessions, showPractice, showImport,
+           hashView, applyHash };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -9885,16 +9917,7 @@ async function init() {
     e.preventDefault();
     const v = el.dataset.view;
     try {
-      if (v==='import')   { Router.showImport(); return; }
-      if (v==='progress') { await Router.showProgress(); return; }
-      if (v==='yardages') { await Router.showYardages(); return; }
-      if (v==='sessions') { await Router.showSessions(); return; }
-      // Practice used to fall through to Router.show(), which only toggles
-      // visibility — so the tab showed whatever had last been painted into it,
-      // which was nothing. Router.showPractice existed, was exported, and was
-      // called from nowhere.
-      if (v==='practice') { await Router.showPractice(); return; }
-      Router.show(v);
+      await Router.go(v);
     } catch (err) {
       // Never let a view-render error leave the tab feeling "dead"
       console.error('Navigation error:', err);
@@ -9936,16 +9959,11 @@ async function init() {
       location.reload();
       return;
     }
-    // Route to a view (same logic as the data-view nav delegator)
+    // Route to a view (same map as the data-view nav delegator)
     if (t.hasAttribute('data-route')) {
       const v = t.getAttribute('data-route');
       try {
-        if (v==='import')   { Router.showImport(); return; }
-        if (v==='progress') { await Router.showProgress(); return; }
-        if (v==='yardages') { await Router.showYardages(); return; }
-        if (v==='sessions' || v==='drill') { await Router.showSessions(); return; }
-        if (v==='practice') { await Router.showPractice(); return; }
-        Router.show(v);
+        await Router.go(v);
       } catch (err) {
         console.error('Route action error:', err);
         Router.show(v);
@@ -10860,6 +10878,13 @@ async function init() {
     Auth.showAuth(true); // mandatory sign-in; guest option after 5s
     await Router.showSessions(); // render empty sessions behind the modal
   }
+
+  // Honour a deep link — a PWA shortcut (manifest.json) or a #practice / #yardages
+  // link. After the initial render so it lands on a painted view, and never on an
+  // OAuth return: that flow captured the token from location.hash at load and
+  // owns it. A later shortcut while the app is open comes in via hashchange.
+  if (!_authRedirect && !_oauthTokens) { try { Router.applyHash(); } catch (_) {} }
+  window.addEventListener('hashchange', () => { try { Router.applyHash(); } catch (_) {} });
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
