@@ -10,11 +10,16 @@
 // ────────────────────────────────────────────────────────────────
 const Sanitize = (() => {
   const div = document.createElement('div');
-  // Escape HTML special characters to prevent XSS
+  // Escape HTML special characters to prevent XSS. The textContent round-trip
+  // handles `& < >`; the two replaces make the result safe in an ATTRIBUTE
+  // context too (`title="${escape(x)}"`), which the round-trip alone does not.
+  // Nothing user-controlled reaches such a spot today, but a stray `"` in a
+  // note dropped into an attribute later would be an injection, and escaping
+  // more is free — a browser renders `&quot;` / `&#39;` identically in text.
   function escape(text) {
     if (!text) return '';
     div.textContent = text;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // Safe text node creation (no HTML parsing)
   function text(str) {

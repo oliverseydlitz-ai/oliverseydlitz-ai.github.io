@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v134';
+const CACHE = 'shotlab-v135';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg',
                 '/404.html', '/manifest.json'];
 
