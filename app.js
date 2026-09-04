@@ -8344,7 +8344,15 @@ const UI = (() => {
       {label:'Carry<br><small>yds</small>', render:s=>fmt(s.carryDistance,0),field:'carryDistance'},
       {label:'Side<br><small>yds</small>',  render:s=>{const v=s.sideCarry;return `<span style="color:${Math.abs(v||0)>15?'var(--red)':Math.abs(v||0)>8?'var(--yellow)':'var(--text)'}">${fmt(v,1)}</span>`;}, field:'sideCarry'},
       {label:'Path<br><small>°</small>',    render:s=>fmt(s.clubPath,1),    field:'clubPath'},
-      {label:'AoA<br><small>°</small>',     render:s=>{const v=s.attackAngle; const ok=s.clubType==='d'?v>=1:(isIron(s.clubType)&&v<=-2&&v>=-6); return `<span style="color:${ok?'var(--green-light)':'var(--yellow)'}">${fmt(v,1)}</span>`;}, field:'attackAngle'},
+      // Coloured against the club's OWN attack target from Benchmarks.targetsFor,
+      // not an inline band. The old `clubType==='d' ? v>=1 : (isIron && v<=-2 && v>=-6)`
+      // was a private copy of the target — disagreeing with TARGET (+2..+5 driver,
+      // -2..-5 iron) and silently uncoloured for every wood, hybrid and wedge. It
+      // is still a per-shot reading convenience, so a missing value is left plain
+      // rather than flagged.
+      {label:'AoA<br><small>°</small>',     render:s=>{const v=s.attackAngle; const band=Benchmarks.targetsFor(s.clubType).attack;
+        const col=!Number.isFinite(v)?'var(--text)':(v>=band.lo&&v<=band.hi)?'var(--green-light)':'var(--yellow)';
+        return `<span style="color:${col}">${fmt(v,1)}</span>`;}, field:'attackAngle'},
       {label:'Spin<br><small>rpm</small>',  render:s=>(Spin.measured(s)&&s.spinRate)?fmt(s.spinRate,0):'—', field:'spinRate'},
       {label:'Axis<br><small>°</small>',    render:s=>(Spin.measured(s)&&s.spinAxis)?fmt(s.spinAxis,1):'—', field:'spinAxis'},
       {label:'Apex<br><small>ft</small>',   render:s=>fmt(s.apex,0),        field:'apex'},
