@@ -223,6 +223,16 @@ you were never going to hole" for a good chipper and a bad one alike.
    `moderate` means the structure is supported but this format is not tested.
    `weak` means no trial — say so in the `why`, as `p-firstputt` and
    `c-pressure-updown` do.
+
+   The app renders `strong` as the literal words "trial evidence", so a
+   rationale is not enough. `test/suites/short-game.js` now enforces this: a
+   `strong` drill's `why` must name a study year or a trial. As of this rule
+   only **`p-gate`, `p-random-band`, `c-three-var`** are `strong` (errorless
+   putting per Maxwell 2001; random-order putting and the three-variation
+   chipping trial). `p-speed`, `p-circle`, `c-landing`, `c-proximity` and
+   `c-errorless-lie` were moved to `moderate` — a strokes-gained rationale, or
+   external focus (whose own effect is g ≈ 0.15), or a putting trial
+   extrapolated to chipping, is `moderate`, not `strong`.
 2. Attach the `structures` it uses. The test suite fails if a drill names a
    structure that does not exist.
 3. Prefer a task constraint over an instruction.

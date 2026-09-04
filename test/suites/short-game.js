@@ -31,6 +31,27 @@ ok(SG.byId('c-pressure-updown').tier === 'weak' && /not because a trial supports
    'so is the pressure drill — the failure is real, the format is not evidenced');
 ok(SG.byId('nope') === null, 'an unknown id is null');
 
+// §9.1 of short-game-evidence.md: `strong` needs "a trial you can cite in the
+// `why`". The app renders `strong` as the words "trial evidence", so a strong
+// drill whose why is only a rationale is telling the golfer something untrue.
+// Six drills had drifted that way — a landing-spot drill marked strong on
+// external focus while the external STRUCTURE is only moderate for the same
+// g ≈ 0.15, a proximity ladder marked strong on a measurement principle. This
+// pins the rule rather than the individual verdicts, so a new strong drill has
+// to bring a citation with it.
+console.log('— every "strong" drill actually cites a trial in its why —');
+const strong = SG.ALL().filter(d => d.tier === 'strong');
+ok(strong.length >= 2, `there are strong drills to check (${strong.length})`);
+for (const d of strong) {
+  ok(/\b(19|20)\d{2}\b/.test(d.why) || /\btrials?\b/i.test(d.why),
+     `${d.id}: the why names a study year or a trial — not just a rationale`);
+}
+// And the ones deliberately at moderate stay there unless a citation is added.
+for (const id of ['p-speed', 'p-circle', 'c-landing', 'c-proximity', 'c-errorless-lie']) {
+  ok(SG.byId(id).tier === 'moderate',
+     `${id} is moderate — rationale or a cross-skill inference, not a trial of the drill`);
+}
+
 console.log('— structures attach to drills, and resolve —');
 ok(SG.structuresFor(SG.byId('p-gate'))[0].id === 'errorless', 'the ladder resolves to errorless');
 ok(SG.structuresFor(SG.byId('c-landing'))[0].id === 'external', 'the landing spot to external focus');

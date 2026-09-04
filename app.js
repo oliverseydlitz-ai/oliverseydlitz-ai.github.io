@@ -2941,25 +2941,28 @@ const ShortGame = (() => {
       'Start at 2 ft and hole five in a row before moving back a foot. Drop back a foot on any miss. ' +
       'Stop when you first fail twice at a distance — that number is your session, not a failure.',
       { structures: ['errorless'], tier: 'strong',
-        why: 'The clearest application of the errorless finding there is: the ladder is designed so you ' +
-             'almost never miss, which is the mechanism, not a side effect.' }),
+        why: 'A pure errorless-learning protocol for putting — the same skill Maxwell et al. (2001) ' +
+             'trialed. The ladder is built so you almost never miss, which is the mechanism itself, not a ' +
+             'side effect.' }),
 
     D('p-speed', 'Speed ladder to the fringe',
       'Distance control from long range — where three-putts come from',
       'Putt to the fringe rather than a hole, from 20, 30, 40 and 50 ft. Score each one on whether it ' +
       'finishes within a putter length past the fringe. Never putt the same distance twice in a row.',
-      { structures: ['random', 'external'], tier: 'strong',
+      { structures: ['random', 'external'], tier: 'moderate',
         why: 'Amateurs lose more strokes to three-putts from outside 25 ft than to any other putting ' +
              'category, and from that range it is speed that decides the second putt, not line. Removing ' +
-             'the hole removes the temptation to aim for a make.' }),
+             'the hole removes the temptation to aim for a make. The random-order structure is ' +
+             'trial-backed; this specific drill is not, so it is moderate rather than strong.' }),
 
     D('p-circle', 'Three-foot circle from long range',
       'Lag putting scored the way it is actually judged',
       'Lay a ring of tees three feet around the hole. From 25 ft and beyond, score a putt as good if it ' +
       'finishes inside the ring — holed or not. Twenty putts, distance changing every time.',
-      { structures: ['random'], tier: 'strong',
+      { structures: ['random'], tier: 'moderate',
         why: 'The outcome that predicts your score from long range is proximity, not the make. Scoring the ' +
-             'make trains you to run six feet past.' }),
+             'make trains you to run six feet past. Moderate, not strong: the proximity-scoring rationale ' +
+             'is sound and the order is random, but no trial has tested this drill.' }),
 
     D('p-clock', 'Clock drill, 4 ft',
       'The distance that decides whether a lag was worth anything',
@@ -3021,10 +3024,11 @@ const ShortGame = (() => {
       'Aiming at the spot the ball lands, not the hole',
       'Put a towel or a coin where you want the ball to pitch. Score whether it lands on the towel — ' +
       'ignore where it finishes. Ten balls, then move the towel.',
-      { structures: ['external'], tier: 'strong',
+      { structures: ['external'], tier: 'moderate',
         why: 'The most external target available in the short game: a spot on the ground you can see, ' +
-             'rather than a feeling in your hands. External focus was one of three methods named superior ' +
-             'in the 2024 review of 52 trials.' }),
+             'rather than a feeling in your hands. External focus was named superior within its strategy ' +
+             'in the 2024 review of 52 trials, but the bias-corrected effect is small (g ≈ 0.15) — which ' +
+             'is why the external structure itself is only moderate, and so is this.' }),
 
     D('c-three-var', 'Three shots, random order',
       'Command of more than one chip',
@@ -3040,17 +3044,20 @@ const ShortGame = (() => {
       'The metric strokes gained around the green actually uses',
       'Ten chips from one lie. Score every one on how far it finishes from the hole in feet, and record ' +
       'the average — not how many went in.',
-      { structures: [], tier: 'strong',
+      { structures: [], tier: 'moderate',
         why: 'Strokes gained around the green is a function of lie and proximity. Holing a chip is close to ' +
-             'noise; finishing eight feet away instead of eighteen is not.' }),
+             'noise; finishing eight feet away instead of eighteen is not. This is a measurement principle, ' +
+             'not a trained method — moderate, because no trial has shown practising this way transfers.' }),
 
     D('c-errorless-lie', 'Errorless lie progression',
       'Contact first, difficulty second',
       'Start on a clean, tight-ish lie from 10 yards where you catch it well nearly every time. Only move ' +
       'to rough, then a bare lie, then downslope, once a full set is struck cleanly.',
-      { structures: ['errorless'], tier: 'strong',
-        why: 'Errorless learning produced putting that survived a loaded secondary task. Chunked chips are ' +
-             'the most pressure-sensitive shot in golf, which is exactly the failure mode it protects.' }),
+      { structures: ['errorless'], tier: 'moderate',
+        why: 'Errorless learning produced PUTTING that survived a loaded secondary task (Maxwell et al. ' +
+             '2001). Chunked chips are the most pressure-sensitive shot in golf, which is exactly the ' +
+             'failure mode it protects — but that is an inference from putting to chipping, so moderate, ' +
+             'not strong.' }),
 
     D('c-oneclub', 'One club, five distances',
       'Distance control through length of swing rather than club choice',
