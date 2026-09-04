@@ -3,7 +3,7 @@ let fail = 0; const ok = (c, m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); i
 const { LearningPath: LP, ContentLibrary: CL, DrillLibrary: DL, FaultEngine: FE, Store } = M;
 const fs = require('fs');
 const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
-const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 
 // Both modules promised content that does not exist. `LearningPath` listed
 // "⛳ Fundamentals — 6 lessons" and "🔄 The Swing — 8 lessons" with `locked`

@@ -12,7 +12,7 @@ const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'
 // pooling other people's rounds. The promise at the bottom of the modal that
 // "real community data will be available soon" was one the app cannot keep.
 console.log('— no invented averages survive anywhere —');
-const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 ok(!/Simulated benchmark data/.test(code), 'the simulated table is gone');
 ok(!/bySkill/.test(code), 'and the invented per-skill rows with it');
 ok(!/community data will be available/i.test(code), 'as is the promise of data the app cannot collect');

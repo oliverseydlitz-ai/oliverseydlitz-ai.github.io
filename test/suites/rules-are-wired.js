@@ -148,7 +148,7 @@ console.log('— and the target bands have exactly one copy —');
   // looked like contains the very string the check forbids. A source-scanning
   // test has to strip the prose or it will eventually be turned off by someone
   // who documented something well.
-  const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const code = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
   const callSites = (src.split('targetsFor(').length - 1);
   ok(callSites >= 3, `targetsFor is read from more than one render path (${callSites} call sites)`);
   ok(!/\+3°[^<]*ideal|ideal[^<]*\+3°/i.test(code),
@@ -186,7 +186,7 @@ console.log('— and no replaced formula is still in use anywhere —');
 // Each entry names the dead expression and what supersedes it. Comments are
 // stripped first, so the note explaining a fix does not fail the check on it.
 {
-  const code = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const code = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
   const ZOMBIES = [
     ['100 - stdDev',  'consistencyScore() / bagConsistency() — a yard figure is not a percentage'],
     ['100-stdDev',    'the same, unspaced'],
@@ -237,7 +237,7 @@ console.log('— the two surviving pooled-carry calls are per club by constructi
   // `Trajectory.avgFlight`, which its caller now filters to one club first.
   // Naming them is the point — an eleventh instance somewhere else is what
   // this is watching for.
-  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const bare = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
   const n = bare.split("avg(shots,'carryDistance')").length - 1;
   ok(n === 2, `exactly two remain (${n}) — a fault description and the averaged flight`);
   const faults = bare.slice(bare.indexOf('const FaultEngine'), bare.indexOf('\nconst ', bare.indexOf('const FaultEngine') + 10));
@@ -264,7 +264,7 @@ console.log('— and no module keeps its own copy of a launch-metric threshold �
     const j = s2.indexOf('\n})();', i);
     return s2.slice(0, i) + '\n'.repeat(s2.slice(i, j).split('\n').length) + s2.slice(j);
   };
-  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const bare = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
   const rest = strip('FaultEngine', strip('Benchmarks', bare));
   // `x > 0` and `x !== 0` are sign and presence checks, not thresholds, so the
   // pattern requires a non-zero literal. Narrowing it here rather than letting
@@ -290,7 +290,7 @@ console.log('— and every fault detection is handed its session —');
 // practice feature). It kept happening because the one-argument form is
 // perfectly valid JavaScript and the output looks right.
 {
-  const bare = src.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+  const bare = src.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
   // Balanced-paren scan, not a regex. The regex version reported
   // `detectFaults((sessions[0] || {}).shots || [], sessions[0] || null)` as
   // taking one argument, because a non-greedy `[^;]*?` stops at the first

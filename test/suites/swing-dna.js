@@ -4,7 +4,7 @@ const { SwingDNA: DNA, Benchmarks: B, Metrics } = M;
 const fs = require('fs');
 const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
 const mod = src.slice(src.indexOf('const SwingDNA'), src.indexOf('\n})();', src.indexOf('const SwingDNA')));
-const code = mod.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = mod.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 
 // The largest concentration of forbidden claims left in the app, and a
 // pre-research-base module that never got revisited.

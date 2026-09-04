@@ -4,7 +4,7 @@ const { PracticeEfficiency: PE, Metrics, Store } = M;
 const fs = require('fs');
 const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
 const mod = src.slice(src.indexOf('const PracticeEfficiency'), src.indexOf('\n})();', src.indexOf('const PracticeEfficiency')));
-const code = mod.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = mod.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 
 // What was here could only return one answer:
 //   ratio = (quality/100) * (shots/(sessions*60))   tested against 80/60/40

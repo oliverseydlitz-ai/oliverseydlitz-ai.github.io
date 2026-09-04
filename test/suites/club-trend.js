@@ -4,7 +4,7 @@ const { ClubAnalyzer: CA, Metrics, Store } = M;
 const fs = require('fs');
 const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
 const mod = src.slice(src.indexOf('const ClubAnalyzer'), src.indexOf('\n})();', src.indexOf('const ClubAnalyzer')));
-const code = mod.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = mod.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 
 // The old version compared the first three shots of a FLATTENED array against
 // shots four to six of it — not a chronology, just wherever `flatMap` put

@@ -4,7 +4,7 @@ const { PersonalCoach: PC, Metrics, Store } = M;
 const fs = require('fs');
 const src = fs.readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
 const mod = src.slice(src.indexOf('const PersonalCoach'), src.indexOf('\n})();', src.indexOf('const PersonalCoach')));
-const code = mod.split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+const code = mod.split(/\r?\n/).map(l => l.replace(/^\s*\/\/.*/, '')).join('\n');
 
 const shot = (o = {}) => ({ clubType: 'd', ballSpeed: 150, clubSpeed: 105, smashFactor: 1.43,
   launchAngle: 12, attackAngle: -6, clubPath: 0, sideCarry: 2,
