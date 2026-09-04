@@ -10654,8 +10654,10 @@ async function init() {
       if (e.key === 'p' || e.key === 'P') { e.preventDefault(); Router.showProgress(); }
       if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); Router.showYardages(); }
       if (e.key === '/' || e.key === '?') { e.preventDefault(); showKeyboardShortcuts(); }
-      if (e.key === 's' || e.key === 'S') { e.preventDefault(); Router.showYardages(); }
-      if (e.key === 'g' || e.key === 'G') { e.preventDefault(); toast('👁️ Quick actions coming soon'); }
+      // Ctrl+S used to be a second binding for Yardages — it hijacked the
+      // browser's Save shortcut for a duplicate of Ctrl+Y. Ctrl+G toasted
+      // "Quick actions coming soon", which is the empty promise this codebase
+      // deletes on sight. Both gone.
     }
   });
 
@@ -10666,7 +10668,6 @@ async function init() {
       { key: 'Ctrl+H', action: 'Home / Sessions' },
       { key: 'Ctrl+P', action: 'Progress' },
       { key: 'Ctrl+Y', action: 'Yardages' },
-      { key: 'Ctrl+S', action: 'Yardages' },
       { key: 'Ctrl+?', action: 'Show this help' },
     ];
 
