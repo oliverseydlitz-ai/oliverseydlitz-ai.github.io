@@ -28,11 +28,12 @@ Copied verbatim from spec §2. Every task's requirements implicitly include thes
 
 **Per-task test cycle.** This is a visual redesign; the regression gates are the test cycle. Unless a task says otherwise, every task ends with:
 ```
-npm test                              # 52 suites (53 after Task 6), load gate first — all green
-bash test/browser/sync.sh             # refresh the mirror — NEVER skip
-node test/browser/render-scan.js      # exit 0
+npm test                              # 52 suites (53 after Task 5), load gate first — all green
+bash test/browser/scan.sh             # sync mirror + start server + render-scan; exit 0
 ```
-and a visual check of the affected view(s) at 393px and 1440px, dark and light.
+`scan.sh` (added in the baseline) wraps `sync.sh` + a `python -m http.server 8766` on `test/browser/site/` + `render-scan.js` with `PW_CHROME` pointed at the system Chrome (`/c/Program Files/Google/Chrome/Application/chrome.exe`) — the render-scan default browser path is Linux-only. Then a visual check of the affected view(s) at 393px and 1440px, dark and light.
+
+**Baseline already done this session:** `module-map.js` slice fixed (CLAUDE.md trim removed its end-anchor); `test/browser/vendor/` populated + `sync.sh` installs it (the mirror's CDN tags were rewritten to files that never shipped, so render-scan died at the import step); `scan.sh` helper added. Tree green at commit `14867e3`.
 
 ---
 
@@ -82,10 +83,11 @@ Add the light override block:
 - [ ] **Step 4: Verify the token contract holds**
 
 ```bash
-grep -oE '^\s*--[a-z0-9-]+' style.css | tr -d ' ' | sort -u > /tmp/tokens-after.txt
-comm -23 /tmp/tokens-before.txt <(sed 's/var(\(--[a-z0-9-]*\))/\1/' /tmp/tokens-before.txt >/dev/null; grep -oE '\-\-[a-z0-9-]+' style.css | sort -u)
+grep -oE '\-\-[a-z0-9-]+' /tmp/tokens-before.txt | sort -u | while read t; do
+  grep -qE "^\s*${t}\s*:" style.css || echo "BROKEN CONTRACT: $t no longer defined in style.css"
+done
 ```
-Simpler: for each name in `/tmp/tokens-before.txt`, confirm `grep -q "  <name>:" style.css`. Every one must be present.
+Expected: no output. Every `var(--x)` name `app.js` uses must still be a defined property (a plain definition or an alias). Any line printed is a C1 violation — add the alias before proceeding.
 
 - [ ] **Step 5: Run the gates**
 
@@ -169,33 +171,39 @@ git commit -m "Redesign: chamfered cut-corner button geometry"
 
 ---
 
-## Task 4: `no-emoji.js` guard suite (fails on purpose)
+> **REORDER (QC fix):** to avoid a committed-red `npm test`, do the icon
+> sprite + `icon()` helper FIRST (old Task 5, now 4a below), THEN the emoji
+> purge and the `no-emoji.js` suite together in one task (4b), so every task
+> boundary is green. The steps below are grouped accordingly; there is no
+> separate Task 6.
 
-**Files:**
-- Create: `test/suites/no-emoji.js`
+## Task 4a: SVG icon sprite + `icon()` helper — then 4b: emoji purge + `no-emoji.js`
+
+**4a Files:** `index.html` (sprite as first `<body>` child), `style.css` (`.icon`, resize `.brand-icon`/`.empty-icon`/`.bnav-icon`/`.drop-icon`), `app.js` (`icon()` helper near `clubColor` ~line 135). Ends green (no emoji touched yet). Commit: `"Redesign: add inline SVG icon sprite and icon() helper"`.
+
+**4b Files:** `index.html` + `app.js` (purge every emoji per the steps below), `test/suites/no-emoji.js` (create). Drive `no-emoji.js` green, then `npm test` (53 suites) + `scan.sh` green in the same task. One commit: `"Redesign: remove every emoji, replace with SVG icons; add no-emoji suite"`.
 
 **Interfaces:**
-- Produces: a suite auto-discovered by `test/run.js` (`fs.readdirSync(SUITES)` — no runner edit needed). Turns green only after Task 6.
+- Produces: `no-emoji.js`, auto-discovered by `test/run.js` (`fs.readdirSync(SUITES)` — no runner edit). `icon(name, cls='')` → `` `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>` ``. Sprite `<symbol id="i-NAME">` for the §6.2 inventory.
 
 - [ ] **Step 1: Write the suite**
 
 ```js
 // No emoji in the shipped source. The redesign replaced every emoji glyph
 // with an inline-SVG icon; this keeps the purge from regressing.
+// Use the Extended_Pictographic Unicode property — it matches emoji
+// pictographs and NOT box-drawing (─), arrows (←→↻), math, or dingbats
+// the source uses on purpose. Node's /u regex supports \p{}.
 const fs = require('fs');
 const path = require('path');
-const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2190}-\u{21FF}\u{2300}-\u{23FF}]/u;
-// NOTE: ←-⇿ (arrows) and ⌀-⏿ are borderline — the app uses
-// real arrow glyphs (←, →, ↻, ✓, ✕) in markup deliberately. Narrow the class
-// to pictographic ranges only; list any surviving intentional symbol here.
-const ALLOW = ['→','←','↻','✓','✕','✗','➔']; // arrows, checks, close
+const EMOJI = /\p{Extended_Pictographic}/u;
+const ALLOW = []; // add an intentional pictograph here, with a reason, if one ever appears
 let failed = 0;
 for (const f of ['index.html', 'app.js']) {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
-  const lines = src.split('\n');
-  lines.forEach((ln, i) => {
+  src.split('\n').forEach((ln, i) => {
     const stripped = [...ln].filter(c => !ALLOW.includes(c)).join('');
-    if (EMOJI.test(stripped)) { console.log(`FAIL ${f}:${i+1}  ${ln.trim().slice(0,80)}`); failed++; }
+    if (EMOJI.test(stripped)) { console.log(`FAIL ${f}:${i+1}  ${ln.trim().slice(0,90)}`); failed++; }
   });
 }
 console.log(failed ? `${failed} FAILED` : 'no-emoji: passed');
@@ -445,6 +453,50 @@ git commit -m "Redesign: OKLCH club colour scale and token-driven Chart.js theme
 
 ---
 
+## Task 10b: app.js inline hardcoded-colour sweep (QC-added)
+
+**Files:**
+- Modify: `app.js` — the ~61 `color:`/`background:`/`border*:` declarations with a literal `#hex` or `rgba()` inside a template string (verified count: `grep -coE "(color|background|border[a-z-]*):\s*(#[0-9a-fA-F]{3,6}|rgba?\()" app.js`)
+
+**Why:** these render in the OLD palette after Task 1's token swap — Tailwind greens (`#4ade80`, `#a3e635`), emerald `rgba(16,185,129,…)`, old red `#dc2626`, blue `#60a5fa`, grade letters `#16a34a`/`#4d7c0f`/`#b45309`/`#c2410c`. Not cosmetic — achievement display, share/export buttons, tutorial blocks, grade stripes go chromatically incoherent.
+
+- [ ] **Step 1: Enumerate**
+
+```bash
+grep -noE "(color|background|border[a-z-]*):[^;\"']*(#[0-9a-fA-F]{3,6}|rgba?\([0-9.,\ ]+\))" app.js > /tmp/hex.txt
+wc -l /tmp/hex.txt && sed -n '1,80p' /tmp/hex.txt
+```
+
+- [ ] **Step 2: Map each to a token**
+
+- greens (`#4ade80 #a3e635 #16a34a rgba(16,185,129 rgba(74,222,128`) → `var(--green)` / `var(--green-light)`
+- reds (`#dc2626 rgba(220,38,38`) → `var(--red)`
+- blues (`#60a5fa #0070f3 rgba(96,165,250 rgba(0,112,243`) → `var(--blue)`
+- ambers/olives (`#4d7c0f #b45309 #c2410c #d97706`) → `var(--yellow)` (grade C/D) — grade letters A–F: A `--green`, B `--green-light`, C `--yellow`, D `--yellow`, F `--red` (accept the C/D collapse, or add `--grade-d`; spec §3.3 has no separate olive so collapse)
+- neutral overlays (`rgba(255,255,255,.05)` on dark, `rgba(0,0,0,.2)`) → `var(--surface2)` / `var(--surface3)` (these were theme-broken already — white overlay on a light bg is invisible)
+- indigo `rgba(99,102,241,.1)` → `var(--accent-weak)`
+- the `slDebug` banner `#111`/`#0f0` (line ~920) → leave (dev-only, never shipped to a user)
+
+- [ ] **Step 3: Apply, then grep for stragglers**
+
+```bash
+grep -noE "(color|background|border[a-z-]*):[^;\"']*#[0-9a-fA-F]{3,6}" app.js
+```
+Expected: only the `slDebug` lines remain.
+
+- [ ] **Step 4: Gates**
+
+`npm test`, `node --check app.js`, `bash test/browser/scan.sh`. Visual: achievements modal, a session card's grade stripe, Progress alert blocks, the export/share buttons, tutorial (setup-guide) modals — dark AND light.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app.js
+git commit -m "Redesign: convert app.js inline hardcoded colours to tokens"
+```
+
+---
+
 ## Task 11: Per-view reskin — Sessions, Session Detail, Yardages
 
 **Files:**
@@ -553,9 +605,11 @@ git commit -m "Redesign: reskin all modals and overlays"
 - Modify: `og-image.png` (re-render — only if a template/generator is found)
 - Possibly modify: `style.css` (leftover override layers), `docs/styleguide.html` (delete)
 
-- [ ] **Step 1: Dead-CSS sweep**
+- [ ] **Step 1: Dead-CSS sweep + peripheral files**
 
-`grep -nE "^/\* ── " style.css` — walk the remaining "v2 fixes / v3 fixes / editorial / TOUR badge / animation override" layers (`:1160`–`:1622`). Anything now redundant or fighting the new system: remove. Anything still needed: leave. Re-run gates after.
+`grep -nE "^/\* ── " style.css` — walk the remaining "v2 fixes / v3 fixes / editorial / TOUR badge / animation override" layers (`:1160`–`:1622`). Anything now redundant or fighting the new system: remove. Anything still needed: leave.
+
+Also: `manifest.json` `theme_color` / `background_color` → new `--bg` / `--accent`. `404.html` — reskin its inline `<style>` to the new palette (it's a standalone page, no `style.css`). `noscript` block in `index.html` — leave (bare fallback, fine). Leave `apple-touch-icon.png` / `icon-*.png` / `favicon.svg` (logo is an explicit spec non-goal). Re-run gates after.
 
 - [ ] **Step 2: og-image**
 
