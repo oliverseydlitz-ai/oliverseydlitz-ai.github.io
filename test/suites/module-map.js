@@ -15,7 +15,14 @@ const doc = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8');
 // Same shape as `DrillLibrary.FAULT_SECTION`, and checked the same way: both
 // directions, against the source.
 const real = new Set([...src.matchAll(/^const ([A-Z][A-Za-z]*) = \(\(\) => \{/gm)].map(m => m[1]));
-const section = doc.slice(doc.indexOf('### Core Modules (in app.js)'), doc.indexOf('### Key Data Shape'));
+// Bound the module list at the next H2, not at a named subheading. The old
+// anchor was `### Key Data Shape`; when that heading was trimmed out of
+// CLAUDE.md, `indexOf` returned -1 and `slice(start, -1)` ran to EOF, sweeping
+// up every backticked capitalised term in the whole file (WebApplication,
+// BYPASSRLS, TIER, …) as phantom module names.
+const _mStart = doc.indexOf('### Core Modules (in app.js)');
+const _mEnd = doc.indexOf('\n## ', _mStart + 1);
+const section = doc.slice(_mStart, _mEnd === -1 ? undefined : _mEnd);
 // Top-level helpers and constant tables are named in the same section but are
 // not IIFE modules, so they are listed here rather than inferred.
 const NOT_MODULES = new Set([
