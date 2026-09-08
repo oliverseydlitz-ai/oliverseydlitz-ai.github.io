@@ -98,51 +98,7 @@ to hand someone starting cold.
      `efficiencyModal`, `learningModal`, `shortcutsModal`) built via
      `innerHTML` at runtime rather than living in `index.html`
 
-### Key Data Shape
-
-```javascript
-// Session object
-{
-  id: string,           // UUID
-  date: ISO8601,        // session timestamp
-  shots: [{             // array of shot objects
-    clubType: string,   // 'd','3w','6i','pw', etc.
-    ballSpeed: number,  // mph
-    smashFactor: number,
-    launchAngle: number,// degrees
-    spinRate: number,   // RPM
-    carry: number,      // yards
-    total: number,      // total distance
-    // ... more fields
-  }],
-  // ... metadata
-}
-```
-
-### External Dependencies
-
-- **idb-keyval** — Lightweight IndexedDB wrapper
-- **supabase-js** — Auth & database client
-- **Chart.js** — Graphing (loaded CDN)
-- Google Fonts (Poppins)
-
 ## Development
-
-### Setup
-
-This is a static site with no build step. Just serve the root directory:
-
-```bash
-# Python
-python3 -m http.server 8000
-
-# Node
-npx http-server
-
-# Or use any static server pointing to /
-```
-
-Then open `http://localhost:8000` in browser.
 
 ### Dev Workflow
 
@@ -154,28 +110,6 @@ Then open `http://localhost:8000` in browser.
    location.reload();
    ```
 4. **View Error Logs** → DevTools Console (auth, parse errors, etc.)
-
-### Common Tasks
-
-**Add a new metric/stat to a session:**
-- CSV parser is around line 300-400 in app.js; add field mapping there
-- Update the session schema in Dashboard rendering (search `dashboardCard`)
-
-**Add a new view:**
-- Add `<section class="view" id="view-{name}">` in index.html
-- Create render function `const render{Name} = () => { ... }` in app.js
-- Add nav link: `<a data-view="{name">`
-- Router calls render function on tab click
-
-**Test CSV import:**
-- Upload a real or mock Rapsodo CSV in the UI
-- Check DevTools Network/Console for parse errors
-- Data persists in IndexedDB immediately on import
-
-**Debug auth flow:**
-- Guest mode (MemDB): sessions lost on page close
-- Logged-in (Supabase): sessions sync to cloud
-- Magic link / OAuth redirects trapped in URL hash → parsed by Auth module
 
 ### Supabase Integration
 
@@ -192,13 +126,6 @@ const SUPABASE_KEY = '...';  // publishable key (safe to expose)
 **When user signs in:**
 - Sessions from MemDB *can* be migrated to Supabase (not automatic; depends on UI flow)
 - Future imports go to both IndexedDB + Supabase if authenticated
-
-### Browser DevTools Tips
-
-- **IndexedDB Inspector** → DevTools > Application > IndexedDB > shotlab-db
-- **Auth State** → Console: `Auth.getUser()` returns current user object
-- **Session Data** → Console: `await DB.getSessions()` lists all stored sessions
-- **Supabase Logs** → Supabase Dashboard > Logs for real-time events
 
 ## ⚠️ Measurement honesty (read `docs/research-base-v2.md` §1 and §9 first)
 
@@ -1311,6 +1238,26 @@ worker at **v132**, 58 modules.
 
 `HANDOVER.md` is a point-in-time narrative from earlier the same day. It is not
 wrong, but **this file is the authority** — where they differ, CLAUDE.md wins.
+
+## Visual Development (design-review agent)
+
+Front-end changes get an automatic design check. Principles:
+`context/design-principles.md`. There is no separate style guide — the design
+system lives in `style.css` (mobile-first, dark theme).
+
+**Quick check — IMMEDIATELY after any front-end change:**
+1. Serve locally (`python3 -m http.server 8000`) and open the affected view(s).
+2. Compare against `context/design-principles.md` and the tokens in `style.css`.
+3. Screenshot at **393px** (iPhone 15 Pro — the viewport `render-scan.js` uses)
+   and at 1440px.
+4. Check the console for errors; run `bash test/browser/sync.sh` +
+   `test/browser/render-scan.js` if layout/CSS moved.
+
+**Full review:** invoke `@agent-design-review` before finalizing any
+significant UI work. It drives a real browser (Playwright MCP, or adapt to the
+`claude-in-chrome` MCP) — diff-aware visual + responsive + WCAG AA+ pass. It
+complements `frontend-design` (direction) and overlaps `render-scan.js` only on
+overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** September 2026 — ShotLab v3. 58 modules, 52 test suites,
 service worker v132. Deterministic auth, cloud sync behind verified row-level
