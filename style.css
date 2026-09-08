@@ -3,59 +3,72 @@
    White + Pine Green · Barlow Condensed data · DM Sans body
    ═══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@600;700;800&display=swap');
 
 /* ── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Design tokens ─────────────────────────────────────── */
+/* ── Design tokens — "Range" (modern-athletic instrument) ──────────────
+   Near-monochrome chrome. Saturated colour is reserved for DATA: the club
+   scale (CLUB_COLORS in app.js), the A–F grade stripes, and the
+   real/withheld/caution/loss verdicts. :root = light; html.dark overrides.
+   Names in the C1 set (see docs/superpowers/specs/2026-09-08-…) are frozen
+   because app.js reads them inline in runtime-injected modals. */
 :root {
-  /* Backgrounds — neutral white/gray */
-  --bg:        #f6f6f7;
-  --surface:   #ffffff;
-  --surface2:  #fafafa;
-  --surface3:  #f1f1f3;
+  color-scheme: light;
 
-  /* Borders */
-  --border:    #e6e6e9;
-  --border-hi: #d3d3d8;
+  /* neutrals (light) */
+  --bg:        #FBFBFC;
+  --surface:   #FFFFFF;
+  --surface2:  #F3F4F6;
+  --surface3:  #ECEEF1;
+  --line:      #E4E6EA;   /* the card-defining element — a 1px hairline, not a shadow */
+  --border:    var(--line);
+  --line-strong: #CDD0D6;
+  --border-hi: var(--line-strong);
+  --text:       #0E1116;
+  --text-muted: #565E6B;
+  --text-dim:   #8A929E;
 
-  /* Text — neutral ink */
-  --text:       #18181b;
-  --text-muted: #65656d;
-  --text-dim:   #9a9aa3;
+  /* accent — signal orange */
+  --accent:      #E24E12;
+  --accent-ink:  #0B0D10;   /* text/icon on an accent fill */
+  --accent-weak: rgba(226,78,18,.10);
+  --accent-glow: var(--accent-weak);
+  --pine:    var(--accent); /* deprecated alias, still read by app.js */
+  --forest:  #C23F0C;       /* accent :hover / pressed */
 
-  /* Brand red family */
-  --pine:    #dc2626;
-  --forest:  #b91c1c;
-  --turf:    #f87171;
+  /* data — verdict semantics (temperature-matched, one notch desaturated) */
+  --green:       #0E9463;   /* real / gain */
+  --green-light: #0B7A52;
+  --withheld:    #6B7480;   /* gated / no answer — intentionally dull */
+  --yellow:      #B57A12;   /* caution / tentative */
+  --red:         #C43C36;   /* loss / regression / danger */
+  --turf:        var(--red);
+  --blue:        #1F73C4;   /* info, "modelled" tags, secondary links */
 
-  /* Accent (= brand red) */
-  --accent:      #dc2626;
-  --accent-glow: rgba(220,38,38,.07);
-
-  /* Semantic — kept for app.js template compat */
-  --green:       #16a34a;
-  --green-light: #15803d;
-  --yellow:      #d97706;
-  --red:         #dc2626;
-  --blue:        #2563eb;
-
-  /* Layout */
-  --radius:    10px;
-  --radius-md: 10px;   /* used by JS-built modals (app.js); matches --radius */
-  --radius-sm: 6px;
+  /* geometry — hard edges; buttons are cut, not rounded */
+  --radius:    0;
+  --radius-md: 0;   /* frozen name (app.js modals); square */
+  --radius-sm: 2px; /* chips / tiny badges only */
+  --cut:       10px;
   --nav-h:     60px;
   --bottom-nav-h: 68px;
+  --tap:       44px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 4px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md: 0 4px 18px rgba(0,0,0,.1),  0 2px 6px rgba(0,0,0,.05);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,.15);
+  /* space + motion */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 40px; --s7: 64px;
+  --dur: .14s;
 
-  /* Typography */
-  --font-display: 'Barlow Condensed', system-ui, sans-serif;
-  --font-body:    'DM Sans', system-ui, sans-serif;
+  /* elevation — overlays only; chrome is flat */
+  --shadow-sm: none;
+  --shadow-md: 0 8px 30px rgba(0,0,0,.12);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.18);
+
+  /* type */
+  --font-display: 'Archivo Expanded', 'Archivo', system-ui, sans-serif;
+  --font-body:    'Archivo', system-ui, sans-serif;
+  --font-mono:    ui-monospace, 'SF Mono', 'Roboto Mono', monospace;
 }
 
 /* ── Base ──────────────────────────────────────────────── */
@@ -71,11 +84,19 @@ body {
   padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
   -webkit-font-smoothing: antialiased;
 }
-h1 { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
-h2 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
-h3 { font-family: var(--font-display); font-size: .9rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
+h2 { font-family: var(--font-display); font-size: 1rem;   font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+h3 { font-family: var(--font-display); font-size: .8rem;  font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 p  { text-wrap: pretty; }
-a  { color: var(--pine); text-decoration: none; }
+a  { color: var(--accent); text-decoration: none; }
+/* tabular numerals wherever data is shown */
+.tnum, td, th { font-variant-numeric: tabular-nums; }
+/* oversized display type steps up only on wider screens — render-scan checks
+   393px for horizontal overflow (spec C6) */
+@media (min-width: 640px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.05rem; }
+}
 
 /* ── Buttons ───────────────────────────────────────────── */
 button {
@@ -1936,23 +1957,29 @@ body {
    DARK MODE — token overrides only (everything else inherits)
    ═══════════════════════════════════════════════════════════════ */
 html.dark {
-  --bg:        #0c0c0d;
-  --surface:   #161618;
-  --surface2:  #1d1d20;
-  --surface3:  #26262a;
-  --border:    #2a2a2e;
-  --border-hi: #3a3a40;
-  --text:       #f4f4f5;
-  --text-muted: #a8a8b0;
-  --text-dim:   #75757e;
-  --pine:    #f43f5e;
-  --forest:  #fb7185;
-  --turf:    #fb7185;
-  --accent:  #f43f5e;
-  --accent-glow: rgba(244,63,94,.12);
-  --shadow-sm: 0 1px 4px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
-  --shadow-md: 0 4px 18px rgba(0,0,0,.5),  0 2px 6px rgba(0,0,0,.35);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,.6);
+  color-scheme: dark;
+  --bg:        #0B0D10;
+  --surface:   #14171C;
+  --surface2:  #1C2026;
+  --surface3:  #232830;
+  --line:      #2A2F37;
+  --line-strong: #3A404A;
+  --text:       #F4F6F8;
+  --text-muted: #A2AAB5;
+  --text-dim:   #6B7480;
+  --accent:      #FF6A2B;
+  --accent-weak: rgba(255,106,43,.12);
+  --forest:  #FF7F49;
+  --green:       #35C08A;
+  --green-light: #2AA679;
+  --withheld:    #8B93A0;
+  --yellow:      #E0A93A;
+  --red:         #E5544E;
+  --blue:        #4FA8E8;
+  --shadow-md: 0 8px 30px rgba(0,0,0,.45);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.6);
+  /* --border, --border-hi, --turf, --pine, --accent-glow inherit via their
+     :root var() aliases, which re-resolve against the values above */
 }
 html.dark body {
   background-color: var(--bg) !important;
