@@ -7,6 +7,13 @@ SITE="${SITE:-$(dirname "$0")/site}"
 mkdir -p "$SITE" || exit 1
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cp "$REPO/app.js" "$REPO/index.html" "$REPO/style.css" "$REPO/sw.js" "$SITE/" || exit 1
+# Vendored CDN libs live in test/browser/vendor/ (committed) and are copied into
+# the served mirror here. Rewriting the <script> tags without shipping the files
+# left every dep 404ing behind the route-blocker, so the import flow could not
+# parse a CSV and render-scan died at the preview step.
+VENDOR="$(dirname "$0")/vendor"
+[ -d "$VENDOR" ] || { echo "MISSING test/browser/vendor/ — run: see test/browser/README.md"; exit 1; }
+mkdir -p "$SITE/vendor" && cp "$VENDOR"/*.js "$SITE/vendor/" || exit 1
 sed -i \
   -e 's#https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js#vendor/papaparse.min.js#' \
   -e 's#https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js#vendor/chart.umd.js#' \
