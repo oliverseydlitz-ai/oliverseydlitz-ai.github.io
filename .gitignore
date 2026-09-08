@@ -4,3 +4,6 @@ package-lock.json
 
 # served mirror built by test/browser/sync.sh
 test/browser/site/
+
+# Playwright MCP scratch (screenshots, snapshots)
+.playwright-mcp/
