@@ -216,37 +216,49 @@ button:disabled, button[disabled] {
 }
 .btn-back:hover { color: var(--accent); }
 
-/* ── Top nav — pine green ──────────────────────────────── */
+/* ── Top nav (desktop) — flat, hairline, no fill ───────────────────────
+   The bar used to be a three-stop gradient with a red glow under it, a
+   diagonal stripe overlay and a bordered TOUR badge. That is four decorative
+   layers on the one element that is on screen for the whole visit. It is now
+   chrome: a surface, a hairline, and an accent tick on the view you are in. */
 .top-nav {
   display: none; position: sticky; top: 0; z-index: 100;
-  background: linear-gradient(110deg, #09401f 0%, #dc2626 45%, #187040 100%);
-  border-bottom: none;
-  padding: 0 1.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--s5);
   height: var(--nav-h);
-  align-items: center; justify-content: space-between; gap: 1rem;
-  box-shadow: 0 2px 20px rgba(220,38,38,.3);
+  align-items: center; justify-content: space-between; gap: var(--s4);
+  box-shadow: none;
 }
-.top-nav-brand { display: flex; align-items: center; gap: .6rem; }
-.brand-icon { font-size: 1.25rem; }
+.top-nav-brand { display: flex; align-items: baseline; gap: .5rem; }
+.brand-icon { font-size: 1.15rem; color: var(--accent); align-self: center; }
 .brand-name {
   font-family: var(--font-display);
-  font-size: 1.35rem; font-weight: 800;
-  color: #fff; letter-spacing: .08em; text-transform: uppercase;
+  font-size: 1.15rem; font-weight: 800;
+  color: var(--text); letter-spacing: .06em; text-transform: uppercase;
 }
-.top-nav-links { display: flex; align-items: center; gap: .15rem; }
+.brand-tag {
+  font-family: var(--font-mono);
+  font-size: .58rem; font-weight: 600; letter-spacing: .22em;
+  color: var(--text-dim); text-transform: uppercase;
+}
+.top-nav-links { display: flex; align-items: center; gap: var(--s1); }
 .top-nav-links .nav-link {
-  color: rgba(255,255,255,.65);
-  font-size: .82rem; font-weight: 600;
-  padding: .38rem .9rem; border-radius: var(--radius-sm);
-  border-bottom: none; letter-spacing: .02em;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: .72rem; font-weight: 500; letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: .38rem .8rem;
+  border-radius: 0; border-bottom: none;
+  border-left: 2px solid transparent;
+  transition: color var(--dur), border-color var(--dur);
 }
-.top-nav-links .nav-link:hover { color: #fff; background: rgba(255,255,255,.12); }
-.top-nav-links .nav-link.active { color: #fff; background: rgba(255,255,255,.18); }
-.top-nav .btn-primary {
-  background: rgba(255,255,255,.14); color: #fff;
-  border: 1.5px solid rgba(255,255,255,.3); box-shadow: none;
+.top-nav-links .nav-link:hover { color: var(--text); background: none; }
+.top-nav-links .nav-link.active {
+  color: var(--text); background: none;
+  border-left-color: var(--accent);
 }
-.top-nav .btn-primary:hover { background: rgba(255,255,255,.24); transform: translateY(-1px); }
+.top-nav .btn-primary { margin-left: var(--s3); }
 
 /* ── App main ──────────────────────────────────────────── */
 .app-main { padding: 0 1rem 2rem; }
@@ -270,10 +282,10 @@ button:disabled, button[disabled] {
   position: fixed; bottom: 0; left: 0; right: 0;
   height: var(--bottom-nav-h);
   padding-bottom: env(safe-area-inset-bottom);
-  background: #fff;
-  border-top: 1.5px solid var(--border);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
   display: flex; z-index: 100;
-  box-shadow: 0 -2px 12px rgba(0,0,0,.06);
+  box-shadow: none;
 }
 .bottom-nav-item {
   flex: 1; min-width: 0; background: none; color: var(--text-dim);
@@ -283,29 +295,38 @@ button:disabled, button[disabled] {
   border-radius: 0; position: relative; transition: color .15s;
 }
 .bottom-nav-item:hover { color: var(--text-muted); }
-.bottom-nav-item.active { color: var(--pine); }
+.bottom-nav-item.active { color: var(--accent); }
+/* A tick on the edge you came from, not a rounded pill under the label. */
 .bottom-nav-item.active::before {
   content: '';
-  position: absolute; top: 0; left: 22%; right: 22%;
-  height: 2.5px; background: var(--pine);
-  border-radius: 0 0 4px 4px;
+  position: absolute; top: 0; left: 18%; right: 18%;
+  height: 2px; background: var(--accent);
+  border-radius: 0;
 }
 .bnav-icon { font-size: 1.25rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .bnav-label { line-height: 1; white-space: nowrap; }
 
-/* ── Import FAB ────────────────────────────────────────── */
+/* #fabImport is kept in the markup (its route handler and its id are still
+   referenced) but not shown: it never had base styles, so it rendered as a
+   static button at the foot of the document rather than floating anywhere,
+   and both navs already carry an Import action a thumb away. */
+.fab { display: none; }
+
+/* ── Import — the one accent block in the bar ──────────────────────────
+   A circle is the one shape this design system does not have. It is the
+   same cut corner as .btn-primary, at nav scale. */
 .bottom-nav-item[data-view="import"] .bnav-icon {
-  background: var(--pine); color: #fff;
-  width: 40px; height: 40px; border-radius: 50%;
+  --cut: 7px;
+  background: var(--accent); color: var(--accent-ink);
+  width: 38px; height: 32px; border-radius: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.5rem; font-weight: 700;
-  box-shadow: 0 4px 14px rgba(220,38,38,.32);
-  margin-bottom: 1px;
-  transition: box-shadow .15s, transform .15s;
+  font-size: 1.15rem; font-weight: 700;
+  box-shadow: none;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  transition: background var(--dur);
 }
 .bottom-nav-item[data-view="import"]:hover .bnav-icon {
-  box-shadow: 0 6px 22px rgba(220,38,38,.48);
-  transform: scale(1.06);
+  background: var(--forest); box-shadow: none; transform: none;
 }
 .bottom-nav-item[data-view="import"].active::before { display: none; }
 .bottom-nav-item[data-view="import"],
@@ -1231,7 +1252,11 @@ body.modal-open {
 
 /* ── Desktop ───────────────────────────────────────────── */
 @media (min-width: 768px) {
-  body { padding-bottom: 0; padding-top: var(--nav-h); }
+  /* The bar is position:sticky, so it occupies its own space in flow. The
+     padding-top here was stacking a second nav-h ON TOP of it and opening a
+     60px band above the bar — visible the whole time the gradient was there
+     to disguise it. */
+  body { padding-bottom: 0; padding-top: 0; }
   .top-nav { display: flex; }
   .bottom-nav { display: none; }
   .app-main { max-width: 980px; margin: 0 auto; padding: 1.75rem 2.25rem 3rem; }
@@ -1267,44 +1292,6 @@ body {
   background-size: 28px 28px !important;
   background-position: -1px -1px !important;
   background-color: var(--bg) !important;
-}
-
-/* ── Top nav — diagonal stripe overlay + TOUR badge ────────── */
-.top-nav { overflow: hidden !important; }
-.top-nav::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    135deg, transparent 0 18px,
-    rgba(255,255,255,.025) 18px 19px
-  );
-  pointer-events: none; z-index: 0;
-}
-.top-nav-brand, .top-nav-links { position: relative; z-index: 1; }
-
-.brand-name {
-  display: inline-flex !important;
-  align-items: center;
-}
-.brand-name::after {
-  content: 'TOUR';
-  font-family: var(--font-mono);
-  font-size: .48em; font-weight: 600;
-  letter-spacing: .16em;
-  color: rgba(255,255,255,.92);
-  margin-left: 12px;
-  padding: 3px 7px 2px;
-  border: 1px solid rgba(255,255,255,.5);
-  border-radius: 3px;
-  line-height: 1;
-}
-
-.top-nav-links .nav-link {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  font-size: .72rem !important;
 }
 
 /* ── Custom select dropdown ─────────────────────────────────── */
@@ -1629,39 +1616,14 @@ th {
   padding: .45rem .85rem !important;
 }
 
-.brand-name::after {
-  color: #d4f5a8 !important;
-  border-color: rgba(212, 245, 168, .7) !important;
-  background: rgba(255, 255, 255, .04);
-  font-size: .52em !important;
-  padding: 3px 8px 2px !important;
-  margin-left: 14px !important;
-  font-weight: 700 !important;
-}
-
-/* Slight background visibility boost for measurement grid */
+/* The measurement grid behind everything. It was tinted with the old red
+   accent; on the Range palette it is a neutral hairline, because a coloured
+   grid competes with the club scale, which is the one thing here that is
+   allowed to be saturated. */
 body {
   background-image:
-    linear-gradient(rgba(220,38,38,.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(220,38,38,.045) 1px, transparent 1px) !important;
-}
-
-/* ── TOUR badge — high visibility on green nav ──────────────── */
-.brand-name::after {
-  content: 'TOUR' !important;
-  background: rgba(255,255,255,.18) !important;
-  color: #ffffff !important;
-  border: 1px solid rgba(255,255,255,.3) !important;
-  font-size: .5em !important;
-  font-weight: 700 !important;
-  letter-spacing: .18em !important;
-  padding: 3px 8px 2px !important;
-  margin-left: 14px !important;
-  border-radius: 3px !important;
-  text-transform: uppercase;
-  line-height: 1;
-  align-self: center;
-  display: inline-block !important;
+    linear-gradient(rgba(14,17,22,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14,17,22,.035) 1px, transparent 1px) !important;
 }
 
 /* ── Animation override: ensure content is always visible ──── */
@@ -1675,27 +1637,6 @@ body {
   opacity: 1 !important;
   transform: none !important;
 }
-
-/* ── BRAND-TAG (real <span>, replaces ::after pseudo) ──────── */
-.brand-tag {
-  display: inline-block;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.5em;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 3px;
-  padding: 3px 8px 2px;
-  margin-left: 14px;
-  vertical-align: 5px;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-/* Hide the redundant ::after */
-.brand-name::after { display: none !important; }
 
 /* ═══════════════ LAYOUT v2 — Dashboard · Trajectory · Subnav ═══════════════ */
 
@@ -2042,13 +1983,10 @@ html.dark body {
     linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px) !important;
 }
-/* Rich red top-nav in dark mode */
-html.dark .top-nav { background: linear-gradient(110deg, #7f1d1d 0%, #991b1b 45%, #b91c1c 100%); }
 /* Table headers stay legible */
 html.dark th { background: #1d1d20; color: rgba(255,255,255,.8); }
 html.dark th:hover { background: #26262a; }
-/* Bottom nav surface */
-html.dark .bottom-nav { background: var(--surface); border-top-color: var(--border); }
+/* Both bars read their tokens directly now, so dark needs no nav override. */
 html.dark .settings-section-title { background: #1d1d20; }
 /* Streak chip stays warm but tuned for dark */
 html.dark .streak-chip { background: linear-gradient(160deg, #2a1a0e, #3a2410); border-color: #6b4422; }
@@ -2199,7 +2137,6 @@ html.dark .drill-card { background: linear-gradient(135deg, rgba(244,63,94,.08),
   .session-card { padding: .8rem; gap: .6rem; }
   .stat-card { padding: .6rem; }
   .stat-value { font-size: 1.2rem; }
-  .fab { width: 50px; height: 50px; font-size: 1.3rem; }
   /* Shrink action buttons on very small screens, but NOT icon/close buttons */
   .btn-primary, .btn-secondary, .btn-danger { padding: .55rem .9rem; font-size: .8rem; }
 }
