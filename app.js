@@ -4396,7 +4396,7 @@ const FaultEngine = (() => {
 
     // ── CONTACT ───────────────────────────────────────────────
     {
-      id:'poor-contact', name:'Poor Contact / Thin Strike', icon:'💥', category:'Contact', severity:'high',
+      id:'poor-contact', name:'Poor Contact / Thin Strike', icon:'target', category:'Contact', severity:'high',
       test: s => s.smashFactor > 0 && s.smashFactor < smashMin(s.clubType),
       description: shots => {
         const a = avg(shots,'smashFactor');
@@ -4418,7 +4418,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'fat-shot', name:'Fat / Heavy Strike', icon:'⛏️', category:'Contact', severity:'high',
+      id:'fat-shot', name:'Fat / Heavy Strike', icon:'target', category:'Contact', severity:'high',
       test: s => s.smashFactor > 0 && s.clubSpeed > 0 &&
         (s.ballSpeed / s.clubSpeed) < 1.22 && s.attackAngle < -6 && isIron(s.clubType),
       description: shots => `Ball speed / club speed ratio of ${fmt(avg(shots,'ballSpeed')/avg(shots,'clubSpeed'),2)} with steep attack angle — classic fat/heavy strike. ` +
@@ -4435,7 +4435,7 @@ const FaultEngine = (() => {
 
     // ── PATH & FACE (D-PLANE) ──────────────────────────────────
     {
-      id:'slice', name:'Slice / Open Face to Path', icon:'↪️', category:'Path & Face', severity:'high',
+      id:'slice', name:'Slice / Open Face to Path', icon:'sync', category:'Path & Face', severity:'high',
       test: s => facePath(s) > 5,   // side carry is tier 3 (modelled) — not used
       description: shots => {
         const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
@@ -4459,7 +4459,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'hook', name:'Hook / Closed Face to Path', icon:'↩️', category:'Path & Face', severity:'medium',
+      id:'hook', name:'Hook / Closed Face to Path', icon:'sync', category:'Path & Face', severity:'medium',
       test: s => facePath(s) < -5,  // side carry is tier 3 (modelled) — not used
       description: shots => {
         const sc = avg(shots,'sideCarry');
@@ -4512,7 +4512,7 @@ const FaultEngine = (() => {
     // ── ATTACK ANGLE ──────────────────────────────────────────
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'driver-negative-aa', name:'Negative Attack Angle on Driver', icon:'📉', category:'Attack Angle', severity:'high',
+      id:'driver-negative-aa', name:'Negative Attack Angle on Driver', icon:'progress', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -1,
       description: shots => {
         const aa = avg(shots,'attackAngle');
@@ -4536,7 +4536,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'driver-very-steep', name:'Very Steep Driver Attack', icon:'📉📉', category:'Attack Angle', severity:'high',
+      id:'driver-very-steep', name:'Very Steep Driver Attack', icon:'progress', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -4,
       description: shots => `Severely negative attack angle of ${fmt(avg(shots,'attackAngle'),1)}° on driver. ` +
         `Likely producing very high spin rates, balloon trajectory, and significant distance loss. ` +
@@ -4552,7 +4552,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'↗️', category:'Attack Angle', severity:'medium',
+      id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'progress', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && !isShort(s.clubType) &&
         Number.isFinite(s.attackAngle) && s.attackAngle > -0.5,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° — too shallow for irons. ` +
@@ -4572,7 +4572,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'iron-very-steep', name:'Very Steep Iron Attack', icon:'⬇️', category:'Attack Angle', severity:'medium',
+      id:'iron-very-steep', name:'Very Steep Iron Attack', icon:'progress', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && s.attackAngle < -7,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° is too steep for irons. ` +
         `Excessively steep approach increases fat shot risk, reduces sweet spot contact, and loses distance through gear effect. ` +
@@ -4588,7 +4588,7 @@ const FaultEngine = (() => {
 
     // ── LAUNCH CONDITIONS ──────────────────────────────────────
     {
-      id:'driver-low-launch', name:'Low Launch on Driver', icon:'🚀', category:'Launch', severity:'medium',
+      id:'driver-low-launch', name:'Low Launch on Driver', icon:'progress', category:'Launch', severity:'medium',
       test: s => s.clubType === 'd' && Number.isFinite(s.launchAngle) && s.launchAngle < 9,
       description: shots => {
         const la = avg(shots,'launchAngle');
@@ -4616,7 +4616,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'driver-high-launch', name:'Ballooning / Too High Launch', icon:'🎈', category:'Launch', severity:'low',
+      id:'driver-high-launch', name:'Ballooning / Too High Launch', icon:'progress', category:'Launch', severity:'low',
       test: s => s.clubType === 'd' && s.launchAngle > 18 && s.carryDistance > 0,
       description: shots => `Launch angle of ${fmt(avg(shots,'launchAngle'),1)}° on driver is too high — creating a ballooning trajectory. ` +
         `A steeply ascending strike adds height without adding carry.`,
@@ -4646,7 +4646,7 @@ const FaultEngine = (() => {
     // adding loft through impact. Estimated from launch and attack angle
     // (Rapsodo does not export dynamic loft) — see spinLoft().
     {
-      id:'high-spin-loft', name:'Adding Loft Through Impact', icon:'📐', category:'Spin Loft', severity:'high',
+      id:'high-spin-loft', name:'Adding Loft Through Impact', icon:'warn', category:'Spin Loft', severity:'high',
       test: s => {
         const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
         return sl !== null && sl > band.hi + 3;
@@ -4675,7 +4675,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'low-spin-loft-iron', name:'Delofting Too Much (Irons)', icon:'🔻', category:'Spin Loft', severity:'medium',
+      id:'low-spin-loft-iron', name:'Delofting Too Much (Irons)', icon:'warn', category:'Spin Loft', severity:'medium',
       test: s => {
         if (!isIron(s.clubType)) return false;
         const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
@@ -4702,7 +4702,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'high-spin-axis', name:'High Spin Axis (Slice Spin)', icon:'🔄', category:'Spin', severity:'high',
+      id:'high-spin-axis', name:'High Spin Axis (Slice Spin)', icon:'sync', category:'Spin', severity:'high',
       // Spin axis is only measured with an RPT ball, and is tier 3 even then.
       test: s => Spin.measured(s) && s.spinAxis && s.spinAxis > 15,
       description: shots => {
@@ -4720,7 +4720,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'low-spin-axis', name:'High Draw/Hook Spin', icon:'🔄', category:'Spin', severity:'medium',
+      id:'low-spin-axis', name:'High Draw/Hook Spin', icon:'sync', category:'Spin', severity:'medium',
       test: s => Spin.measured(s) && s.spinAxis && s.spinAxis < -15,
       description: shots => `Spin axis tilted ${fmt(avg(shots,'spinAxis'),1)}° counter-clockwise — significant draw/hook spin. ` +
         `A small amount of draw spin is controllable and fine; this much curvature is hard to command under pressure ` +
@@ -4735,7 +4735,7 @@ const FaultEngine = (() => {
 
     // ── EFFICIENCY ────────────────────────────────────────────
     {
-      id:'low-ball-speed', name:'Low Ball Speed / Energy Loss', icon:'🐌', category:'Efficiency', severity:'medium',
+      id:'low-ball-speed', name:'Low Ball Speed / Energy Loss', icon:'progress', category:'Efficiency', severity:'medium',
       test: s => s.clubSpeed > 0 && s.ballSpeed > 0 && (s.ballSpeed/s.clubSpeed) < 1.30 && s.smashFactor > 1.28,
       description: shots => {
         const ratio = avg(shots,'ballSpeed') / avg(shots,'clubSpeed');
@@ -4754,7 +4754,7 @@ const FaultEngine = (() => {
 
     // ── SHORT GAME ────────────────────────────────────────────
     {
-      id:'wedge-thin', name:'Thin Wedge Strikes', icon:'⚡', category:'Wedge', severity:'medium',
+      id:'wedge-thin', name:'Thin Wedge Strikes', icon:'target', category:'Wedge', severity:'medium',
       test: s => isShort(s.clubType) && Number.isFinite(s.smashFactor) && s.smashFactor < 1.20 &&
         Number.isFinite(s.launchAngle) && s.launchAngle > 35,
       description: shots => `Smash factor ${fmt(avg(shots,'smashFactor'),2)} on wedges combined with high launch angle — classic thin/bladed wedge. ` +
@@ -4772,7 +4772,7 @@ const FaultEngine = (() => {
   // Session-wide consistency rules (operate on all shots together)
   const SESSION_RULES = [
     {
-      id:'inconsistent-contact', name:'Inconsistent Contact Quality', icon:'📊', category:'Consistency', severity:'medium',
+      id:'inconsistent-contact', name:'Inconsistent Contact Quality', icon:'progress', category:'Consistency', severity:'medium',
       test: shots => {
         const vals = shots.map(s=>s.smashFactor).filter(v=>v>0);
         return stdDev(vals) > 0.08;
@@ -4795,7 +4795,7 @@ const FaultEngine = (() => {
       ],
     },
     {
-      id:'variable-launch', name:'Variable Launch Angle', icon:'📐', category:'Consistency', severity:'low',
+      id:'variable-launch', name:'Variable Launch Angle', icon:'progress', category:'Consistency', severity:'low',
       test: shots => {
         const vals = shots.map(s=>s.launchAngle).filter(v=>v>0);
         return vals.length >= 5 && stdDev(vals) > 5;
@@ -4812,7 +4812,7 @@ const FaultEngine = (() => {
       ],
     },
     {
-      id:'session-fatigue', name:'Fatigue Pattern Detected', icon:'😤', category:'Consistency', severity:'low',
+      id:'session-fatigue', name:'Fatigue Pattern Detected', icon:'warn', category:'Consistency', severity:'low',
       test: shots => {
         if (shots.length < 10) return false;
         const firstHalf = shots.slice(0, Math.floor(shots.length/2));
@@ -4836,7 +4836,7 @@ const FaultEngine = (() => {
       ],
     },
     {
-      id:'dispersion-wide', name:'Wide Shot Dispersion', icon:'↔️', category:'Consistency', severity:'medium',
+      id:'dispersion-wide', name:'Wide Shot Dispersion', icon:'target', category:'Consistency', severity:'medium',
       test: shots => {
         const vals = shots.map(s=>s.sideCarry);
         return stdDev(vals) > 20;
@@ -5058,10 +5058,10 @@ const SwingDNA = (() => {
     const cs = list.filter(s => s.clubType === club);
     const n = cs.length;
     if (!club || n < Metrics.MIN_SHOTS_REPORT) {
-      return [{ category: 'Not yet', icon: '⏳', tone: NEUTRAL,
+      return [{ category: 'Not yet', icon: 'search', tone: NEUTRAL,
         value: `${Metrics.MIN_SHOTS_REPORT - n} more shots of one club` }];
     }
-    pills.push({ category: 'Read on', icon: '🏌️', tone: NEUTRAL, value: `${clubLabel(club)} · ${n} shots` });
+    pills.push({ category: 'Read on', icon: 'bag', tone: NEUTRAL, value: `${clubLabel(club)} · ${n} shots` });
 
     // ── Tier 1: strike. The only place a verdict is earned. ──────────
     const smashVals = cs.map(s => s.smashFactor).filter(v => v > 0);
@@ -5074,13 +5074,13 @@ const SwingDNA = (() => {
       const q = floor && sd <= floor ? { val: 'Repeating below what the device resolves', tone: 'good' }
               : floor && sd <= floor * 2 ? { val: 'Repeating well', tone: 'good' }
               : { val: 'Spread wide', tone: 'bad' };
-      pills.push({ category: 'Strike repeatability', icon: '🎯', tone: q.tone,
+      pills.push({ category: 'Strike repeatability', icon: 'target', tone: q.tone,
         value: `${q.val} (σ ${fmt(sd, 3)})` });
     }
     const b = Benchmarks.get(club);
     if (b && Number.isFinite(avgSmash)) {
       const tone = avgSmash >= b.pga.sf * 0.99 ? 'good' : avgSmash >= b.am.sf ? 'ok' : 'bad';
-      pills.push({ category: 'Smash factor', icon: '💥', tone,
+      pills.push({ category: 'Smash factor', icon: 'star', tone,
         value: `${fmt(avgSmash, 2)} · amateur ${fmt(b.am.sf, 2)}, tour ${fmt(b.pga.sf, 2)}` });
     }
 
@@ -5089,13 +5089,13 @@ const SwingDNA = (() => {
     const tgt = Benchmarks.targetsFor(club);
     const aa = avg(cs, 'attackAngle');
     if (Number.isFinite(aa) && n >= Metrics.MIN_SHOTS_DELIVERY) {
-      pills.push({ category: 'Attack angle', icon: '📐', tone: NEUTRAL,
+      pills.push({ category: 'Attack angle', icon: 'progress', tone: NEUTRAL,
         value: `${aa > 0 ? '+' : ''}${fmt(aa, 1)}° · target ${tgt.attack.label}` +
                (inBand(aa, tgt.attack) ? ' — inside it' : '') });
     }
     const path = avg(cs, 'clubPath');
     if (Number.isFinite(path) && n >= Metrics.MIN_SHOTS_DELIVERY) {
-      pills.push({ category: 'Club path', icon: '↗️', tone: NEUTRAL,
+      pills.push({ category: 'Club path', icon: 'progress', tone: NEUTRAL,
         value: `${path > 0 ? '+' : ''}${fmt(path, 1)}° ${path > 0.5 ? 'in-to-out' : path < -0.5 ? 'out-to-in' : 'neutral'}` });
     }
 
@@ -5103,13 +5103,13 @@ const SwingDNA = (() => {
     const spinShots = cs.filter(s => s.spinRate && Spin.measured(s));
     if (spinShots.length >= Metrics.MIN_SHOTS_REPORT) {
       const ds = avg(spinShots, 'spinRate');
-      pills.push({ category: 'Spin', icon: '🌀', tone: NEUTRAL,
+      pills.push({ category: 'Spin', icon: 'sync', tone: NEUTRAL,
         value: `${fmt(ds, 0)} rpm · published window ${tgt.spin.label} — measured, but never a prescription` });
     }
     const avgSC = avg(cs, 'sideCarry');
     if (Number.isFinite(avgSC)) {
       const dir = avgSC < -3 ? 'left of target' : avgSC > 3 ? 'right of target' : 'straight';
-      pills.push({ category: 'Where it finishes', icon: '↔️', tone: NEUTRAL,
+      pills.push({ category: 'Where it finishes', icon: 'target', tone: NEUTRAL,
         value: `${fmt(Math.abs(avgSC), 0)} yds ${dir} on average — a modelled figure, not a measurement` });
     }
 
@@ -5488,7 +5488,7 @@ const PracticePlan = (() => {
   function transferBlock(totalMin = 45) {
     return {
       name: 'Play the course',
-      icon: '⛳',
+      icon: 'flag',
       minutes: Math.max(5, Math.round(totalMin * 0.25)),
       balls: 12,
       drill: {
@@ -5774,7 +5774,7 @@ const SmartRecommendations = (() => {
           why: 'Ranked first because it expires. A probe can only be answered between a day and ' +
                `${RetentionProbe.MAX_GAP_DAYS} days after it opened, and whether a change held is the ` +
                'only efficacy evidence this app can produce.',
-          icon: '🔁', action: 'import', deadline: RetentionProbe.deadline(p),
+          icon: 'sync', action: 'import', deadline: RetentionProbe.deadline(p),
         };
       }
     } catch (_) {}
@@ -5789,7 +5789,7 @@ const SmartRecommendations = (() => {
       why: 'You have no sessions yet, and the best-evidenced intervention in the whole research base is a ' +
            'putting one — a single 20-putt session produced the published result. Import a CSV whenever you ' +
            'next hit balls.',
-      icon: '⛳', action: 'practice',
+      icon: 'flag', action: 'practice',
     };
 
     // 3. The on-course profile. Outcome data beats anything inferred from a
@@ -5803,7 +5803,7 @@ const SmartRecommendations = (() => {
               `${fmt(p.best.implied, 0)}. Progress shows what to do about it.`,
         why: 'Ranked above anything from the range because it is what actually happened on a course. A range ' +
              'fault is a hypothesis about your scoring; a category gap is your scoring.',
-        icon: '📉', action: 'progress',
+        icon: 'progress', action: 'progress',
       };
     } catch (_) {}
 
@@ -5842,7 +5842,7 @@ const SmartRecommendations = (() => {
             'a target width you set first.',
       why: 'Nothing recurred often enough to prescribe against, which is a real result. The block most ' +
            'golfers skip is the one closest to the game they are practising for.',
-      icon: '⛳', action: 'practice',
+      icon: 'target', action: 'practice',
     };
   }
 
@@ -6038,16 +6038,16 @@ const Features = (() => {
       const clubs = sortedClubs(all).length;
       const st = streak(sessions);
       const defs = [
-        { id:'first',   icon:'🌱', name:'First Steps',     desc:'Log your first session',      got: sessions.length >= 1 },
-        { id:'dozen',   icon:'📚', name:'Getting Serious',  desc:'Log 12 sessions',             got: sessions.length >= 12 },
-        { id:'century',  icon:'💯', name:'Century',          desc:'Log 100 shots total',         got: all.length >= 100 },
-        { id:'grand',   icon:'🎯', name:'Range Rat',        desc:'Log 1,000 shots total',       got: all.length >= 1000 },
-        { id:'bag',     icon:'🎒', name:'Full Bag',         desc:'Track 10+ different clubs',   got: clubs >= 10 },
-        { id:'streak3', icon:'🔥', name:'On a Roll',        desc:'3-day practice streak',       got: st.best >= 3 },
-        { id:'streak7', icon:'⚡', name:'Week Warrior',     desc:'7-day practice streak',       got: st.best >= 7 },
-        { id:'smash',   icon:'🥎', name:'Pure Contact',     desc:'Hit 1.45+ smash factor',      got: smash >= 1.45 },
-        { id:'bomb',    icon:'🚀', name:'Bomber',           desc:'250+ yard carry',             got: carry >= 250 },
-        { id:'speed',   icon:'💨', name:'Speed Demon',      desc:'170+ mph ball speed',         got: ball >= 170 },
+        { id:'first',   icon:'star', name:'First Steps',     desc:'Log your first session',      got: sessions.length >= 1 },
+        { id:'dozen',   icon:'star', name:'Getting Serious',  desc:'Log 12 sessions',             got: sessions.length >= 12 },
+        { id:'century',  icon:'star', name:'Century',          desc:'Log 100 shots total',         got: all.length >= 100 },
+        { id:'grand',   icon:'star', name:'Range Rat',        desc:'Log 1,000 shots total',       got: all.length >= 1000 },
+        { id:'bag',     icon:'star', name:'Full Bag',         desc:'Track 10+ different clubs',   got: clubs >= 10 },
+        { id:'streak3', icon:'star', name:'On a Roll',        desc:'3-day practice streak',       got: st.best >= 3 },
+        { id:'streak7', icon:'star', name:'Week Warrior',     desc:'7-day practice streak',       got: st.best >= 7 },
+        { id:'smash',   icon:'star', name:'Pure Contact',     desc:'Hit 1.45+ smash factor',      got: smash >= 1.45 },
+        { id:'bomb',    icon:'star', name:'Bomber',           desc:'250+ yard carry',             got: carry >= 250 },
+        { id:'speed',   icon:'star', name:'Speed Demon',      desc:'170+ mph ball speed',         got: ball >= 170 },
       ];
       const unlocked = defs.filter(d => d.got).length;
       return { defs, unlocked, total: defs.length };
@@ -6398,7 +6398,7 @@ function applyPaywall(el, cta) {
     <div class="paywall-wrap">
       <div class="paywall-blur" aria-hidden="true">${inner}</div>
       <div class="paywall-overlay">
-        <span class="paywall-lock">🔒</span>
+        <span class="paywall-lock">${icon('lock')}</span>
         <span class="paywall-msg">${cta || 'Sign in to unlock'}</span>
         <button class="btn-primary btn-sm paywall-btn">Sign In</button>
       </div>
@@ -6790,7 +6790,7 @@ const RangeCard = (() => {
              data-rc="jump" data-i="${i}" aria-label="Block ${i + 1}"></button>`).join('')}</div>
         <div class="rc-body">
           <div class="rc-step">Block ${_i + 1} of ${n}</div>
-          <div class="rc-name">${esc(b.icon || '')} ${esc(b.name)}</div>
+          <div class="rc-name">${b.icon ? icon(b.icon) + ' ' : ''}${esc(b.name)}</div>
           <div class="rc-count">${b.balls ? `${b.balls} balls` : ''}${b.balls && b.minutes ? ' · ' : ''}${b.minutes ? `${b.minutes} min` : ''}</div>
           <div class="rc-cue">
             <div class="rc-cue-name">${esc(cue.name)}</div>
@@ -6847,7 +6847,7 @@ const UI = (() => {
     const n = st.shown;
     el.hidden = false;
     el.innerHTML = `<div class="sync-warn">
-        <div class="sync-warn-head">⚠ Your cloud sessions did not load</div>
+        <div class="sync-warn-head">${icon('warn')} Your cloud sessions did not load</div>
         <p class="sync-warn-p">You are signed in, but this device could not reach the server, so you are
           looking at ${n} session${n === 1 ? '' : 's'} stored on this device — not your whole account.
           Everything below is calculated from those alone.</p>
@@ -6868,14 +6868,14 @@ const UI = (() => {
     // Render tip of the day
     try {
       const tips = [
-        '💡 Pro tip: Consistency matters more than distance. Focus on repeatable swings.',
-        '🎯 Track your practice: Use notes to reflect on what\'s working.',
-        '📊 Check your analytics: Understand your swing patterns.',
-        '🏆 Set a goal: Use the Goals feature to stay motivated.',
-        '🔥 Build a streak: Practice regularly to build momentum.',
-        '📚 Learn something new: Visit the Learning Library today.',
-        '🎨 Experiment: Try different clubs to find your strengths.',
-        '⚡ Quality over quantity: 20 focused shots beat 100 mindless ones.',
+        'Pro tip: Consistency matters more than distance. Focus on repeatable swings.',
+        'Track your practice: Use notes to reflect on what\'s working.',
+        'Check your analytics: Understand your swing patterns.',
+        'Set a goal: Use the Goals feature to stay motivated.',
+        'Build a streak: Practice regularly to build momentum.',
+        'Learn something new: Visit the Learning Library today.',
+        'Experiment: Try different clubs to find your strengths.',
+        'Quality over quantity: 20 focused shots beat 100 mindless ones.',
       ];
       const todayTip = tips[new Date().getDate() % tips.length];
       const tipHost = document.getElementById('tipHost');
@@ -6907,7 +6907,7 @@ const UI = (() => {
         const next = SmartRecommendations.getNextStep(sessions);
         nextHost.innerHTML = `
           <div class="drill-card next-step${next.deadline ? ' has-deadline' : ''}" data-route="${Sanitize.escape(next.action)}">
-            <div class="drill-icon">${next.icon}</div>
+            <div class="drill-icon">${icon(next.icon)}</div>
             <div class="drill-title">${Sanitize.escape(next.title)}</div>
             <div class="drill-desc">${Sanitize.escape(next.desc)}</div>
             ${next.deadline ? `<div class="next-deadline">${Sanitize.escape(next.deadline)}</div>` : ''}
@@ -6925,7 +6925,7 @@ const UI = (() => {
         if (insights.length) {
           insightHost.innerHTML = insights.map(i =>
             `<div style="padding:.7rem;background:rgba(0,112,243,.05);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
-              <span style="font-size:1rem;margin-right:.4rem">${i.icon}</span>${i.text}
+              <span style="font-size:1rem;margin-right:.4rem">${icon(i.icon)}</span>${i.text}
             </div>`
           ).join('');
         }
@@ -6941,7 +6941,7 @@ const UI = (() => {
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
             ${alerts.map(a => `
               <div style="padding:.8rem;background:${a.severity==='high'?'rgba(238,0,0,.06)':a.severity==='info'?'rgba(0,112,243,.06)':'rgba(0,112,243,.06)'};border-left:3px solid ${a.severity==='high'?'var(--red)':a.severity==='info'?'var(--accent)':'var(--accent)'};border-radius:var(--radius-sm)">
-                <div style="font-weight:600;margin-bottom:.3rem">${a.icon} ${a.title}</div>
+                <div style="font-weight:600;margin-bottom:.3rem">${icon(a.icon)} ${a.title}</div>
                 <div style="font-size:.9rem;color:var(--text-dim)">${a.message}</div>
               </div>
             `).join('')}
@@ -6977,7 +6977,7 @@ const UI = (() => {
                 </div>
               </div>
               <div style="font-size:.9rem;padding:.8rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);margin-bottom:.8rem">
-                <strong>💡 Focus:</strong> ${Sanitize.escape(coach.topFocus?.name || 'Nothing recurring')} — ${Sanitize.escape(coach.drillRecommendation)}
+                <strong>${icon('target')} Focus:</strong> ${Sanitize.escape(coach.topFocus?.name || 'Nothing recurring')} — ${Sanitize.escape(coach.drillRecommendation)}
               </div>
               <div style="font-size:.85rem;color:#a3e635;font-weight:600">${coach.motivationalMessage}</div>
             </div>` : '';
@@ -7011,25 +7011,25 @@ const UI = (() => {
 
     const streakHtml = st.current > 0
       ? `<div class="streak-chip ${st.active?'is-active':''}" title="Best: ${st.best} days">
-           <span class="streak-flame">🔥</span>
+           <span class="streak-flame">${icon('star')}</span>
            <span class="streak-n">${st.current}</span>
            <span class="streak-lbl">day${st.current>1?'s':''}<br>streak</span>
          </div>`
       : `<div class="streak-chip streak-dim" title="Practice today to start a streak">
-           <span class="streak-flame">🔥</span>
+           <span class="streak-flame">${icon('star')}</span>
            <span class="streak-lbl">Start a<br>streak today</span>
          </div>`;
 
     let focusHtml = '';
     if (fc && fc.clean) {
       focusHtml = `<div class="focus-card focus-clean">
-          <div class="focus-head"><span class="focus-icon">✅</span><span class="focus-kicker">Focus</span></div>
+          <div class="focus-head"><span class="focus-icon">${icon('check')}</span><span class="focus-kicker">Focus</span></div>
           <div class="focus-title">No fault clears the reporting bar right now</div>
           <div class="focus-sub">Your recent sessions are clean. Maintain your routine.</div>
         </div>`;
     } else if (fc) {
       focusHtml = `<div class="focus-card sev-${fc.severity}">
-          <div class="focus-head"><span class="focus-icon">${fc.icon||'🎯'}</span><span class="focus-kicker">Work on this</span>
+          <div class="focus-head"><span class="focus-icon">${icon(fc.icon || 'target')}</span><span class="focus-kicker">Work on this</span>
             <span class="focus-conf conf-${fc.confidence.toLowerCase()}">${fc.confidence} confidence</span></div>
           <div class="focus-title">${fc.name}</div>
           <div class="focus-sub">Seen in <strong>${fc.pct}%</strong> of your last ${fc.sample} shots.${fc.drill?` Try: <strong>${fc.drill.name}</strong>.`:''}</div>
@@ -7037,7 +7037,7 @@ const UI = (() => {
     }
 
     const achHtml = `<div class="ach-strip" id="achStrip" role="button" tabindex="0">
-        <span class="ach-trophy">🏆</span>
+        <span class="ach-trophy">${icon('star')}</span>
         <span class="ach-count">${ach.unlocked}/${ach.total}</span>
         <span class="ach-lbl">achievements</span>
         <span class="ach-go">View →</span>
@@ -7065,7 +7065,7 @@ const UI = (() => {
     document.getElementById('achHeadCount').textContent = `${ach.unlocked} of ${ach.total} unlocked`;
     body.innerHTML = ach.defs.map(d => `
       <div class="ach-item ${d.got?'got':'locked'}">
-        <span class="ach-item-icon">${d.got?d.icon:'🔒'}</span>
+        <span class="ach-item-icon">${icon(d.got ? d.icon : 'lock')}</span>
         <div class="ach-item-text">
           <div class="ach-item-name">${d.name}</div>
           <div class="ach-item-desc">${d.desc}</div>
@@ -7082,7 +7082,7 @@ const UI = (() => {
     if (document.getElementById('sessionSearch')) return; // already present
     const bar = document.createElement('div');
     bar.className = 'search-bar';
-    bar.innerHTML = `<span class="search-ico">🔎</span>
+    bar.innerHTML = `<span class="search-ico">${icon('search')}</span>
       <input id="sessionSearch" type="search" placeholder="Search sessions — date, club, notes…" autocomplete="off">`;
     const title = recent.querySelector('.recent-title');
     recent.insertBefore(bar, title ? title.nextSibling : recent.firstChild);
@@ -7162,7 +7162,7 @@ const UI = (() => {
         ${topBall?`<div class="dash-tile"><div class="dt-val">${topBall.value}<small>mph</small></div><div class="dt-label">Top ball speed</div></div>`:''}
         <div class="dash-tile wide clickable" data-goto-last="${last.id}">
           <div class="dt-label">Last session · ${formatDate(last.date)}</div>
-          <div class="dt-lastline">${topFault?`<span class="dt-fault">${topFault.icon} ${topFault.name}</span>`:'<span class="dt-clean">✅ No major faults — clean session</span>'}</div>
+          <div class="dt-lastline">${topFault?`<span class="dt-fault">${icon(topFault.icon)} ${topFault.name}</span>`:`<span class="dt-clean">${icon('check')} No major faults — clean session</span>`}</div>
           <div class="dt-cta">View report →</div>
         </div>
       </div>
@@ -7256,11 +7256,11 @@ const UI = (() => {
               })()}
               <div class="session-card-badges">
                 ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
-                ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${f.icon} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
+                ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${icon(f.icon)} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
               </div>
               <div style="display:flex;gap:.4rem;margin-top:.6rem;font-size:.8rem">
-                <button data-share="${s.id}" style="background:rgba(74,222,128,.15);border:none;color:#4ade80;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">📤 Share</button>
-                <button data-export="${s.id}" style="background:rgba(96,165,250,.15);border:none;color:#60a5fa;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">📊 Export</button>
+                <button data-share="${s.id}" style="background:rgba(74,222,128,.15);border:none;color:#4ade80;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('external')} Share</button>
+                <button data-export="${s.id}" style="background:rgba(96,165,250,.15);border:none;color:#60a5fa;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('import')} Export</button>
               </div>
             </div>
             <div style="text-align:right">
@@ -7644,7 +7644,7 @@ const UI = (() => {
     if (!ins) { el.innerHTML=''; return; }
     el.innerHTML = `
       <div class="insights-head">
-        <span class="insights-icon">🧠</span>
+        <span class="insights-icon">${icon('star')}</span>
         <span class="insights-title">Coach's Notes</span>
       </div>
       <div class="insights-cols">
@@ -7857,7 +7857,7 @@ const UI = (() => {
         <div class="plan-item severity-${p.severity||'low'}">
           <div class="plan-num">${i+1}</div>
           <div class="plan-body">
-            <div class="plan-head"><span>${p.icon} ${Sanitize.escape(p.name)}</span><span class="plan-min">${p.minutes} min · ${p.balls} balls</span></div>
+            <div class="plan-head"><span>${p.icon ? icon(p.icon) + ' ' : ''}${Sanitize.escape(p.name)}</span><span class="plan-min">${p.minutes} min · ${p.balls} balls</span></div>
             ${p.libraryDrill
               ? `<div class="plan-drill"><strong>${Sanitize.escape(p.libraryDrill.name)}:</strong>
                    ${Sanitize.escape(p.libraryDrill.desc)}</div>
@@ -8024,7 +8024,7 @@ const UI = (() => {
     const el = document.getElementById('swingDna');
     el.innerHTML = pills.map(p => `
       <div class="dna-pill tone-${p.tone}">
-        <span class="dna-icon">${p.icon}</span>
+        <span class="dna-icon">${icon(p.icon)}</span>
         <div class="dna-text">
           <div class="dna-cat">${p.category}</div>
           <div class="dna-val">${p.value}</div>
@@ -8166,8 +8166,8 @@ const UI = (() => {
         // the spin, so the ORDER of the clubs survives and the SIZE of the gap
         // between them does not. The carries stay, the verdict goes.
         const gapStatus = g === null ? '' : !gappingOK ? `<span style="color:var(--text-muted)">not on these balls</span>` :
-          g < 8  ? `<span style="color:var(--red)">⚠ Only ${fmt(g,0)} yds</span>` :
-          g > 25 ? `<span style="color:var(--yellow)">⚠ Big gap ${fmt(g,0)} yds</span>` :
+          g < 8  ? `<span style="color:var(--red)">${icon('warn')} Only ${fmt(g,0)} yds</span>` :
+          g > 25 ? `<span style="color:var(--yellow)">${icon('warn')} Big gap ${fmt(g,0)} yds</span>` :
                    `<span style="color:var(--green-light)">✓ ${fmt(g,0)} yds</span>`;
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(c)}"></span><strong>${clubLabel(c)}</strong></td>
@@ -8228,7 +8228,7 @@ const UI = (() => {
     const faults = FaultEngine.detectFaults(shots, session);
     const el = document.getElementById('faultList');
     if (!faults.length) {
-      el.innerHTML=`<div class="no-faults">✅ No faults detected in this selection. Keep it up!</div>`; return;
+      el.innerHTML=`<div class="no-faults">${icon('check')} No faults detected in this selection. Keep it up!</div>`; return;
     }
 
     const cats = [...new Set(faults.map(f=>f.category))];
@@ -8241,7 +8241,7 @@ const UI = (() => {
             <div class="fault-card severity-${f.severity}" data-fault="${f.id}">
               <div class="fault-header">
                 <div class="fault-header-left">
-                  <span class="fault-icon">${f.icon}</span>
+                  <span class="fault-icon">${icon(f.icon)}</span>
                   <div>
                     <div class="fault-name">${f.name}</div>
                     <div class="fault-count">${f.count} of ${f.total} shots affected</div>
@@ -8273,7 +8273,7 @@ const UI = (() => {
                   const { checkable, feel } = FaultEngine.splitDrills(f.drills);
                   const card = d => `
                     <div class="drill-card">
-                      <div class="drill-name">💡 ${Sanitize.escape(d.name)}</div>
+                      <div class="drill-name">${icon('target')} ${Sanitize.escape(d.name)}</div>
                       <div class="drill-desc">${Sanitize.escape(d.desc)}</div>
                     </div>`;
                   return (checkable.length ? `
@@ -8522,8 +8522,8 @@ const UI = (() => {
       <table class="sm-table">${rows.map(([k,v,c])=>`<tr><td class="sm-k">${k}</td><td class="sm-v">${v}</td><td class="sm-c">${c}</td></tr>`).join('')}</table>
       ${faults.length ? `
         <div class="sm-faults-title">Faults on this shot</div>
-        ${faults.map(f=>`<div class="sm-fault severity-${f.severity}">${f.icon} ${f.name}</div>`).join('')}
-      ` : `<div class="sm-clean">✅ No faults flagged on this shot</div>`}`;
+        ${faults.map(f=>`<div class="sm-fault severity-${f.severity}">${icon(f.icon)} ${f.name}</div>`).join('')}
+      ` : `<div class="sm-clean">${icon('check')} No faults flagged on this shot</div>`}`;
 
     modal.hidden = false;
   }
@@ -8575,7 +8575,7 @@ const UI = (() => {
       if (drillHost) {
         const widest = book.filter(b => b.enough && b.cv != null).sort((a,b) => b.cv - a.cv)[0];
         if (!widest) {
-          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill focus</h3>
+          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h3>
             <div class="tail-note">No club has reached ${Metrics.MIN_SHOTS_REPORT} shots in these conditions
             yet, so nothing here is your widest. That is the answer rather than a gap in the app.</div>`;
         } else {
@@ -8583,7 +8583,7 @@ const UI = (() => {
           const rows = DrillLibrary.forSection('A',
             { shots: clubShots, clubType: widest.club, sessions: used.length });
           const pick = rows.filter(r => r.ok)[0];
-          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">🎯 Drill focus</h3>
+          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h3>
             <div class="drill-card" data-route="practice">
               <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(widest.club)}"></div>
               <div class="drill-title">${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
@@ -8729,7 +8729,7 @@ const UI = (() => {
       if (alertsHost) {
         const alerts = Features.performanceAlerts(sessions);
         if (alerts.length) {
-          alertsHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">⚡ Alerts</div>' + alerts.map(a =>
+          alertsHost.innerHTML = `<div class="section-title" style="margin-bottom:.8rem">${icon('warn')} Alerts</div>` + alerts.map(a =>
             `<div class="alert-item ${a.type}">${a.msg}</div>`
           ).join('');
         } else {
@@ -8745,7 +8745,7 @@ const UI = (() => {
         const progress = Features.goalProgress(sessions);
         if (Object.keys(progress).length) {
           const metricLabels = { carry: 'Longest Carry', ball_speed: 'Ball Speed', smash: 'Smash', score: 'Form Score', sessions: 'Sessions' };
-          goalsHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">🎯 Goals</div>' + Object.entries(progress).map(([m, p]) =>
+          goalsHost.innerHTML = `<div class="section-title" style="margin-bottom:.8rem">${icon('target')} Goals</div>` + Object.entries(progress).map(([m, p]) =>
             `<div class="goal-item">
               <div>
                 <div class="goal-metric">${metricLabels[m]}</div>
@@ -8766,7 +8766,7 @@ const UI = (() => {
       if (benchHost) {
         const benches = Features.benchmarks(sessions);
         if (Object.keys(benches).length) {
-          benchHost.innerHTML = '<div class="section-title" style="margin-bottom:.8rem">📊 Club Benchmarks</div>' +
+          benchHost.innerHTML = `<div class="section-title" style="margin-bottom:.8rem">${icon('progress')} Club Benchmarks</div>` +
             '<table class="benchmark-table"><thead><tr><th>Club</th><th>Avg Carry</th><th>Shots</th></tr></thead><tbody>' +
             Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.avg} yds</td><td>${b.count}</td></tr>`).join('') +
             '</tbody></table>';
@@ -9268,7 +9268,7 @@ const UI = (() => {
         exercise rather than practice.</div>` +
       plan.map(p => `
       <div class="drill-card" style="padding:1rem">
-        <div style="font-size:1.6rem;margin-bottom:.3rem">${p.icon || '&#9971;'}</div>
+        <div style="font-size:1.6rem;margin-bottom:.3rem">${icon(p.icon || 'flag')}</div>
         <div class="drill-title" style="font-size:.9rem">${esc(p.name)}</div>
         <div class="drill-time" style="margin-top:.4rem">${p.minutes} min &middot; ${p.balls} balls</div>
         <div style="font-size:.75rem;line-height:1.4;color:var(--text-dim);margin-top:.5rem">
@@ -10132,7 +10132,7 @@ async function init() {
           ${res.skipped ? `${res.skipped} already here and untouched. ` : ''}
           ${res.failed ? `${res.failed} could not be written — see the console.` : ''}</div>`;
         pending = null;
-        toast(`📥 Restored ${res.saved} session${res.saved === 1 ? '' : 's'}`);
+        toast(`Restored ${res.saved} session${res.saved === 1 ? '' : 's'}`);
         try { await Router.showSessions(); } catch (_) {}
       });
     });
@@ -10143,7 +10143,7 @@ async function init() {
     const user = Auth.getUser();
     if (!user) { toast('Sign in first'); return; }
     showConfirm(
-      '⚠️ Delete account & all data?',
+      'Delete account & all data?',
       `Your account (${user.email}) and ALL sessions will be permanently deleted. This cannot be undone.`,
       async ()=>{
         try {
@@ -10183,17 +10183,17 @@ async function init() {
     modal.innerHTML = `
       <div class="modal modal-wide">
         <div class="modal-head">
-          <h2 class="modal-title">📋 Your Data & Rights</h2>
+          <h2 class="modal-title">${icon('sessions')} Your Data &amp; Rights</h2>
           <button class="btn-icon" data-close-modal>✕</button>
         </div>
         <div style="padding:1.2rem;color:var(--text)">
           <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
           <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
-            <strong>✅ Right to Access</strong><br>
+            <strong>${icon('check')} Right to Access</strong><br>
             Click "Export all data" below to download your sessions as JSON or CSV.
           </div>
           <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
-            <strong>✅ Right to Delete</strong><br>
+            <strong>${icon('check')} Right to Delete</strong><br>
             ${user ? `
               Click "Delete my account & data" in Account section above to permanently delete your account and all sessions.
             ` : `
@@ -10201,20 +10201,20 @@ async function init() {
             `}
           </div>
           <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
-            <strong>✅ Right to Portability</strong><br>
+            <strong>${icon('check')} Right to Portability</strong><br>
             Your data is yours. Export it anytime using "Export all data" button in Data & Export section.
           </div>
           <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
-            <strong>✅ Right to Object</strong><br>
+            <strong>${icon('check')} Right to Object</strong><br>
             ${user ? `You can request to opt-out. Email us with your account (${user.email}).` : `Email us to opt-out of data processing.`}
           </div>
 
           <h3 style="margin-top:2rem">What Data Do We Have?</h3>
           <ul style="margin:1rem 0;padding-left:1.5rem">
-            <li>📧 Email: <strong>${user?.email || 'Not logged in'}</strong></li>
-            <li>🏌️ Golf sessions: Your Rapsodo data (clubs, metrics, notes)</li>
-            <li>⚙️ Preferences: Theme, goals, ratings (local only)</li>
-            <li>📅 Timestamp: When you created your account & sessions</li>
+            <li>Email: <strong>${user?.email || 'Not logged in'}</strong></li>
+            <li>Golf sessions: Your Rapsodo data (clubs, metrics, notes)</li>
+            <li>Preferences: Theme, goals, ratings (local only)</li>
+            <li>Timestamp: When you created your account & sessions</li>
           </ul>
 
           <h3 style="margin-top:2rem">How to Delete Everything</h3>
@@ -10237,18 +10237,18 @@ async function init() {
 
           <h3 style="margin-top:2rem">What Gets Deleted?</h3>
           <ul style="margin:1rem 0;padding-left:1.5rem;color:var(--text-dim)">
-            <li>✅ All sessions & golf data</li>
-            <li>✅ Your account & email</li>
-            <li>✅ Goals & preferences</li>
-            <li>✅ Any stored backups (within 30 days)</li>
+            <li>${icon('check')} All sessions &amp; golf data</li>
+            <li>${icon('check')} Your account &amp; email</li>
+            <li>${icon('check')} Goals &amp; preferences</li>
+            <li>${icon('check')} Any stored backups (within 30 days)</li>
           </ul>
 
           <div style="background:rgba(220,38,38,.1);border-left:3px solid #dc2626;padding:1rem;margin-top:2rem;border-radius:var(--radius-sm)">
-            <strong style="color:#dc2626">⚠️ This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
+            <strong style="color:#dc2626">${icon('warn')} This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
           </div>
 
           <button class="btn-primary" data-export-close style="width:100%;margin-top:1.5rem">
-            📥 Export My Data First (Recommended)
+            ${icon('import')} Export My Data First (Recommended)
           </button>
           <button class="btn-danger" data-close-modal style="width:100%;margin-top:.6rem">
             Close
@@ -10262,7 +10262,7 @@ async function init() {
 
   document.getElementById('clearDataBtn').addEventListener('click', ()=>{
     showConfirm(
-      '🗑️ Clear all local data?',
+      'Clear all local data?',
       'This removes all sessions from your device. Your account stays active. If signed in, data will re-sync from the cloud on next visit.',
       async ()=>{
         try {
@@ -10287,7 +10287,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            📊 Advanced Analytics
+            ${icon('progress')} Advanced Analytics
             <button data-close="analyticsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:1rem">
@@ -10364,7 +10364,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
-            📊 Where you sit
+            ${icon('progress')} Where you sit
             <button data-close="benchmarkModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
@@ -10420,7 +10420,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
-            📚 What you can work on
+            ${icon('book')} What you can work on
             <button data-close="learningModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
@@ -10454,7 +10454,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            🏌️ Club Performance Analysis
+            ${icon('bag')} Club Performance Analysis
             <button data-close="clubModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
@@ -10479,7 +10479,7 @@ async function init() {
                     <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
                   </div>
                 </div>
-                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('📈') ? '#4ade80' : c.trend.label.startsWith('📉') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
+                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? '#4ade80' : c.trend.label.startsWith('↓') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
               </div>
             `).join('')}
           </div>
@@ -10501,7 +10501,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
-            ⚡ How you practised
+            ${icon('target')} How you practised
             <button data-close="efficiencyModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">Your last session, read off the order you hit in</div>
@@ -10714,7 +10714,7 @@ async function init() {
       <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            ⌨️ Keyboard Shortcuts
+            Keyboard Shortcuts
             <button data-close="shortcutsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
@@ -10884,7 +10884,7 @@ async function init() {
     await renderGoals();
     document.getElementById('goalMetric').value = '';
     document.getElementById('goalTarget').value = '';
-    toast('Goal set! 🎯');
+    toast('Goal set!');
   });
 
   await renderGoals();
@@ -10939,7 +10939,7 @@ async function init() {
   // Initialize responsive UX enhancements
 
   // Show welcome message with tips
-  console.log('%cWelcome to ShotLab v3.0 🏌️', 'font-size:16px;font-weight:bold;color:#0070f3');
+  console.log('%cWelcome to ShotLab v3.0', 'font-size:16px;font-weight:bold;color:#0070f3');
   console.log('%cPress Ctrl+? for keyboard shortcuts', 'font-size:12px;color:#888888');
 }
 
@@ -10959,8 +10959,7 @@ function showFatalError(err) {
       'align-items:center;justify-content:center;padding:2rem;font-family:system-ui,sans-serif';
     el.innerHTML =
       '<div style="max-width:340px;text-align:center">' +
-      '<div style="font-size:2.5rem;margin-bottom:.5rem">⛳</div>' +
-      '<h2 style="font-size:1.2rem;color:#171717;margin-bottom:.5rem">Something hiccuped</h2>' +
+            '<h2 style="font-size:1.2rem;color:#171717;margin-bottom:.5rem">Something hiccuped</h2>' +
       '<p style="color:#4d4d4d;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
       'The app hit an unexpected snag while loading. Your saved data is safe.</p>' +
       '<button id="slReload" style="background:#171717;color:#fff;border:none;border-radius:6px;' +
@@ -11028,7 +11027,7 @@ const InsightEngine = (() => {
         const surf = Conditions.surface(sn);
         return surf.id === 'unknown' ? ball : `${ball} off ${surf.label.toLowerCase()}`;
       };
-      out.push({ icon: '🔄', type: 'info',
+      out.push({ icon: 'sync', type: 'info',
         text: `This session was ${where(latest)}, your last was ${where(prior)} — ` +
               `distances and spread do not compare across that.` });
     }
@@ -11041,10 +11040,10 @@ const InsightEngine = (() => {
         const carries = shots.filter(s => s.clubType === club).map(s => s.carryDistance);
         const cs = consistencyScore(carries);
         if (cs !== null && cs >= 90) {
-          out.push({ icon: '🎯', type: 'positive',
+          out.push({ icon: 'target', type: 'positive',
             text: `Your ${clubLabel(club)} is repeating well — ${cs}% over ${n} shots. That is a distance you can club off.` });
         } else if (cs !== null && cs <= 65) {
-          out.push({ icon: '📏', type: 'warning',
+          out.push({ icon: 'warn', type: 'warning',
             text: `Your ${clubLabel(club)} carry is spread wide over ${n} shots (${cs}%). ` +
                   `Strike quality is the usual reason, and it is the one thing here the device measures directly.` });
         }
@@ -11056,7 +11055,7 @@ const InsightEngine = (() => {
     try {
       const st = Features.streak(sessions);
       if (st.current >= 3) {
-        out.push({ icon: '🔥', type: 'positive',
+        out.push({ icon: 'star', type: 'positive',
           text: `${st.current} days in a row${st.best > st.current ? ` — your best is ${st.best}` : ', which is your best run yet'}.` });
       }
     } catch (_) {}
@@ -11069,7 +11068,7 @@ const InsightEngine = (() => {
     if (others.length >= 2) {
       const usual = others.reduce((a, b) => a + b, 0) / others.length;
       if (latest.shots.length > usual * 1.4) {
-        out.push({ icon: '🧺', type: 'info',
+        out.push({ icon: 'bag', type: 'info',
           text: `${latest.shots.length} shots this session against your usual ${Math.round(usual)}. ` +
                 `Worth knowing when you read the numbers below — a long session is a different sample, not a better one.` });
       }
@@ -11104,47 +11103,47 @@ const CoachingMode = (() => {
   // nothing to apply.)
   const TIPS = {
     'Slice': [
-      '⛳ Start line: pick a target 20 yards out and try to start the ball just right of it — let the curve bring it back',
-      '🕳️ Headcover gate: put a headcover a foot outside the ball and swing so the club misses it coming down',
-      '🎯 Toe-over-heel: feel the toe of the club pass the heel through the ball, like closing a door',
-      '🪵 Grip end first: from the top, the butt of the club should point down at the ball line before the head starts toward it',
+      'Start line: pick a target 20 yards out and try to start the ball just right of it — let the curve bring it back',
+      'Headcover gate: put a headcover a foot outside the ball and swing so the club misses it coming down',
+      'Toe-over-heel: feel the toe of the club pass the heel through the ball, like closing a door',
+      'Grip end first: from the top, the butt of the club should point down at the ball line before the head starts toward it',
     ],
     'Hook': [
-      '⛳ Start line: aim to start the ball left of target and hold the face there through the finish',
-      '🖐️ Grip check: at address, count 2 knuckles on the lead hand — not 3',
-      '🏌️ Finish tall: swing to a full high finish with the club pointing at the sky behind you',
-      '🎯 Chest to target: turn the shirt logo to face the target at the finish rather than letting the hands roll',
+      'Start line: aim to start the ball left of target and hold the face there through the finish',
+      'Grip check: at address, count 2 knuckles on the lead hand — not 3',
+      'Finish tall: swing to a full high finish with the club pointing at the sky behind you',
+      'Chest to target: turn the shirt logo to face the target at the finish rather than letting the hands roll',
     ],
     'Thin': [
-      '🪙 Coin drill: put a coin 3 inches in front of the ball and try to take turf where the coin is',
-      '🧺 Towel behind: lay a towel 4 inches behind the ball and miss it on the way down',
-      '⛳ Low point: try to bruise the grass in FRONT of the ball, not under it',
-      '🌱 Off grass, not a mat: a mat lets a thin strike slide into the ball and still look fine — hit these off turf so the strike tells you the truth',
+      'Coin drill: put a coin 3 inches in front of the ball and try to take turf where the coin is',
+      'Towel behind: lay a towel 4 inches behind the ball and miss it on the way down',
+      'Low point: try to bruise the grass in FRONT of the ball, not under it',
+      'Off grass, not a mat: a mat lets a thin strike slide into the ball and still look fine — hit these off turf so the strike tells you the truth',
     ],
     'Fat': [
-      '📐 Ball back a touch: move the ball one ball-width back and watch whether the turf mark moves in front of it',
-      '🧺 Towel behind: same towel 4 inches behind the ball — hitting it is the fault, missing it is the fix',
-      '⛳ Turf mark: hit 10 shots and look only at where the turf is scuffed; aim to move that mark forward each time',
-      '🚶 Step-through: after impact, walk through toward the target so the finish is on the lead side',
+      'Ball back a touch: move the ball one ball-width back and watch whether the turf mark moves in front of it',
+      'Towel behind: same towel 4 inches behind the ball — hitting it is the fault, missing it is the fix',
+      'Turf mark: hit 10 shots and look only at where the turf is scuffed; aim to move that mark forward each time',
+      'Step-through: after impact, walk through toward the target so the finish is on the lead side',
     ],
     'Adding Loft Through Impact': [
-      '🚧 Under the bar: keep the ball under an imagined bar 10 feet high, 20 yards ahead',
-      '✋ Short finish: stop the club at chest height on the way through instead of swinging to a full finish',
-      '🧺 Towel behind: miss a towel 4 inches behind the ball and take turf in front of it',
-      '⛳ Flight window: pick a lower window than feels natural and try to fly the ball through it',
+      'Under the bar: keep the ball under an imagined bar 10 feet high, 20 yards ahead',
+      'Short finish: stop the club at chest height on the way through instead of swinging to a full finish',
+      'Towel behind: miss a towel 4 inches behind the ball and take turf in front of it',
+      'Flight window: pick a lower window than feels natural and try to fly the ball through it',
     ],
     'Delofting Too Much (Irons)': [
-      '🎈 High window: pick a target window twice as high as normal and fly the ball through it',
-      '⛳ Ladder: hit 3 low, 3 stock, 3 high with the same club, repeating',
-      '🏌️ Club passes hands: feel the clubhead overtake the hands after the ball, into a full finish',
-      '📍 Ball forward: move the ball one ball-width forward and note the flight change',
+      'High window: pick a target window twice as high as normal and fly the ball through it',
+      'Ladder: hit 3 low, 3 stock, 3 high with the same club, repeating',
+      'Club passes hands: feel the clubhead overtake the hands after the ball, into a full finish',
+      'Ball forward: move the ball one ball-width forward and note the flight change',
     ],
   };
 
   const GENERIC = [
-    '⛳ Pick a specific target for every ball — a flag, a post, a distinct patch of grass',
-    '🎬 Film one swing per session from down the line, phone on the ground behind the ball',
-    '⏱️ Leave 20+ seconds between shots — faster than that is exercise, not practice',
+    'Pick a specific target for every ball — a flag, a post, a distinct patch of grass',
+    'Film one swing per session from down the line, phone on the ground behind the ball',
+    'Leave 20+ seconds between shots — faster than that is exercise, not practice',
     '1️⃣ One cue per session. A second cue halves the value of the first',
   ];
 
@@ -11238,7 +11237,7 @@ const SessionSnapshot = (() => {
       ? `${snapshot.club} carry: ${fmt(snapshot.carry.mean,0)} ± ${fmt(snapshot.carry.ci,0)} yds ` +
         `(${snapshot.carry.n} shots)\n`
       : `No club reached ${Metrics.MIN_SHOTS_REPORT} shots, so no carry figure\n`;
-    return `📊 ShotLab Session Summary\n\n` +
+    return `ShotLab Session Summary\n\n` +
       `Date: ${snapshot.date}\n` +
       `Score: ${snapshot.formScore}/100 (${snapshot.grade})\n` +
       `Shots: ${snapshot.shotCount}\n` +
@@ -11246,7 +11245,7 @@ const SessionSnapshot = (() => {
       `Ball: ${snapshot.ballLabel}${snapshot.gappingValid ? '' : ' — distances are indicative only'}\n` +
       `Top Issue: ${snapshot.topFault}\n` +
       `\n${snapshot.summary}\n\n` +
-      `Tracked with ShotLab 🎯`;
+      `Tracked with ShotLab`;
   }
 
   return { create, toShareText };
@@ -11310,7 +11309,7 @@ const SessionSharing = (() => {
 
   function copyToClipboard(text) {
     return navigator.clipboard.writeText(text).then(() => {
-      toast('📋 Copied to clipboard!');
+      toast('Copied to clipboard!');
       return true;
     }).catch(() => {
       toast('Unable to copy. Try manual copy.');
@@ -11329,7 +11328,7 @@ const SessionSharing = (() => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast('📥 Downloaded backup!');
+    toast('Downloaded backup!');
   }
 
   // RFC 4180 quoting. Session notes are free text, and neither of the two CSV
@@ -11486,11 +11485,11 @@ const PersonalCoach = (() => {
   // this reason: something that changes when you look at it is not a reading.
   function getGreeting(sessions) {
     const greetings = [
-      '🎯 Ready to improve your game?',
-      '⛳ Let\'s work on your consistency!',
-      '🚀 Time to level up your swing.',
-      '💪 Keep grinding — you\'re getting better!',
-      '📈 Progress is the priority.',
+      'Ready to improve your game?',
+      'Let\'s work on your consistency!',
+      'Time to level up your swing.',
+      'Keep grinding — you\'re getting better!',
+      'Progress is the priority.',
     ];
     const key = String((sessions && sessions[0] && (sessions[0].id || sessions[0].date)) || '');
     let h = 0;
@@ -11512,10 +11511,10 @@ const PersonalCoach = (() => {
     // meant to be spread out. Hence "varied", not "inconsistent".
     const consistency = consistencyScore(shots.map(s => s.carryDistance));
     if (consistency === null) return 'Not enough carry data yet to say anything about your spread.';
-    if (consistency > 85) return '🌟 Very tight distance grouping across these sessions.';
-    if (consistency > 70) return '✅ Reasonably tight grouping. Worth checking club by club.';
-    if (consistency > 50) return '📊 A varied set of sessions — expected if you worked through the bag.';
-    return '🔧 Widely varied distances. Look club by club before reading anything into it.';
+    if (consistency > 85) return 'Very tight distance grouping across these sessions.';
+    if (consistency > 70) return 'Reasonably tight grouping. Worth checking club by club.';
+    if (consistency > 50) return 'A varied set of sessions — expected if you worked through the bag.';
+    return 'Widely varied distances. Look club by club before reading anything into it.';
   }
 
   // The drill comes from the gated library, not from here. This module kept a
@@ -11542,11 +11541,11 @@ const PersonalCoach = (() => {
     if (!grade) return 'Start by importing your first session!';
 
     const messages = {
-      'A': '🏆 Top tier! You\'re mastering this. Push toward consistency at the highest level.',
-      'B': '👏 Strong performance! You\'re in the zone. Maintain this trajectory.',
-      'C': '💯 Good foundation. A few focused improvements will unlock your next level.',
-      'D': '📈 You\'re building skills. Every session teaches you something.',
-      'F': '🎯 Every pro started here. Focus on one thing and watch your improvement.',
+      'A': 'Top tier! You\'re mastering this. Push toward consistency at the highest level.',
+      'B': 'Strong performance! You\'re in the zone. Maintain this trajectory.',
+      'C': 'Good foundation. A few focused improvements will unlock your next level.',
+      'D': 'You\'re building skills. Every session teaches you something.',
+      'F': 'Every pro started here. Focus on one thing and watch your improvement.',
     };
 
     return messages[grade.grade] || 'Keep practicing — progress takes time!';
@@ -11664,9 +11663,9 @@ const AnalyticsHub = (() => {
     const lastAvg = last3.reduce((a,b)=>a+b,0) / last3.length;
     const change = lastAvg - firstAvg;
 
-    if (change > 5) return '📈 Strong improvement';
-    if (change > 0) return '📊 Slight improvement';
-    if (change < -5) return '📉 Needs attention';
+    if (change > 5) return '↑ Strong improvement';
+    if (change > 0) return '→ Slight improvement';
+    if (change < -5) return '↓ Needs attention';
     return '→ Staying consistent';
   }
 
@@ -11811,8 +11810,8 @@ const CommunityInsights = (() => {
 // LearningPath — Personalized improvement curriculum
 // ════════════════════════════════════════════════════════════════
 const LearningPath = (() => {
-  // What was here promised a curriculum that does not exist: "⛳ Fundamentals —
-  // 6 lessons", "🔄 The Swing — 8 lessons", with `status: 'locked'` badges on
+  // What was here promised a curriculum that does not exist: "Fundamentals —
+  // 6 lessons", "The Swing — 8 lessons", with `status: 'locked'` badges on
   // modules that would never unlock, because there are no lessons anywhere in
   // this app and never have been. Tapping one did nothing, by necessity.
   //
@@ -11919,7 +11918,7 @@ const PerformanceAlerts = (() => {
       if (f) {
         const tentative = f.confidence === 'tentative';
         alerts.push({
-          icon: tentative ? '🟠' : '🔴',
+          icon: 'warn',
           severity: tentative ? 'info' : 'high',
           title: f.name,
           message: `${f.count} of ${f.total} ${clubLabel(f.clubType || latest.shots[0]?.clubType)} shots ` +
@@ -11935,7 +11934,7 @@ const PerformanceAlerts = (() => {
     try {
       const st = Features.streak(sessions);
       if (st.current > 3 && st.current % 5 === 0) {
-        alerts.push({ icon: '🔥', severity: 'info', title: 'Streak milestone',
+        alerts.push({ icon: 'star', severity: 'info', title: 'Streak milestone',
           message: `${st.current} days in a row.` });
       }
     } catch (_) {}
@@ -11943,7 +11942,7 @@ const PerformanceAlerts = (() => {
     // Nothing logged in a while. Also not a measurement claim.
     const days = Math.floor((Date.now() - new Date(latest.date).getTime()) / 864e5);
     if (days >= 7) {
-      alerts.push({ icon: '📅', severity: 'info', title: 'Nothing logged in a while',
+      alerts.push({ icon: 'progress', severity: 'info', title: 'Nothing logged in a while',
         message: `${days} days since your last session. The short-game work in Practice needs no launch monitor.` });
     }
 
@@ -12001,7 +12000,7 @@ const ClubAnalyzer = (() => {
 
   // This compared the first three shots of a FLATTENED array against shots
   // four to six of it — not a chronology, just wherever `flatMap` happened to
-  // put them — and called a 3-yard difference "📈 Improving", in green. The
+  // put them — and called a 3-yard difference "Improving", in green. The
   // minimum detectable change for carry is 13 yards at ten shots
   // (`Metrics.MDC_N10`), so the threshold was a quarter of the smallest change
   // the device can resolve, off a sixth of the shots.
@@ -12027,7 +12026,7 @@ const ClubAnalyzer = (() => {
                                    same.map(x => x), clubType);
     if (v.real === null) return { label: '→ Not enough history to judge', real: false, note: v.note };
     if (!v.real) return { label: `→ Inside your own spread (±${fmt(v.threshold, 0)} yds)`, real: false };
-    return { label: delta > 0 ? `📈 +${fmt(delta, 0)} yds` : `📉 ${fmt(delta, 0)} yds`,
+    return { label: delta > 0 ? `+${fmt(delta, 0)} yds` : `${fmt(delta, 0)} yds`,
              real: true, delta };
   }
 
@@ -12183,7 +12182,7 @@ const EnhancedMetricsWidget = (() => {
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">CONSISTENCY</div>
         </div>
         <div style="padding:1rem;background:rgba(251,146,60,.1);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2rem;font-weight:800;color:#fb923c">🔥 ${stats.streak}</div>
+          <div style="font-size:2rem;font-weight:800;color:#fb923c">${stats.streak}</div>
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">DAY STREAK</div>
         </div>
       </div>`;
