@@ -98,11 +98,50 @@ a  { color: var(--accent); text-decoration: none; }
   h2 { font-size: 1.05rem; }
 }
 
+/* ── Layout primitives (spec §7.1) ─────────────────────────────────────
+   Small, composable, var()-driven. These replaced the 35 inline style=""
+   blocks in index.html: an inline style cannot be re-themed, cannot answer
+   a media query, and is invisible to every check that reads the stylesheet.
+   No component styling belongs in here. */
+.pad     { padding-inline: var(--s4); }
+.pad-y   { padding-block: var(--s4); }
+.pad-b   { padding-bottom: var(--s4); }
+.stack > * + * { margin-top: var(--gap, var(--s4)); }
+.cluster { display: flex; flex-wrap: wrap; gap: var(--gap, var(--s2)); align-items: center; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--col, 160px), 1fr));
+  gap: var(--gap, var(--s3));
+}
+/* A link sitting inside a paragraph of body text. */
+.link-inline { color: var(--accent); font-weight: 600; text-decoration: none; }
+.link-inline:hover { text-decoration: underline; }
+/* Explanatory copy under a view heading. */
+.view-lede { color: var(--text-muted); font-size: .9rem; margin-bottom: var(--s5); }
+/* The no-JS fallback. It has to stand on its own — nothing has run. */
+.noscript-note { padding: var(--s6) var(--s5); text-align: center; }
+
+/* Vertical rhythm, on the scale rather than in a style attribute. */
+.mt-2 { margin-top: var(--s2); }
+.mt-3 { margin-top: var(--s3); }
+.mt-4 { margin-top: var(--s4); }
+.mt-6 { margin-top: var(--s6); }
+.mb-2 { margin-bottom: var(--s2); }
+.mb-3 { margin-bottom: var(--s3); }
+.mb-4 { margin-bottom: var(--s4); }
+.mb-5 { margin-bottom: var(--s5); }
+.mb-6 { margin-bottom: var(--s6); }
+.w-full { width: 100%; }
+
 /* ── Icons — inline SVG sprite (spec §6.1) ─────────────────────────────
    1em square so an icon inherits the size of the text it sits beside;
    currentColor so it inherits the colour too. Squared caps/joins to match
    the chamfer. Set on the element, not the symbol, so a single sprite can
    be tinted per site. */
+/* The sprite itself: zero-sized and out of flow. width/height="0" on the
+   element already collapses it; this keeps it out of flow too. */
+.icon-sprite { position: absolute; }
 .icon {
   width: 1em; height: 1em; display: inline-block;
   vertical-align: -.125em; flex: none;
@@ -353,7 +392,8 @@ button:disabled, button[disabled] {
 .form-group { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
 .form-group label { font-size: .72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; }
 .label-opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
-.form-group input, .form-group textarea, .form-group select {
+.form-group input, .form-group textarea, .form-group select,
+.input, .select {
   background: var(--surface); border: 1.5px solid var(--border-hi);
   border-radius: var(--radius-sm); color: var(--text);
   /* 16px, not .9rem. Safari on iOS zooms the whole page when a focused field is
@@ -364,7 +404,8 @@ button:disabled, button[disabled] {
   max-width: 100%;
   transition: border-color .15s, box-shadow .15s;
 }
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus,
+.input:focus, .select:focus {
   border-color: var(--pine); box-shadow: 0 0 0 3px rgba(220,38,38,.08);
 }
 /* A grid item's default `min-width: auto` means it refuses to shrink below its
@@ -701,6 +742,7 @@ tr:hover td { background: var(--surface2); }
   padding: .9rem 1rem; background: none; color: var(--text); text-align: left;
   border-top: 1px solid var(--border); font-size: .875rem; transition: background .15s;
 }
+.settings-row { cursor: pointer; }
 .settings-row:first-of-type { border-top: none; }
 .settings-row:not(.static):hover { background: var(--surface2); }
 .settings-row.static { cursor: default; }

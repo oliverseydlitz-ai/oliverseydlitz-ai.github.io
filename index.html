@@ -78,7 +78,7 @@
 <body>
 
 <!-- ═══════════════════ ICON SPRITE (spec §6.1/§6.2 — inline, CSP-safe, no icon font) -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<svg class="icon-sprite" width="0" height="0" aria-hidden="true" focusable="false">
   <symbol id="i-sessions" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
   <symbol id="i-bag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter"><path d="M7 8h10v13H7zM10 8V4h4v4M7 12h10"/></symbol>
   <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter"><path d="M12 3v11M8 10l4 4 4-4M4 20h16"/></symbol>
@@ -104,7 +104,7 @@
 </svg>
 
 <noscript>
-  <div style="padding:2rem;text-align:center;font-family:sans-serif">
+  <div class="noscript-note">
     <h1>ShotLab needs JavaScript</h1>
     <p>Please enable JavaScript to analyze your golf swing data.</p>
   </div>
@@ -133,8 +133,8 @@
   <!-- ── Sessions ────────────────────────── -->
   <section class="view active" id="view-sessions">
     <!-- Tip of the day + headline metrics (replaced each render) -->
-    <div id="tipHost" style="padding:0 1rem"></div>
-    <div id="metricsWidgetHost" style="padding:0 1rem"></div>
+    <div id="tipHost" class="pad"></div>
+    <div id="metricsWidgetHost" class="pad"></div>
 
     <!-- Quick stats always visible -->
     <div class="quick-stats" id="quickStatsHost"></div>
@@ -170,14 +170,14 @@
     <!-- Cloud reachability. A signed-in user seeing only the sessions cached on
          this device must be told the view is partial, BEFORE they act on it. -->
     <div id="syncBanner" hidden></div>
-    <div id="nextStepHost" style="padding:1rem"></div>
+    <div id="nextStepHost" class="pad pad-y"></div>
 
     <!-- Actionable insights -->
-    <div id="insightsHost" style="padding:0 1rem 1rem"></div>
+    <div id="insightsHost" class="pad pad-b"></div>
 
     <!-- Performance alerts + coaching (replaced each render) -->
-    <div id="alertsHost" style="padding:0 1rem"></div>
-    <div id="coachHost" style="padding:0 1rem 1rem"></div>
+    <div id="alertsHost" class="pad"></div>
+    <div id="coachHost" class="pad pad-b"></div>
 
 
     <div id="dashboard" class="dashboard" hidden></div>
@@ -378,7 +378,7 @@
       <div class="chart-card gapping-card">
         <canvas id="chartGapping"></canvas>
       </div>
-      <div class="table-wrap" style="margin-top:.75rem">
+      <div class="table-wrap mt-3">
         <table id="gapTable"></table>
       </div>
     </div>
@@ -407,7 +407,7 @@
       <div class="table-wrap">
         <table class="bench-table" id="benchTable"></table>
       </div>
-      <div id="benchNote" style="margin-top:.6rem"></div>
+      <div id="benchNote" class="mt-2"></div>
     </div>
 
     <!-- Shot log -->
@@ -485,10 +485,10 @@
       <p>Import sessions to get AI-generated practice routines.</p>
     </div>
     <div id="practice-content" hidden>
-      <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:.9rem">Smart routines personalized to your swing. Pick one and dive in.</p>
-      <div id="practiceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.8rem;margin-bottom:1.4rem"></div>
-      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:2rem">Looking for a specific drill rather than a plan?
-        <a href="#" data-view="drills" style="color:var(--pine);font-weight:600">Open the drill library →</a></p>
+      <p class="view-lede">Smart routines personalized to your swing. Pick one and dive in.</p>
+      <div id="practiceGrid" class="grid-auto mb-5"></div>
+      <p class="view-lede mb-6">Looking for a specific drill rather than a plan?
+        <a href="#" data-view="drills" class="link-inline">Open the drill library →</a></p>
     </div>
 
     <!-- Short game — putting and chipping. No launch-monitor data at all, so
@@ -515,7 +515,7 @@
     <div class="view-header">
       <h1 class="view-title">Drill Library</h1>
     </div>
-    <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:.9rem">Every drill in the research base, grouped by what it trains. A locked drill stays on screen with the reason and what would unlock it — the lock is the next step, not a wall.</p>
+    <p class="view-lede">Every drill in the research base, grouped by what it trains. A locked drill stays on screen with the reason and what would unlock it — the lock is the next step, not a wall.</p>
     <div class="section-block" id="secDrills">
       <div id="drillHost"></div>
     </div>
@@ -533,7 +533,7 @@
     </div>
     <div id="yardages-content" hidden>
       <!-- Drill recommendations -->
-      <div id="drillFinderHost" style="margin-bottom:1.5rem"></div>
+      <div id="drillFinderHost" class="mb-5"></div>
 
       <!-- The printed card. Built at render time so its conditions line can
            never drift from the table it sits above — a card in a golf bag has
@@ -541,13 +541,13 @@
       <div id="yardagePrintHead" class="print-only"></div>
 
       <p class="yardage-intro">Your stock carry per club — use this for club selection on the course. <span id="yardageMeta" class="yardage-meta"></span></p>
-      <button class="btn-secondary no-print" id="printYardages" style="margin-bottom:.8rem"><svg class="icon" aria-hidden="true"><use href="#i-print"/></svg> Print / save as PDF</button>
-      <div id="yardageConditions" style="margin-bottom:.8rem"></div>
+      <button id="printYardages" class="btn-secondary no-print mb-3"><svg class="icon" aria-hidden="true"><use href="#i-print"/></svg> Print / save as PDF</button>
+      <div id="yardageConditions" class="mb-3"></div>
       <div class="table-wrap">
         <table id="yardageTable"></table>
       </div>
-      <div id="yardageLegend" style="margin-top:.6rem"></div>
-      <div class="section-block" style="margin-top:2rem">
+      <div id="yardageLegend" class="mt-2"></div>
+      <div class="section-block mt-6">
         <h2 class="section-title">Personal Bests</h2>
         <div class="records-grid" id="recordsGrid"></div>
       </div>
@@ -638,7 +638,7 @@
            The finding now lives where it can operate: on the range session. -->
       <h2 class="settings-section-title">How you practise</h2>
       <div class="settings-group">
-        <p class="form-hint" id="feedbackNote" style="padding:.6rem .85rem .85rem"></p>
+        <p class="form-hint pad pad-y" id="feedbackNote"></p>
         <button class="settings-row" id="rangeWrapperBtn">
           <span>How to run the session itself</span>
           <span class="settings-arrow">→</span>
@@ -647,8 +647,8 @@
       <div class="settings-section">
         <h2 class="settings-section-title">Goals</h2>
         <div class="goal-inputs">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.8rem">
-            <select id="goalMetric" style="padding:.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+          <div class="form-row mb-3">
+            <select id="goalMetric" class="select">
               <option value="">—</option>
               <option value="carry">Longest Carry (yds)</option>
               <option value="ball_speed">Ball Speed (mph)</option>
@@ -656,11 +656,11 @@
               <option value="score">Form Score (/100)</option>
               <option value="sessions">Sessions (count)</option>
             </select>
-            <input type="number" id="goalTarget" placeholder="Target" min="0" max="300" style="padding:.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+            <input type="number" id="goalTarget" placeholder="Target" min="0" max="300" class="input">
           </div>
-          <button id="setGoalBtn" style="width:100%;padding:.6rem;background:var(--pine);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;font-weight:600">Set Goal</button>
+          <button id="setGoalBtn" class="btn-primary w-full">Set Goal</button>
         </div>
-        <div id="goalsList" style="margin-top:.8rem"></div>
+        <div id="goalsList" class="mt-3"></div>
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">Data & Export</h2>
@@ -668,7 +668,7 @@
           <span>Keep sessions on this device</span>
           <span class="pref-toggle" id="keepLocalToggle"></span>
         </button>
-        <p class="form-hint" id="keepLocalNote" style="padding:0 .85rem"></p>
+        <p class="form-hint pad" id="keepLocalNote"></p>
         <button class="settings-row" id="dataControlsBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-sessions"/></svg> View my data &amp; controls (GDPR/CCPA)</span>
           <span class="settings-arrow">→</span>
@@ -688,24 +688,24 @@
           <span class="settings-arrow">→</span>
         </button>
         <input type="file" id="restoreInput" accept="application/json,.json" hidden>
-        <div id="restoreHost" style="padding:0 .85rem"></div>
-        <button class="settings-row" id="showAnalyticsBtn" style="cursor:pointer">
+        <div id="restoreHost" class="pad"></div>
+        <button class="settings-row" id="showAnalyticsBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-progress"/></svg> View Analytics</span>
           <span class="settings-arrow">→</span>
         </button>
-        <button class="settings-row" id="showBenchmarksBtn" style="cursor:pointer">
+        <button class="settings-row" id="showBenchmarksBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg> Compare to Community</span>
           <span class="settings-arrow">→</span>
         </button>
-        <button class="settings-row" id="showLearningBtn" style="cursor:pointer">
+        <button class="settings-row" id="showLearningBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg> Learning Library</span>
           <span class="settings-arrow">→</span>
         </button>
-        <button class="settings-row" id="showClubAnalysisBtn" style="cursor:pointer">
+        <button class="settings-row" id="showClubAnalysisBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-bag"/></svg> Club Analysis</span>
           <span class="settings-arrow">→</span>
         </button>
-        <button class="settings-row" id="showEfficiencyBtn" style="cursor:pointer">
+        <button class="settings-row" id="showEfficiencyBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg> Practice Efficiency</span>
           <span class="settings-arrow">→</span>
         </button>
@@ -927,7 +927,7 @@
         <input type="password" id="authPassword" name="password"
                autocomplete="current-password" placeholder="••••••••">
       </div>
-      <button class="btn-primary" type="submit" style="width:100%">Sign In</button>
+      <button class="btn-primary w-full" type="submit">Sign In</button>
       <p class="auth-hint">New to ShotLab? <a href="#" id="authSwitchSignup">Create account</a></p>
     </form>
 
@@ -947,13 +947,13 @@
         <input type="password" id="authSignupConfirm" name="confirm-password"
                autocomplete="new-password" placeholder="••••••••">
       </div>
-      <button class="btn-primary" type="submit" style="width:100%">Create Account</button>
+      <button class="btn-primary w-full" type="submit">Create Account</button>
       <p class="auth-hint">Already have an account? <a href="#" id="authSwitchLogin">Sign in</a></p>
     </form>
 
     <p id="authError" class="auth-error"></p>
     <div id="authGuestWrap" class="auth-guest" hidden>
-      <button id="authGuestBtn" class="btn-secondary" style="width:100%">Continue as guest</button>
+      <button id="authGuestBtn" class="btn-secondary w-full">Continue as guest</button>
       <p class="auth-guest-note" id="authGuestNote">Sessions are held in memory only and are lost when you
         close the tab. Nothing is written to this device and nothing syncs. You can turn on device storage
         in Settings, or sign in to keep them.</p>
