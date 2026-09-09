@@ -61,6 +61,8 @@
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 40px; --s7: 64px;
   --dur: .14s;
 
+  --overlay: rgba(0,0,0,.6);   /* modal scrim — the six app.js-injected modals read this */
+
   /* elevation — overlays only; chrome is flat */
   --shadow-sm: none;
   --shadow-md: 0 8px 30px rgba(0,0,0,.12);
@@ -610,22 +612,16 @@ textarea { resize: vertical; }
 /* ── Charts ────────────────────────────────────────────── */
 .chart-card {
   background: var(--surface);
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1.1rem;
-  box-shadow: var(--shadow-sm);
+  padding: var(--s4);
+  box-shadow: none;
 }
 .chart-card h3 {
-  font-size: .68rem; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .1em;
-  margin-bottom: .875rem; font-weight: 700;
+  font-size: .7rem; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: var(--s3); font-weight: 600;
   display: flex; align-items: center; gap: .4rem;
-}
-.chart-card h3::before {
-  content: '';
-  display: inline-block; width: 3px; height: 9px;
-  background: var(--pine); border-radius: 2px; opacity: .65;
-  flex-shrink: 0;
 }
 .dispersion-card { padding-bottom: 1.5rem; }
 .dispersion-card canvas { height: 280px !important; }
@@ -633,9 +629,11 @@ textarea { resize: vertical; }
 canvas { max-height: 180px; }
 
 /* ── Club dot ──────────────────────────────────────────── */
+/* A square swatch, not a dot: it is a key to a chart series, and the charts
+   in this app draw square bars and square-capped lines. */
 .club-dot {
-  display: inline-block; width: 7px; height: 7px;
-  border-radius: 50%; margin-right: 5px;
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 0; margin-right: 6px;
   vertical-align: middle; flex-shrink: 0;
 }
 
@@ -1923,6 +1921,7 @@ html.dark {
   --yellow:      #E0A93A;
   --red:         #E5544E;
   --blue:        #4FA8E8;
+  --overlay: rgba(0,0,0,.72);
   --shadow-md: 0 8px 30px rgba(0,0,0,.45);
   --shadow-lg: 0 20px 60px rgba(0,0,0,.6);
   /* --border, --border-hi, --turf, --pine, --accent-glow inherit via their

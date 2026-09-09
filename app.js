@@ -110,12 +110,25 @@ const Agreement = (() => {
 const CLUB_ORDER = ['d','2w','3w','4w','5w','7w','2h','3h','4h','5h',
   '1i','2i','3i','4i','5i','6i','7i','8i','9i','pw','aw','sw','lw'];
 
+// An even OKLCH hue sweep across CLUB_ORDER (spec §3.4): fixed chroma .13,
+// fixed lightness .62, hue stepping 45° -> 345°. Fixed L and C is the whole
+// point — the old Tailwind-palette scale mixed a 0.75-lightness amber with a
+// 0.55-lightness indigo, so a club read as "brighter" for a reason that had
+// nothing to do with the club. Warm woods to cool wedges, as before.
+//
+// Deviation from the spec's literal "0° -> 330°", stated rather than
+// silently applied: hue is circular, so 0 and 330 are 30° apart and the
+// driver and the lob wedge — the two clubs most often on a chart together —
+// would have come out nearly the same colour. Starting at 45 and spanning
+// 300 keeps every pair at least 15° apart and puts the ends furthest apart.
+//
+// Computed once, written as literals: no runtime OKLCH dependency.
 const CLUB_COLORS = {
-  d:'#f59e0b','2w':'#f97316','3w':'#ef4444','4w':'#ec4899','5w':'#a855f7',
-  '7w':'#8b5cf6','2h':'#06b6d4','3h':'#0ea5e9','4h':'#3b82f6','5h':'#6366f1',
-  '1i':'#14b8a6','2i':'#10b981','3i':'#22c55e','4i':'#84cc16','5i':'#eab308',
-  '6i':'#f59e0b','7i':'#f97316','8i':'#ef4444','9i':'#ec4899',
-  pw:'#a855f7',aw:'#8b5cf6',sw:'#6366f1',lw:'#3b82f6',
+  d:'#c56a3e','2w':'#bf7027','3w':'#b5770b','4w':'#a97f00','5w':'#998700',
+  '7w':'#878e1b','2h':'#719434','3h':'#58994b','4h':'#379c61','5h':'#009e77',
+  '1i':'#009f8b','2i':'#009d9e','3i':'#009aaf','4i':'#0096be','5i':'#1091c9',
+  '6i':'#408ad1','7i':'#5c84d4','8i':'#737dd3','9i':'#8677ce',
+  pw:'#9770c5',aw:'#a66bb9',sw:'#b267a9',lw:'#bc6398',
 };
 
 const CLUB_LABELS = {
@@ -132,7 +145,7 @@ const isLong = t => isWood(t) || isHybrid(t) || ['1i','2i','3i','4i'].includes(t
 const isShort = t => ['8i','9i','pw','aw','sw','lw'].includes(t);
 const isMid = t => ['5i','6i','7i'].includes(t);
 const clubLabel = t => CLUB_LABELS[t] || (t || '').toUpperCase();
-const clubColor = t => CLUB_COLORS[t] || '#8891aa';
+const clubColor = t => CLUB_COLORS[t] || '#8B93A0';   // --withheld: an unknown club is not a hue
 const clubOrder = t => { const i = CLUB_ORDER.indexOf(t); return i === -1 ? 99 : i; };
 
 // Inline-SVG icon reference (spec §6.1). The sprite lives at the top of
@@ -865,8 +878,9 @@ function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', dark);
   const sw = document.getElementById('themeSwitch');
   if (sw) sw.classList.toggle('on', dark);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', dark ? '#000000' : '#ffffff');
+  const bar = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+              || (dark ? '#0B0D10' : '#FBFBFC');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bar));
 }
 (function initThemeEarly(){
   try {
@@ -5007,7 +5021,7 @@ const ShotScorer = (() => {
     if (avgScore >= 70) return {letter:'B',color:'#4d7c0f'};
     if (avgScore >= 55) return {letter:'C',color:'#b45309'};
     if (avgScore >= 40) return {letter:'D',color:'#c2410c'};
-    return {letter:'F',color:'#dc2626'};
+    return {letter:'F',color:'var(--red)'};
   }
 
   function scoreColor(s) {
@@ -6827,6 +6841,51 @@ const UI = (() => {
     if (_charts[id]) { try { _charts[id].destroy(); } catch {} delete _charts[id]; }
   }
 
+  // ── Chart theme (spec §7.7) ───────────────────────────────────
+  // Chart.js draws to a canvas, so it cannot inherit a CSS token — every
+  // grid line and tick colour has to be handed to it as a value. Read them
+  // off :root at render time rather than typing them in: the three chart
+  // configs held eleven copies of the same two grey literals between them,
+  // which is why they all still looked like the old light theme in dark
+  // mode. Reading the token means the charts follow the palette, both ways.
+  const chartTheme = () => {
+    const v = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    return { grid: v('--line') || '#E4E6EA', tick: v('--text-dim') || '#8A929E',
+             font: v('--font-body') || 'system-ui, sans-serif',
+             good: v('--green') || '#0E9463', bad: v('--red') || '#C43C36',
+             accent: v('--accent') || '#E24E12' };
+  };
+
+  // A canvas does not repaint itself when a class changes on <html>. Chart.js
+  // keeps its own registry of live instances, so the toggle walks the ones
+  // this module owns and re-applies the theme in place — cheaper and less
+  // disruptive than re-rendering the view under the golfer.
+  function retintCharts() {
+    const t = chartTheme();
+    Object.values(_charts).forEach(c => {
+      try {
+        const sc = c.options && c.options.scales;
+        if (!sc) return;
+        ['x', 'y'].forEach(ax => {
+          if (!sc[ax]) return;
+          if (sc[ax].ticks) { sc[ax].ticks.color = t.tick; }
+          if (sc[ax].title) { sc[ax].title.color = t.tick; }
+          // the dispersion x-axis grid is a function (it highlights zero)
+          if (sc[ax].grid && typeof sc[ax].grid.color !== 'function') { sc[ax].grid.color = t.grid; }
+        });
+        if (c.options.plugins && c.options.plugins.legend && c.options.plugins.legend.labels) {
+          c.options.plugins.legend.labels.color = t.tick;
+        }
+        (c.data.datasets || []).forEach(ds => {
+          if (!ds._accent) return;
+          ds.borderColor = t.accent;
+          ds.backgroundColor = t.accent + '22';
+        });
+        c.update('none');
+      } catch (_) {}
+    });
+  }
+
   // ── Home: dashboard + recent sessions ─────────────────────────
   // ── Cloud reachability ────────────────────────────────────────
   // Rendered above everything on the home view, because it changes what the
@@ -6880,7 +6939,7 @@ const UI = (() => {
       const todayTip = tips[new Date().getDate() % tips.length];
       const tipHost = document.getElementById('tipHost');
       if (tipHost) {
-        tipHost.innerHTML = `<div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
+        tipHost.innerHTML = `<div style="background:var(--accent-weak);border:1px solid var(--line);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
       }
     } catch(e){ console.error('tip',e); }
 
@@ -6924,7 +6983,7 @@ const UI = (() => {
         const insights = InsightEngine.generateInsights(sessions);
         if (insights.length) {
           insightHost.innerHTML = insights.map(i =>
-            `<div style="padding:.7rem;background:rgba(0,112,243,.05);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
+            `<div style="padding:.7rem;background:var(--surface2);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
               <span style="font-size:1rem;margin-right:.4rem">${icon(i.icon)}</span>${i.text}
             </div>`
           ).join('');
@@ -6956,30 +7015,30 @@ const UI = (() => {
         const grade = PerformanceGrade.calculateFullGrade(sessions);
         const coach = PersonalCoach.analyzeSessions(sessions);
         coachHost.innerHTML = (grade && coach) ? `
-            <div style="margin-top:1.5rem;padding:1.2rem;background:linear-gradient(135deg,rgba(11,77,46,.08),rgba(16,185,129,.04));border-radius:var(--radius-md);border:1px solid rgba(16,185,129,.2)">
+            <div style="margin-top:1.5rem;padding:1.2rem;background:var(--surface2);border-radius:var(--radius-md);border:1px solid var(--line)">
               <div style="font-weight:700;margin-bottom:.5rem;font-size:1.05rem">${coach.greeting}</div>
               <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.8rem">${coach.assessment}</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem">
-                <div style="background:rgba(255,255,255,.05);padding:.8rem;border-radius:var(--radius-sm)">
+                <div style="background:var(--surface2);padding:.8rem;border-radius:var(--radius-sm)">
                   <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Overall Grade</div>
-                  <div style="font-size:1.8rem;font-weight:800;color:#4ade80">${grade.grade}</div>
+                  <div style="font-size:1.8rem;font-weight:800;color:var(--green)">${grade.grade}</div>
                   <div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${grade.overall}/100</div>
                 </div>
-                <div style="background:rgba(255,255,255,.05);padding:.8rem;border-radius:var(--radius-sm)">
+                <div style="background:var(--surface2);padding:.8rem;border-radius:var(--radius-sm)">
                   <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Next gate</div>
                   <div style="font-size:1rem;margin-bottom:.3rem">${coach.nextMilestone.progress}%</div>
-                  <div style="background:rgba(0,0,0,.2);height:4px;border-radius:2px;overflow:hidden">
-                    <div style="background:#4ade80;height:100%;width:${coach.nextMilestone.progress}%"></div>
+                  <div style="background:var(--surface3);height:4px;border-radius:2px;overflow:hidden">
+                    <div style="background:var(--green);height:100%;width:${coach.nextMilestone.progress}%"></div>
                   </div>
                   <!-- The message was computed and never rendered, so the tile
                        was a bare percentage of an unstated target. -->
                   <div style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem;line-height:1.4">${Sanitize.escape(coach.nextMilestone.message || '')}</div>
                 </div>
               </div>
-              <div style="font-size:.9rem;padding:.8rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);margin-bottom:.8rem">
+              <div style="font-size:.9rem;padding:.8rem;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:.8rem">
                 <strong>${icon('target')} Focus:</strong> ${Sanitize.escape(coach.topFocus?.name || 'Nothing recurring')} — ${Sanitize.escape(coach.drillRecommendation)}
               </div>
-              <div style="font-size:.85rem;color:#a3e635;font-weight:600">${coach.motivationalMessage}</div>
+              <div style="font-size:.85rem;color:var(--green-light);font-weight:600">${coach.motivationalMessage}</div>
             </div>` : '';
       }
     } catch(e){ console.error('coaching',e); }
@@ -7259,8 +7318,8 @@ const UI = (() => {
                 ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${icon(f.icon)} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
               </div>
               <div style="display:flex;gap:.4rem;margin-top:.6rem;font-size:.8rem">
-                <button data-share="${s.id}" style="background:rgba(74,222,128,.15);border:none;color:#4ade80;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('external')} Share</button>
-                <button data-export="${s.id}" style="background:rgba(96,165,250,.15);border:none;color:#60a5fa;padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('import')} Export</button>
+                <button data-share="${s.id}" style="background:var(--surface2);border:none;color:var(--green);padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('external')} Share</button>
+                <button data-export="${s.id}" style="background:var(--surface2);border:none;color:var(--blue);padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('import')} Export</button>
               </div>
             </div>
             <div style="text-align:right">
@@ -8057,20 +8116,21 @@ const UI = (() => {
       label:'Centre line',
       data:[{x:0,y:minCarry},{x:0,y:maxCarry}],
       type:'line',
-      borderColor:'#00000018',
+      borderColor: chartTheme().grid,
       borderWidth:1,
       borderDash:[4,4],
       pointRadius:0,
       showLine:true,
     });
 
+    const _t = chartTheme();
     _charts.dispersion = new Chart(canvas, {
       type:'scatter',
       data:{datasets},
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#888888',font:{size:11}}},
+          legend:{labels:{color:_t.tick,font:{size:11,family:_t.font}}},
           tooltip:{
             callbacks:{
               label: ctx => {
@@ -8081,12 +8141,14 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:'#888888',font:{size:11}},
-            ticks:{color:'#888888'},
-            grid:{color: ctx => ctx.tick.value===0?'rgba(0,0,0,0.15)':'#ebebeb'},
+          x:{title:{display:true,text:'Side Carry (yds) — left / right',color:_t.tick,font:{size:11,family:_t.font}},
+            ticks:{color:_t.tick,font:{family:_t.font}},
+            // the target line stays heavier than the rest of the grid: it is
+            // the only gridline that means something
+            grid:{color: ctx => ctx.tick.value===0?_t.tick:_t.grid},
           },
-          y:{title:{display:true,text:'Carry Distance (yds)',color:'#888888',font:{size:11}},
-            ticks:{color:'#888888'},grid:{color:'#ebebeb'},
+          y:{title:{display:true,text:'Carry Distance (yds)',color:_t.tick,font:{size:11,family:_t.font}},
+            ticks:{color:_t.tick,font:{family:_t.font}},grid:{color:_t.grid},
           },
         },
       },
@@ -8112,6 +8174,7 @@ const UI = (() => {
     const colors = clubs.map(clubColor);
     const gaps = carries.map((c,i) => i===0?null : (carries[i-1]-c));
 
+    const _t = chartTheme();
     _charts.gapping = new Chart(canvas,{
       type:'bar',
       data:{
@@ -8122,7 +8185,7 @@ const UI = (() => {
           backgroundColor: colors.map(c=>c+'cc'),
           borderColor:colors,
           borderWidth:1.5,
-          borderRadius:4,
+          borderRadius:0,   // square bars; nothing in this design system is rounded
         }],
       },
       options:{
@@ -8139,9 +8202,9 @@ const UI = (() => {
           }
         },
         scales:{
-          x:{ticks:{color:'#888888'},grid:{color:'#ebebeb'}},
-          y:{ticks:{color:'#888888'},grid:{color:'#ebebeb'},
-            title:{display:true,text:'Carry (yds)',color:'#888888',font:{size:11}}},
+          x:{ticks:{color:_t.tick,font:{family:_t.font}},grid:{color:_t.grid}},
+          y:{ticks:{color:_t.tick,font:{family:_t.font}},grid:{color:_t.grid},
+            title:{display:true,text:'Carry (yds)',color:_t.tick,font:{size:11,family:_t.font}}},
         },
       },
     });
@@ -9107,31 +9170,43 @@ const UI = (() => {
       return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
     });
 
+    const _t = chartTheme();
     const mkCfg = (data,color,yLabel) => ({
       type:'line', data:{labels,datasets:[{
         data, borderColor:color, backgroundColor:color+'22',
-        tension:0.3, pointRadius:5, fill:true, borderWidth:2,
+        tension:0.3, pointRadius:4, fill:true, borderWidth:2,
+        // marks this series as accent-driven so a theme switch re-reads it.
+        // Club-coloured series deliberately do NOT carry this: the club scale
+        // is one fixed set of hues in both themes, because a club that
+        // changed colour with the theme would stop being a key.
+        _accent: true,
       }]},
       options:{
         responsive:true, maintainAspectRatio:true,
         plugins:{legend:{display:false}},
         scales:{
-          x:{ticks:{color:'#888888',font:{size:10}},grid:{color:'#ebebeb'}},
-          y:{ticks:{color:'#888888',font:{size:10}},grid:{color:'#ebebeb'},
-            title:{display:!!yLabel,text:yLabel||'',color:'#888888',font:{size:10}}},
+          x:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid}},
+          y:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid},
+            title:{display:!!yLabel,text:yLabel||'',color:_t.tick,font:{size:10,family:_t.font}}},
         },
       },
     });
 
+    // Seven single-series charts, all in --accent (spec §7.7). They were
+    // seven different hues, which read as a colour key — but the colours
+    // encoded nothing: each chart has exactly one series, and none of them
+    // shares an axis with another. Saturated colour in this palette is
+    // reserved for data that is actually categorical, which is the club
+    // scale.
     const defs=[
-      {id:'chartSmash',     data:d('smashFactor'), color:'#16a34a',yLabel:'Smash Factor'},
-      {id:'chartCarry',     data:d('carryDistance'),color:'#2563eb',yLabel:'Carry (yds)'},
-      {id:'chartLaunch',    data:d('launchAngle'), color:'#d97706',yLabel:'Launch Angle (°)'},
-      {id:'chartBallSpeed', data:d('ballSpeed'),   color:'#7c3aed',yLabel:'Ball Speed (mph)'},
-      {id:'chartPath',      data:d('clubPath'),    color:'#0891b2',yLabel:'Club Path (°)'},
-      {id:'chartAA',        data:d('attackAngle'), color:'#ea580c',yLabel:'Attack Angle (°)'},
-      {id:'chartQuality',   data:qualityData,      color:'#15803d',yLabel:'Session Score'},
-    ];
+      {id:'chartSmash',     data:d('smashFactor'),  yLabel:'Smash Factor'},
+      {id:'chartCarry',     data:d('carryDistance'),yLabel:'Carry (yds)'},
+      {id:'chartLaunch',    data:d('launchAngle'),  yLabel:'Launch Angle (°)'},
+      {id:'chartBallSpeed', data:d('ballSpeed'),    yLabel:'Ball Speed (mph)'},
+      {id:'chartPath',      data:d('clubPath'),     yLabel:'Club Path (°)'},
+      {id:'chartAA',        data:d('attackAngle'),  yLabel:'Attack Angle (°)'},
+      {id:'chartQuality',   data:qualityData,       yLabel:'Session Score'},
+    ].map(c => ({ ...c, color: _t.accent }));
 
     defs.forEach(({id,data,color,yLabel})=>{
       destroyChart(id);
@@ -9595,7 +9670,7 @@ const UI = (() => {
   }
 
   return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
-           renderQuietEye, renderDrills, renderShortGame, renderRounds };
+           renderQuietEye, renderDrills, renderShortGame, renderRounds, retintCharts };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -10188,11 +10263,11 @@ async function init() {
         </div>
         <div style="padding:1.2rem;color:var(--text)">
           <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
-          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+          <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Access</strong><br>
             Click "Export all data" below to download your sessions as JSON or CSV.
           </div>
-          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+          <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Delete</strong><br>
             ${user ? `
               Click "Delete my account & data" in Account section above to permanently delete your account and all sessions.
@@ -10200,11 +10275,11 @@ async function init() {
               Sign in first, then go to Account section to delete your account.
             `}
           </div>
-          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+          <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Portability</strong><br>
             Your data is yours. Export it anytime using "Export all data" button in Data & Export section.
           </div>
-          <div style="background:rgba(16,185,129,.1);border-left:3px solid #10b981;padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
+          <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Object</strong><br>
             ${user ? `You can request to opt-out. Email us with your account (${user.email}).` : `Email us to opt-out of data processing.`}
           </div>
@@ -10243,8 +10318,8 @@ async function init() {
             <li>${icon('check')} Any stored backups (within 30 days)</li>
           </ul>
 
-          <div style="background:rgba(220,38,38,.1);border-left:3px solid #dc2626;padding:1rem;margin-top:2rem;border-radius:var(--radius-sm)">
-            <strong style="color:#dc2626">${icon('warn')} This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
+          <div style="background:var(--surface2);border-left:3px solid var(--red);padding:1rem;margin-top:2rem;border-radius:var(--radius-sm)">
+            <strong style="color:var(--red)">${icon('warn')} This is permanent!</strong> Deleted data cannot be recovered. Make sure to export your data first if you want to keep it.
           </div>
 
           <button class="btn-primary" data-export-close style="width:100%;margin-top:1.5rem">
@@ -10284,52 +10359,52 @@ async function init() {
     if (!metrics) { toast('Unable to generate metrics'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Advanced Analytics
             <button data-close="analyticsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
           </div>
           <div style="display:grid;gap:1rem">
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Sessions</div>
               <div style="font-size:2rem;font-weight:800">${metrics.totalSessions}</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Shots</div>
               <div style="font-size:2rem;font-weight:800">${metrics.totalShots}</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Avg Carry Distance</div>
               <div style="font-size:2rem;font-weight:800">${metrics.avgCarry === null ? '—' : metrics.avgCarry + ' yds'}</div>
               ${metrics.carryClub ? `<div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${Sanitize.escape(metrics.carryClub)}</div>` : ''}
               ${metrics.carryConsistency === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>`}
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Ball Speed</div>
               <div style="font-size:1.5rem;font-weight:800">${metrics.ballSpeedAvg} mph avg</div>
               ${metrics.ballSpeedMax === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Max: ${metrics.ballSpeedMax} mph</div>`}
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Launch Angle</div>
               <div style="font-size:1.5rem;font-weight:800">${metrics.launchAngleAvg}°</div>
               ${metrics.launchAngleRange ? `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Range: ${metrics.launchAngleRange[0].toFixed(1)}° - ${metrics.launchAngleRange[1].toFixed(1)}°</div>` : ''}
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Practice Frequency</div>
               <div style="font-size:1.5rem;font-weight:800">${metrics.sessionFrequency}</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Trend</div>
-              <div style="font-size:1.1rem;font-weight:700;color:#4ade80">${metrics.improvementTrend}</div>
+              <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${metrics.improvementTrend}</div>
             </div>
-            <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
               <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Top Clubs</div>
               <div style="display:flex;flex-direction:column;gap:.4rem">
                 ${metrics.topPerformers.map(c => `
-                  <div style="display:flex;justify-content:space-between;padding:.4rem .6rem;background:rgba(0,0,0,.1);border-radius:4px">
+                  <div style="display:flex;justify-content:space-between;padding:.4rem .6rem;background:var(--surface3);border-radius:4px">
                     <span>${c.club}</span>
-                    <span style="color:#60a5fa;font-weight:600">${c.avgCarry === null ? 'no carry data' : c.avgCarry + ' yds'} (${c.shots} shots)</span>
+                    <span style="color:var(--blue);font-weight:600">${c.avgCarry === null ? 'no carry data' : c.avgCarry + ' yds'} (${c.shots} shots)</span>
                   </div>
                 `).join('')}
               </div>
@@ -10349,7 +10424,7 @@ async function init() {
     const course = CommunityInsights.onCourse();
 
     const rowHtml = r => `
-      <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+      <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
         <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">${esc(r.label)}</div>
         <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
           <div><span style="color:var(--text-dim)">You:</span>
@@ -10361,7 +10436,7 @@ async function init() {
       </div>`;
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Where you sit
@@ -10379,7 +10454,7 @@ async function init() {
                   : `${pub.need} more shot${pub.need === 1 ? '' : 's'} of your most-hit club before a
                      comparison means anything — a mean off a handful is not a number to measure yourself by.`}</div>`}
             ${course ? `
-              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
                 <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">On the course</div>
                 <div style="font-size:.9rem;line-height:1.5">${esc(course.note || '')}</div>
               </div>` : ''}
@@ -10402,8 +10477,8 @@ async function init() {
     const path = LearningPath.generatePath(sessions);
 
     const module = m => `
-      <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);
-                  border-left:3px solid ${m.status === 'open' ? '#4ade80' : 'var(--yellow)'}">
+      <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);
+                  border-left:3px solid ${m.status === 'open' ? 'var(--green)' : 'var(--yellow)'}">
         <div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;margin-bottom:.4rem">
           <div style="font-weight:600">${esc(m.id)} · ${esc(m.title)}</div>
           <div style="font-size:.72rem;white-space:nowrap;color:var(--text-dim)">
@@ -10417,7 +10492,7 @@ async function init() {
       </div>`;
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('book')} What you can work on
@@ -10429,7 +10504,7 @@ async function init() {
           <div style="display:grid;gap:.8rem">
             ${path.modules.map(module).join('')}
             ${path.wrappers ? `
-              <div style="padding:1rem;background:rgba(96,165,250,.08);border-radius:var(--radius-sm);border-left:3px solid #60a5fa">
+              <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid var(--blue)">
                 <div style="font-weight:600;margin-bottom:.4rem">${esc(path.wrappers.id)} · ${esc(path.wrappers.title)}</div>
                 <div style="font-size:.82rem;line-height:1.5;color:var(--text-dim)">${esc(path.wrappers.why)}</div>
                 <div style="font-size:.78rem;color:var(--text-muted);margin-top:.4rem">
@@ -10451,7 +10526,7 @@ async function init() {
     if (!clubs.length) { toast('No club data'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('bag')} Club Performance Analysis
@@ -10459,7 +10534,7 @@ async function init() {
           </div>
           <div style="display:grid;gap:.8rem">
             ${clubs.map(c => `
-              <div style="padding:1rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm);border-left:4px solid ${clubColor(c.club === clubLabel(c.club) ? Object.keys(CLUB_LABELS).find(k => CLUB_LABELS[k] === c.club) : c.club)}">
+              <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);border-left:4px solid ${clubColor(c.club === clubLabel(c.club) ? Object.keys(CLUB_LABELS).find(k => CLUB_LABELS[k] === c.club) : c.club)}">
                 <div style="font-weight:600;margin-bottom:.6rem">${c.club}</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem">
                   <div>
@@ -10479,7 +10554,7 @@ async function init() {
                     <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
                   </div>
                 </div>
-                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? '#4ade80' : c.trend.label.startsWith('↓') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
+                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? 'var(--green)' : c.trend.label.startsWith('↓') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
               </div>
             `).join('')}
           </div>
@@ -10498,7 +10573,7 @@ async function init() {
     const vol = PracticeEfficiency.volume(latest);
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('target')} How you practised
@@ -10507,7 +10582,7 @@ async function init() {
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">Your last session, read off the order you hit in</div>
           <div style="display:grid;gap:1rem">
             ${st.ok ? `
-              <div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+              <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
                 <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Order</div>
                 <div style="font-size:1.8rem;font-weight:800;text-transform:capitalize">${esc(st.mode)}</div>
                 <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">
@@ -10517,7 +10592,7 @@ async function init() {
               <div class="tail-note">${esc(st.note)}</div>
               <div class="tail-note">${esc(st.caveat)}</div>`
             : `<div class="tail-note">${esc(st.why)}</div>`}
-            ${vol ? `<div style="background:rgba(255,255,255,.05);padding:1rem;border-radius:var(--radius-sm)">
+            ${vol ? `<div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
                 <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Volume</div>
                 <div style="font-size:1.6rem;font-weight:800">${vol.shots}${vol.prescribed ? ` <small style="font-weight:400;color:var(--text-dim)">vs ${vol.prescribed} prescribed</small>` : ''}</div>
                 <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">${esc(vol.note)}</div>
@@ -10559,6 +10634,10 @@ async function init() {
     themeBtn.addEventListener('click', () => {
       const dark = !document.documentElement.classList.contains('dark');
       applyTheme(dark);
+      // A canvas keeps the colours it was drawn with. Without this the charts
+      // stay in the old theme's greys until the view is re-entered — which is
+      // exactly the kind of half-applied change nobody reports as a bug.
+      UI.retintCharts();
       try { localStorage.setItem('slTheme', dark ? 'dark' : 'light'); } catch(_) {}
     });
   }
@@ -10711,7 +10790,7 @@ async function init() {
     ];
 
     const html = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
+      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
         <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             Keyboard Shortcuts
@@ -10719,14 +10798,14 @@ async function init() {
           </div>
           <div style="display:grid;gap:.8rem">
             ${shortcuts.map(s => `
-              <div style="display:flex;justify-content:space-between;padding:.6rem;background:rgba(255,255,255,.05);border-radius:var(--radius-sm)">
-                <span style="font-family:monospace;font-weight:600;color:#60a5fa">${s.key}</span>
+              <div style="display:flex;justify-content:space-between;padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm)">
+                <span style="font-family:monospace;font-weight:600;color:var(--blue)">${s.key}</span>
                 <span style="color:var(--text-dim)">${s.action}</span>
               </div>
             `).join('')}
           </div>
-          <div style="margin-top:1.2rem;padding:.8rem;background:rgba(99,102,241,.1);border-radius:var(--radius-sm);font-size:.85rem;color:var(--text-dim)">
-            Press <kbd style="background:rgba(0,0,0,.2);padding:.2rem .4rem;border-radius:3px;font-size:.8rem">Escape</kbd> to close this dialog
+          <div style="margin-top:1.2rem;padding:.8rem;background:var(--accent-weak);border-radius:var(--radius-sm);font-size:.85rem;color:var(--text-dim)">
+            Press <kbd style="background:var(--surface3);padding:.2rem .4rem;border-radius:3px;font-size:.8rem">Escape</kbd> to close this dialog
           </div>
         </div>
       </div>`;
@@ -10955,17 +11034,17 @@ function showFatalError(err) {
     if (existing) return;
     const el = document.createElement('div');
     el.id = 'slFatal';
-    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#fafafa;display:flex;' +
+    el.style.cssText = 'position:fixed;inset:0;z-index:99998;background:var(--bg,#fafafa);display:flex;' +
       'align-items:center;justify-content:center;padding:2rem;font-family:system-ui,sans-serif';
     el.innerHTML =
       '<div style="max-width:340px;text-align:center">' +
-            '<h2 style="font-size:1.2rem;color:#171717;margin-bottom:.5rem">Something hiccuped</h2>' +
-      '<p style="color:#4d4d4d;font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
+            '<h2 style="font-size:1.2rem;color:var(--text,#171717);margin-bottom:.5rem">Something hiccuped</h2>' +
+      '<p style="color:var(--text-muted,#4d4d4d);font-size:.9rem;margin-bottom:1.25rem;line-height:1.5">' +
       'The app hit an unexpected snag while loading. Your saved data is safe.</p>' +
-      '<button id="slReload" style="background:#171717;color:#fff;border:none;border-radius:6px;' +
+      '<button id="slReload" style="background:var(--accent,#171717);color:var(--accent-ink,#fff);border:none;border-radius:var(--radius,0);' +
       'padding:.7rem 1.4rem;font-weight:600;cursor:pointer;width:100%;margin-bottom:.6rem">Reload app</button>' +
-      '<button id="slReset" style="background:none;color:#4d4d4d;border:1px solid #ebebeb;' +
-      'border-radius:6px;padding:.6rem 1.4rem;font-weight:500;cursor:pointer;width:100%">Reset &amp; reload</button>' +
+      '<button id="slReset" style="background:none;color:var(--text-muted,#4d4d4d);border:1px solid var(--line,#ebebeb);' +
+      'border-radius:var(--radius,0);padding:.6rem 1.4rem;font-weight:500;cursor:pointer;width:100%">Reset &amp; reload</button>' +
       '</div>';
     document.body.appendChild(el);
     document.getElementById('slReload').onclick = () => location.reload();
@@ -12177,12 +12256,12 @@ const EnhancedMetricsWidget = (() => {
           <div style="font-size:2.5rem;font-weight:800;color:${stats.color}">${stats.grade}</div>
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">FORM GRADE</div>
         </div>
-        <div style="padding:1rem;background:rgba(74,222,128,.1);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2.5rem;font-weight:800;color:#4ade80">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
+        <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:2.5rem;font-weight:800;color:var(--green)">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">CONSISTENCY</div>
         </div>
-        <div style="padding:1rem;background:rgba(251,146,60,.1);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2rem;font-weight:800;color:#fb923c">${stats.streak}</div>
+        <div style="padding:1rem;background:var(--accent-weak);border-radius:var(--radius-sm);text-align:center">
+          <div style="font-size:2rem;font-weight:800;color:var(--accent)">${stats.streak}</div>
           <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">DAY STREAK</div>
         </div>
       </div>`;
