@@ -98,6 +98,18 @@ a  { color: var(--accent); text-decoration: none; }
   h2 { font-size: 1.05rem; }
 }
 
+/* ── Icons — inline SVG sprite (spec §6.1) ─────────────────────────────
+   1em square so an icon inherits the size of the text it sits beside;
+   currentColor so it inherits the colour too. Squared caps/joins to match
+   the chamfer. Set on the element, not the symbol, so a single sprite can
+   be tinted per site. */
+.icon {
+  width: 1em; height: 1em; display: inline-block;
+  vertical-align: -.125em; flex: none;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: square; stroke-linejoin: miter;
+}
+
 /* ── Buttons — chamfered cut-corner geometry ──────────────────────────
    One silhouette: top-left + bottom-right corners sliced by --cut. Three
    weights. clip-path also clips a real border, so .btn-secondary draws its
@@ -176,7 +188,7 @@ button:disabled, button[disabled] {
   box-shadow: 0 2px 20px rgba(220,38,38,.3);
 }
 .top-nav-brand { display: flex; align-items: center; gap: .6rem; }
-.brand-icon { font-size: 1.1rem; }
+.brand-icon { font-size: 1.25rem; }
 .brand-name {
   font-family: var(--font-display);
   font-size: 1.35rem; font-weight: 800;
@@ -239,7 +251,7 @@ button:disabled, button[disabled] {
   height: 2.5px; background: var(--pine);
   border-radius: 0 0 4px 4px;
 }
-.bnav-icon { font-size: 1.2rem; line-height: 1; }
+.bnav-icon { font-size: 1.25rem; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .bnav-label { line-height: 1; white-space: nowrap; }
 
 /* ── Import FAB ────────────────────────────────────────── */
@@ -265,8 +277,7 @@ button:disabled, button[disabled] {
   text-align: center; padding: 5rem 2rem;
   display: flex; flex-direction: column; align-items: center; gap: 1rem;
 }
-.empty-icon { font-size: 3rem; opacity: .4; animation: floatIcon 3.5s ease-in-out infinite; }
-@keyframes floatIcon { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+.empty-icon { font-size: 2.5rem; color: var(--text-dim); opacity: .55; line-height: 1; }
 .empty-state h2 { font-size: 1.3rem; color: var(--text); }
 .empty-state p { color: var(--text-muted); font-size: .9rem; max-width: 250px; }
 
@@ -313,7 +324,7 @@ button:disabled, button[disabled] {
   background: rgba(220,38,38,.04);
   box-shadow: 0 0 0 4px rgba(220,38,38,.07);
 }
-.drop-icon { font-size: 2.5rem; opacity: .5; }
+.drop-icon { font-size: 2rem; color: var(--text-dim); line-height: 1; }
 .drop-label { font-size: .95rem; font-weight: 600; color: var(--text); }
 .drop-sub { color: var(--text-muted); font-size: .82rem; }
 

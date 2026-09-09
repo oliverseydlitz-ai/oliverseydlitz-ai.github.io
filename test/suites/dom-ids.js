@@ -73,7 +73,13 @@ const mentioned = new RegExp('\\b(' + [...inHtml].map(i2 =>
   i2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'g');
 const inApp = new Set([...app.matchAll(mentioned)].map(m => m[1]));
 const STYLED_ONLY = new Set([...css.matchAll(/#([\w-]+)\s*[{,:]/g)].map(m => m[1]));
+// The icon sprite's <symbol> ids are referenced as `#i-${name}`, built inside
+// icon() at runtime, so no literal `i-star` ever appears in app.js — the same
+// shape as `view-` + name below. The `i-` prefix is owned entirely by the
+// sprite, so excluding it by prefix cannot hide a real host.
+const isSpriteSymbol = id => /^i-[a-z]+$/.test(id);
 const orphans = [...inHtml].filter(id =>
+  !isSpriteSymbol(id) &&
   !referenced.has(id) && !inApp.has(id) && !STYLED_ONLY.has(id) &&
   !html.includes(`for="${id}"`) &&
   !html.includes(`href="#${id}"`) &&

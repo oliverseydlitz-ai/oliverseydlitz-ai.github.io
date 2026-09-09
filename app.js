@@ -135,6 +135,14 @@ const clubLabel = t => CLUB_LABELS[t] || (t || '').toUpperCase();
 const clubColor = t => CLUB_COLORS[t] || '#8891aa';
 const clubOrder = t => { const i = CLUB_ORDER.indexOf(t); return i === -1 ? 99 : i; };
 
+// Inline-SVG icon reference (spec §6.1). The sprite lives at the top of
+// <body> in index.html; this only points at a <symbol> in it. Returns a
+// string because almost every call site is a template literal. aria-hidden
+// throughout: every icon in this app sits beside its own text label, so a
+// screen reader announcing it twice is noise, not information.
+const icon = (name, cls = '') =>
+  `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
 function avg(arr, field) {
   // `s?.[field]` rather than `s[field]`: several call sites pass an array of
   // computed values where an element can legitimately be null (ShotScorer
