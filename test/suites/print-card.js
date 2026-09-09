@@ -61,6 +61,23 @@ console.log('— clubs under the floor KEEP their row —');
 ok(!/yard-thin[^\n]*display:\s*none/.test(print),
    'the under-floor rows are not hidden when printing — a missing row on paper reads as a club you do not own');
 
+console.log('— and every selector in the hide list points at something real —');
+// `.top-bar` sat in that list naming a class this codebase has never had, so
+// the desktop nav printed on the card for as long as the rule existed. A
+// selector that matches nothing fails exactly like a gate nothing calls: no
+// error, no log line, the thing it was meant to hide simply still there.
+// Strip comments first. The rule's own explanation names `.top-bar` — the
+// class it was fixed FROM — and a scan that reads its own comment reports the
+// bug it was written to catch. This has bitten this repo three times.
+const printCode = print.replace(/\/\*[^]*?\*\//g, '');
+const hideList = (printCode.match(/([^]*?)\{\s*display:\s*none\s*!important/) || [,''])[1];
+const classes = [...new Set([...hideList.matchAll(/\.([\w-]+)/g)].map(m => m[1]))];
+ok(classes.length >= 8, `${classes.length} classes named in the print hide list`);
+const ghosts = classes.filter(c =>
+  !html.includes(c) && !src.includes(c) && !css.includes(`.${c} {`) && !css.includes(`.${c}{`));
+ok(ghosts.length === 0,
+   `each one exists in the markup or is written by app.js${ghosts.length ? ` — these do not: ${ghosts.join(', ')}` : ''}`);
+
 console.log('— and it is actually reachable —');
 ok(/window\.print\(\)/.test(src), 'the button calls the browser print dialog');
 ok(/getElementById\('printYardages'\)/.test(src), 'and is wired');

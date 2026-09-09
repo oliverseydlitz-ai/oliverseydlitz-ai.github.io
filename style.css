@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════
-   ShotLab — Tour Pro Edition
-   White + Pine Green · Barlow Condensed data · DM Sans body
+   ShotLab TOUR — "Range" modern-athletic instrument skin
+   Graphite + signal orange · Archivo display & body
+   See docs/superpowers/specs/2026-09-08-athletic-redesign-design.md
    ═══════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@600;700;800&display=swap');
@@ -415,8 +416,9 @@ button:disabled, button[disabled] {
 .label-opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .form-group input, .form-group textarea, .form-group select,
 .input, .select {
-  background: var(--surface); border: 1.5px solid var(--border-hi);
-  border-radius: var(--radius-sm); color: var(--text);
+  background: var(--surface2); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); color: var(--text);
+  min-height: var(--tap);
   /* 16px, not .9rem. Safari on iOS zooms the whole page when a focused field is
      under 16px and does NOT zoom back out afterwards, so every tap on a form
      left the app scaled up and scrolled sideways. This is the single most
@@ -427,7 +429,7 @@ button:disabled, button[disabled] {
 }
 .form-group input:focus, .form-group textarea:focus, .form-group select:focus,
 .input:focus, .select:focus {
-  border-color: var(--pine); box-shadow: 0 0 0 3px rgba(220,38,38,.08);
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak);
 }
 /* A grid item's default `min-width: auto` means it refuses to shrink below its
    content — so a <select> with a long option, or an input with a wide
@@ -536,30 +538,54 @@ textarea { resize: vertical; }
   box-shadow: 0 2px 8px rgba(220,38,38,.22);
 }
 
-/* ── Section block ─────────────────────────────────────── */
-.section-block {
-  margin-bottom: 2.25rem;
-  animation: viewFadeIn .3s ease backwards;
+/* ── Cards & section blocks (spec §7.3) ────────────────────────────────
+   A card is defined by a hairline, not by a shadow. The eight staggered
+   fade-in delays below were already dead — a later "content is always
+   visible" override set animation:none on .section-block — so they are gone
+   rather than left looking like a decision. */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  box-shadow: none;
 }
-.section-block:nth-child(2)  { animation-delay: .04s; }
-.section-block:nth-child(3)  { animation-delay: .08s; }
-.section-block:nth-child(4)  { animation-delay: .12s; }
-.section-block:nth-child(5)  { animation-delay: .16s; }
-.section-block:nth-child(6)  { animation-delay: .20s; }
-.section-block:nth-child(7)  { animation-delay: .24s; }
-.section-block:nth-child(8)  { animation-delay: .28s; }
+
+.section-block {
+  margin-bottom: var(--s6);
+  border-top: 1px solid var(--line);
+  padding-top: var(--s5);
+}
+/* The first block under a view header already has the header's rule above it. */
+.view-header + .section-block,
+.section-block:first-child { border-top: none; padding-top: 0; }
 
 .section-title {
-  font-size: .62rem; font-weight: 700; color: var(--pine);
-  text-transform: uppercase; letter-spacing: .12em;
-  margin-bottom: .875rem;
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 600; color: var(--text);
+  text-transform: uppercase; letter-spacing: .04em;
+  margin-bottom: var(--s3);
   display: flex; align-items: center; gap: .5rem;
 }
-.section-title::before {
-  content: '';
-  display: inline-block; width: 3px; height: 11px;
-  background: var(--pine); border-radius: 2px; flex-shrink: 0;
+
+/* A small upper-case label above a heading or a number. */
+.kicker {
+  font-family: var(--font-body);
+  font-size: .7rem; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .08em;
+  display: block;
 }
+
+/* The ONE hero numeral per screen (spec §4.2, §7.3). Applied by the score
+   banner; defined here so there is a single copy of it. */
+.stat-hero {
+  font-family: var(--font-display);
+  font-weight: 800; font-size: 2.4rem; line-height: 1;
+  letter-spacing: -.02em; color: var(--text);
+  font-variant-numeric: tabular-nums;
+  display: block;
+}
+@media (min-width: 640px) { .stat-hero { font-size: 3.4rem; } }
 
 /* ── Swing DNA ─────────────────────────────────────────── */
 .dna-grid { display: flex; flex-direction: column; gap: .4rem; }
@@ -684,19 +710,27 @@ canvas { max-height: 180px; }
 /* ── Tables ────────────────────────────────────────────── */
 .table-wrap {
   overflow-x: auto; border-radius: var(--radius);
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--line);
   -webkit-overflow-scrolling: touch;
 }
 table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+/* Instrument table: the header is a label row, not a filled band. The rule
+   under it is the heaviest line in the table because it is the only one that
+   separates two different kinds of thing. */
 th {
-  background: var(--pine); color: rgba(255,255,255,.82);
-  text-align: left; padding: .65rem .875rem;
-  font-weight: 700; font-size: .6rem;
+  background: var(--surface); color: var(--text-dim);
+  text-align: left; padding: .6rem .875rem;
+  font-weight: 600; font-size: .7rem;
   text-transform: uppercase; letter-spacing: .08em;
+  border-bottom: 1.5px solid var(--line-strong);
   white-space: nowrap; cursor: pointer; user-select: none; line-height: 1.4;
 }
-th:hover { color: #fff; background: var(--forest); }
-td { padding: .55rem .875rem; border-top: 1px solid var(--border); white-space: nowrap; color: var(--text); }
+th:hover { color: var(--text); background: var(--surface2); }
+td {
+  padding: .55rem .875rem; border-top: 1px solid var(--line);
+  white-space: nowrap; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
 tr:hover td { background: var(--surface2); }
 .row-good td { border-left: 2px solid var(--green); }
 .row-ok   td { border-left: 2px solid var(--yellow); }
@@ -1247,6 +1281,7 @@ body.modal-open {
   .bench-table td:first-child, .bench-table th:first-child {
     position: sticky; left: 0;
     background: var(--surface); z-index: 1;
+    border-right: 1px solid var(--line);
   }
 }
 
@@ -1277,12 +1312,10 @@ body.modal-open {
    Custom dropdowns · Decorative ornaments · Hero score
    ═══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
-:root {
-  --font-serif: 'DM Serif Display', Georgia, serif;
-  --font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
-}
+/* The webfont @import that used to sit here was dead: a CSS @import is only
+   honoured before every other rule, and this one was ~1200 lines in, so the
+   browser dropped it. DM Serif Display and JetBrains Mono never loaded once.
+   --font-mono keeps the spec §4.1 stack it was already falling back to. */
 
 /* ── Measurement-grid background ────────────────────────────── */
 body {
@@ -1295,24 +1328,23 @@ body {
 }
 
 /* ── Custom select dropdown ─────────────────────────────────── */
-.form-group select {
+.form-group select, .select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23dc2626' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23E24E12' stroke-width='1.6' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 42px;
   cursor: pointer;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: 600;
-  font-size: .88rem;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  transition: background-color .15s, border-color .15s, box-shadow .15s;
+  font-size: .9rem;
+  letter-spacing: .01em;
+  transition: background-color var(--dur), border-color var(--dur), box-shadow var(--dur);
 }
-.form-group select:hover {
-  background-color: var(--surface2);
-  border-color: var(--pine);
+.form-group select:hover, .select:hover {
+  background-color: var(--surface3);
+  border-color: var(--accent);
 }
 
 /* ── Date input: monospace ─────────────────────────────────── */
@@ -1324,22 +1356,9 @@ body {
 
 /* ── HERO SCORE BANNER ─────────────────────────────────────── */
 .score-banner-content {
-  padding: 1.6rem 1.7rem 1.5rem !important;
-  background:
-    radial-gradient(ellipse at top right, rgba(220,38,38,.055) 0%, transparent 55%),
-    radial-gradient(ellipse at bottom left, rgba(34,197,94,.04) 0%, transparent 50%),
-    var(--surface) !important;
+  padding: var(--s5) var(--s5) var(--s4) !important;
+  background: var(--surface) !important;
   position: relative;
-}
-.score-banner-content::after {
-  content: '◆';
-  position: absolute;
-  top: 14px; right: 16px;
-  font-size: .65rem;
-  color: var(--pine);
-  opacity: .4;
-  display: block;
-  font-style: normal;
 }
 .score-ring svg { width: 110px !important; height: 110px !important; }
 
@@ -1347,22 +1366,11 @@ body {
   display: flex !important;
   align-items: center;
   gap: 7px;
-  font-family: var(--font-mono) !important;
-  letter-spacing: .12em !important;
-  font-size: .6rem !important;
+  font-family: var(--font-body) !important;
+  font-weight: 600 !important;
+  letter-spacing: .08em !important;
+  font-size: .7rem !important;
 }
-.score-label::before {
-  content: '';
-  display: inline-block;
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--turf);
-  box-shadow: 0 0 8px rgba(34,197,94,.6);
-  animation: blink 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
-
 /* ── EDITORIAL SESSION CARDS ───────────────────────────────── */
 .session-card { padding: 1.2rem 1.35rem !important; }
 
@@ -1390,52 +1398,13 @@ body {
   letter-spacing: .12em !important;
 }
 
-/* ── SECTION TITLE — hairline trail ────────────────────────── */
-.section-title {
-  font-family: var(--font-mono) !important;
-  margin-bottom: 1.1rem !important;
-  letter-spacing: .13em !important;
-  font-weight: 500 !important;
-}
-.section-title::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(to right, var(--border-hi), transparent);
-}
-
-/* ── Decorative corner marks on cards ──────────────────────── */
 .chart-card, .trend-box, .insights-card { position: relative; }
-.chart-card::after,
-.trend-box::after,
-.insights-card::after {
-  content: '+';
-  position: absolute;
-  top: 10px; right: 14px;
-  font-family: var(--font-mono);
-  font-size: .85rem;
-  color: var(--text-dim);
-  opacity: .38;
-  line-height: 1;
-  pointer-events: none;
-  font-weight: 500;
-}
 
-/* ── Trend heading: pine pulse dot ─────────────────────────── */
 .trend-heading {
   display: flex !important;
   align-items: center !important;
   gap: 8px;
-  font-family: var(--font-mono) !important;
-  letter-spacing: .13em !important;
-}
-.trend-heading::before {
-  content: '';
-  display: inline-block;
-  width: 6px; height: 6px;
-  background: var(--pine);
-  border-radius: 50%;
-  flex-shrink: 0;
+  letter-spacing: .06em !important;
 }
 
 /* ── Insights title — mono ─────────────────────────────────── */
@@ -1458,17 +1427,9 @@ body {
   letter-spacing: .12em !important;
 }
 
-/* ── Table headers — mono ─────────────────────────────────── */
-th {
-  font-family: var(--font-mono) !important;
-  font-weight: 500 !important;
-  letter-spacing: .13em !important;
-  font-size: .57rem !important;
-}
-
 /* ── Record cards — editorial serif ────────────────────────── */
 .record-value {
-  font-family: var(--font-serif) !important;
+  font-family: var(--font-display) !important;
   font-weight: 400 !important;
   font-size: 2rem !important;
   letter-spacing: -.015em !important;
@@ -1588,16 +1549,6 @@ th {
 /* ── Custom number values throughout ───────────────────────── */
 .trend-val, .score-bd-n, .sm-v, .disp-stat-val, .score-number, .score-max {
   font-variant-numeric: tabular-nums;
-}
-
-/* ── Section block divider ornament ────────────────────────── */
-.section-block + .section-block::before {
-  content: '';
-  display: block;
-  width: 30px; height: 1px;
-  background: var(--border-hi);
-  margin: 0 auto 1.5rem;
-  opacity: .4;
 }
 
 /* ── Desktop — hero proportions ────────────────────────────── */
@@ -2385,7 +2336,10 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 @media print {
   /* Nothing but the book. Nav, other views, the drill finder, the
      records grid and every control are screen furniture. */
-  .bottom-nav, .top-bar, .view-header, .no-print, .modal-overlay, .cookie-consent,
+  /* `.top-bar` was a class that does not exist in this codebase, so the
+     desktop nav printed on the card for as long as this rule has been here —
+     the element is `.top-nav`. C4 says everything but the book is hidden. */
+  .bottom-nav, .top-nav, .view-header, .no-print, .modal-overlay, .cookie-consent,
   #drillFinderHost, #recordsGrid, #yardages-empty, .paywall-overlay,
   .tag-row, .search-bar, .range-card { display: none !important; }
   .view:not(#view-yardages) { display: none !important; }
