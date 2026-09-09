@@ -650,6 +650,137 @@ Write a `project` memory noting the redesign shipped, the palette name ("Range")
 
 ---
 
+## Task 15: Scroll motion — three effects that mean something (QC-added)
+
+**Files:**
+- Modify: `style.css` — new "Scroll motion" section after the layout primitives
+- Modify: `app.js` — a `ScrollMotion` module near `UI`; an `IntersectionObserver` hook in `UI.retintCharts`'s neighbourhood
+- Modify: `test/suites/scroll-motion.js` (create)
+
+**Interfaces:**
+- Produces: `ScrollMotion.observe(el, kind)`, `ScrollMotion.reduced()`, `.sm-*` classes.
+- Consumes: `chartTheme()`, the existing `prefers-reduced-motion` block (`style.css:958`).
+
+### Why this is scoped to three effects and not "animate the sections in"
+
+**The generic version has already failed in this codebase, once.** `.section-block`
+carried a `viewFadeIn` animation with eight staggered `nth-child` delays. Somebody
+later added an override titled *"Animation override: ensure content is always
+visible"* setting `animation: none !important; opacity: 1 !important` on it —
+which is what you write when the entrance animation left content invisible for
+real users. The delays were then dead for months and nobody noticed, because a
+thing that does not appear is indistinguishable from a thing that was never
+there. Task 9 deleted the eight delays; the `!important` override that killed
+them, and the `viewFadeIn` keyframe it neutralised, are **still in the file**
+(`style.css` "Animation override: ensure content is always visible", and
+`.view.active { animation: viewFadeIn }` above it). Task 14's dead-CSS sweep
+should remove both — check that first, because starting this task on top of a
+live `animation: none !important` on `.section-block` means step 3 will do
+nothing and look like a bug in the observer. **Do not reintroduce the
+stagger pattern itself.**
+
+So the rule for everything below, and it is not negotiable:
+
+> **Animate FROM a visible resting state, never TO one.** No element's
+> un-animated state may be `opacity: 0`, `visibility: hidden`, or translated
+> off its own box. If the observer never fires — JS error, an engine without
+> `IntersectionObserver`, a print, a screen reader linearising the page,
+> `render-scan.js` sampling a frame — the page must already be correct.
+
+That single constraint is also what separates this from the fade-up-everything
+look: nothing *arrives*. Things that are already there sharpen.
+
+### The three
+
+- [ ] **Step 1: Chart draw-on when the chart is actually looked at**
+
+The highest-value one, and it is a bug fix rather than decoration. Chart.js
+runs its entry animation at **construction**. Every chart below the fold —
+which on a phone is all seven Progress charts and both session-detail charts —
+finishes animating before the golfer has scrolled to it. The animation this app
+already pays for has never once been seen.
+
+`ScrollMotion.observe(canvas, 'chart')` holds the instance at
+`options.animation = false` on first render, then on first intersection sets the
+duration and calls `chart.update()`. Bars grow from the axis, lines draw left to
+right. Fires **once** per chart — a chart that re-animates every time it scrolls
+past is the thing that reads as vibecoded.
+
+Data is on screen either way: a chart whose observer never fires is simply a
+finished chart, which is exactly today's behaviour.
+
+- [ ] **Step 2: The view header condenses into the nav**
+
+On scroll past ~`--nav-h`, `.view-title` interpolates down to the nav's own
+scale and the bar takes a hairline shadow. Functional, not ornamental: the
+golfer keeps the "which screen am I on" context that a 393px viewport otherwise
+scrolls away, and a condensing instrument header is the one motion in this list
+that looks like the design language rather than like a marketing page.
+
+Drive it from a single `scroll` listener behind `requestAnimationFrame`, or a
+zero-height sentinel + `IntersectionObserver` (preferred — no scroll handler at
+all). Toggle **one class on `<html>`**, per the `ViewPrefs` / `RangeCard`
+precedent: a class on the root survives every `innerHTML =` underneath it.
+
+- [ ] **Step 3: Section rules draw in**
+
+`.section-block`'s top hairline scales from `transform: scaleX(0)` to `1`,
+left to right, over `--dur * 2`, when the block first intersects. This is the
+only "reveal" of the three and it is deliberately on the **1px rule, not the
+content**: the border is decoration by definition, so if it never animates
+nothing is lost, and the constraint above holds trivially — the rule's resting
+state is the drawn one, and the observer removes a class rather than adding it.
+
+### Explicitly NOT doing
+
+- **No count-up on the hero numeral.** A carry figure rolling 000 → 240 shows
+  the golfer numbers that were never measured, in a font that makes them look
+  measured. This app withholds a mean under ten shots; animating through eleven
+  fake values to reach a real one is the same lie with a nicer easing curve.
+- **No parallax, no scroll-jacking, no reveal on the caveat blocks.** The
+  caveats are the part a golfer most needs to have already read.
+- **No stagger.** See above — it is what broke last time.
+
+- [ ] **Step 4: Reduced motion, twice**
+
+`style.css:958` already zeroes every CSS animation under
+`prefers-reduced-motion: reduce`. **It cannot touch step 1**, which is a JS-driven
+Chart.js duration, so `ScrollMotion.reduced()` must read
+`matchMedia('(prefers-reduced-motion: reduce)').matches` itself and skip
+straight to the finished state. A CSS-only kill switch that silently misses the
+JS half is the same defect class as a gate nothing calls.
+
+- [ ] **Step 5: The suite**
+
+`test/suites/scroll-motion.js` asserts the constraint rather than the effect:
+
+1. No selector introduced by this task sets `opacity: 0`, `visibility: hidden`
+   or a `translate` on a resting state — scan the new CSS section, comments
+   stripped (this repo has been bitten four times by a scan reading its own
+   explanation).
+2. `ScrollMotion.reduced()` exists and is referenced from the chart path, so
+   the JS half of reduced-motion is wired and not just written.
+3. `IntersectionObserver` is feature-detected before use.
+4. A negative control: assert the old `viewFadeIn` stagger has **not** come
+   back (`.section-block:nth-child(N) { animation-delay` matches nothing).
+
+- [ ] **Step 6: Gates**
+
+Per-task cycle. `render-scan.js` matters more here than anywhere else: it
+samples a frame, so anything that starts invisible shows up as missing text or
+as an overflow that resolves a moment later. Run it twice. Then run it a third
+time with `IntersectionObserver` stubbed out to `undefined` in an init script —
+**the scan must still pass**, which is the constraint above, tested.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add style.css app.js test/suites/scroll-motion.js
+git commit -m "Redesign: scroll motion — chart draw-on, condensing header, section rules"
+```
+
+---
+
 ## Self-Review
 
 **Spec coverage:**
