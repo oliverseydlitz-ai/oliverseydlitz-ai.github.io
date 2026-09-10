@@ -34,24 +34,47 @@ const Sanitize = (() => {
 // ────────────────────────────────────────────────────────────────
 const CookieConsent = (() => {
   const CONSENT_KEY = 'slCookieConsent';
-  const CONSENT_VERSION = '1';
+  const CONSENT_VERSION = '2';
 
-  function hasConsent() {
+  // The banner recorded acceptance and nothing else: there was no way to
+  // refuse, and the text said continued use was agreement. Neither is valid
+  // consent in the EU — CJEU C-673/17 (Planet49) killed consent by
+  // continued browsing, and refusing has to be as easy as accepting.
+  //
+  // What is actually stored is narrow enough that most of it needs no
+  // consent at all: the items are either strictly necessary to run a
+  // session the user asked for, or a preference the user set themselves,
+  // and there is no analytics, advertising or third-party tracking anywhere
+  // in the app. So this is an informed choice over the one category that is
+  // neither — see Conditions of use in the Privacy Policy — rather than a
+  // banner that pretends everything hangs on it.
+  function decision() {
     try {
-      const saved = localStorage.getItem(CONSENT_KEY);
-      return saved === CONSENT_VERSION;
-    } catch (_) { return false; }
+      const saved = localStorage.getItem(CONSENT_KEY) || '';
+      const [v, choice] = saved.split(':');
+      return v === CONSENT_VERSION ? (choice === 'granted' || choice === 'denied' ? choice : null) : null;
+    } catch (_) { return null; }
   }
+  const hasConsent = () => decision() === 'granted';
+  const answered = () => decision() !== null;
 
-  function setConsent() {
+  function setConsent(granted = true) {
     try {
-      localStorage.setItem(CONSENT_KEY, CONSENT_VERSION);
+      localStorage.setItem(CONSENT_KEY, `${CONSENT_VERSION}:${granted ? 'granted' : 'denied'}`);
     } catch (_) {}
+    // A refusal removes what was already stored under the optional heading
+    // rather than only stopping future writes. Leaving it in place would
+    // make "Reject" a button that changes nothing, which is worse than not
+    // offering one.
+    if (!granted) {
+      ['slTheme', 'slViewPrefs', 'slSeenIntro', 'slLastConditions']
+        .forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+    }
     hideBanner();
   }
 
   function showBanner() {
-    if (hasConsent()) return;
+    if (answered()) return;
     const banner = document.getElementById('cookieConsent');
     if (banner) banner.hidden = false;
   }
@@ -61,7 +84,7 @@ const CookieConsent = (() => {
     if (banner) banner.hidden = true;
   }
 
-  return { hasConsent, setConsent, showBanner, hideBanner };
+  return { hasConsent, setConsent, showBanner, hideBanner, decision, answered };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -71,11 +94,12 @@ const CookieConsent = (() => {
 // ────────────────────────────────────────────────────────────────
 const Agreement = (() => {
   const KEY = 'slTermsAccepted';
-  // Bumped for the 2026-09-10 rewrite of both documents. This is a material
+  // Bumped again for the 2026-09-11 move to Czech governing law and Czech/EU
+  // consumer-law terms. This is a material
   // change — the governing law, the dispute-resolution route and the legal
   // bases for processing all moved — so every user is asked again rather than
   // being bound by terms they accepted a different version of.
-  const VERSION = '2026-09-10';
+  const VERSION = '2026-09-11';
 
   function hasAccepted() {
     try {
@@ -9979,7 +10003,8 @@ async function init() {
   // Initialize cookie consent banner (only if the gate was already accepted)
   try {
     if (Agreement.hasAccepted()) CookieConsent.showBanner();
-    document.getElementById('cookieAcceptBtn')?.addEventListener('click', () => CookieConsent.setConsent());
+    document.getElementById('cookieAcceptBtn')?.addEventListener('click', () => CookieConsent.setConsent(true));
+    document.getElementById('cookieRejectBtn')?.addEventListener('click', () => CookieConsent.setConsent(false));
     document.getElementById('cookieLearnBtn')?.addEventListener('click', () => {
       document.getElementById('privacyBtn')?.click();
     });

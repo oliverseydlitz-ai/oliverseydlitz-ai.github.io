@@ -3,12 +3,16 @@
 **ShotLab TOUR**
 
 **Effective date:** 10 September 2026
-**Version:** 2026-09-10
+**Version:** 2026-09-11
 **Supersedes:** the policy dated 16 June 2026
 
 ## 1. Controller and scope
 
 ShotLab TOUR (the "Service") is a golf swing analysis web application operated by Oliver Seydlitz (the "Operator", "we", "us", "our") and published at https://oliverseydlitz-ai.github.io. The Operator is the data controller for the personal data described in this policy.
+
+The Operator is established in the Czech Republic. Processing is therefore governed by Regulation (EU) 2016/679 (the General Data Protection Regulation) and by Czech Act No. 110/2019 Coll., on the processing of personal data. The competent supervisory authority is the Office for Personal Data Protection (Úřad pro ochranu osobních údajů), Pplk. Sochora 27, 170 00 Prague 7, Czech Republic, https://uoou.gov.cz.
+
+No data protection officer has been appointed. The Operator is not a public authority, does not carry out large-scale systematic monitoring, and does not process special categories of data on a large scale, so none of the conditions in Art. 37(1) GDPR applies. Privacy matters are handled directly by the Operator at the address below.
 
 Contact for all privacy matters, including requests to exercise the rights described in Sections 9 and 10: shotlab_legal@oliverseydlitz.com.
 
@@ -46,7 +50,7 @@ The Service derives statistics, quality scores, fault classifications, practice 
 
 ### 3.3 Data collected automatically
 
-The Service sets no analytics cookies, contains no advertising or tracking pixels, and operates no profiling for marketing purposes.
+The Service sets no analytics cookies, contains no advertising or tracking pixels, operates no profiling for marketing purposes, and makes no request to any third-party server while it loads. Typefaces and code libraries are served from the Service's own origin rather than from a content delivery network, so no third party receives the user's IP address as a side effect of opening the application.
 
 Supabase records standard server-side connection logs for the requests the Service makes to it, which may include IP address, user-agent string and timestamp. GitHub, as the host of the static site, may record equivalent logs for requests to the site itself. Neither log is accessible to, or aggregated by, the Operator for any purpose other than security and abuse investigation, and the Operator does not combine them with account data.
 
@@ -106,9 +110,13 @@ Enabling it writes sessions to IndexedDB on the device. It applies to sessions a
 
 This setting is independent of signing in. It governs storage on the device only.
 
-### 5.4 Withdrawing consent to storage
+### 5.4 Consent, refusal and withdrawal
 
-Non-essential storage may be declined or later withdrawn through the storage notice, reachable from Settings. Clearing site data in the browser removes all items in Section 5.2. Removing strictly necessary items will sign the user out and reset acceptance of the Terms.
+Items marked "strictly necessary" in the table above are exempt from the consent requirement in Art. 5(3) of Directive 2002/58/EC, as implemented by Section 89(3) of Czech Act No. 127/2005 Coll., because they are required to provide a service the user has explicitly requested. They are not optional, and the Service cannot function without them.
+
+Everything else is optional. The storage notice shown on first use offers acceptance and refusal with equal prominence and equal effort, and no optional item is written before a choice is made. Refusing removes any optional item already stored rather than merely preventing further writes. The choice may be changed at any time from Settings, and clearing site data in the browser removes every item in Section 5.2.
+
+Continued use of the Service is not treated as consent. Consent within the meaning of Art. 4(11) GDPR requires a clear affirmative act, and browsing is not one.
 
 ## 6. Recipients and processors
 
@@ -119,7 +127,6 @@ The Operator does not sell, rent, licence or trade personal data, and does not d
 | Supabase, Inc. | Processor — authentication, database, hosting of the account and session data | Email address, hashed password, session and practice data, preferences synced to the account | Data processing agreement under Art. 28 |
 | GitHub, Inc. | Processor — static hosting of the application files | Connection metadata only, as described in Section 3.3 | Data processing agreement under Art. 28 |
 | Google LLC | Independent controller — only where the user chooses Google Sign-In | The authentication exchange itself. Google returns an email address and identifier to the Service | The user's own decision to authenticate with Google |
-| jsDelivr | Content delivery network for three third-party code libraries and, separately, Google Fonts for typefaces | The user's IP address and user-agent, as an unavoidable consequence of requesting a file | Legitimate interests (delivery of the application) |
 
 The Operator may also disclose personal data where required to do so by law, by a court of competent jurisdiction, or where necessary to establish, exercise or defend legal claims.
 
@@ -127,9 +134,11 @@ Supabase's privacy terms are at https://supabase.com/privacy. Google's are at ht
 
 ## 7. Location of processing and international transfers
 
-The Supabase project used by the Service is hosted in the European Union (Ireland, `eu-west-1`). Account and session data are stored there.
+The Supabase project used by the Service is hosted in the European Union (Ireland, `eu-west-1`). Account and session data are stored there and are not routinely transferred outside the European Economic Area.
 
-Supabase, Inc. and GitHub, Inc. are incorporated in the United States, and support or administrative access from the United States is possible. Where personal data is transferred outside the United Kingdom or the European Economic Area, the transfer is made under the European Commission's Standard Contractual Clauses, together with the UK International Data Transfer Addendum where the UK GDPR applies, as incorporated into each processor's data processing agreement.
+Supabase, Inc. and GitHub, Inc. are incorporated in the United States, and support or administrative access from the United States is possible. Any such transfer is made under the European Commission's Standard Contractual Clauses adopted by Implementing Decision (EU) 2021/914, as incorporated into each processor's data processing agreement, supplemented by the technical measures described in Section 11. Where a processor is certified under the EU-US Data Privacy Framework, that adequacy decision may be relied on in addition.
+
+Google LLC receives personal data only where a user chooses Google Sign-In, and acts as an independent controller in that exchange under its own terms.
 
 A copy of the relevant transfer mechanism may be requested at the address in Section 1.
 
@@ -147,7 +156,7 @@ The Operator operates no separate backup of the production database, and no copy
 
 ## 9. Rights of data subjects
 
-Users in the United Kingdom and the European Economic Area have the rights set out below under the UK GDPR and EU GDPR. Users elsewhere are afforded the same rights as a matter of policy, to the extent this is technically possible.
+Users in the European Economic Area and the United Kingdom have the rights set out below under the GDPR and, respectively, Czech Act No. 110/2019 Coll. and the UK GDPR. Users elsewhere are afforded the same rights as a matter of policy, to the extent this is technically possible. No fee is charged and no right is conditional on any other.
 
 **9.1 Access.** All data held about an account is visible within the Service, and a complete machine-readable copy may be exported at any time from Settings → Data & Export.
 
@@ -161,9 +170,11 @@ Users in the United Kingdom and the European Economic Area have the rights set o
 
 **9.6 Withdrawal of consent.** Where processing is based on consent, consent may be withdrawn at any time as described in Section 5.4, or by contacting the address in Section 1.
 
-**9.7 Complaint.** A complaint may be lodged with a supervisory authority, in particular in the member state of residence, place of work or place of the alleged infringement. In the United Kingdom this is the Information Commissioner's Office (https://ico.org.uk). Users are asked, but not required, to raise the matter with the Operator first.
+**9.7 Complaint.** A complaint may be lodged with a supervisory authority, in particular in the member state of habitual residence, place of work, or place of the alleged infringement. The Operator's lead supervisory authority is the Czech Office for Personal Data Protection (Úřad pro ochranu osobních údajů), https://uoou.gov.cz. Users in the United Kingdom may instead contact the Information Commissioner's Office, https://ico.org.uk. Users are asked, but not required, to raise the matter with the Operator first.
 
-**9.8 Making a request.** Requests should be sent to shotlab_legal@oliverseydlitz.com from the email address registered with the account. A response will be provided within one month of receipt, extendable by two further months where the request is complex, in which case the user will be told within the first month. No fee is charged unless a request is manifestly unfounded or excessive.
+**9.8 Compensation.** Art. 82 GDPR gives a right to compensation for material or non-material damage caused by processing that infringes the Regulation. That right exists independently of these documents and is not affected by any limitation of liability in the Terms of Service.
+
+**9.9 Making a request.** Requests should be sent to shotlab_legal@oliverseydlitz.com from the email address registered with the account. A response will be provided within one month of receipt, extendable by two further months where the request is complex, in which case the user will be told within the first month. No fee is charged unless a request is manifestly unfounded or excessive.
 
 ## 10. Rights of California residents
 

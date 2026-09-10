@@ -12,7 +12,7 @@
        X-Frame-Options, X-Content-Type-Options, HSTS, Permissions-Policy) live in the
        /_headers file and take effect when the site is fronted by Cloudflare/Netlify.
        See SECURITY-HEADERS.md. GitHub Pages cannot send custom headers. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>ShotLab TOUR — Golf Swing Analysis for Rapsodo</title>
   <meta name="description" content="Import your Rapsodo launch monitor CSV and get instant swing analysis: club gapping, dispersion, fault detection, yardage book, and progress trends. Free, private, works offline.">
@@ -40,8 +40,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link rel="preload" href="fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous">
   <link rel="stylesheet" href="style.css">
   <!-- Schema.org. Only claims that are visibly true of the app: it is a free
        web application for analysing golf launch-monitor data, it runs in a
@@ -844,13 +843,24 @@
   </div>
 </div>
 
-<!-- CDN deps: crossorigin enables Subresource Integrity (SRI). To lock these
-     against CDN tampering, pin exact versions and add integrity="sha384-..." —
-     see SECURITY-HEADERS.md for the one-command generator. -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin="anonymous"></script>
+<!-- Dependencies are served from this origin, not from a CDN. Two reasons,
+     and the second one is why it changed:
+
+     1. Every CDN request hands the visitor's IP address to a third party
+        before a line of our code runs. For an EU-established operator that
+        is a transfer requiring a basis the app cannot obtain at that point,
+        and it is unavoidable once the tag is in the page.
+     2. The tags used floating ranges (@5, @4, @2, @6), so the exact code
+        executing here changed whenever the CDN republished, with no review
+        and no integrity hash pinning it. Vendored copies are reviewable and
+        stable; the cost is that updates are now a deliberate act.
+
+     Consequence worth knowing: these no longer receive upstream security
+     fixes automatically. Check them when updating. -->
+<script src="vendor/papaparse.min.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/idb-keyval.js"></script>
+<script src="vendor/supabase.js"></script>
 <script src="app.js"></script>
 
 <!-- ═══════════════════ AGREEMENT GATE (blocking first-run consent) -->
@@ -878,12 +888,13 @@
 <div id="cookieConsent" class="cookie-consent" hidden>
   <div class="cookie-consent-content">
     <div class="cookie-consent-text">
-      <strong>Storage notice</strong>
-      <p>Continued use of this Service constitutes acceptance of the <a href="#" id="cookieTermsLink">Terms of Service</a> and the <a href="#" id="cookiePrivacyLink">Privacy Policy</a>, which set out what is stored on this device and why.</p>
+      <strong>Storage on this device</strong>
+      <p>This Service stores data in this browser. Some of it is required to run a session you asked for and cannot be declined; the rest is optional and remembers your settings. Nothing is used for analytics, advertising or tracking, and nothing is shared with a third party for those purposes. See the <a href="#" id="cookiePrivacyLink">Privacy Policy</a> and the <a href="#" id="cookieTermsLink">Terms of Service</a>.</p>
     </div>
     <div class="cookie-consent-actions">
-      <button id="cookieAcceptBtn" class="btn-primary btn-sm">Accept</button>
-      <button id="cookieLearnBtn" class="btn-secondary btn-sm">Learn more</button>
+      <button id="cookieAcceptBtn" class="btn-primary btn-sm">Accept optional</button>
+      <button id="cookieRejectBtn" class="btn-primary btn-sm">Reject optional</button>
+      <button id="cookieLearnBtn" class="btn-ghost btn-sm">Details</button>
     </div>
   </div>
 </div>

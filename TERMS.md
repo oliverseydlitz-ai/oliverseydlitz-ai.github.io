@@ -3,12 +3,14 @@
 **ShotLab TOUR**
 
 **Effective date:** 10 September 2026
-**Version:** 2026-09-10
+**Version:** 2026-09-11
 **Supersedes:** the terms dated 16 June 2026
 
 ## 1. Agreement
 
-These Terms of Service (the "Terms") form a binding agreement between the user ("you") and Oliver Seydlitz, operator of ShotLab TOUR (the "Operator", "we", "us"), governing use of the ShotLab TOUR web application at https://oliverseydlitz-ai.github.io (the "Service").
+These Terms of Service (the "Terms") form a binding agreement between the user ("you") and Oliver Seydlitz, operator of ShotLab TOUR (the "Operator", "we", "us"), established in the Czech Republic, governing use of the ShotLab TOUR web application at https://oliverseydlitz-ai.github.io (the "Service").
+
+The Service is provided free of charge. No payment is taken, no subscription exists, and no feature is sold.
 
 By indicating acceptance in the Service, by creating an account, or by using the Service in any way, you confirm that you have read and accept these Terms and the Privacy Policy, which is incorporated into these Terms by reference. If you do not accept them, do not use the Service.
 
@@ -72,13 +74,23 @@ The Operator will make reasonable efforts to give advance notice of a permanent 
 
 ## 7. Third-party services
 
-The Service depends on third parties, including Supabase for authentication and database hosting, GitHub for static hosting, Google where Google Sign-In is used, and content delivery networks for code libraries and typefaces. Your use of those services is governed by their own terms, over which the Operator has no control and for which it accepts no responsibility. The Privacy Policy identifies each and its role.
+The Service depends on third parties, including Supabase for authentication and database hosting, GitHub for static hosting, and Google where you choose Google Sign-In. Your use of those services is governed by their own terms, over which the Operator has no control and for which it accepts no responsibility. The Privacy Policy identifies each and its role.
+
+Typefaces and code libraries are served from the Service's own origin and not from a content delivery network, so opening the Service makes no request to any third party.
 
 ## 8. Intellectual property
 
 The source code of the Service is licensed under the MIT Licence, the text of which is published with the repository. The name "ShotLab TOUR", the associated logo, and the visual design of the Service are the property of the Operator and are not licensed under the MIT Licence.
 
 The Service reproduces published research findings, benchmark tables and normative statistics attributed to their sources within the Service itself. Those materials remain the property of their respective owners and are used for reference and commentary.
+
+## 8A. Consumer information
+
+The Service is supplied free of charge and involves no payment, so the right of withdrawal from a distance contract under Directive 2011/83/EU, and Sections 1829 and following of Czech Act No. 89/2012 Coll., does not arise: there is nothing to withdraw from and nothing to refund. You may stop using the Service and delete your account at any time, with immediate effect and without giving a reason.
+
+Directive (EU) 2019/770 on contracts for the supply of digital content and digital services applies where a consumer supplies personal data in exchange for a digital service. Where it applies to your use of the Service, your rights under it, including in respect of conformity of the digital service, are unaffected by these Terms.
+
+The Operator is a natural person and not a trader in the business of selling this Service. Where any provision of consumer law nonetheless applies, it applies in full and takes precedence over any conflicting provision of these Terms.
 
 ## 9. Disclaimer of warranties
 
@@ -90,13 +102,17 @@ Nothing in this Section affects any statutory right that cannot lawfully be excl
 
 ## 10. Limitation of liability
 
-**10.1** Nothing in these Terms excludes or limits liability for death or personal injury caused by negligence, for fraud or fraudulent misrepresentation, or for any other liability that cannot lawfully be excluded or limited.
+**10.1** Nothing in these Terms excludes or limits liability for death or personal injury caused by negligence, for harm caused intentionally or by gross negligence, for harm to a person's natural rights, for fraud or fraudulent misrepresentation, or for any other liability that cannot lawfully be excluded or limited. Section 2898 of Czech Act No. 89/2012 Coll. disregards any advance exclusion or limitation of those liabilities, and Section 10.3 is to be read accordingly.
+
+**10.1a** Nothing in these Terms affects any right to compensation under Art. 82 of Regulation (EU) 2016/679 for damage caused by processing that infringes that Regulation. That right is independent of this agreement and cannot be limited by it.
 
 **10.2** Subject to Section 10.1, and to the maximum extent permitted by applicable law, the Operator will not be liable for any indirect, incidental, special, consequential, exemplary or punitive loss, nor for any loss of profit, revenue, opportunity, goodwill, anticipated saving, or data, arising out of or in connection with the Service or these Terms, whether in contract, tort including negligence, breach of statutory duty, or otherwise, and whether or not the Operator was advised of the possibility of such loss.
 
 **10.3** Subject to Section 10.1, and to the maximum extent permitted by applicable law, the Operator's total aggregate liability arising out of or in connection with the Service or these Terms is limited to one hundred United States dollars (US$100).
 
-**10.4** Where you deal as a consumer, this Section applies only so far as the law of your country of residence permits. Some jurisdictions do not allow the exclusion or limitation of certain losses, in which case the exclusions and limitations above apply only to the extent permitted, and the remainder of this Section continues in effect.
+**10.4** Where you deal as a consumer, this Section applies only so far as the mandatory law of your country of habitual residence permits. In the European Union a term that causes a significant imbalance in the parties' rights to the consumer's detriment is not binding on the consumer, under Directive 93/13/EEC and, in the Czech Republic, Sections 1810 to 1867 of Act No. 89/2012 Coll. Where any exclusion or limitation in this Section is unfair within that meaning, it does not apply to you, and the remainder of this Section continues in effect.
+
+**10.4a** For the avoidance of doubt, this Section does not purport to exclude the Operator's obligations as a data controller, its obligations under mandatory consumer law, or any liability arising from a failure to provide the Service in accordance with a description the Operator has itself given.
 
 **10.5** This Section survives termination of these Terms.
 
@@ -118,13 +134,15 @@ Sections 5.1, 5.4, 8, 9, 10, 11, 13 and 14 survive termination.
 
 **13.1 Informal resolution.** Before commencing proceedings, you agree to contact the Operator at the address in Section 16 and to allow thirty days for the matter to be resolved informally. This is a requirement of good faith and does not restrict either party's access to the courts.
 
-**13.2 Governing law.** These Terms and any dispute arising out of or in connection with them, including non-contractual disputes, are governed by the law of England and Wales.
+**13.2 Governing law.** These Terms and any dispute arising out of or in connection with them, including non-contractual disputes, are governed by the law of the Czech Republic, in particular Act No. 89/2012 Coll., the Civil Code.
 
-**13.3 Jurisdiction.** The courts of England and Wales have non-exclusive jurisdiction over any such dispute.
+**13.3 Jurisdiction.** The courts of the Czech Republic have jurisdiction over any such dispute, subject to Section 13.4.
 
-**13.4 Consumers.** Where you use the Service as a consumer, Sections 13.2 and 13.3 do not deprive you of the protection of the mandatory law of your country of habitual residence, and you may bring proceedings in the courts of that country. Consumers resident in the European Union may also use the European Commission's online dispute resolution platform.
+**13.4 Consumers.** Where you use the Service as a consumer, nothing in Sections 13.2 or 13.3 deprives you of the protection of the mandatory provisions of the law of your country of habitual residence, as guaranteed by Art. 6 of Regulation (EC) No 593/2008 (Rome I). Under Regulation (EU) No 1215/2012 (Brussels I recast) you may bring proceedings in the courts of your own domicile, and the Operator may sue you only there.
 
-**13.5** These Terms contain no arbitration clause and no waiver of class or representative proceedings. Nothing in them requires you to arbitrate a dispute.
+**13.5 Out-of-court settlement.** A consumer who is not satisfied with the outcome of a complaint may apply for out-of-court resolution of the dispute to the Czech Trade Inspection Authority (Česká obchodní inspekce), Štěpánská 44, 110 00 Prague 1, https://adr.coi.cz, which is the entity designated for that purpose under Act No. 634/1992 Coll., on consumer protection. This right exists in addition to, and does not replace, the right to go to court.
+
+**13.6 No arbitration, no class waiver.** These Terms contain no arbitration clause and no waiver of class or representative proceedings. Nothing in them requires you to arbitrate a dispute or to give up any collective remedy available to you.
 
 ## 14. General
 

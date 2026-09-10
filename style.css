@@ -4,7 +4,58 @@
    See docs/superpowers/specs/2026-09-08-athletic-redesign-design.md
    ═══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@600;700;800&display=swap');
+/* ── Fonts — self-hosted, deliberately ─────────────────────────────────
+   Archivo was loaded from Google Fonts. Every visitor's IP address was
+   therefore sent to Google on first paint, with no consent and no way to
+   refuse — the exact arrangement a German court found unlawful in LG
+   München I, 20 January 2022 (Az. 3 O 17493/20), and a live risk for an
+   EU-established operator. Self-hosting removes the transfer entirely
+   rather than papering over it with a consent banner.
+
+   It also fixes two things that were not legal problems: a PWA that
+   promises offline use could not render its own typeface offline, and the
+   CSP no longer needs to allow fonts.googleapis.com or fonts.gstatic.com.
+
+   One variable file per subset, carrying weight 400-800 and width
+   100-125%. The Expanded family is the same file pinned to width 125%,
+   which is what "Archivo Expanded" is. latin-ext is not optional: it
+   carries the Czech diacritics (c/d/e/n/r/s/t/u/z with hacek and ring). */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Archivo Expanded';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Archivo Expanded';
+  font-style: normal;
+  font-weight: 400 800;
+  font-stretch: 125%;
+  font-display: swap;
+  src: url('fonts/archivo-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 /* ── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

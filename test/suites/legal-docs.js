@@ -85,10 +85,24 @@ const NEEDED_PRIVACY = {
 for (const [what, re] of Object.entries(NEEDED_PRIVACY)) {
   ok(re.test(privacy), `privacy policy covers ${what}`);
 }
+
+console.log('— and it names the right supervisory authority for a Czech controller —');
+ok(/Úřad pro ochranu osobních údajů/.test(privacy), 'the Czech DPA is named');
+ok(/uoou\.gov\.cz/.test(privacy), 'with its address');
+ok(/Act No\. 110\/2019 Coll/.test(privacy), 'and the Czech implementing act');
+ok(/No data protection officer has been appointed/.test(privacy),
+   'the absence of a DPO is stated, with the Art. 37(1) reasoning');
 const NEEDED_TERMS = {
-  'a real governing law': /law of England and Wales/,
-  'consumer carve-out on jurisdiction': /mandatory law of your country of habitual residence/,
+  'a real governing law': /law of the Czech Republic/,
+  'the Czech Civil Code by number': /Act No\. 89\/2012 Coll/,
+  'consumer carve-out on jurisdiction': /mandatory provisions of the law of your country of habitual residence/,
+  'Rome I': /Rome I/,
+  'Brussels I recast': /Brussels I recast/,
+  'the Czech ADR body': /Česká obchodní inspekce/,
   'liability carve-out for death or personal injury': /death or personal injury caused by negligence/,
+  'the s.2898 carve-out for intent and gross negligence': /intentionally or by gross negligence/,
+  'GDPR Art. 82 is not limited by the cap': /Art\. 82 of Regulation \(EU\) 2016\/679/,
+  'unfair-terms carve-out': /Directive 93\/13\/EEC/,
   'the MIT licence is not overridden': /Nothing in this Section restricts any right granted to you by that licence/,
 };
 for (const [what, re] of Object.entries(NEEDED_TERMS)) {
@@ -98,12 +112,37 @@ for (const [what, re] of Object.entries(NEEDED_TERMS)) {
 console.log('— and the claims that were legally counterproductive are gone —');
 ok(!/no warranties regarding its completeness or accuracy/i.test(privacy),
    'the privacy policy no longer disclaims its own accuracy');
-ok(!/arbitration/i.test(terms.replace(/no arbitration clause[^.]*\./gi, '')
-     .replace(/requires you to arbitrate[^.]*\./gi, '')),
-   'the unspecified binding-arbitration clause is gone');
+// Look for an obligation to arbitrate, not for the word — the terms now say
+// explicitly that there is no arbitration clause, and a scan that trips on
+// its own denial is the trap this repo keeps falling into.
+ok(!/(agree to (resolve|submit)[^.]*arbitrat|binding arbitration)/i.test(terms),
+   'no operative obligation to arbitrate');
+ok(/no arbitration clause and no waiver of class or representative proceedings/i.test(terms),
+   'and the terms say so in terms');
 ok(!/cost of a coffee/i.test(terms), 'and the editorialising in the liability cap is gone');
 ok(!/Data Protection Officer.*Supabase/i.test(privacy),
    'a processor is no longer named as the Data Protection Officer');
+
+console.log('— the consent mechanism matches what the policy promises —');
+ok(/offers acceptance and refusal with equal prominence/.test(privacy),
+   'the policy claims an equally prominent refusal');
+ok(/id="cookieRejectBtn"/.test(html), 'and a reject control exists');
+const acceptCls = (html.match(/id="cookieAcceptBtn" class="([^"]+)"/) || [])[1];
+const rejectCls = (html.match(/id="cookieRejectBtn" class="([^"]+)"/) || [])[1];
+ok(acceptCls && acceptCls === rejectCls,
+   `accept and reject carry the same styling (${acceptCls} / ${rejectCls})`);
+ok(/Continued use of the Service is not treated as consent/.test(privacy),
+   'consent by continued browsing is disclaimed (CJEU C-673/17)');
+ok(/setConsent\(false\)/.test(src) && /removeItem\(k\)/.test(src),
+   'refusing actually removes the optional items rather than only blocking new ones');
+
+console.log('— no third party is contacted on load —');
+ok(!/cdn\.jsdelivr\.net/.test(html) && !/fonts\.googleapis\.com/.test(html),
+   'no CDN or webfont host in the markup');
+ok(/script-src 'self';/.test(html) && /font-src 'self';/.test(html),
+   "and the CSP no longer allows either");
+ok(/makes no request to any third-party server while it loads/.test(privacy),
+   'which is what the policy says');
 
 console.log('— both are reachable and printable —');
 ok(/id="privacyPdfBtn"/.test(html) && /id="termsPdfBtn"/.test(html), 'each document has a PDF control');

@@ -1,10 +1,19 @@
-const CACHE = 'shotlab-v146';
+const CACHE = 'shotlab-v148';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
 // a crawler or a share sheet, never by the app itself.
+// The two font files are precached because they are now self-hosted and
+// render-blocking: without them an offline first paint falls back to
+// system-ui, which is the one thing self-hosting was meant to stop. The
+// legal documents are precached because they are fetched at runtime and an
+// offline user is still entitled to read the terms they agreed to.
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg',
                 '/404.html', '/manifest.json',
+                '/fonts/archivo-latin.woff2', '/fonts/archivo-latin-ext.woff2',
+                '/vendor/papaparse.min.js', '/vendor/chart.umd.js',
+                '/vendor/idb-keyval.js', '/vendor/supabase.js',
+                '/PRIVACY.md', '/TERMS.md',
                 '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
