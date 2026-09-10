@@ -6,7 +6,11 @@
 SITE="${SITE:-$(dirname "$0")/site}"
 mkdir -p "$SITE" || exit 1
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
-cp "$REPO/app.js" "$REPO/index.html" "$REPO/style.css" "$REPO/sw.js" "$SITE/" || exit 1
+# PRIVACY.md and TERMS.md are fetched at runtime by the legal modals. Without
+# them in the mirror the fetch 404s and the documents render empty — so the
+# browser checks could never see that half of the app at all.
+cp "$REPO/app.js" "$REPO/index.html" "$REPO/style.css" "$REPO/sw.js" \
+   "$REPO/PRIVACY.md" "$REPO/TERMS.md" "$SITE/" || exit 1
 # Vendored CDN libs live in test/browser/vendor/ (committed) and are copied into
 # the served mirror here. Rewriting the <script> tags without shipping the files
 # left every dep 404ing behind the route-blocker, so the import flow could not

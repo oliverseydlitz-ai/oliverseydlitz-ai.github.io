@@ -821,7 +821,10 @@
   <div class="modal modal-wide">
     <div class="modal-head">
       <h2 class="modal-title">Privacy Policy</h2>
-      <button class="btn-icon" id="privacyModalClose" aria-label="Close">✕</button>
+      <div class="doc-head-actions">
+        <button class="btn-secondary btn-sm no-print" id="privacyPdfBtn"><svg class="icon" aria-hidden="true"><use href="#i-print"/></svg> PDF</button>
+        <button class="btn-icon" id="privacyModalClose" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body modal-document" id="privacyBody"></div>
   </div>
@@ -832,7 +835,10 @@
   <div class="modal modal-wide">
     <div class="modal-head">
       <h2 class="modal-title">Terms of Service</h2>
-      <button class="btn-icon" id="termsModalClose" aria-label="Close">✕</button>
+      <div class="doc-head-actions">
+        <button class="btn-secondary btn-sm no-print" id="termsPdfBtn"><svg class="icon" aria-hidden="true"><use href="#i-print"/></svg> PDF</button>
+        <button class="btn-icon" id="termsModalClose" aria-label="Close">✕</button>
+      </div>
     </div>
     <div class="modal-body modal-document" id="termsBody"></div>
   </div>
@@ -852,23 +858,11 @@
   <div class="modal">
     <h2 class="modal-title">Welcome to ShotLab TOUR</h2>
     <div class="modal-body agreement-gate-body">
-      <p>Before you start, please review and accept our terms. <strong>Using ShotLab
-      is your choice.</strong> It's a data-analysis tool for launch monitor exports
-      (e.g. Rapsodo) — information only, not coaching.</p>
-      <ul class="agreement-gate-points">
-        <li><strong>You own your decisions.</strong> Any choices you make based on
-        the app are yours. We're not liable for outcomes.</li>
-        <li>Metrics and insights are <strong>automated estimates</strong> that may be
-        wrong. Verify anything important with a pro.</li>
-        <li>Our liability is capped at $100 max, even if you claim more in damages.</li>
-        <li>We store your email and data to run the service. You can delete it anytime
-        (see Privacy Policy).</li>
-      </ul>
-      <p>By clicking <strong>"I Agree &amp; Continue"</strong> you confirm you have
-      read and accept our
+      <p>Use of ShotLab TOUR is governed by the
       <button type="button" class="link-btn" id="gateTermsLink">Terms of Service</button>
-      and
-      <button type="button" class="link-btn" id="gatePrivacyLink">Privacy Policy</button>.</p>
+      and the
+      <button type="button" class="link-btn" id="gatePrivacyLink">Privacy Policy</button>.
+      Both open here, and both can be saved as a PDF.</p>
       <label class="agreement-gate-check">
         <input type="checkbox" id="agreementCheckbox">
         <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
@@ -884,8 +878,8 @@
 <div id="cookieConsent" class="cookie-consent" hidden>
   <div class="cookie-consent-content">
     <div class="cookie-consent-text">
-      <strong>Cookie &amp; Data Notice</strong>
-      <p>We use cookies and local storage to personalize your experience and sync your data. By continuing, you agree to our <a href="PRIVACY.md" target="_blank">Privacy Policy</a> and <a href="TERMS.md" target="_blank">Terms of Service</a>.</p>
+      <strong>Storage notice</strong>
+      <p>Continued use of this Service constitutes acceptance of the <a href="#" id="cookieTermsLink">Terms of Service</a> and the <a href="#" id="cookiePrivacyLink">Privacy Policy</a>, which set out what is stored on this device and why.</p>
     </div>
     <div class="cookie-consent-actions">
       <button id="cookieAcceptBtn" class="btn-primary btn-sm">Accept</button>

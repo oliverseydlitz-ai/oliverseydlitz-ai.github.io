@@ -17,7 +17,10 @@ const EMOJI = /\p{Extended_Pictographic}/u;
 const ALLOW = [];
 
 let failed = 0;
-for (const f of ['index.html', 'app.js']) {
+// The two legal documents are shipped, user-facing text rendered inside
+// the app, so they are held to the same rule as the markup that renders
+// them. A pictograph in a privacy policy is not a style preference.
+for (const f of ['index.html', 'app.js', 'PRIVACY.md', 'TERMS.md']) {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
   src.split('\n').forEach((ln, i) => {
     const stripped = [...ln].filter(c => !ALLOW.includes(c)).join('');

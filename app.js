@@ -71,7 +71,11 @@ const CookieConsent = (() => {
 // ────────────────────────────────────────────────────────────────
 const Agreement = (() => {
   const KEY = 'slTermsAccepted';
-  const VERSION = '2026-06-16';
+  // Bumped for the 2026-09-10 rewrite of both documents. This is a material
+  // change — the governing law, the dispute-resolution route and the legal
+  // bases for processing all moved — so every user is asked again rather than
+  // being bound by terms they accepted a different version of.
+  const VERSION = '2026-09-10';
 
   function hasAccepted() {
     try {
@@ -9983,39 +9987,130 @@ async function init() {
 
   // Privacy & Legal links in Settings
   try {
+    // Markdown -> HTML for the two legal documents. Deliberately small: it
+    // handles exactly what PRIVACY.md and TERMS.md use and nothing else.
+    //
+    // The previous version emitted one <p> per line, which meant every row of
+    // a table rendered as a paragraph of pipe characters and every list item
+    // as a stray <li> with no list around it. Both documents are mostly
+    // tables and lists, so most of the text a user saw was malformed. It is
+    // also why they read as unprofessional: the content was fine, the
+    // rendering was not.
+    //
+    // Everything is escaped BEFORE any markup is added, so a document can
+    // never inject HTML even though both are files we control.
+    const renderMarkdown = (text) => {
+      const esc = (t) => Sanitize.escape(t);
+      const inline = (t) => esc(t)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+                 '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      const cells = (row) => row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const isDivider = (row) => /^\|?[\s:|-]+\|[\s:|-]*$/.test(row) && row.includes('-');
+
+      const lines = text.split('\n');
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // table: a pipe row followed by a divider row
+        if (line.trim().startsWith('|') && isDivider(lines[i + 1] || '')) {
+          const head = cells(line.trim());
+          i += 2;
+          const body = [];
+          while (i < lines.length && lines[i].trim().startsWith('|')) {
+            body.push(cells(lines[i].trim())); i++;
+          }
+          out.push('<div class="doc-table-wrap"><table class="doc-table"><thead><tr>' +
+            head.map(c => `<th>${inline(c)}</th>`).join('') + '</tr></thead><tbody>' +
+            body.map(r => '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') +
+            '</tbody></table></div>');
+          continue;
+        }
+
+        // list: consecutive "- " lines become one <ul>
+        if (/^[-*] /.test(line.trim())) {
+          const items = [];
+          while (i < lines.length && /^[-*] /.test(lines[i].trim())) {
+            items.push(`<li>${inline(lines[i].trim().slice(2))}</li>`); i++;
+          }
+          out.push(`<ul>${items.join('')}</ul>`);
+          continue;
+        }
+
+        if (line.startsWith('### ')) out.push(`<h3>${inline(line.slice(4))}</h3>`);
+        else if (line.startsWith('## ')) out.push(`<h2>${inline(line.slice(3))}</h2>`);
+        else if (line.startsWith('# ')) out.push(`<h1>${inline(line.slice(2))}</h1>`);
+        else if (line.startsWith('> ')) out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`);
+        else if (line.trim() !== '') out.push(`<p>${inline(line)}</p>`);
+        i++;
+      }
+      return out.join('\n');
+    };
+
     const loadDocument = async (url, elementId) => {
       try {
         const response = await fetch(url);
-        const text = await response.text();
-        const el = document.getElementById(elementId);
-        // Render markdown line-by-line. Strip simple emphasis markers and
-        // always escape the text first (defense against any HTML in the docs).
-        const inline = (s) => Sanitize.escape(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        el.innerHTML = text
-          .split('\n')
-          .map(line => {
-            if (line.startsWith('### ')) return `<h3>${inline(line.slice(4))}</h3>`;
-            if (line.startsWith('## ')) return `<h2>${inline(line.slice(3))}</h2>`;
-            if (line.startsWith('# ')) return `<h1>${inline(line.slice(2))}</h1>`;
-            if (line.startsWith('> ')) return `<blockquote>${inline(line.slice(2))}</blockquote>`;
-            if (line.startsWith('- ')) return `<li>${inline(line.slice(2))}</li>`;
-            if (line.trim() === '') return '';
-            return `<p>${inline(line)}</p>`;
-          })
-          .join('\n');
+        if (!response.ok) throw new Error(`${response.status}`);
+        document.getElementById(elementId).innerHTML = renderMarkdown(await response.text());
       } catch (e) {
         console.error(`Failed to load ${url}:`, e);
-        toast(`Could not load document`);
+        toast('Could not load document');
       }
     };
 
-    document.getElementById('privacyBtn')?.addEventListener('click', async () => {
-      await loadDocument('PRIVACY.md', 'privacyBody');
-      document.getElementById('privacyModal').hidden = false;
+    // Save the open document as a PDF.
+    //
+    // This hands the document to the browser's own print pipeline rather than
+    // generating a PDF in JavaScript. That is not a shortcut — it is the only
+    // route that works here. The app's Content-Security-Policy sets
+    // object-src 'none' and allows frames only from accounts.google.com, so a
+    // PDF cannot be embedded or framed in the page at all, and loosening
+    // either directive on a page that holds an auth token in localStorage is a
+    // real security cost for a cosmetic gain. A generated PDF would also be a
+    // second copy of a legal document that can drift from the source; this one
+    // is rendered from the same markdown file every time.
+    //
+    // The class goes on <html> for the reason ViewPrefs and RangeCard do it:
+    // it survives a re-render, where an inline style or a `hidden` attribute
+    // would be wiped by the next innerHTML on the container.
+    const printDocument = (modalId) => {
+      const root = document.documentElement;
+      root.classList.add('legal-print');
+      root.setAttribute('data-legal-print', modalId);
+      const cleanup = () => {
+        root.classList.remove('legal-print');
+        root.removeAttribute('data-legal-print');
+      };
+      // afterprint is not fired by every engine; the timeout is the backstop,
+      // because leaving the class on would hide the whole app on the next
+      // print of anything else.
+      window.addEventListener('afterprint', cleanup, { once: true });
+      setTimeout(cleanup, 1500);
+      window.print();
+    };
+
+    const openDoc = async (file, bodyId, modalId) => {
+      await loadDocument(file, bodyId);
+      document.getElementById(modalId).hidden = false;
+    };
+    document.getElementById('privacyBtn')?.addEventListener('click',
+      () => openDoc('PRIVACY.md', 'privacyBody', 'privacyModal'));
+    document.getElementById('termsBtn')?.addEventListener('click',
+      () => openDoc('TERMS.md', 'termsBody', 'termsModal'));
+    document.getElementById('privacyPdfBtn')?.addEventListener('click',
+      () => printDocument('privacyModal'));
+    document.getElementById('termsPdfBtn')?.addEventListener('click',
+      () => printDocument('termsModal'));
+    // The storage notice links to the documents; it must open the rendered
+    // modal, not hand the browser a raw .md file to download.
+    document.getElementById('cookiePrivacyLink')?.addEventListener('click', e => {
+      e.preventDefault(); openDoc('PRIVACY.md', 'privacyBody', 'privacyModal');
     });
-    document.getElementById('termsBtn')?.addEventListener('click', async () => {
-      await loadDocument('TERMS.md', 'termsBody');
-      document.getElementById('termsModal').hidden = false;
+    document.getElementById('cookieTermsLink')?.addEventListener('click', e => {
+      e.preventDefault(); openDoc('TERMS.md', 'termsBody', 'termsModal');
     });
     document.getElementById('cookiePrefsBtn')?.addEventListener('click', () => {
       CookieConsent.showBanner();

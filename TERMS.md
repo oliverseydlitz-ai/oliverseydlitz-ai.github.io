@@ -1,248 +1,154 @@
-# Terms of Service — ShotLab TOUR
+# Terms of Service
 
-**Effective Date:** June 16, 2026
+**ShotLab TOUR**
 
-> **⚠️ PLEASE READ CAREFULLY — THIS IS A BINDING LEGAL AGREEMENT.**
-> By clicking "I Agree," creating an account, or using ShotLab TOUR in any
-> way, you confirm that you have read, understood, and accept these Terms of
-> Service and the Privacy Policy in full. **By using the Service, you agree that
-> you voluntarily choose to use it (Section 5A), assume responsibility for all
-> your own decisions and actions, accept our disclaimers (Section 5), and
-> accept a $100 cap on our liability (Section 6).** If you do not agree to
-> every part, do not use the Service.
+**Effective date:** 10 September 2026
+**Version:** 2026-09-10
+**Supersedes:** the terms dated 16 June 2026
 
-## 1. Agreement to Terms
+## 1. Agreement
 
-By accessing, browsing, clicking "I Agree," or otherwise using ShotLab TOUR
-("Site," "Service," "App," "we," "us," "our"), you agree to be legally bound by
-these Terms of Service ("Terms"). This is an enforceable contract between you
-and the operator of ShotLab TOUR. If you disagree with any part, you must not
-access or use the Service.
+These Terms of Service (the "Terms") form a binding agreement between the user ("you") and Oliver Seydlitz, operator of ShotLab TOUR (the "Operator", "we", "us"), governing use of the ShotLab TOUR web application at https://oliverseydlitz-ai.github.io (the "Service").
 
-If you are using the Service on behalf of an organization, you represent that
-you have authority to bind that organization to these Terms.
+By indicating acceptance in the Service, by creating an account, or by using the Service in any way, you confirm that you have read and accept these Terms and the Privacy Policy, which is incorporated into these Terms by reference. If you do not accept them, do not use the Service.
 
-## 2. Use License
+You confirm that you are aged eighteen or over and have the legal capacity to enter into this agreement. Where you use the Service on behalf of an organisation, you confirm that you have authority to bind that organisation, and "you" includes that organisation.
 
-We grant you a limited, non-exclusive, revocable license to access the Site for personal, non-commercial use. You may not:
+## 2. Nature of the Service
 
-- Modify or copy the code (except for personal use)
-- Use the Site for illegal purposes
-- Transmit viruses, malware, or malicious code
-- Reverse-engineer or attempt to access our systems
-- Scrape or bulk-download data
-- Sell or redistribute the Service
+The Service is an informational data-analysis tool. It imports launch monitor exports, principally Rapsodo CSV files, and presents statistics, charts, classifications of recurring faults, and suggested practice work derived from them.
 
-## 3. User Accounts
+Every metric, classification, verdict and recommendation the Service produces is an automated estimate calculated from data the Service did not itself measure, using models and thresholds that are approximations. Several are explicitly derived rather than measured, and the Service marks them as such where it can.
 
-### 3.1 Registration
+The Service is not, and does not purport to be:
 
-By creating an account, you agree to:
-- Provide accurate, current information
-- Maintain the confidentiality of your password
-- Not share your account with others
-- Accept responsibility for all activity on your account
+- golf instruction, coaching, or supervision of practice;
+- medical, physiotherapeutic, fitness or health advice;
+- a diagnosis of any physical condition or swing characteristic;
+- professional advice of any kind; or
+- a guarantee, prediction or assurance of any playing outcome.
 
-### 3.2 Guest Mode
+Use of the Service is voluntary. You remain responsible for your own practice, your equipment, your physical safety, and every decision you take, whether or not the Service informed it. You should obtain advice from a qualified professional before acting on anything the Service produces, and before beginning or changing any physical activity.
 
-Guest data is stored locally and deleted when you close the page. We are not responsible for loss of guest data.
+## 3. Licence and permitted use
 
-## 4. Content Ownership
+Subject to these Terms, you are granted a limited, non-exclusive, non-transferable, revocable licence to access and use the Service for your own personal, non-commercial purposes.
 
-### 4.1 Your Golf Data
+You must not:
 
-**You own your session data (CSV imports, metrics, notes).**
+- use the Service for any unlawful purpose, or in breach of any applicable law or regulation;
+- attempt to gain unauthorised access to the Service, to its database, to any account other than your own, or to any system or network connected to it;
+- circumvent, disable or interfere with any security, authentication or access control feature;
+- introduce any virus, worm, or other malicious code;
+- use any automated system to scrape, harvest, or bulk-download data from the Service, or place an unreasonable load on its infrastructure;
+- resell, sublicense, rent, or otherwise commercially exploit access to the hosted Service; or
+- upload or transmit content that is unlawful, that infringes the rights of any third party, or that contains personal data about an identifiable person other than yourself.
 
-We have permission to:
-- Store and process your data
-- Display it back to you
-- Use aggregated, anonymized data for improvement
-- Backup to Supabase for your protection
+The source code of the Service is published separately on GitHub under the MIT Licence. Nothing in this Section restricts any right granted to you by that licence in respect of that source code. The restrictions in this Section apply to the hosted Service, its database, and its infrastructure.
 
-### 4.2 Service Content
+## 4. Accounts
 
-Code, design, documentation, and features are our property (MIT License applies to code on GitHub).
+An account is optional. The Service may be used without one, subject to Section 5.
 
-## 5A. Voluntary Use & Your Responsibility
+Where you create an account, you must provide accurate information, keep your credentials confidential, and not share the account. You are responsible for activity carried out under your credentials. You must notify the Operator promptly at the address in Section 16 if you believe your account has been accessed without your authorisation.
 
-**Using ShotLab TOUR is entirely voluntary. You choose to use it or not.**
+The Operator may suspend or terminate an account, with or without notice, where it reasonably believes these Terms have been breached, or where necessary to protect the Service or other users. You may delete your account at any time from within the Service, as described in the Privacy Policy.
 
-If you use it:
-- You are responsible for all your own decisions and actions based on any
-  information or analysis the app provides.
-- You are responsible for the safety, legality, and consequences of how you use
-  the app and any data you import into it.
-- You are responsible for your own golf practice, swing changes, equipment, and
-  any outcomes (good or bad) from your choices.
+## 5. Data, storage and loss
 
-**ShotLab TOUR is an informational data-analysis tool only.** It imports launch
-monitor data (such as Rapsodo CSV exports), then displays statistics, charts,
-and automated insights. The metrics, fault detection, and "what to work on"
-insights are **automated estimates that may be incomplete or inaccurate.**
+**5.1 Ownership.** You retain all rights in the launch monitor data you import and in the notes, tags and records you enter. These Terms grant the Operator no ownership of that data.
 
-It is **not**:
-- A coach, trainer, instructor, or supervisor
-- Medical, fitness, or professional advice
-- A provider of training programs or guaranteed results
+**5.2 Permission to process.** You grant the Operator a limited licence to store, transmit, process and display that data for the sole purpose of providing the Service to you. This licence exists only to make the Service function, is limited to what is necessary for that purpose, and ends when the data is deleted. The Operator does not aggregate, anonymise, publish, or otherwise use your data for any purpose beyond providing the Service to you.
 
-**You own the outcome of any choices you make.** We don't.
+**5.3 Storage on your device.** Where an account is not used, or where the "Keep sessions on this device" setting is enabled, data is stored in your browser on your own device. That storage is under your control and outside the Operator's. It is not encrypted, it is not a backup, and it may be lost without notice through browser settings, private browsing, storage pressure, clearing site data, device failure, or reinstallation.
 
-## 5. Disclaimers
+**5.4 Loss.** To the extent permitted by law, the Operator is not liable for the loss, corruption or unavailability of data, whether stored on your device or in the account database. You are responsible for maintaining your own copies, and the Service provides an export function for that purpose at Settings → Data & Export.
 
-### 5.1 "AS-IS" / "AS-AVAILABLE" Service
+## 6. Availability
 
-THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITH ALL FAULTS AND WITHOUT
-WARRANTY OF ANY KIND. **TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WE
-EXPRESSLY DISCLAIM ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR
-OTHERWISE, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.**
+The Service is provided free of charge and without any commitment as to availability. It may be unavailable, degraded, or discontinued at any time, in whole or in part, without notice and without liability. Features may be added, altered or removed. The database on which the cloud element depends is operated on a plan that suspends after a period of inactivity, in which case cloud synchronisation will fail until it resumes; the Service indicates when this has occurred.
 
-We make **no warranty** that the Service will be accurate, reliable,
-uninterrupted, secure, error-free, or that defects will be corrected. This
-includes, without limitation:
-- Accuracy of fault detection, metrics, or distance/gap calculations
-- Golf swing recommendations, drills, or "what to work on" guidance
-- Uninterrupted or timely availability
-- Freedom from errors, bugs, or data loss
+The Operator will make reasonable efforts to give advance notice of a permanent discontinuation of the Service, and to allow data to be exported before it ceases, but gives no undertaking to do so.
 
-**You are solely responsible for** your own golf instruction, decisions, and
-safety. No advice or information obtained from the Service creates any warranty
-not expressly stated here.
+## 7. Third-party services
 
-### 5.2 Data Loss
+The Service depends on third parties, including Supabase for authentication and database hosting, GitHub for static hosting, Google where Google Sign-In is used, and content delivery networks for code libraries and typefaces. Your use of those services is governed by their own terms, over which the Operator has no control and for which it accepts no responsibility. The Privacy Policy identifies each and its role.
 
-We are not liable for:
-- Loss of locally stored data (IndexedDB)
-- Service worker cache clearing
-- Browser crashes or storage limits
-- Accidental data deletion
+## 8. Intellectual property
 
-**Backup strategy:** Export your data regularly (Settings → Export).
+The source code of the Service is licensed under the MIT Licence, the text of which is published with the repository. The name "ShotLab TOUR", the associated logo, and the visual design of the Service are the property of the Operator and are not licensed under the MIT Licence.
 
-### 5.3 No Medical/Legal Advice
+The Service reproduces published research findings, benchmark tables and normative statistics attributed to their sources within the Service itself. Those materials remain the property of their respective owners and are used for reference and commentary.
 
-ShotLab provides analysis only, not:
-- Medical advice
-- Professional swing instruction
-- Legal guidance
+## 9. Disclaimer of warranties
 
-Consult a PGA professional for instruction.
+To the maximum extent permitted by applicable law, the Service is provided "as is" and "as available", with all faults and without warranty of any kind, whether express, implied, statutory or otherwise. The Operator expressly disclaims all implied warranties, including those of merchantability, satisfactory quality, fitness for a particular purpose, accuracy, and non-infringement.
 
-## 6. Limitation of Liability
+Without limiting the foregoing, the Operator does not warrant that the Service will be uninterrupted, timely, secure, or free from error; that any defect will be corrected; that any metric, classification, verdict or recommendation it produces is accurate, complete, or suitable for any purpose; or that any result will be achieved by following it.
 
-**TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT WILL WE (OR OUR
-OPERATORS, CONTRIBUTORS, OR AFFILIATES) BE LIABLE TO YOU FOR ANY INDIRECT,
-INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY
-LOSS OF PROFITS, REVENUE, DATA, GOODWILL, USE, OR OTHER INTANGIBLE LOSSES,
-ARISING OUT OF OR RELATING TO THE SERVICE OR THESE TERMS, WHETHER BASED ON
-CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR ANY OTHER LEGAL
-THEORY, AND WHETHER OR NOT WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
-DAMAGES.**
+Nothing in this Section affects any statutory right that cannot lawfully be excluded. Where you deal as a consumer, your statutory rights are unaffected by these Terms.
 
-**OUR TOTAL CUMULATIVE LIABILITY FOR ALL CLAIMS ARISING OUT OF OR RELATING TO
-THE SERVICE OR THESE TERMS WILL NOT EXCEED US $100.00, REGARDLESS OF THE AMOUNT
-OF ACTUAL DAMAGES, LOSSES, OR COSTS YOU CLAIM.** For free accounts (which is
-most users), this cap means you can recover at most the cost of a coffee.
+## 10. Limitation of liability
 
-This limitation applies to the fullest extent permitted by law and survives any
-termination of these Terms. Some jurisdictions do not allow the exclusion or
-limitation of certain damages, so some of the above may not apply to you; in
-those jurisdictions our liability is limited to the smallest amount permitted by
-law. Nothing in these Terms limits liability that cannot be limited by law (such
-as for fraud or willful misconduct).
+**10.1** Nothing in these Terms excludes or limits liability for death or personal injury caused by negligence, for fraud or fraudulent misrepresentation, or for any other liability that cannot lawfully be excluded or limited.
 
-## 7. Modifications & Downtime
+**10.2** Subject to Section 10.1, and to the maximum extent permitted by applicable law, the Operator will not be liable for any indirect, incidental, special, consequential, exemplary or punitive loss, nor for any loss of profit, revenue, opportunity, goodwill, anticipated saving, or data, arising out of or in connection with the Service or these Terms, whether in contract, tort including negligence, breach of statutory duty, or otherwise, and whether or not the Operator was advised of the possibility of such loss.
 
-We may:
-- Modify the Site at any time
-- Discontinue features with 30 days notice
-- Have scheduled/emergency maintenance (best effort notification)
-- Update these Terms anytime (changes posted here)
+**10.3** Subject to Section 10.1, and to the maximum extent permitted by applicable law, the Operator's total aggregate liability arising out of or in connection with the Service or these Terms is limited to one hundred United States dollars (US$100).
 
-## 8. Prohibited Conduct
+**10.4** Where you deal as a consumer, this Section applies only so far as the law of your country of residence permits. Some jurisdictions do not allow the exclusion or limitation of certain losses, in which case the exclusions and limitations above apply only to the extent permitted, and the remainder of this Section continues in effect.
 
-You agree **not to:**
-- Reverse-engineer or decompile the Site
-- Access our servers or databases without authorization
-- Transmit malware or harmful code
-- Spam, harass, or abuse others
-- Commit fraud or misrepresentation
-- Violate laws or regulations
-- Attempt to gain unauthorized access
+**10.5** This Section survives termination of these Terms.
 
-**Violations** may result in account suspension without refund.
+## 11. Indemnity
 
-## 9. Third-Party Services
+This Section does not apply where you use the Service as a consumer.
 
-We use Supabase for authentication and cloud storage. You agree to:
-- [Supabase Terms of Service](https://supabase.com/terms)
-- [Supabase Acceptable Use Policy](https://supabase.com/acceptable-use)
+Where you use the Service for business purposes or on behalf of an organisation, you will indemnify the Operator against all claims, liabilities, damages, losses and reasonable costs, including reasonable legal fees, arising out of or in connection with your breach of these Terms, your use of the Service, or content you upload to it. The Operator will notify you promptly of any claim to which this Section applies, will not settle it without your consent, and may participate in its defence at its own expense.
 
-## 10. Intellectual Property
+## 12. Suspension and termination
 
-### 10.1 Our IP
+You may stop using the Service at any time and may delete your account from within it.
 
-- Code licensed under [MIT License](https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io/blob/main/LICENSE)
-- Design and documentation copyright © 2026
-- "ShotLab," "TOUR" are trademarks (limited use)
+The Operator may suspend or terminate your access, and delete your account and its data, where you materially breach these Terms, where required by law, or where the Service is discontinued under Section 6. Where the reason for termination permits it, the Operator will give you a reasonable opportunity to export your data first.
 
-### 10.2 Your IP
+Sections 5.1, 5.4, 8, 9, 10, 11, 13 and 14 survive termination.
 
-You retain all rights to your golf data and session notes.
+## 13. Governing law and disputes
 
-## 11. Privacy
+**13.1 Informal resolution.** Before commencing proceedings, you agree to contact the Operator at the address in Section 16 and to allow thirty days for the matter to be resolved informally. This is a requirement of good faith and does not restrict either party's access to the courts.
 
-See our [Privacy Policy](./PRIVACY.md) for data handling, cookies, and your rights.
+**13.2 Governing law.** These Terms and any dispute arising out of or in connection with them, including non-contractual disputes, are governed by the law of England and Wales.
 
-## 12. Indemnification
+**13.3 Jurisdiction.** The courts of England and Wales have non-exclusive jurisdiction over any such dispute.
 
-**You agree to defend, indemnify, and hold harmless ShotLab TOUR and its
-operators, contributors, and affiliates from and against any and all claims,
-demands, liabilities, damages, losses, costs, and expenses (including
-reasonable attorneys' fees) arising out of or relating to:**
-- Your violation of these Terms or the Privacy Policy
-- Your access to or use of the Service
-- Your golf data, content, or activities
-- Your account, including any activity under your credentials
-- Your violation of any law or the rights of any third party
-- Any loss or damage arising from your reliance on the Service or its analysis
+**13.4 Consumers.** Where you use the Service as a consumer, Sections 13.2 and 13.3 do not deprive you of the protection of the mandatory law of your country of habitual residence, and you may bring proceedings in the courts of that country. Consumers resident in the European Union may also use the European Commission's online dispute resolution platform.
 
-We reserve the right, at our own expense, to assume the exclusive defense and
-control of any matter otherwise subject to indemnification by you, and you agree
-to cooperate with our defense of such claims.
+**13.5** These Terms contain no arbitration clause and no waiver of class or representative proceedings. Nothing in them requires you to arbitrate a dispute.
 
-## 13. Dispute Resolution
+## 14. General
 
-### 13.1 Governing Law
+**14.1 Entire agreement.** These Terms and the Privacy Policy constitute the entire agreement between the parties in respect of the Service and supersede all prior understandings relating to it. Nothing in this Section limits liability for fraudulent misrepresentation.
 
-These Terms are governed by the laws of the United States (GitHub Pages jurisdiction), without regard to conflicts of law principles.
+**14.2 Severability.** If any provision is held invalid or unenforceable, it is to be modified to the minimum extent necessary to make it enforceable, or if that is not possible, severed. The remaining provisions continue in full effect.
 
-### 13.2 Informal Resolution
+**14.3 No waiver.** A failure to enforce any provision is not a waiver of it.
 
-Before legal action, contact us at our GitHub Issues to resolve disputes informally.
+**14.4 Assignment.** You may not assign or transfer your rights under these Terms. The Operator may assign them on notice to you in connection with a transfer of the Service, provided your rights are not thereby diminished.
 
-### 13.3 Arbitration
+**14.5 No third-party rights.** A person who is not a party to these Terms has no right to enforce any of its provisions.
 
-You agree to resolve any dispute via binding arbitration (not court), except for:
-- IP infringement claims
-- Equitable relief (injunctions)
-- Claims under $5,000 (small claims court OK)
+**14.6 Force majeure.** The Operator is not liable for any failure or delay caused by events beyond its reasonable control.
 
-## 14. Severability
+## 15. Changes to these Terms
 
-If any provision is found invalid, the remaining provisions remain in effect.
+These Terms may be amended. The version identifier and effective date at the head of the document will be updated. Where an amendment is material, acceptance will be requested again in the Service before continued use, and the previous version's date will be recorded above.
 
-## 15. Entire Agreement
-
-These Terms, along with our [Privacy Policy](./PRIVACY.md) and [Cookie Policy](#cookies), constitute the entire agreement between you and ShotLab.
+Continued use of the Service after an amendment takes effect constitutes acceptance of the amended Terms. If you do not accept them, you must stop using the Service, and may delete your account and export your data beforehand.
 
 ## 16. Contact
 
-For questions or disputes:
-- GitHub: [oliverseydlitz-ai/oliverseydlitz-ai.github.io](https://github.com/oliverseydlitz-ai/oliverseydlitz-ai.github.io/issues)
-- Include "LEGAL:" in the subject line
+Oliver Seydlitz, Operator of ShotLab TOUR
+shotlab_legal@oliverseydlitz.com
 
----
-
-**Last Updated:** June 16, 2026  
-**Changes:** We may update these terms anytime. Check back regularly.
+Correspondence concerning these Terms should be marked "Legal".
