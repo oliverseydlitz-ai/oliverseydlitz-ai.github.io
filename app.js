@@ -113,9 +113,59 @@ const Agreement = (() => {
       localStorage.setItem(KEY, JSON.stringify({
         version: VERSION,
         acceptedAt: new Date().toISOString(),
+        // Recorded separately from the agreement itself, because it is a
+        // separate affirmative act: the golfer ticked a box saying they
+        // understand the software is experimental and unwarranted. A record
+        // that says only "accepted v2026-09-11" cannot evidence that.
+        acknowledgedRisk: true,
       }));
     } catch (_) {}
     hideGate();
+  }
+
+  // Declining is a real answer, so it gets a real outcome: the app is not
+  // entered. Nothing is stored — a decline is not a preference to remember,
+  // and writing one would be storing a record of someone who just refused
+  // the terms under which we could store anything.
+  //
+  // Leaving is attempted in the order of what actually works, and only where
+  // it lands somewhere real.
+  //
+  // history.length is the wrong signal: a tab that has only ever shown this
+  // page still reports 2, because about:blank counts. Going "back" then
+  // navigates to a blank document, which to the person looking at it is
+  // indistinguishable from the app crashing. document.referrer is the honest
+  // test — non-empty means they arrived from somewhere, so back() returns
+  // them there.
+  //
+  // Typed the address in? There is nowhere to send them that is not somebody
+  // else's site, and this app just spent a release removing every
+  // third-party request. So they get a terminal screen instead of a redirect
+  // to a search engine.
+  function decline() {
+    renderDeclined();
+    try { window.close(); } catch (_) {}   // only works for a script-opened window
+    try {
+      if (document.referrer) window.history.back();
+    } catch (_) {}
+  }
+
+  function renderDeclined() {
+    const el = document.createElement('div');
+    el.id = 'declinedScreen';
+    el.className = 'declined-screen';
+    el.setAttribute('role', 'document');
+    el.innerHTML =
+      '<div class="declined-card">' +
+        '<h1 class="declined-title">Terms declined</h1>' +
+        '<p>ShotLab TOUR cannot be used without accepting the Terms of Service ' +
+        'and the Privacy Policy. Nothing has been stored on this device.</p>' +
+        '<button class="btn-primary" id="declinedBack">Read the terms again</button>' +
+      '</div>';
+    document.body.innerHTML = '';
+    document.body.appendChild(el);
+    document.getElementById('declinedBack')
+      .addEventListener('click', () => window.location.reload());
   }
 
   function showGate() {
@@ -129,7 +179,7 @@ const Agreement = (() => {
     if (gate) gate.hidden = true;
   }
 
-  return { hasAccepted, accept, showGate, hideGate, VERSION };
+  return { hasAccepted, accept, decline, showGate, hideGate, VERSION };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -9976,20 +10026,40 @@ async function init() {
   // Reflect persisted theme on the Settings switch (class already set early)
   applyTheme(document.documentElement.classList.contains('dark'));
 
-  // Blocking agreement gate — must accept Terms & Privacy before using the app.
-  // Accepting also satisfies cookie consent, so the banner won't double-prompt.
+  // Blocking agreement gate — the Terms and the Privacy Policy must be
+  // accepted before the app can be used. Two boxes, not one: agreeing to a
+  // contract and acknowledging that the software is experimental and
+  // unwarranted are different acts, and a single tick cannot evidence both.
+  //
+  // Accepting here deliberately does NOT grant storage consent. It used to:
+  // the accept button called CookieConsent.setConsent(), so ticking "I agree
+  // to the Terms" silently also granted the optional storage a user is
+  // entitled to refuse. Art. 7(4) GDPR is explicit that consent bundled into
+  // acceptance of a contract is not freely given, and it is the reason the
+  // storage notice exists as a separate step with its own refusal.
   try {
     const checkbox = document.getElementById('agreementCheckbox');
+    const riskCheckbox = document.getElementById('agreementRiskCheckbox');
     const acceptBtn = document.getElementById('agreementAcceptBtn');
+    const declineBtn = document.getElementById('agreementDeclineBtn');
 
-    checkbox?.addEventListener('change', () => {
-      if (acceptBtn) acceptBtn.disabled = !checkbox.checked;
-    });
+    const syncAccept = () => {
+      if (acceptBtn) acceptBtn.disabled = !(checkbox?.checked && riskCheckbox?.checked);
+    };
+    checkbox?.addEventListener('change', syncAccept);
+    riskCheckbox?.addEventListener('change', syncAccept);
 
     acceptBtn?.addEventListener('click', () => {
+      if (acceptBtn.disabled) return;
       Agreement.accept();
-      CookieConsent.setConsent();
+      // The storage question comes AFTER the contract question, as its own
+      // decision. Without this a first-time user would never be asked at
+      // all — the banner is only raised at boot, and at boot the gate had
+      // not been accepted yet, so accepting used to hand storage consent
+      // over silently precisely because nothing else would have asked.
+      CookieConsent.showBanner();
     });
+    declineBtn?.addEventListener('click', () => Agreement.decline());
 
     // Review the full docs from inside the gate (open above it).
     document.getElementById('gateTermsLink')?.addEventListener('click', () =>

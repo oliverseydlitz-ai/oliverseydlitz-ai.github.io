@@ -21,8 +21,19 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', x => errs.push(x.message));
   await p.goto((process.env.PW_URL || 'http://127.0.0.1:8766') + '/index.html',{waitUntil:'domcontentloaded'}); await p.waitForTimeout(800);
+  // Two boxes now: the agreement and the experimental-software
+  // acknowledgement. Accept stays disabled until both are ticked, which is
+  // the point of them being separate.
   if (await p.locator('#agreementCheckbox').isVisible().catch(()=>0)) {
-    await p.check('#agreementCheckbox'); await p.click('#agreementAcceptBtn'); await p.waitForTimeout(400); }
+    await p.check('#agreementCheckbox');
+    await p.check('#agreementRiskCheckbox');
+    await p.click('#agreementAcceptBtn'); await p.waitForTimeout(400);
+    // The storage notice is raised after the gate, as its own question, and
+    // covers the bottom of the viewport until it is answered.
+    if (await p.locator('#cookieAcceptBtn').isVisible().catch(()=>0)) {
+      await p.click('#cookieAcceptBtn'); await p.waitForTimeout(300);
+    }
+  }
   await p.waitForSelector('#authGuestWrap button',{state:'visible',timeout:8000}).catch(()=>{});
   await p.click('#authGuestWrap button').catch(()=>{}); await p.waitForTimeout(600);
   // A brand-new account gets the FirstRun orientation over the home view. It is

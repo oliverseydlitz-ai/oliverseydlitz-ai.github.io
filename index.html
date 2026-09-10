@@ -873,13 +873,23 @@
       and the
       <button type="button" class="link-btn" id="gatePrivacyLink">Privacy Policy</button>.
       Both open here, and both can be saved as a PDF.</p>
+      <p class="agreement-gate-risk"><strong>This is experimental software.</strong>
+      It is provided free, as is, with no warranty of any kind, and every metric,
+      fault and recommendation it produces is an automated estimate that may be
+      wrong. It is not coaching and not professional advice. You use it at your
+      own risk and remain responsible for your own practice, equipment and safety.</p>
       <label class="agreement-gate-check">
         <input type="checkbox" id="agreementCheckbox">
         <span>I have read and agree to the Terms of Service and Privacy Policy.</span>
       </label>
+      <label class="agreement-gate-check">
+        <input type="checkbox" id="agreementRiskCheckbox">
+        <span>I understand this is experimental software provided without warranty, and that I use it at my own risk.</span>
+      </label>
     </div>
     <div class="modal-actions">
-      <button class="btn-primary" id="agreementAcceptBtn" disabled>I Agree &amp; Continue</button>
+      <button class="btn-secondary" id="agreementDeclineBtn">Decline and leave</button>
+      <button class="btn-primary" id="agreementAcceptBtn" disabled>Accept and continue</button>
     </div>
   </div>
 </div>

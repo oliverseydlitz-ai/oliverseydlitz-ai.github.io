@@ -136,6 +136,35 @@ ok(/Continued use of the Service is not treated as consent/.test(privacy),
 ok(/setConsent\(false\)/.test(src) && /removeItem\(k\)/.test(src),
    'refusing actually removes the optional items rather than only blocking new ones');
 
+console.log('— the gate asks two separate questions and takes no for an answer —');
+ok(/id="agreementCheckbox"/.test(html) && /id="agreementRiskCheckbox"/.test(html),
+   'agreement and risk are two separate boxes, not one tick standing for both');
+ok(/acknowledgedRisk: true/.test(src),
+   'and the risk acknowledgement is recorded, so it can be evidenced');
+ok(/id="agreementDeclineBtn"/.test(html), 'declining is possible');
+ok(/Agreement\.decline\(\)/.test(src), 'and wired');
+ok(/riskCheckbox\?\.checked/.test(src),
+   'accept stays disabled until BOTH boxes are ticked');
+
+// The bundling bug: accepting the contract used to call setConsent(), so
+// agreeing to the Terms silently granted the optional storage a user is
+// entitled to refuse. Art. 7(4) GDPR — consent bundled into acceptance of a
+// contract is not freely given.
+const acceptHandler = src.slice(src.indexOf("acceptBtn?.addEventListener"),
+                                src.indexOf("declineBtn?.addEventListener"));
+ok(!/setConsent\(/.test(acceptHandler),
+   'accepting the Terms does NOT grant storage consent (Art. 7(4))');
+ok(/CookieConsent\.showBanner\(\)/.test(acceptHandler),
+   'it raises the storage question separately instead');
+
+// Declining must not write anything. A record of someone who just refused the
+// terms under which anything could be stored is the one write that cannot be
+// justified.
+const declineFn = src.slice(src.indexOf('function decline()'), src.indexOf('function renderDeclined()'));
+ok(!/setItem/.test(declineFn), 'declining stores nothing at all');
+ok(/document\.referrer/.test(declineFn),
+   'and leaves via referrer rather than history.length, which counts about:blank');
+
 console.log('— no third party is contacted on load —');
 ok(!/cdn\.jsdelivr\.net/.test(html) && !/fonts\.googleapis\.com/.test(html),
    'no CDN or webfont host in the markup');
