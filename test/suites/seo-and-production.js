@@ -24,11 +24,21 @@ ok(/Disallow: \/test\//.test(robots) && /Disallow: \/node_modules\//.test(robots
    'test and dependency scaffolding is kept out of the index');
 ok(!/^Disallow: \/$/m.test(robots), 'and it never blocks the whole site — the failure that costs everything');
 
-console.log('— the sitemap lists exactly the one indexable URL —');
+console.log('— the sitemap lists the app once, plus the standalone legal pages —');
 const sm = new JSDOM(read('sitemap.xml'), { contentType: 'text/xml' }).window.document;
 const locs = [...sm.querySelectorAll('loc')].map(n => n.textContent);
-ok(locs.length === 1, `one URL (${locs.length}) — the app is a single page and its views are hash routes a crawler discards`);
-ok(locs[0] === `${DOMAIN}/`, 'and it is the canonical root on the production domain');
+// The APP is one URL: its views are hash routes and a crawler discards
+// everything after the #. /terms/, /privacy/ and /contact/ are separate
+// documents with their own pre-rendered content and their own URLs, and a
+// policy nobody can link to is not much better than one nobody can read.
+const EXPECTED = [`${DOMAIN}/`, `${DOMAIN}/terms/`, `${DOMAIN}/privacy/`, `${DOMAIN}/contact/`];
+ok(locs.length === EXPECTED.length,
+   `${EXPECTED.length} URLs (${locs.length}) — the app once, and each legal page once`);
+ok(EXPECTED.every(u => locs.includes(u)),
+   'the root and all three legal pages are listed');
+ok(!locs.some(u => /\/#|index\.html/.test(u)),
+   'no hash route and no index.html duplicate of the root');
+ok(locs[0] === `${DOMAIN}/`, 'and the root comes first on the production domain');
 ok(locs.every(u => u.startsWith('https://')), 'https only');
 ok(!locs.some(u => /#/.test(u)), 'no hash routes, which cannot be indexed separately');
 

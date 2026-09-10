@@ -12,7 +12,12 @@ const src = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 // Anything not printed is gone — on screen a caveat is a paragraph you can
 // scroll back to, on paper it either printed or it did not.
 
-const print = css.slice(css.indexOf('@media print'));
+// The stylesheet now has THREE @media print blocks — the yardage card, the
+// legal-document print path, and the standalone legal pages. Slicing from the
+// first one picked up whichever happened to be earliest in the file, so this
+// anchors on the block that actually mentions the book.
+const print = css.slice(css.indexOf('@media print', css.indexOf('#view-yardages') - 4000 > 0
+  ? css.lastIndexOf('@media print', css.indexOf('#view-yardages')) : 0));
 ok(print.length > 200, 'there is a print stylesheet');
 
 console.log('— the caveats travel with the card —');

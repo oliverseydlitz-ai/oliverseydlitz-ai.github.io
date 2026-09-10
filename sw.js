@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v149';
+const CACHE = 'shotlab-v150';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
@@ -14,6 +14,7 @@ const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg',
                 '/vendor/papaparse.min.js', '/vendor/chart.umd.js',
                 '/vendor/idb-keyval.js', '/vendor/supabase.js',
                 '/PRIVACY.md', '/TERMS.md',
+                '/terms/', '/privacy/', '/contact/', '/legal.js',
                 '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

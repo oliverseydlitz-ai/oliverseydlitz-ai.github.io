@@ -11,6 +11,13 @@ REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # browser checks could never see that half of the app at all.
 cp "$REPO/app.js" "$REPO/index.html" "$REPO/style.css" "$REPO/sw.js" \
    "$REPO/PRIVACY.md" "$REPO/TERMS.md" "$SITE/" || exit 1
+# The standalone legal pages are part of the site, not part of the app bundle.
+# Without them the mirror 404s /terms/ and /privacy/ and no browser check can
+# see the pages a regulator or an app-store reviewer would actually open.
+cp "$REPO/legal.js" "$SITE/" || exit 1
+for d in terms privacy contact; do
+  mkdir -p "$SITE/$d" && cp "$REPO/$d/index.html" "$SITE/$d/" || exit 1
+done
 # self-hosted fonts: without these the mirror falls back to system-ui and
 # every width measurement the render scan takes is of the wrong typeface
 mkdir -p "$SITE/fonts" && cp "$REPO/fonts"/*.woff2 "$SITE/fonts/" || exit 1

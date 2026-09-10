@@ -2,7 +2,7 @@
   "id": "/",
   "name": "ShotLab TOUR — Golf Swing Analysis",
   "short_name": "ShotLab",
-  "description": "Import Rapsodo launch monitor CSV exports and get club gapping, dispersion, fault detection, a yardage book and progress trends — with every number gated by what the device can actually measure.",
+  "description": "Beta. Import your own Rapsodo launch monitor CSV exports for club gapping, dispersion, recurring faults, a yardage book and progress trends — with every number gated by what the device can actually measure. Not coaching or professional advice.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

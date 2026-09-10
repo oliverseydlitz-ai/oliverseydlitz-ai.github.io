@@ -3,7 +3,7 @@
 **ShotLab TOUR**
 
 **Effective date:** 10 September 2026
-**Version:** 2026-09-11
+**Version:** 2026-09-12
 **Supersedes:** the terms dated 16 June 2026
 
 ## 1. Agreement
@@ -16,19 +16,55 @@ By indicating acceptance in the Service, by creating an account, or by using the
 
 You confirm that you are aged eighteen or over and have the legal capacity to enter into this agreement. Where you use the Service on behalf of an organisation, you confirm that you have authority to bind that organisation, and "you" includes that organisation.
 
+## 1A. Beta software
+
+The Service is beta software, provided free of charge for testing and development. Analysis, calculations, recommendations and generated practice drills may contain errors, inaccuracies or bugs, and may change without notice. Features may be added, altered, degraded or withdrawn, and the Service may become unavailable or be discontinued at any time.
+
+Accepting these Terms includes acknowledging that the Service is experimental and unwarranted, and that you use it at your own risk. That acknowledgement is recorded separately from acceptance of these Terms.
+
+Beta status does not remove any liability that cannot lawfully be excluded. It describes the maturity of the software; it is not a legal shield.
+
 ## 2. Nature of the Service
 
 The Service is an informational data-analysis tool. It imports launch monitor exports, principally Rapsodo CSV files, and presents statistics, charts, classifications of recurring faults, and suggested practice work derived from them.
 
 Every metric, classification, verdict and recommendation the Service produces is an automated estimate calculated from data the Service did not itself measure, using models and thresholds that are approximations. Several are explicitly derived rather than measured, and the Service marks them as such where it can.
 
+### 2.1 No professional advice
+
 The Service is not, and does not purport to be:
 
-- golf instruction, coaching, or supervision of practice;
-- medical, physiotherapeutic, fitness or health advice;
-- a diagnosis of any physical condition or swing characteristic;
+- golf instruction, coaching, or supervision of practice, and is not a replacement for a qualified golf professional;
+- medical advice, physiotherapy, rehabilitation, injury treatment, or a medical diagnosis;
+- fitness, strength-and-conditioning or health advice;
+- a diagnosis of any physical condition;
 - professional advice of any kind; or
 - a guarantee, prediction or assurance of any playing outcome.
+
+Where the Service classifies a "fault", that word describes a pattern in launch monitor numbers. It is not a finding about your body.
+
+### 2.2 No guarantee of result
+
+The Service does not guarantee, and makes no representation as to, any improvement in:
+
+- swing mechanics;
+- club head speed;
+- ball speed;
+- carry or total distance;
+- accuracy or dispersion;
+- score or handicap;
+- consistency; or
+- any other training or playing result.
+
+Nor does it guarantee that following any suggestion will avoid or prevent injury. No such claim is made anywhere in the Service, and none should be inferred from any figure, trend or recommendation it displays.
+
+### 2.3 Physical activity and your own judgement
+
+The Service suggests physical activity, including golf practice and, in one section, gym, plyometric and overspeed work. You alone decide whether any suggested activity is appropriate for you, your health, your fitness and your circumstances. You should consult a qualified professional before beginning or changing physical activity, and obtain qualified coaching on technique and loading before undertaking any strength, plyometric or speed-training work.
+
+Stop any activity immediately if you experience pain, injury, dizziness or other concerning symptoms, and seek appropriate professional advice. The Service will not tell you whether an activity is safe for you: it processes launch monitor numbers and has no information about your body.
+
+The Service does not instruct users to train through pain, to ignore an injury, to exceed their physical limits, to use exercise as treatment for an injury, or to substitute its output for medical or professional advice. If any output appears to do so, treat it as a defect and report it to the address in Section 16.
 
 Use of the Service is voluntary. You remain responsible for your own practice, your equipment, your physical safety, and every decision you take, whether or not the Service informed it. You should obtain advice from a qualified professional before acting on anything the Service produces, and before beginning or changing any physical activity.
 
@@ -74,7 +110,7 @@ The Operator will make reasonable efforts to give advance notice of a permanent 
 
 ## 7. Third-party services
 
-The Service depends on third parties, including Supabase for authentication and database hosting, GitHub for static hosting, and Google where you choose Google Sign-In. Your use of those services is governed by their own terms, over which the Operator has no control and for which it accepts no responsibility. The Privacy Policy identifies each and its role.
+The Service depends on third parties, including Supabase for authentication and database hosting, GitHub for static hosting, and Google where you choose Google Sign-In. No artificial-intelligence or machine-learning provider is used: all analysis and every practice suggestion is produced by fixed rules and a fixed drill library within the Service itself. Your use of those services is governed by their own terms, over which the Operator has no control and for which it accepts no responsibility. The Privacy Policy identifies each and its role.
 
 Typefaces and code libraries are served from the Service's own origin and not from a content delivery network, so opening the Service makes no request to any third party.
 
@@ -83,6 +119,8 @@ Typefaces and code libraries are served from the Service's own origin and not fr
 The source code of the Service is licensed under the MIT Licence, the text of which is published with the repository. The name "ShotLab TOUR", the associated logo, and the visual design of the Service are the property of the Operator and are not licensed under the MIT Licence.
 
 The Service reproduces published research findings, benchmark tables and normative statistics attributed to their sources within the Service itself. Those materials remain the property of their respective owners and are used for reference and commentary.
+
+"Rapsodo" and "MLM2PRO" are trademarks of Rapsodo Inc. The Operator is not affiliated with, endorsed by, sponsored by, or in any partnership with Rapsodo Inc. The Service reads CSV files that you export yourself from your own device or account, and interacts with no Rapsodo system, service or API. References to Rapsodo and MLM2PRO are descriptive only, to identify the file format the Service accepts.
 
 ## 8A. Consumer information
 

@@ -863,6 +863,8 @@ tr:hover td { background: var(--surface2); }
   min-height: var(--tap);
 }
 .settings-row { cursor: pointer; }
+/* One row in the list is a real link to a real page, not a modal opener. */
+a.settings-row { text-decoration: none; }
 .settings-row:first-of-type { border-top: none; }
 .settings-row:not(.static):hover { background: var(--surface2); }
 .settings-row.static { cursor: default; }
@@ -1297,12 +1299,83 @@ body.modal-open {
    makes all of them less likely to be read — while a paraphrase of the Terms
    sitting outside the Terms is exactly the ambiguity s.1812(2) of the Czech
    Civil Code resolves against whoever drafted it. */
-.agreement-gate-risk {
+/* The beta notice. Deliberately not small print — it is the same size as the
+   body text around it, because a notice set smaller than what it qualifies is
+   decoration rather than disclosure. */
+.beta-notice {
   margin-top: var(--s4);
-  padding: var(--s3);
+  padding: var(--s4);
   background: var(--surface2);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  font-size: .82rem; line-height: 1.55;
+  font-size: .85rem; line-height: 1.6;
+}
+.beta-notice p { margin: 0 0 .6rem; }
+.beta-notice p:last-child { margin-bottom: 0; }
+.beta-notice-head {
+  font-family: var(--font-display);
+  font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  font-size: .8rem; color: var(--accent);
+}
+/* A persistent, dismissible marker that this is beta, on the app chrome. */
+.beta-tag {
+  font-family: var(--font-mono);
+  font-size: .58rem; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent);
+  padding: 2px 5px 1px; border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+/* ── Standalone legal pages (/terms, /privacy, /contact) ───────────────
+   These share style.css with the app so there is one design system, but they
+   are ordinary documents rather than app views: always-visible nav, a
+   measured column, and no view machinery. */
+.legal-nav { display: flex !important; position: static; }
+.legal-home { text-decoration: none; display: flex; align-items: baseline; gap: .5rem; }
+.legal-page {
+  max-width: 46rem; margin: 0 auto;
+  padding: var(--s6) var(--s4) var(--s7);
+}
+.legal-page .modal-document { max-height: none; overflow: visible; padding: 0; }
+/* On its own page the document's <h1> IS the heading, so it comes back. */
+.legal-page .doc-standalone h1 {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 800; letter-spacing: .01em;
+  text-transform: uppercase;
+  margin: 0 0 var(--s4);
+  padding-bottom: var(--s3);
+  border-bottom: 2px solid var(--accent);
+}
+@media (min-width: 640px) { .legal-page .doc-standalone h1 { font-size: 2rem; } }
+@media print {
+  .legal-nav { display: none !important; }
+  .legal-page { max-width: none; padding: 0; }
+}
+
+/* ── Safety notices (audit §9) ─────────────────────────────────────────
+   Rendered above the drill catalogue and on every surface that prescribes
+   physical activity. Deliberately not small print: a warning set smaller
+   than the thing it warns about is decoration. */
+.safety-note {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--yellow);
+  background: var(--surface2);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s4);
+  font-size: .84rem; line-height: 1.55;
+}
+.safety-note p { margin: 0; }
+.safety-note p + p { margin-top: .5rem; }
+.safety-pain { color: var(--text-muted); }
+.safety-inline { margin: var(--s3) 0 var(--s4); }
+/* On an entry that prescribes barbell, plyometric or overspeed work. */
+.drill-row-risk { color: var(--yellow); }
+.rc-safety {
+  margin-top: var(--s3); padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  font-size: .82rem; color: var(--text-muted); line-height: 1.5;
 }
 
 /* ── Declined ──────────────────────────────────────────────────────────

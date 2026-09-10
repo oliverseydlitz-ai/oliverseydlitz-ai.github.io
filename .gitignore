@@ -7,3 +7,15 @@ test/browser/site/
 
 # Playwright MCP scratch (screenshots, snapshots)
 .playwright-mcp/
+
+# Secrets. Nothing of this shape has ever been committed (65 commits scanned,
+# September 2026 audit) and this is here so that stays true by default rather
+# than by luck.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.supabase/
+service-role*

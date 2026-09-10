@@ -15,9 +15,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https://jdmahrrxtxqrcpcwmwvx.supabase.co https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>ShotLab TOUR — Golf Swing Analysis for Rapsodo</title>
-  <meta name="description" content="Import your Rapsodo launch monitor CSV and get instant swing analysis: club gapping, dispersion, fault detection, yardage book, and progress trends. Free, private, works offline.">
+  <meta name="description" content="Beta. Turn your own Rapsodo launch monitor CSV exports into practice suggestions: club gapping, dispersion, recurring faults, a yardage book and progress trends. Free, no tracking, works offline. Not coaching or professional advice.">
   <meta property="og:title" content="ShotLab TOUR — Golf Swing Analysis">
-  <meta property="og:description" content="Turn Rapsodo launch monitor data into insights: gapping, dispersion, faults, yardages, and trends.">
+  <meta property="og:description" content="Beta. Turn your own Rapsodo launch monitor data into practice suggestions: gapping, dispersion, recurring faults, yardages and trends. Not coaching or professional advice.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://oliverseydlitz-ai.github.io/">
   <meta property="og:site_name" content="ShotLab TOUR">
@@ -115,6 +115,7 @@
     <span class="brand-icon"><svg class="icon" aria-hidden="true"><use href="#i-flag"/></svg></span>
     <span class="brand-name">ShotLab</span>
     <span class="brand-tag">TOUR</span>
+    <span class="beta-tag">Beta</span>
   </div>
   <nav class="top-nav-links">
     <a href="#" class="nav-link active" data-view="sessions">Sessions</a>
@@ -731,9 +732,13 @@
           <span class="settings-arrow">→</span>
         </button>
         <button class="settings-row" id="cookiePrefsBtn">
-          <span>Cookie Preferences</span>
+          <span>Storage preferences</span>
           <span class="settings-arrow">→</span>
         </button>
+        <a class="settings-row" href="/contact/">
+          <span>Contact &amp; data requests</span>
+          <span class="settings-arrow">→</span>
+        </a>
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">Fault Engine</h2>
@@ -873,11 +878,20 @@
       and the
       <button type="button" class="link-btn" id="gatePrivacyLink">Privacy Policy</button>.
       Both open here, and both can be saved as a PDF.</p>
-      <p class="agreement-gate-risk"><strong>This is experimental software.</strong>
-      It is provided free, as is, with no warranty of any kind, and every metric,
-      fault and recommendation it produces is an automated estimate that may be
-      wrong. It is not coaching and not professional advice. You use it at your
-      own risk and remain responsible for your own practice, equipment and safety.</p>
+      <div class="beta-notice">
+        <p class="beta-notice-head">Beta — important notice</p>
+        <p>ShotLab TOUR is free beta software provided for testing and development.
+        Analysis, calculations, recommendations and generated practice drills may
+        contain errors, inaccuracies or bugs, and may change without notice.</p>
+        <p>It provides general golf-training information and practice suggestions
+        based on the data you give it. It does not guarantee any improvement in
+        performance, distance, accuracy, handicap, score or any other result.</p>
+        <p>It is not a substitute for instruction from a qualified golf professional,
+        nor for medical advice, physiotherapy, rehabilitation or other professional advice.</p>
+        <p>You decide whether and how to perform any suggested activity. Stop if you
+        experience pain, injury, dizziness or other concerning symptoms, and seek
+        appropriate professional advice.</p>
+      </div>
       <label class="agreement-gate-check">
         <input type="checkbox" id="agreementCheckbox">
         <span>I have read and agree to the Terms of Service and Privacy Policy.</span>

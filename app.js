@@ -94,12 +94,14 @@ const CookieConsent = (() => {
 // ────────────────────────────────────────────────────────────────
 const Agreement = (() => {
   const KEY = 'slTermsAccepted';
-  // Bumped again for the 2026-09-11 move to Czech governing law and Czech/EU
-  // consumer-law terms. This is a material
+  // Bumped for the 2026-09-12 hardening audit: an explicit beta section, the
+  // no-guarantee and no-professional-advice clauses, the physical-activity
+  // safety clause and the Rapsodo non-affiliation statement. This is a material
   // change — the governing law, the dispute-resolution route and the legal
   // bases for processing all moved — so every user is asked again rather than
   // being bound by terms they accepted a different version of.
-  const VERSION = '2026-09-11';
+  const VERSION = '2026-09-12';
+  const PRIVACY_VERSION = '2026-09-12';
 
   function hasAccepted() {
     try {
@@ -168,6 +170,30 @@ const Agreement = (() => {
       .addEventListener('click', () => window.location.reload());
   }
 
+  // Acceptance lived only in this browser's localStorage, so clearing site
+  // data erased the only record that it ever happened — which makes it
+  // useless as evidence, and evidence is the entire reason to record it.
+  //
+  // Written server-side for signed-in users only: a guest has no identity to
+  // attach it to, and inventing one to log a consent would be collecting a
+  // person who deliberately chose not to be collected. Best effort by design
+  // — the gate must never be blocked by a database that is unreachable, and
+  // the local record still stands on its own.
+  async function recordServerSide() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!saved || saved.version !== VERSION) return;
+      const user = typeof Auth !== 'undefined' && Auth.getUser ? Auth.getUser() : null;
+      if (!user) return;
+      await sb.from('terms_acceptances').upsert({
+        user_id: user.id,
+        terms_version: VERSION,
+        privacy_version: PRIVACY_VERSION,
+        acknowledged_risk: saved.acknowledgedRisk === true,
+      }, { onConflict: 'user_id,terms_version', ignoreDuplicates: true });
+    } catch (_) { /* never block the app on this */ }
+  }
+
   function showGate() {
     if (hasAccepted()) return;
     const gate = document.getElementById('agreementGate');
@@ -179,7 +205,8 @@ const Agreement = (() => {
     if (gate) gate.hidden = true;
   }
 
-  return { hasAccepted, accept, decline, showGate, hideGate, VERSION };
+  return { hasAccepted, accept, decline, showGate, hideGate, recordServerSide,
+           VERSION, PRIVACY_VERSION };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -2718,6 +2745,31 @@ const DrillLibrary = (() => {
   // Nothing is deleted: a trend review and a med-ball throw are both worth
   // doing. They are just not range work, and a list that says they are is
   // lying about what it is offering.
+  // ── Safety (audit §9) ───────────────────────────────────────────
+  // Every surface that prescribes physical activity renders SAFETY. It is a
+  // constant here rather than a string at each render site so it cannot say
+  // one thing on the practice plan and another on the range card.
+  //
+  // PAIN is the app's answer to a golfer who is hurt. It deliberately gives
+  // no drill, no modification and no assessment: this app has launch monitor
+  // numbers and nothing else, and nothing in a CSV can tell it whether an
+  // activity is safe for a particular body. Declining to answer IS the safe
+  // answer.
+  const SAFETY = 'Stop any drill if you feel pain, dizziness or unusual discomfort. ' +
+                 'You decide whether a drill suits you.';
+  const PAIN = 'If you are in pain or think you are injured, this app cannot tell you ' +
+               'whether any drill is appropriate — it sees launch monitor numbers, not you. ' +
+               'Speak to a qualified medical professional, and to a PGA professional before ' +
+               'changing how you swing.';
+  // Load-bearing physical work carries more than the general line. These are
+  // barbell, plyometric and overspeed sessions — the entries in this library
+  // most capable of hurting somebody, and the ones furthest from anything the
+  // launch monitor can check.
+  const FITNESS_CAVEAT = 'Gym, plyometric and overspeed work carries a higher injury risk than ' +
+                         'hitting balls, and none of it is supervised or adapted to you here. ' +
+                         'Get qualified coaching on technique and loading before starting, build ' +
+                         'up gradually, and stop if anything hurts.';
+
   const KINDS = {
     drill:     { id:'drill',     label:'Drill',
                  blurb:'Range or green work: a club, some balls, and something that gives you feedback.' },
@@ -2727,7 +2779,10 @@ const DrillLibrary = (() => {
                        'improvement from one — that is not what it is for.' },
     fitness:   { id:'fitness',   label:'Off the course',
                  blurb:'Gym and load work. Well evidenced, and not something you do in a bay — it needs a ' +
-                       'different place, a different day and a different kind of planning.' },
+                       'different place, a different day and a different kind of planning. ' +
+                       'It also carries a higher injury risk than hitting balls: get qualified ' +
+                       'coaching on technique and loading first, build up gradually, and stop if ' +
+                       'anything hurts.' },
     equipment: { id:'equipment', label:'Equipment check',
                  blurb:'Kit, not technique. Worth ruling out before you practise against a problem your ' +
                        'gear is causing.' },
@@ -2951,6 +3006,7 @@ const DrillLibrary = (() => {
   const count = () => ALL.length;
 
   return { SECTIONS, ALL, KINDS, kindOf, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
+           SAFETY, PAIN, FITNESS_CAVEAT,
            admissible, forSection, count };
 })();
 
@@ -6890,6 +6946,7 @@ const RangeCard = (() => {
           </div>
           ${notes.map(t => `<p class="rc-note">${esc(t)}</p>`).join('')}
           <p class="rc-space">Leave 20 seconds between shots.</p>
+          <p class="rc-safety">${esc(DrillLibrary.SAFETY)}</p>
         </div>
         <div class="rc-foot">
           <button class="rc-btn ghost" data-rc="prev"${_i === 0 ? ' disabled' : ''}>←</button>
@@ -7990,6 +8047,7 @@ const UI = (() => {
       <div class="plan-intro">A ${total}-minute, ${balls}-ball session, weighted by how much each fault is
         likely costing you — severity, how often it recurred, and how much the clubs it appeared on matter
         to scoring. Leave 20s between shots.</div>
+      <div class="safety-note safety-inline">${Sanitize.escape(DrillLibrary.SAFETY)}</div>
       ${blocks.map((p,i)=>`
         <div class="plan-item severity-${p.severity||'low'}">
           <div class="plan-num">${i+1}</div>
@@ -9466,12 +9524,20 @@ const UI = (() => {
     const secs = Object.values(DrillLibrary.SECTIONS);
     const tabs = secs.map(sc => `<button class="drill-tab${sc.id === _drillSection ? ' on' : ''}"
         data-drill-sec="${sc.id}">${sc.id} · ${esc(sc.name)}</button>`).join('');
+    // Rendered above the catalogue, not below it: this is the one page in the
+    // app that lists 79 physical activities, and a safety line under 79
+    // entries is a safety line nobody reaches.
+    const safety = `<div class="safety-note">
+        <p>${esc(DrillLibrary.SAFETY)}</p>
+        <p class="safety-pain">${esc(DrillLibrary.PAIN)}</p>
+      </div>`;
 
     const sc = DrillLibrary.SECTIONS[_drillSection];
     const rows = DrillLibrary.forSection(_drillSection, ctx);
     const openN = rows.filter(r => r.ok).length;
 
     el.innerHTML = `
+      ${safety}
       <div class="drill-tabs">${tabs}</div>
       <div class="tail-block">
         <div class="tail-head">${esc(sc.name)}
@@ -9493,6 +9559,8 @@ const UI = (() => {
               <span class="drill-row-state">${r.offDevice ? 'no device needed' : r.ok ? (r.flaggedOnly ? 'open · flagged' : 'open') : 'locked'}</span>
             </div>
             <div class="drill-row-desc">${esc(r.drill.desc)}</div>
+            ${DrillLibrary.kindOf(r.drill) === 'fitness'
+              ? `<div class="drill-row-why drill-row-risk">${esc(DrillLibrary.FITNESS_CAVEAT)}</div>` : ''}
             ${r.drill.feel ? `<div class="drill-row-why">${esc(FaultEngine.FEEL_CAVEAT)}</div>` : ''}
             ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
           </div>`;
@@ -10052,6 +10120,7 @@ async function init() {
     acceptBtn?.addEventListener('click', () => {
       if (acceptBtn.disabled) return;
       Agreement.accept();
+      Agreement.recordServerSide();
       // The storage question comes AFTER the contract question, as its own
       // decision. Without this a first-time user would never be asked at
       // all — the banner is only raised at boot, and at boot the gate had
@@ -10870,6 +10939,9 @@ async function init() {
   async function afterAuth() {
     const user = Auth.getUser();
     if (!user) return;
+    // The gate is answered before anyone signs in, so this is where an
+    // acceptance first becomes attributable to an account.
+    Agreement.recordServerSide();
     await Router.showSessions();
     // Offer to back up anything this device holds that the account does not.
     // Asked rather than done: uploading is data leaving the device, and

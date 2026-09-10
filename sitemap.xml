@@ -1,15 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  One URL, deliberately. ShotLab is a single-page app whose views are hash
-  routes; a crawler cannot address them separately, so listing them would be
-  listing the same page several times. The docs under /docs/ are working notes
-  rather than pages written for a reader, and PRIVACY.md / TERMS.md are served
-  as raw markdown — neither belongs in an index.
+  The app itself is ONE url, deliberately. ShotLab is a single-page app whose
+  views are hash routes; a crawler discards everything after the #, so listing
+  them would be listing the same page several times. The docs under /docs/ are
+  working notes rather than pages written for a reader.
+
+  /terms/, /privacy/ and /contact/ ARE listed. They are real pages with their
+  own pre-rendered content, and a legal document that cannot be linked to or
+  indexed is of no use to a regulator, an app-store reviewer, or anyone who
+  wants to send somebody the policy.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://oliverseydlitz-ai.github.io/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://oliverseydlitz-ai.github.io/terms/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://oliverseydlitz-ai.github.io/privacy/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://oliverseydlitz-ai.github.io/contact/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

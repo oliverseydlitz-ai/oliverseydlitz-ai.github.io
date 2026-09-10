@@ -155,7 +155,55 @@ CREATE POLICY "delete own sessions" ON public.sessions
 -- but a guest never touches this table, and a grant that exists only to be
 -- refused later is one policy edit away from being a hole.
 REVOKE ALL ON public.sessions FROM anon;
+-- Revoke from `authenticated` FIRST, then grant back exactly what the app
+-- uses. Supabase's ALTER DEFAULT PRIVILEGES grants ALL on every new table in
+-- `public` to `authenticated`, so a bare GRANT of the four verbs leaves
+-- TRUNCATE, TRIGGER and REFERENCES sitting there from the default.
+--
+-- TRUNCATE is the one that matters, and it is not obvious: **row level
+-- security does not apply to TRUNCATE**. No policy stops it. A signed-in
+-- user holding TRUNCATE on this table can empty it for every user at once.
+-- The live database held that grant until the September 2026 audit; this
+-- script had always claimed otherwise, which is exactly the drift between
+-- script and database that makes a setup script worse than none.
+REVOKE ALL ON public.sessions FROM authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sessions TO authenticated;
+
+-- ── 8. Terms acceptance record ──────────────────────────────────────
+-- Which version of the Terms a user accepted, and when. This lived only in
+-- the browser's localStorage, so clearing site data destroyed the only
+-- record that acceptance ever happened — worthless as evidence, which is
+-- the sole reason to keep it.
+CREATE TABLE IF NOT EXISTS public.terms_acceptances (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  terms_version    text NOT NULL CHECK (length(terms_version) BETWEEN 4 AND 32),
+  privacy_version  text NOT NULL CHECK (length(privacy_version) BETWEEN 4 AND 32),
+  acknowledged_risk boolean NOT NULL DEFAULT false,
+  accepted_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- One row per user per version: re-accepting the same version is a no-op
+-- rather than an unbounded append, which also caps this table's growth.
+CREATE UNIQUE INDEX IF NOT EXISTS terms_acceptances_user_version_idx
+  ON public.terms_acceptances (user_id, terms_version);
+
+ALTER TABLE public.terms_acceptances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.terms_acceptances FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "insert own acceptance" ON public.terms_acceptances;
+DROP POLICY IF EXISTS "read own acceptance"   ON public.terms_acceptances;
+-- Insert and read own only. There is deliberately NO update and NO delete
+-- policy: a record of what somebody agreed to is worth nothing if the same
+-- party can rewrite it afterwards. Erasure still works — ON DELETE CASCADE
+-- from auth.users takes the row with the account.
+CREATE POLICY "insert own acceptance" ON public.terms_acceptances
+  FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()));
+CREATE POLICY "read own acceptance"   ON public.terms_acceptances
+  FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+
+REVOKE ALL ON public.terms_acceptances FROM anon, authenticated;
+GRANT SELECT, INSERT ON public.terms_acceptances TO authenticated;
 
 -- ════════════════════════════════════════════════════════════════════
 -- Two things this script CANNOT do, both dashboard settings:
