@@ -5017,10 +5017,10 @@ const ShotScorer = (() => {
   }
 
   function grade(avgScore) {
-    if (avgScore >= 85) return {letter:'A',color:'#16a34a'};
-    if (avgScore >= 70) return {letter:'B',color:'#4d7c0f'};
-    if (avgScore >= 55) return {letter:'C',color:'#b45309'};
-    if (avgScore >= 40) return {letter:'D',color:'#c2410c'};
+    if (avgScore >= 85) return {letter:'A',color:'var(--green)'};
+    if (avgScore >= 70) return {letter:'B',color:'var(--green-light)'};
+    if (avgScore >= 55) return {letter:'C',color:'var(--yellow)'};
+    if (avgScore >= 40) return {letter:'D',color:'var(--yellow)'};
     return {letter:'F',color:'var(--red)'};
   }
 
@@ -6999,7 +6999,7 @@ const UI = (() => {
         alertsHost.innerHTML = alerts.length ? `
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
             ${alerts.map(a => `
-              <div style="padding:.8rem;background:${a.severity==='high'?'rgba(238,0,0,.06)':a.severity==='info'?'rgba(0,112,243,.06)':'rgba(0,112,243,.06)'};border-left:3px solid ${a.severity==='high'?'var(--red)':a.severity==='info'?'var(--accent)':'var(--accent)'};border-radius:var(--radius-sm)">
+              <div class="alert-item ${a.severity === 'high' ? 'decline' : ''}">
                 <div style="font-weight:600;margin-bottom:.3rem">${icon(a.icon)} ${a.title}</div>
                 <div style="font-size:.9rem;color:var(--text-dim)">${a.message}</div>
               </div>
@@ -8022,7 +8022,7 @@ const UI = (() => {
           ${['Elite','Good','OK','Poor','Missed'].reverse().map((l,i) => {
             const idx = 4-i;
             const n = idx===4 ? scores.filter(s=>s<25).length : scores.filter(s=>s>=idx*25&&s<(idx+1)*25).length;
-            return `<div class="score-bd-row"><span class="score-bd-label">${l}</span><span class="score-bd-bar" style="width:${n>0?Math.max(8,n/scores.length*100):0}%;background:${['#fca5a5','#fdba74','#fde68a','#bbf7d0','#86efac'][idx]}"></span><span class="score-bd-n">${n}</span></div>`;
+            return `<div class="score-bd-row"><span class="score-bd-label">${l}</span><span class="score-bd-bar" style="width:${n>0?Math.max(8,n/scores.length*100):0}%;background:${['var(--red)','var(--yellow)','var(--yellow)','var(--green-light)','var(--green)'][idx]}"></span><span class="score-bd-n">${n}</span></div>`;
           }).join('')}
         </div>
       </div>`;
@@ -8039,12 +8039,16 @@ const UI = (() => {
   // ── Metrics strip ─────────────────────────────────────────────
   function renderMetricsStrip(shots, allShots) {
     const M = [
-      {label:'Avg Smash',   field:'smashFactor',     dec:2, unit:'',    col:'#16a34a'},
-      {label:'Ball Speed',  field:'ballSpeed',        dec:0, unit:'mph', col:'#2563eb'},
-      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds', col:'#0070f3'},
-      {label:'Launch Angle',field:'launchAngle',      dec:1, unit:'°',   col:'#b45309'},
-      {label:'Club Speed',  field:'clubSpeed',        dec:0, unit:'mph', col:'#7c3aed'},
-      {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds', col:'#0891b2'},
+      // The rule above each cell marks the metric's TRUST TIER, not the
+      // metric. Six different hues encoded nothing — they were six labels in
+      // six colours. Tier 1 is prescribable and gets the accent; tier 2 is
+      // display-only and gets a hairline; tier 3 never appears in this strip.
+      {label:'Avg Smash',   field:'smashFactor',     dec:2, unit:'',    col:'var(--accent)'},
+      {label:'Ball Speed',  field:'ballSpeed',        dec:0, unit:'mph', col:'var(--accent)'},
+      {label:'Carry',       field:'carryDistance',    dec:0, unit:'yds', col:'var(--accent)'},
+      {label:'Launch Angle',field:'launchAngle',      dec:1, unit:'°',   col:'var(--line-strong)'},
+      {label:'Club Speed',  field:'clubSpeed',        dec:0, unit:'mph', col:'var(--accent)'},
+      {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds', col:'var(--line-strong)'},
     ];
     const el = document.getElementById('metricsStrip');
     el.innerHTML = M.map(m => {
@@ -8713,7 +8717,7 @@ const UI = (() => {
         // Colour off the RELATIVE spread. The old bands were fixed yardages, so
         // a wedge and a driver were judged on the same ±6 — which flatters the
         // wedge and condemns the driver for the same quality of striking.
-        const consC = b.cv < 0.035 ? '#22c55e' : b.cv < 0.07 ? '#eab308' : '#ef4444';
+        const consC = b.cv < 0.035 ? 'var(--green)' : b.cv < 0.07 ? 'var(--yellow)' : 'var(--red)';
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
           <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
@@ -10097,13 +10101,44 @@ async function init() {
   document.getElementById('detailBackBtn').addEventListener('click', ()=>Router.showSessions());
 
   // In-page section nav (session detail)
-  document.querySelectorAll('.subnav-link').forEach(link => {
+  const subnavLinks = [...document.querySelectorAll('.subnav-link')];
+  const markSubnav = link => subnavLinks.forEach(l => l.classList.toggle('active', l === link));
+  subnavLinks.forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
       const target=document.getElementById(link.dataset.target);
       if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+      markSubnav(link);
     });
   });
+
+  // Which of the eight sections you are actually in. The subnav had an
+  // active style and nothing to set it: it jumped you somewhere and then
+  // showed the same eight identical tabs, so on a page this long it told you
+  // where you could go and never where you were.
+  //
+  // Marking on click alone would be worse than nothing — it goes stale the
+  // moment the golfer scrolls by hand, and a tab bar pointing at the wrong
+  // section is a wrong answer rather than a missing one. So this observes the
+  // sections themselves. Feature-detected: without IntersectionObserver the
+  // subnav is exactly what it is today, a set of jump links.
+  if (typeof IntersectionObserver === 'function' && subnavLinks.length) {
+    const seen = new Map();
+    const spy = new IntersectionObserver(entries => {
+      entries.forEach(en => seen.set(en.target.id, en.isIntersecting ? en.intersectionRatio : 0));
+      // topmost visible section wins, in the subnav's own order
+      const hit = subnavLinks.find(l => (seen.get(l.dataset.target) || 0) > 0);
+      if (hit) markSubnav(hit);
+    }, { rootMargin: '-72px 0px -55% 0px', threshold: [0, 0.01] });
+    subnavLinks.forEach(l => {
+      const el = document.getElementById(l.dataset.target);
+      if (el) spy.observe(el);
+    });
+    // At the top of the page no section has crossed the trigger line yet, and
+    // a tab bar with nothing marked reads as broken rather than as "not
+    // scrolled". The first tab IS where you are when you arrive.
+    markSubnav(subnavLinks[0]);
+  }
 
   // File pick
   const fileInput=document.getElementById('fileInput'), dropZone=document.getElementById('dropZone');
@@ -10554,7 +10589,7 @@ async function init() {
                     <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
                   </div>
                 </div>
-                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? 'var(--green)' : c.trend.label.startsWith('↓') ? '#ef4444' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
+                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? 'var(--green)' : c.trend.label.startsWith('↓') ? 'var(--red)' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
               </div>
             `).join('')}
           </div>
@@ -12250,19 +12285,24 @@ const EnhancedMetricsWidget = (() => {
 
   function renderWidget(stats) {
     if (!stats) return '';
+    // Three readings off the same account, so three identical cells. They
+    // used to carry three different fills — a wash mixed at runtime from the
+    // grade colour, a grey, and an accent tint — which made them read as
+    // three different KINDS of number. Only the grade keeps a colour, on the
+    // glyph, because the grade IS a verdict; a streak count is not.
     return `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.2rem">
-        <div style="padding:1rem;background:rgba(${parseInt(stats.color.slice(1,3),16)},${parseInt(stats.color.slice(3,5),16)},${parseInt(stats.color.slice(5,7),16)},.1);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2.5rem;font-weight:800;color:${stats.color}">${stats.grade}</div>
-          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">FORM GRADE</div>
+      <div class="grid-auto mb-4" style="--col:100px">
+        <div class="stat-card">
+          <div class="stat-value" style="color:${stats.color}">${stats.grade}</div>
+          <div class="stat-label">Form grade</div>
         </div>
-        <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2.5rem;font-weight:800;color:var(--green)">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
-          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">CONSISTENCY</div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
+          <div class="stat-label">Consistency</div>
         </div>
-        <div style="padding:1rem;background:var(--accent-weak);border-radius:var(--radius-sm);text-align:center">
-          <div style="font-size:2rem;font-weight:800;color:var(--accent)">${stats.streak}</div>
-          <div style="font-size:.75rem;color:var(--text-dim);margin-top:.3rem">DAY STREAK</div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.streak}</div>
+          <div class="stat-label">Day streak</div>
         </div>
       </div>`;
   }
