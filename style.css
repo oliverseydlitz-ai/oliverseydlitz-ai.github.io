@@ -1174,11 +1174,11 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 
 /* ── Shot detail modal ─────────────────────────────────── */
 .modal-wide { max-width: 440px; }
-.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.1rem; padding-bottom: .875rem; border-bottom: 1px solid var(--border); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s4); padding-bottom: .875rem; border-bottom: 1px solid var(--line); }
 .modal-head .btn-icon { width: 30px; height: 30px; font-size: .9rem; }
 .sm-grade { font-size: .85rem; font-weight: 700; margin-left: .4rem; }
 .sm-table { width: 100%; border-collapse: collapse; }
-.sm-table td { padding: .42rem .25rem; border-top: 1px solid var(--border); white-space: nowrap; }
+.sm-table td { padding: .42rem .25rem; border-top: 1px solid var(--line); white-space: nowrap; }
 .sm-table tr:first-child td { border-top: none; }
 .sm-k { color: var(--text-muted); font-size: .8rem; }
 .sm-v { font-weight: 600; font-size: .85rem; text-align: right; font-variant-numeric: tabular-nums; }
@@ -1198,8 +1198,10 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 /* ── Modal overlay ─────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(12,31,20,.4);
-  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  /* Was rgba(12,31,20,.4) — a green-black left over from the pine theme,
+     which tints everything behind it. --overlay is the one scrim value. */
+  background: var(--overlay);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   display: flex; align-items: flex-start; justify-content: center;
   /* Respect notch/home-bar safe areas */
   padding-top: max(1.5rem, env(safe-area-inset-top));
@@ -1225,7 +1227,7 @@ body.modal-open {
 }
 
 /* ── Agreement gate (blocking first-run consent) ───────── */
-.agreement-gate { z-index: 400; background: rgba(12,31,20,.7); }
+.agreement-gate { z-index: 400; background: var(--overlay); }
 /* Terms/Privacy must open ABOVE the gate when reviewed from it */
 #privacyModal, #termsModal { z-index: 500; }
 .agreement-gate-body { max-height: 60vh; overflow-y: auto; }
@@ -1238,17 +1240,20 @@ body.modal-open {
 .agreement-gate-check input { margin-top: .2rem; flex: 0 0 auto; }
 .link-btn {
   background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--accent, #d11); text-decoration: underline;
+  color: var(--accent); text-decoration: underline;
   font: inherit;
 }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .modal {
   background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-top: 3px solid var(--pine);
-  border-radius: var(--radius); padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--accent);
+  border-radius: var(--radius); padding: var(--s5);
   max-width: 380px; width: 100%;
-  box-shadow: var(--shadow-lg);
+  /* --shadow-md, not lg: a modal floats above the page, it does not hover
+     over a hole in it. The agreement gate keeps lg — it is the one overlay
+     that blocks the whole app. */
+  box-shadow: var(--shadow-md);
   animation: modalIn .22s ease;
   /* Center vertically when overlay has free space; allow scrolling if modal is tall */
   margin: auto;
@@ -1256,10 +1261,13 @@ body.modal-open {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* Rises, does not zoom. A scale-up on a square-cornered panel reads as a
+   dialog box from a different design system. */
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(.95) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.agreement-gate .modal { box-shadow: var(--shadow-lg); }
 .modal-title { margin-bottom: .5rem; }
 .modal-body { color: var(--text-muted); font-size: .875rem; margin-bottom: 1.25rem; line-height: 1.6; }
 .modal-document { max-height: 70vh; overflow-y: auto; padding: 1.5rem; }
@@ -1270,8 +1278,8 @@ body.modal-open {
 .modal-document li { margin-left: 1.5rem; margin-bottom: 0.25rem; }
 .modal-document blockquote {
   margin: 0.75rem 0; padding: .65rem .9rem;
-  border-left: 3px solid var(--accent, #d11);
-  background: rgba(221,17,17,.06); border-radius: 4px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface2); border-radius: var(--radius);
 }
 .modal-document strong { font-weight: 600; }
 .modal-actions { display: flex; justify-content: flex-end; gap: .75rem; flex-wrap: wrap; }
@@ -1702,38 +1710,39 @@ body {
 }
 
 /* Auth modal */
-.auth-tabs { display:flex; gap:0; border-bottom:1.5px solid var(--border); margin-bottom:1.5rem; }
+.auth-tabs { display:flex; gap:0; border-bottom:1px solid var(--line); margin-bottom:1.5rem; }
 .auth-tab {
-  flex:1; padding:.75rem; font-size:.85rem; font-weight:700; background:none; border:none;
+  flex:1; padding:.75rem; font-size:.85rem; font-weight:600; background:none; border:none;
   color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent;
-  transition:color .15s, border-color .15s;
+  min-height:var(--tap);
+  transition:color var(--dur), border-color var(--dur);
 }
-.auth-tab.active { color:var(--pine); border-bottom-color:var(--pine); }
+.auth-tab:hover { color:var(--text); border-bottom-color:var(--line-strong); }
+.auth-tab.active { color:var(--text); border-bottom-color:var(--accent); }
 .auth-form { display:none; }
 .auth-form.active { display:block; }
 .auth-error { color:var(--red); font-size:.82rem; margin-top:.75rem; }
 .auth-hint { font-size:.8rem; color:var(--text-muted); margin-top:.75rem; text-align:center; }
-.auth-hint a { color:var(--pine); text-decoration:none; font-weight:700; }
+.auth-hint a { color:var(--accent); text-decoration:none; font-weight:600; }
 
 .auth-social { display:flex; flex-direction:column; gap:.55rem; margin-bottom:1.1rem; }
 .auth-social-btn {
   display:flex; align-items:center; justify-content:center; gap:.6rem;
   width:100%; padding:.65rem 1rem; font-size:.85rem; font-weight:600;
-  background:var(--surface); color:var(--text); border:1.5px solid var(--border-hi);
-  border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text); border:1px solid var(--line-strong);
+  border-radius:var(--radius); min-height:var(--tap);
 }
-.auth-social-btn:hover { background:var(--surface2); border-color:var(--pine); }
+.auth-social-btn:hover { background:var(--surface2); border-color:var(--accent); }
 .auth-social-btn svg { flex-shrink:0; }
 
 .auth-divider {
   display:flex; align-items:center; gap:.7rem; margin-bottom:1.1rem;
   color:var(--text-muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
 }
-.auth-divider::before, .auth-divider::after { content:''; flex:1; height:1.5px; background:var(--border); }
+.auth-divider::before, .auth-divider::after { content:''; flex:1; height:1px; background:var(--line); }
 
 .auth-guest {
-  margin-top:1.1rem; padding-top:1.1rem; border-top:1.5px solid var(--border);
-  animation:viewFadeIn .25s ease;
+  margin-top:1.1rem; padding-top:1.1rem; border-top:1px solid var(--line);
 }
 .auth-guest-note { font-size:.72rem; color:var(--text-muted); margin-top:.5rem; text-align:center; }
 
@@ -1741,7 +1750,7 @@ body {
 .toast {
   position:fixed; left:50%; bottom:calc(var(--bottom-nav-h) + 1rem);
   transform:translate(-50%, 1rem); z-index:300;
-  background:var(--pine); color:#fff; font-weight:600; font-size:.85rem;
+  background:var(--accent); color:var(--accent-ink); font-weight:600; font-size:.85rem;
   padding:.7rem 1.1rem; border-radius:var(--radius); box-shadow:var(--shadow-md);
   opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:90vw; text-align:center;
 }
@@ -1768,13 +1777,15 @@ body {
   align-items: center;
   justify-content: center;
   gap: .6rem;
-  background: rgba(237,244,238,.82);
+  /* was rgba(237,244,238,.82) — a pale green wash from the pine palette,
+     which read as a tint over the data rather than as a cover on it */
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   border-radius: var(--radius);
   z-index: 2;
 }
 .paywall-lock { font-size: 1.5rem; }
 .paywall-msg {
-  font-size: .82rem; font-weight: 600; color: var(--pine);
+  font-size: .82rem; font-weight: 600; color: var(--accent);
   text-align: center; padding: 0 1.5rem; line-height: 1.45;
   font-family: var(--font-mono);
   letter-spacing: .04em;
@@ -1967,7 +1978,7 @@ html.dark .settings-section-title { background: #1d1d20; }
 /* Streak chip stays warm but tuned for dark */
 html.dark .streak-chip { background: linear-gradient(160deg, #2a1a0e, #3a2410); border-color: #6b4422; }
 html.dark .streak-chip.streak-dim { background: var(--surface2); border-color: var(--border); }
-html.dark .paywall-overlay { background: var(--overlay); }
+html.dark .paywall-overlay { background: color-mix(in srgb, var(--surface) 88%, transparent); }
 
 /* ─────────────────────────────────────────────────────────────
    NEW FEATURES: Goals, View Preferences, Customization
@@ -2177,9 +2188,9 @@ canvas {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(10px);
-  border-top: 1.5px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: none;
+  border-top: 1px solid var(--line-strong);
   padding: 1.2rem;
   padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
   animation: slideUp .3s ease;
@@ -2195,7 +2206,7 @@ canvas {
 }
 
 .cookie-consent-text {
-  color: #fff;
+  color: var(--text);
   flex: 1;
 }
 
@@ -2207,7 +2218,7 @@ canvas {
 
 .cookie-consent-text p {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-muted);
   margin: 0;
 }
 

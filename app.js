@@ -10395,10 +10395,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Advanced Analytics
-            <button data-close="analyticsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="analyticsModal" aria-label="Close">✕</button>
           </div>
           <div style="display:grid;gap:1rem">
             <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
@@ -10472,10 +10472,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Where you sit
-            <button data-close="benchmarkModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="benchmarkModal" aria-label="Close">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
             ${pub.ok ? `Your ${esc(clubLabel(pub.club))} over ${pub.n} shots, against TrackMan's published rows`
@@ -10528,10 +10528,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('book')} What you can work on
-            <button data-close="learningModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="learningModal" aria-label="Close">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
             ${path.club ? `Gated against your ${esc(clubLabel(path.club))}` : 'Nothing imported yet, so every gate reads as closed'}
@@ -10562,10 +10562,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('bag')} Club Performance Analysis
-            <button data-close="clubModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="clubModal" aria-label="Close">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
             ${clubs.map(c => `
@@ -10609,10 +10609,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('target')} How you practised
-            <button data-close="efficiencyModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="efficiencyModal" aria-label="Close">✕</button>
           </div>
           <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">Your last session, read off the order you hit in</div>
           <div style="display:grid;gap:1rem">
@@ -10826,10 +10826,10 @@ async function init() {
 
     const html = `
       <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
-        <div style="background:var(--surface);border-radius:var(--radius-md);max-width:400px;width:100%;padding:1.5rem">
+        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:400px;width:100%;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             Keyboard Shortcuts
-            <button data-close="shortcutsModal" style="background:none;border:none;font-size:1.2rem;cursor:pointer">✕</button>
+            <button class="btn-icon" data-close="shortcutsModal" aria-label="Close">✕</button>
           </div>
           <div style="display:grid;gap:.8rem">
             ${shortcuts.map(s => `
