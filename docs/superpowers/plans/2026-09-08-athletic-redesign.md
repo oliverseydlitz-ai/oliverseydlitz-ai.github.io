@@ -800,3 +800,17 @@ git commit -m "Redesign: scroll motion — chart draw-on, condensing header, sec
 **Type consistency:** `icon(name, cls)` signature identical in Tasks 5 and 6. `chartTheme()` return keys (`grid tick font good bad accent`) consistent Task 10 Steps 2–3. `CLUB_COLORS` keeps existing keys (Task 10). Token names: Global Constraints C1 list == Task 1 Step 4 check == spec §3.
 
 **Known deviations from a pure-TDD plan:** this is a visual redesign; Tasks 1–3 and 7–13 use the regression suites + render-scan + visual check as their test cycle rather than a written-first unit test. Task 4/6 (`no-emoji.js`) is genuine test-first. This is called out in the per-task cycle note and is the honest shape of the work.
+
+---
+
+## Next in the queue
+
+Task 15 above is the last task in **this** plan. What follows it is
+`docs/superpowers/plans/2026-09-11-design-md-workover.md` — a generated
+`DESIGN.md` design contract plus four structural fixes, built from a side-by-side
+against a professionally-authored design system (`docs/reference/`). It assumes
+Task 15 has shipped and the CSS it touches is settled.
+
+Its **Task 0 is a live bug**, independent of everything else here and safe to do
+first in any order: the grade-badge SVG still names the retired Outfit typeface,
+so it renders in the browser's default sans.

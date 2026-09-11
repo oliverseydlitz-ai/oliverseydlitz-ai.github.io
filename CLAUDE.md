@@ -1190,6 +1190,31 @@ is unstarted. Read that task before beginning it: the dead `viewFadeIn`
 keyframe and the `animation: none !important` override that neutralised it are
 now removed, which was its prerequisite.
 
+**Queued behind it:** `docs/superpowers/plans/2026-09-11-design-md-workover.md`
+— five tasks, built from a side-by-side against BMW M's design system as
+analysed by VoltAgent/awesome-design-md (vendored under `docs/reference/`, MIT,
+with a README stating what is borrowed and what is not). It is **not a reskin**;
+the palette, the type and the chamfer all survive. It delivers a generated
+`DESIGN.md` at the repo root with a drift guard, and closes four gaps the
+comparison exposed:
+
+- **Task 0 is a live bug, already diagnosed.** `app.js:7469` and `app.js:8146`
+  set `font-family="Outfit,sans-serif"` on the grade-badge SVG text. Outfit is
+  the **retired** typeface — nothing loads it and `font-src 'self'` would refuse
+  it — so the single largest glyph on the session detail has been rendering in
+  the browser's default sans since the redesign shipped. It is invisible to
+  every existing check: colours-are-tokens scans colours, no-emoji scans
+  characters, render-scan greps for NaN and measures width, and a wrong font is
+  none of those. Fix it first.
+- The display tier (`.stat-hero`) is defined and **referenced by nothing**.
+- All-caps tracking is 0.51px where the reference systems call 1.5px
+  non-negotiable.
+- The home view is seven identically-treated surfaces, which flattens the one
+  ranked card `getNextStep` exists to produce.
+
+Two decisions in it are Oliver's and are named rather than taken: dark as the
+default surface, and the pine-green logo that contradicts the graphite app.
+
 ### What the redesign changed that a new session must not undo
 
 - **Palette is "Range"** — graphite + signal orange. Token names are frozen
