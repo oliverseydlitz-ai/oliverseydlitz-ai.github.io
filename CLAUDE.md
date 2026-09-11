@@ -885,7 +885,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **59 suites**. `test/browser/` holds checks that are **not** in
+`npm test` runs **60 suites**. `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1182,7 +1182,7 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` is current, working tree clean, **59 suites green**,
+State at handover: `main` is current, working tree clean, **60 suites green**,
 render scan exit 0, service worker at **v154**, 59 modules.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
@@ -1197,6 +1197,9 @@ the palette, the type and the chamfer all survive. It delivers a generated
 `DESIGN.md` at the repo root with a drift guard, and closes four gaps the
 comparison exposed:
 
+- **Task 1 — DONE (11 Sep).** `DESIGN.md` at the repo root, front matter
+  generated from `style.css`, prose hand-written between markers the generator
+  preserves. See its own section below.
 - **Task 0 — DONE (11 Sep).** Both grade-badge SVGs set
   `font-family="Outfit,sans-serif"` on their `<text>` node. Outfit is the
   **retired** typeface — nothing loads it and `font-src 'self'` would refuse it
@@ -1260,6 +1263,50 @@ default surface, and the pine-green logo that contradicts the graphite app.
 - **Chart.js reads tokens through `chartTheme()`** and `retintCharts()` runs
   on the theme toggle, because a canvas does not repaint when a class changes
   on `<html>`.
+
+### DESIGN.md is generated, and that is the only reason to have one
+
+`DESIGN.md` at the repo root is the design contract an agent reads before
+building a surface here. Its front matter — every colour, type size, spacing
+step, radius and component geometry — is produced by `tools/build-design-md.js`
+from `style.css`. The prose between the `prose:start` / `prose:end` markers is
+hand-written and the generator preserves it verbatim, never writing a word of
+it. `test/suites/design-md.js` re-runs the real tool in a real process and
+fails if the committed file differs.
+
+A design document that hand-restates values living in the stylesheet is a
+second copy of the truth, and second copies rot here: the target bands once had
+twelve disagreeing copies, the privacy policy was wrong on every fact that
+mattered, and this repository claimed an og-image generator for months while
+neither it nor its template existed.
+
+Things worth knowing before touching the generator:
+
+- **It reads the cascade, not the first declaration.** `.view-title` is
+  declared twice, 1,400 lines apart. Documenting the first would have described
+  a rule the browser never applies — the same defect as a card redeclared below
+  itself with a different shadow.
+- **It is mobile-first.** `@media` blocks are lifted out before the base pass,
+  so the base value is the PHONE value and a `min-width` override is reported
+  as a step-up. Reading them together would have documented the view title as
+  2rem, which is only ever true on a desktop.
+- **The club scale is referenced, never copied.** Fourteen hex values in a
+  second file is exactly the drift this prevents, and the suite checks that
+  none of them appears in the document.
+- **A colour token with no role in the tool's `ROLE` map fails the build.** A
+  hex says what a colour is; only a human can say what it is for, and a token
+  added without a role would otherwise be a silent gap.
+- **The prose may contain no colour literal.** Nothing regenerates prose, so a
+  hex typed into a paragraph is the copy that goes stale.
+- **The fabrication check anchors on the claim, not the vocabulary.** Its first
+  version banned the words "lessons" and "videos" and failed on the paragraph
+  warning against them — the seventh time a scan in this repo has read its own
+  explanation. A document that says "there is no video content" must stay
+  sayable.
+
+`rules-are-wired.js` now asserts that each generated artefact has BOTH a
+generator and a guard suite that names it. A generator nobody runs is the same
+defect as a gate nobody calls.
 
 ### Scroll motion — one rule, and it is not style
 
@@ -1420,7 +1467,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 59 modules,
-**59 test suites**, service worker **v154**. Deterministic auth, cloud sync
+**60 test suites**, service worker **v154**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

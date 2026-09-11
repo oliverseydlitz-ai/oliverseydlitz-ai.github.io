@@ -148,9 +148,9 @@ git commit -m "Fix: grade badge was rendering in the retired typeface"
 
 ---
 
-## Task 1: `DESIGN.md`, generated from `style.css`
+## Task 1: `DESIGN.md`, generated from `style.css` — DONE (11 Sep)
 
-- [ ] **Step 1: `tools/build-design-md.js`.** Playwright is not needed; this is
+- [x] **Step 1: `tools/build-design-md.js`.** Playwright is not needed; this is
   a text transform. It reads `style.css` and emits the DESIGN.md front matter:
 
   - `colors:` — every custom property in `:root` whose value is a colour, plus
@@ -172,7 +172,7 @@ git commit -m "Fix: grade badge was rendering in the retired typeface"
   the drift D2 exists to prevent; the front matter names the generator and the
   sweep parameters instead.
 
-- [ ] **Step 2: The prose.** Nine sections, hand-written, between
+- [x] **Step 2: The prose.** Nine sections, hand-written, between
   `<!-- prose:start -->` / `<!-- prose:end -->` markers the generator preserves.
   Follow the format's own section list (overview, colours, typography, layout,
   elevation, shapes, components, do's and don'ts, responsive) and write the
@@ -191,13 +191,13 @@ git commit -m "Fix: grade badge was rendering in the retired typeface"
   - **Responsive.** 393px is the design viewport, not a breakpoint to degrade
     to. Say that oversized type steps up at 640px and why.
 
-- [ ] **Step 3: The guard.** `test/suites/design-md.js` runs the generator into
+- [x] **Step 3: The guard.** `test/suites/design-md.js` runs the generator into
   memory and diffs it against the committed `DESIGN.md`, failing with the first
   differing line. Same shape as `legal-pages.js`. Add both the tool and the
   suite to `rules-are-wired.js`'s expectations so a generator nobody runs is
   caught the way a gate nobody calls is.
 
-- [ ] **Step 4: Gates and commit.** No app file changes, so `render-scan` cannot
+- [x] **Step 4: Gates and commit.** No app file changes, so `render-scan` cannot
   regress — run it anyway, because "cannot regress" is what was said about the
   mirror the week it went stale.
 

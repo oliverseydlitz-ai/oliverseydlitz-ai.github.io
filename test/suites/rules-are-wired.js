@@ -328,6 +328,32 @@ console.log('— and every fault detection is handed its session —');
      `every PracticePlan.generate passes shots, minutes AND session${badGen.length ? ' — not ' + badGen.join(', ') : ''}`);
 }
 
+// Generated artefacts, and the guard that keeps each honest. The failure mode
+// here is not a wrong value — it is a generator nobody runs, which is the same
+// defect as a gate nobody calls: the source moves, the artefact does not, and
+// the artefact is the thing people trust. Each row is (generator, guard suite).
+// `tools/build-og-image.js` was claimed by CLAUDE.md for months while neither
+// it nor its template existed anywhere in the repository, which is why the
+// pairing is asserted rather than remembered.
+console.log('— every generated artefact has a generator AND a guard —');
+{
+  const fs2 = require('fs'), path2 = require('path');
+  const root2 = path2.join(__dirname, '..', '..');
+  for (const [tool, suite, artefact] of [
+    ['tools/build-design-md.js', 'test/suites/design-md.js', 'DESIGN.md'],
+    ['tools/build-legal-pages.js', 'test/suites/legal-pages.js', 'terms/index.html'],
+    ['tools/build-og-image.js', 'test/suites/seo-and-production.js', 'og-image.png'],
+  ]) {
+    const have = [tool, suite, artefact].filter(f => fs2.existsSync(path2.join(root2, f)));
+    ok(have.length === 3,
+       `${artefact}: generator + guard + artefact all present${have.length === 3 ? '' : ` — missing ${[tool, suite, artefact].filter(f => !have.includes(f)).join(', ')}`}`);
+    if (fs2.existsSync(path2.join(root2, suite)))
+      ok(fs2.readFileSync(path2.join(root2, suite), 'utf8').includes(path2.basename(tool).replace('.js', '')) ||
+         fs2.readFileSync(path2.join(root2, suite), 'utf8').includes(artefact),
+         `  and ${path2.basename(suite)} actually names what it guards`);
+  }
+}
+
 // A check that cannot fail proves nothing, and this one is a string search —
 // exactly the shape that quietly stops discriminating. `ViewPrefs.setPref` is
 // confirmed dead and deliberately left in place (HANDOVER lists it), so it is
