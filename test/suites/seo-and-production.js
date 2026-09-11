@@ -94,6 +94,24 @@ ok(d404.querySelector('meta[name="robots"]').content.includes('noindex'), 'noind
 ok(!/location\.replace|location\.href\s*=|http-equiv=["']refresh/i.test(read('404.html')),
    'and it does NOT redirect — bouncing every bad URL to the homepage tells a crawler the wrong URL was fine');
 
+// The 404 inlines its own copy of the palette, deliberately: it has to render
+// when style.css is the thing that could not be found. A copy that can drift
+// is normally banned here, so it is pinned instead — this page went a whole
+// redesign still painted in the retired red because nothing checked it.
+const css404 = read('404.html');
+const appCss = read('style.css');
+const rootBlock = appCss.slice(appCss.indexOf(':root {'), appCss.indexOf('/* ── Base'));
+for (const name of ['bg', 'surface', 'accent', 'text']) {
+  const inApp = (rootBlock.match(new RegExp('--' + name + ':\\s*(#[0-9a-fA-F]{6})')) || [])[1];
+  const in404 = (css404.match(new RegExp('--' + name + ':\\s*(#[0-9a-fA-F]{6})')) || [])[1];
+  ok(!!inApp && !!in404 && inApp.toUpperCase() === in404.toUpperCase(),
+     `404 --${name} is ${in404 || 'missing'}, matching style.css (${inApp || 'missing'})`);
+}
+ok(/fonts\/archivo-latin\.woff2/.test(css404),
+   'and it uses the self-hosted typeface, not a font nothing loads');
+ok(/href="\/privacy\/"/.test(css404) && /href="\/terms\/"/.test(css404),
+   'its legal links point at the rendered pages, not raw markdown');
+
 console.log('— no development artefacts ship —');
 ok(!has('vite.config.js') && !has('webpack.config.js'), 'no bundler config (there is no build step)');
 const maps = fs.readdirSync(root).filter(f => f.endsWith('.map'));

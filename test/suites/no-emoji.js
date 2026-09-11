@@ -20,7 +20,12 @@ let failed = 0;
 // The two legal documents are shipped, user-facing text rendered inside
 // the app, so they are held to the same rule as the markup that renders
 // them. A pictograph in a privacy policy is not a style preference.
-for (const f of ['index.html', 'app.js', 'PRIVACY.md', 'TERMS.md']) {
+// Every file that ships text to a user. 404.html was outside this list and
+// kept an emoji through the whole purge — a page nobody looks at until
+// something has already gone wrong is exactly where one survives.
+for (const f of ['index.html', 'app.js', 'PRIVACY.md', 'TERMS.md', '404.html',
+                 'legal.js', 'contact/index.html', 'terms/index.html',
+                 'privacy/index.html', 'manifest.json', 'llms.txt']) {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
   src.split('\n').forEach((ln, i) => {
     const stripped = [...ln].filter(c => !ALLOW.includes(c)).join('');

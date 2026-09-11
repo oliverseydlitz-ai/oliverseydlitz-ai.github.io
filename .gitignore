@@ -19,3 +19,4 @@ test/browser/site/
 *.p12
 .supabase/
 service-role*
+.og-template.html

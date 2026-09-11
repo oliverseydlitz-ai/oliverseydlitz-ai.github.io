@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0c0c0d" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#dc2626" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0D10" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#FBFBFC" media="(prefers-color-scheme: light)">
   <!-- GitHub Pages serves this file with a real HTTP 404 status for any path it
        cannot find, so this is a genuine 404 rather than a redirect dressed as
        one. It deliberately does NOT bounce to the homepage: a silent redirect
@@ -15,33 +15,49 @@
   <link rel="canonical" href="https://oliverseydlitz-ai.github.io/">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <style>
-    :root{--bg:#0c0c0d;--surface:#161618;--border:#26262a;--text:#fafafa;
-          --dim:#a1a1aa;--muted:#71717a;--accent:#dc2626;--radius:12px}
-    @media (prefers-color-scheme: light){
-      :root{--bg:#fafafa;--surface:#fff;--border:#e4e4e7;--text:#18181b;
-            --dim:#52525b;--muted:#71717a}
+    /* The Range palette, inlined. This page is standalone on purpose — it has
+       to render when style.css is the thing that 404'd — so the tokens are
+       copied rather than linked. They are the same values as :root and
+       html.dark in style.css; if those change, change these. */
+    :root{--bg:#FBFBFC;--surface:#FFFFFF;--line:#E4E6EA;--line-strong:#CDD0D6;
+          --text:#0E1116;--dim:#565E6B;--muted:#8A929E;--accent:#E24E12;
+          --accent-ink:#0B0D10;--radius:0}
+    @media (prefers-color-scheme: dark){
+      :root{--bg:#0B0D10;--surface:#14171C;--line:#2A2F37;--line-strong:#3A404A;
+            --text:#F4F6F8;--dim:#A2AAB5;--muted:#6B7480;--accent:#FF6A2B}
     }
+    /* Self-hosted, same file the app uses. font-display:swap so a missing
+       font never blocks the text of a 404 page. */
+    @font-face{font-family:'Archivo';font-style:normal;font-weight:400 800;
+      font-stretch:100% 125%;font-display:swap;
+      src:url('/fonts/archivo-latin.woff2') format('woff2')}
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:var(--bg);color:var(--text);min-height:100vh;
-      font-family:Outfit,system-ui,-apple-system,"Segoe UI",sans-serif;
+      font-family:'Archivo',system-ui,-apple-system,"Segoe UI",sans-serif;
       display:flex;align-items:center;justify-content:center;padding:1.5rem;line-height:1.6}
     main{max-width:34rem;width:100%}
     .brand{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:1.05rem;margin-bottom:2rem}
-    .tag{background:var(--accent);color:#fff;font-size:.62rem;font-weight:800;
-      padding:.15rem .4rem;border-radius:4px;letter-spacing:.5px}
+    .tag{background:var(--accent);color:var(--accent-ink);font-size:.62rem;font-weight:800;
+      padding:.15rem .4rem;border-radius:2px;letter-spacing:.5px;text-transform:uppercase}
+    .mark{width:1.1em;height:1.1em;fill:none;stroke:var(--accent);stroke-width:1.6;
+      stroke-linecap:square;stroke-linejoin:miter;flex:none}
     .code{font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
       color:var(--accent);margin-bottom:.5rem}
     h1{font-size:1.9rem;font-weight:800;letter-spacing:-1px;line-height:1.15;margin-bottom:.8rem}
     p{color:var(--dim);font-size:.95rem;margin-bottom:1rem}
     .path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;
-      background:var(--surface);border:1px solid var(--border);border-radius:6px;
+      background:var(--surface);border:1px solid var(--line);border-radius:2px;
       padding:.15rem .4rem;word-break:break-all;color:var(--text)}
     .links{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.6rem}
-    a.btn{display:inline-block;text-decoration:none;font-size:.9rem;font-weight:600;
-      padding:.7rem 1.1rem;border-radius:var(--radius);border:1px solid var(--border);
-      background:var(--surface);color:var(--text)}
-    a.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-    .also{margin-top:2rem;padding-top:1.2rem;border-top:1px solid var(--border)}
+    /* The same cut-corner silhouette as the app's buttons, without pulling in
+       the whole button system for three links. */
+    a.btn{display:inline-block;text-decoration:none;font-size:.82rem;font-weight:700;
+      text-transform:uppercase;letter-spacing:.04em;
+      padding:.7rem 1.1rem;border:1px solid var(--line-strong);
+      background:var(--surface);color:var(--text);
+      clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
+    a.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+    .also{margin-top:2rem;padding-top:1.2rem;border-top:1px solid var(--line)}
     .also-h{font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;
       letter-spacing:.08em;margin-bottom:.7rem}
     .also ul{list-style:none;display:flex;flex-direction:column;gap:.5rem}
@@ -52,7 +68,7 @@
 </head>
 <body>
   <main>
-    <div class="brand"><span aria-hidden="true">⛳</span><span>ShotLab</span><span class="tag">TOUR</span></div>
+    <div class="brand"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v18M6 4l12 4-12 4"/></svg><span>ShotLab</span><span class="tag">TOUR</span><span class="tag">Beta</span></div>
     <div class="code">Error 404</div>
     <h1>That page does not exist.</h1>
     <p>Nothing is served at <span class="path" id="badPath">this address</span>. It was either
@@ -69,8 +85,9 @@
     <div class="also">
       <div class="also-h">Also here</div>
       <ul>
-        <li><a href="/PRIVACY.md">Privacy policy</a></li>
-        <li><a href="/TERMS.md">Terms of use</a></li>
+        <li><a href="/privacy/">Privacy policy</a></li>
+        <li><a href="/terms/">Terms of service</a></li>
+        <li><a href="/contact/">Contact &amp; data requests</a></li>
         <li><a href="/SECURITY.md">Security policy</a></li>
         <li><a href="/llms.txt">What this app is, in full</a></li>
       </ul>

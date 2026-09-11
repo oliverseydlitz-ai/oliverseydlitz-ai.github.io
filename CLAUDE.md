@@ -884,7 +884,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **52 suites**. `test/browser/` holds checks that are **not** in
+`npm test` runs **57 suites**. `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1080,7 +1080,7 @@ that reads it has already moved on.
   hash routes and crawlers discard everything after the `#`, so listing them
   would be listing the same page repeatedly. `robots.txt` allows the site,
   disallows `/test/`, `/node_modules/` and `/supabase/`, and names the sitemap.
-- **`og-image.png` is RENDERED, not hand-cropped** (Playwright, from a template),
+- **`og-image.png` is RENDERED, not hand-cropped** — by `tools/build-og-image.js` (Playwright, from a template in that file),
   so it cannot drift from the 1200×630 the meta tags promise. The suite reads
   the PNG's IHDR and compares it to the tags rather than trusting them.
 - **The JSON-LD has no `aggregateRating` and no `review`.** There are no ratings.
@@ -1181,9 +1181,65 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` and `claude/codebase-review-continuation-dw5cgd` are
-identical, working tree clean, **52 suites green**, render scan passing, service
-worker at **v132**, 58 modules.
+State at handover: `main` is current, working tree clean, **57 suites green**,
+render scan exit 0, service worker at **v151**, 58 modules.
+
+The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
+is **shipped through Task 14**. Only **Task 15 — scroll motion** remains, and it
+is unstarted. Read that task before beginning it: the dead `viewFadeIn`
+keyframe and the `animation: none !important` override that neutralised it are
+now removed, which was its prerequisite.
+
+### What the redesign changed that a new session must not undo
+
+- **Palette is "Range"** — graphite + signal orange. Token names are frozen
+  (spec C1) because `app.js` reads them inline in runtime-injected modals.
+- **Typeface is Archivo, self-hosted** in `fonts/`. The four libraries are
+  self-hosted in `vendor/`. **The site makes zero third-party requests on
+  load** — that is a deliberate EU-law position (an unconsented IP transfer to
+  a US company on every page load; LG München I, Jan 2022), not a performance
+  tweak. `script-src 'self'; font-src 'self'` enforces it. Do not reintroduce
+  a CDN tag; `sync.sh` fails if one appears.
+- **No emoji anywhere.** `test/suites/no-emoji.js` covers `index.html`,
+  `app.js`, both legal documents, `404.html`, the standalone pages, the
+  manifest and `llms.txt`. Icons are `<symbol>` marks in the sprite at the top
+  of `<body>`, referenced through `icon(name)`.
+- **No colour literal in `app.js`** outside `CLUB_COLORS`.
+  `colours-are-tokens.js` scans the whole file, not just after a property
+  name — the first sweep missed a third of its targets because colours hidden
+  inside a ternary survived a `background:<literal>` grep.
+- **`CLUB_COLORS` is an even OKLCH sweep** — fixed chroma and lightness, hue
+  45°→345°. Do not swap in a hand-picked palette: fixed L and C is the point.
+- **Chart.js reads tokens through `chartTheme()`** and `retintCharts()` runs
+  on the theme toggle, because a canvas does not repaint when a class changes
+  on `<html>`.
+
+### Legal, privacy and safety layer (audited 11 September 2026)
+
+- `PRIVACY.md` and `TERMS.md` are the source of truth and are **rendered, not
+  duplicated**: `/privacy/` and `/terms/` are pre-rendered from them by
+  `tools/build-legal-pages.js`, and `legal-pages.js` fails if the HTML and the
+  markdown disagree. Edit the markdown, re-run the generator.
+- Both documents carry a **version**, and `Agreement.VERSION` must match it —
+  `legal-docs.js` pins that, so a rewrite cannot skip the re-prompt.
+- Acceptance is recorded **server-side** in `public.terms_acceptances`
+  (insert + select own only; no update or delete policy, deliberately).
+- **`legal-docs.js` checks the documents against the code**: the storage-key
+  table against the keys `app.js` actually uses, the auth-token storage
+  medium, the database region, and the names of the real deletion controls.
+  A privacy policy is a statement of fact about a system, and the previous one
+  was wrong on every point that mattered.
+- **`DrillLibrary.SAFETY` / `.PAIN` / `.FITNESS_CAVEAT`** are the only copies
+  of the safety text and render on every surface that prescribes activity.
+  `PAIN` deliberately offers no drill: the app sees launch monitor numbers,
+  not a body, so declining to answer is the safe answer.
+- **Supabase grants: revoke from `authenticated` BEFORE granting.** Supabase's
+  `ALTER DEFAULT PRIVILEGES` grants ALL on every new table in `public` to
+  `authenticated`, and **RLS does not apply to TRUNCATE** — so a bare
+  `GRANT SELECT, INSERT, UPDATE, DELETE` leaves a whole-table wipe in place
+  that no policy stops. The live database held exactly that on
+  `public.sessions` until this audit. `supabase-setup.sql` now does both, and
+  this bit both tables before it was noticed.
 
 ### Open, and NOT fixable from this repo
 
@@ -1259,8 +1315,16 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** September 2026 — ShotLab v3. 58 modules, 52 test suites,
-service worker v132. Deterministic auth, cloud sync behind verified row-level
-security, dark mode, installable PWA, printable yardage card, full SEO and
-crawlability layer. Repo audited end-to-end: no stray files, no non-golf
-content, only `main` + active branches exist.
+**Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 58 modules,
+**57 test suites**, service worker **v151**. Deterministic auth, cloud sync
+behind row-level security verified live against production, dark mode,
+installable PWA, printable yardage card, printable legal documents, standalone
+`/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
+third-party requests on load.
+
+Two generated artefacts, both with a guard so they cannot drift from their
+source: `tools/build-legal-pages.js` (the standalone legal pages, pinned by
+`legal-pages.js`) and `tools/build-og-image.js` (the share card — this file
+claimed for months that the card was rendered from a template when no template
+or generator existed anywhere in the repository, and it went through the whole
+redesign still painted in the retired red).

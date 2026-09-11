@@ -319,11 +319,13 @@ button:disabled, button[disabled] {
 
 /* ── Views ─────────────────────────────────────────────── */
 .view { display: none; padding-top: 1.25rem; }
-.view.active { display: block; animation: viewFadeIn .22s ease; }
-@keyframes viewFadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* No entrance animation. There was one — a viewFadeIn on every view and a
+   staggered version on .section-block — and somebody later neutralised it
+   with an "ensure content is always visible" override setting
+   animation:none !important on both. That override is what you write when an
+   entrance animation has left real content invisible for real users. Both
+   halves are gone now rather than left cancelling each other out. */
+.view.active { display: block; }
 .view-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; padding: .25rem 0; }
 .view-title { flex: 1; }
 .section-sub {
@@ -522,12 +524,9 @@ textarea { resize: vertical; }
 .score-details { flex: 1; min-width: 0; }
 /* This is the screen's one hero numeral, so it takes .stat-hero's scale
    rather than a fourth near-2rem size of its own. */
-.score-number {
-  font-family: var(--font-display);
-  font-size: 2.4rem; font-weight: 800; line-height: 1;
-  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text);
-}
-@media (min-width: 640px) { .score-number { font-size: 3.4rem; } }
+/* Sized by .stat-hero, which is the single definition of the hero numeral —
+   see the Cards & section blocks section. Only what is specific to the score
+   banner lives here. */
 .score-max { font-size: .8rem; font-weight: 400; color: var(--text-muted); }
 .score-label { font-size: .7rem; color: var(--text-dim); margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
 .score-bar-row { display: flex; height: 6px; border-radius: 0; overflow: hidden; gap: 1px; }
@@ -643,14 +642,18 @@ textarea { resize: vertical; }
 
 /* The ONE hero numeral per screen (spec §4.2, §7.3). Applied by the score
    banner; defined here so there is a single copy of it. */
-.stat-hero {
+/* The ONE hero numeral per screen (spec §4.2, §7.3). .score-number is listed
+   here rather than given its own copy of these values: it IS the hero numeral
+   on the session detail, and two rules setting one size is how a type scale
+   drifts. */
+.stat-hero, .score-number {
   font-family: var(--font-display);
   font-weight: 800; font-size: 2.4rem; line-height: 1;
   letter-spacing: -.02em; color: var(--text);
   font-variant-numeric: tabular-nums;
   display: block;
 }
-@media (min-width: 640px) { .stat-hero { font-size: 3.4rem; } }
+@media (min-width: 640px) { .stat-hero, .score-number { font-size: 3.4rem; } }
 
 /* ── Swing DNA ─────────────────────────────────────────── */
 .dna-grid { display: flex; flex-direction: column; gap: .4rem; }
@@ -1284,8 +1287,6 @@ body.modal-open {
 /* Terms/Privacy must open ABOVE the gate when reviewed from it */
 #privacyModal, #termsModal { z-index: 500; }
 .agreement-gate-body { max-height: 60vh; overflow-y: auto; }
-.agreement-gate-points { margin: .75rem 0; padding-left: 1.25rem; }
-.agreement-gate-points li { margin-bottom: .5rem; line-height: 1.5; }
 .agreement-gate-check {
   display: flex; align-items: flex-start; gap: .6rem;
   margin-top: 1rem; cursor: pointer; font-size: .85rem;
@@ -1619,7 +1620,10 @@ body {
   font-size: .7rem !important;
 }
 /* ── EDITORIAL SESSION CARDS ───────────────────────────────── */
-.session-card { padding: 1.2rem 1.35rem !important; }
+/* The base rule sets --s4 and nothing else competes for it now, so the
+   !important that was holding this padding against the folded override
+   has nothing left to beat. */
+.session-card { padding: var(--s4); }
 
 /* ── METRIC CARDS — auto numbered ──────────────────────────── */
 .metrics-strip { counter-reset: metric; }
@@ -1816,18 +1820,6 @@ body {
   background-image:
     linear-gradient(rgba(14,17,22,.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(14,17,22,.035) 1px, transparent 1px) !important;
-}
-
-/* ── Animation override: ensure content is always visible ──── */
-.view.active {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
-}
-.section-block {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
 }
 
 /* ═══════════════ LAYOUT v2 — Dashboard · Trajectory · Subnav ═══════════════ */
@@ -2280,16 +2272,17 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 }
 .quick-stat-label { color: var(--text-dim); margin-top: 2px; letter-spacing: .08em; }
 
-/* Session cards redesigned - visual + actionable */
+/* The session card's LAYOUT only. This block used to redeclare the whole
+   card — border, background, a drop shadow and a hover state with a red glow
+   and a 2px lift — and being later in the file it quietly won over the
+   reskin, so every session row still carried the retired accent and a shadow
+   the spec forbids on chrome. Found by a QC pass that walked every view in
+   both themes looking for a computed box-shadow, because reading the
+   stylesheet had not found it in two passes. The card's appearance now lives
+   in exactly one place, in the Session list section. */
 .session-card {
-  border: 1.5px solid var(--border); border-radius: var(--radius); overflow: visible;
-  background: var(--surface); cursor: pointer; transition: all .2s;
-  display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
-}
-.session-card:hover {
-  border-color: var(--pine); box-shadow: 0 4px 12px rgba(220,38,38,.15);
-  transform: translateY(-2px);
+  overflow: visible;
+  display: grid; grid-template-columns: 1fr auto; gap: .8rem;
 }
 .session-card-date { font-weight: 600; color: var(--text); font-size: .95rem; }
 .session-card-meta { font-size: .8rem; color: var(--text-muted); margin: .3rem 0; }
