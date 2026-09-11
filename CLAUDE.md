@@ -1191,7 +1191,7 @@ keyframe and the `animation: none !important` override that neutralised it are
 now removed, which was its prerequisite.
 
 **Queued behind it:** `docs/superpowers/plans/2026-09-11-design-md-workover.md`
-— five tasks, built from a side-by-side against BMW M's design system as
+— six tasks (0 through 5), built from a side-by-side against BMW M's design system as
 analysed by VoltAgent/awesome-design-md (vendored under `docs/reference/`, MIT,
 with a README stating what is borrowed and what is not). It is **not a reskin**;
 the palette, the type and the chamfer all survive. It delivers a generated
