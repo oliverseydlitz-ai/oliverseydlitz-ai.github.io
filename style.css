@@ -546,6 +546,17 @@ textarea { resize: vertical; }
 .score-bd-n { color: var(--text-muted); min-width: 16px; text-align: right; font-size: .75rem; font-variant-numeric: tabular-nums; }
 
 /* ── Ring arc animation ────────────────────────────────── */
+/* The grade letter inside both score rings. It carried
+   font-family="Outfit,sans-serif" as an SVG presentation attribute — Outfit
+   being the typeface this redesign replaced, which nothing loads and which
+   font-src 'self' would refuse — so the largest glyph on the session detail
+   rendered in the browser's default sans beside Archivo Expanded headings.
+
+   A class, not the literal 'Archivo Expanded': a literal in the markup is how
+   this happened in the first place. An SVG <text> inherits font-family from
+   CSS, so the attribute was never needed. Guarded by fonts-are-tokens.js. */
+.grade-glyph { font-family: var(--font-display); }
+
 .score-ring-arc { transition: stroke-dashoffset .95s cubic-bezier(.15,.65,.25,1); }
 .scard-ring-arc { transition: stroke-dashoffset .8s  cubic-bezier(.15,.65,.25,1); }
 

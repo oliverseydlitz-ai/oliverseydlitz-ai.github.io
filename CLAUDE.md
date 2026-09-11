@@ -884,7 +884,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **57 suites**. `test/browser/` holds checks that are **not** in
+`npm test` runs **58 suites**. `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1181,8 +1181,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` is current, working tree clean, **57 suites green**,
-render scan exit 0, service worker at **v152**, 58 modules.
+State at handover: `main` is current, working tree clean, **58 suites green**,
+render scan exit 0, service worker at **v153**, 58 modules.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
 is **shipped through Task 14**. Only **Task 15 — scroll motion** remains, and it
@@ -1198,14 +1198,13 @@ the palette, the type and the chamfer all survive. It delivers a generated
 `DESIGN.md` at the repo root with a drift guard, and closes four gaps the
 comparison exposed:
 
-- **Task 0 is a live bug, already diagnosed.** `app.js:7469` and `app.js:8146`
-  set `font-family="Outfit,sans-serif"` on the grade-badge SVG text. Outfit is
-  the **retired** typeface — nothing loads it and `font-src 'self'` would refuse
-  it — so the single largest glyph on the session detail has been rendering in
-  the browser's default sans since the redesign shipped. It is invisible to
-  every existing check: colours-are-tokens scans colours, no-emoji scans
-  characters, render-scan greps for NaN and measures width, and a wrong font is
-  none of those. Fix it first.
+- **Task 0 — DONE (11 Sep).** Both grade-badge SVGs set
+  `font-family="Outfit,sans-serif"` on their `<text>` node. Outfit is the
+  **retired** typeface — nothing loads it and `font-src 'self'` would refuse it
+  — so the single largest glyph on the session detail rendered in the browser's
+  default sans for the whole life of the redesign. They now carry a class that
+  reads `--font-display`; a literal in the markup is how it happened.
+  `fonts-are-tokens.js` is the guard and it was written failing first.
 - The display tier (`.stat-hero`) is defined and **referenced by nothing**.
 - All-caps tracking is 0.51px where the reference systems call 1.5px
   non-negotiable.
@@ -1365,7 +1364,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**57 test suites**, service worker **v152**. Deterministic auth, cloud sync
+**58 test suites**, service worker **v153**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

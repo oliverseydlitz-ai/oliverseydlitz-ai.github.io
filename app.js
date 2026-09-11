@@ -7466,7 +7466,7 @@ const UI = (() => {
                     stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66"
                     transform="rotate(-90 26 26)" class="scard-ring-arc"/>
                   <text x="26" y="26" text-anchor="middle" dominant-baseline="central"
-                    font-family="Outfit,sans-serif" font-size="17" font-weight="800"
+                    class="grade-glyph" font-size="17" font-weight="800"
                     fill="${grade.color}">${grade.letter}</text>
                 </svg>
                 <div class="session-score-num">${avgScore}</div>
@@ -8143,7 +8143,7 @@ const UI = (() => {
               stroke-linecap="round" stroke-dasharray="226.19" stroke-dashoffset="226.19"
               transform="rotate(-90 45 45)" class="score-ring-arc"/>
             <text x="45" y="45" text-anchor="middle" dominant-baseline="central"
-              font-family="Outfit,sans-serif" font-size="30" font-weight="800"
+              class="grade-glyph" font-size="30" font-weight="800"
               fill="${g.color}">${g.letter}</text>
           </svg>
         </div>

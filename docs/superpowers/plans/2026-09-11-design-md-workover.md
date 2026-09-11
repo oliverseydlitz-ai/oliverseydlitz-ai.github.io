@@ -91,7 +91,7 @@ Then a visual check of the affected view at 393px and 1440px, light and dark.
 
 ---
 
-## Task 0: The retired typeface that is still shipping
+## Task 0: The retired typeface that is still shipping — DONE (11 Sep)
 
 **This is a bug, not a design change, and it is why the exercise was worth
 doing.** It was found by asking the question the DESIGN.md format forces — where
@@ -116,7 +116,7 @@ width, and a fallback font is neither; the load gate loads the file and a
 `font-family` attribute on an SVG text node throws nothing. Nobody looking at
 the badge would necessarily know what it was *supposed* to look like.
 
-- [ ] **Step 1: The suite first.** `test/suites/fonts-are-tokens.js`:
+- [x] **Step 1: The suite first.** `test/suites/fonts-are-tokens.js`:
   1. No `font-family` literal in `app.js` names a family that is not defined by
      an `@font-face` in `style.css` or is not a generic keyword. Strip comments
      before scanning — this repository has been bitten five times by a
@@ -130,16 +130,16 @@ the badge would necessarily know what it was *supposed* to look like.
      reference exists, the check above is worthless.
   Run it. It must fail on both lines before anything is fixed.
 
-- [ ] **Step 2: Fix.** An inline SVG cannot read `var(--font-display)` from an
+- [x] **Step 2: Fix.** An inline SVG cannot read `var(--font-display)` from an
   attribute, but it can from CSS. Give the two `<text>` nodes a class and set
   `font-family: var(--font-display)` in `style.css`, rather than substituting
   the literal string `'Archivo Expanded'` — a literal is how this happened.
 
-- [ ] **Step 3: Gates.** Per-task cycle. Visual check of the grade badge at
+- [x] **Step 3: Gates.** Per-task cycle. Visual check of the grade badge at
   393px specifically: Archivo Expanded is *wider* than the fallback at the same
   point size, so a letter that fitted may not.
 
-- [ ] **Step 4: Commit.**
+- [x] **Step 4: Commit.**
 
 ```bash
 git add app.js style.css test/suites/fonts-are-tokens.js
