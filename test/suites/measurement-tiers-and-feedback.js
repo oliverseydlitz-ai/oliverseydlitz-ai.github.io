@@ -52,7 +52,15 @@ const iv=M.Metrics.interval([100,101,99,102,100],' mph',1);
 ok(/±/.test(iv.text)&&/5 shots/.test(iv.text), `reports an interval not a point: "${iv.text}"`);
 
 console.log('— §1.4 per-user typical error —');
-const sess=n=>({shots:Array.from({length:12},()=>({clubType:'d',clubSpeed:100+Math.random()*2}))});
+// Deterministic jitter, NOT Math.random(). This fixture rolled a +/-150 rpm
+// spread on every run, and an unlucky draw put enough shots outside
+// trimOutliers() to drop a 12-shot session under the 10-shot floor — so this
+// suite failed roughly one run in ten, on a check that gates every push. A
+// test that fails at random is a test people learn to re-run instead of read.
+// A small LCG: same numbers every time, still an uneven spread.
+let _seed = 20260911;
+const rnd = () => ((_seed = (_seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const sess=n=>({shots:Array.from({length:12},()=>({clubType:'d',clubSpeed:100+rnd()*2}))});
 const few2=M.Metrics.typicalError([sess(),sess()],'clubSpeed','d');
 ok(few2.source==='population', 'falls back to population defaults under 3 sessions');
 const many=M.Metrics.typicalError([sess(),sess(),sess(),sess(),sess()],'clubSpeed','d');

@@ -1,6 +1,14 @@
 const M=require('../harness.js').load();
 let fail=0; const ok=(c,m)=>{console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c)fail++;};
-const sess=n=>({shots:Array.from({length:12},()=>({clubType:'d',clubSpeed:100+Math.random()*2}))});
+// Deterministic jitter, NOT Math.random(). This fixture rolled a +/-150 rpm
+// spread on every run, and an unlucky draw put enough shots outside
+// trimOutliers() to drop a 12-shot session under the 10-shot floor — so this
+// suite failed roughly one run in ten, on a check that gates every push. A
+// test that fails at random is a test people learn to re-run instead of read.
+// A small LCG: same numbers every time, still an uneven spread.
+let _seed = 20260911;
+const rnd = () => ((_seed = (_seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const sess=n=>({shots:Array.from({length:12},()=>({clubType:'d',clubSpeed:100+rnd()*2}))});
 
 console.log('— every ± comes from the golfer, never a population figure —');
 ok(M.Metrics.DEVICE_ERROR===0, 'device error is zero in the model');

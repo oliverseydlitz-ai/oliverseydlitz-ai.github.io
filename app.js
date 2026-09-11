@@ -6964,6 +6964,130 @@ const RangeCard = (() => {
 // ────────────────────────────────────────────────────────────────
 // UI
 // ────────────────────────────────────────────────────────────────
+// ── Scroll motion (spec Task 15) ─────────────────────────────────────────
+// Three effects, and one rule: animate FROM a visible resting state, never TO
+// one. Nothing here may leave an element invisible waiting for JS. If the
+// observer never fires — an engine without IntersectionObserver, a JS error, a
+// print, render-scan.js sampling a single frame — the page is ALREADY correct,
+// and the only thing lost is the motion.
+//
+// That constraint is not style. `.section-block` used to fade in on a
+// staggered delay; somebody later found content invisible for real users and
+// killed it with `animation: none !important`, and the delays sat dead for
+// months, because a thing that does not appear is indistinguishable from a
+// thing that was never there.
+const ScrollMotion = (() => {
+  const SUPPORTED = typeof IntersectionObserver === 'function';
+
+  // The CSS kill switch at `@media (prefers-reduced-motion: reduce)` zeroes
+  // every CSS animation and cannot touch effect 1, which is a JS-driven
+  // Chart.js duration. A kill switch that silently misses half of what it
+  // claims to cover is the same defect class as a gate nothing calls, so the
+  // JS half reads the query itself.
+  const reduced = () => {
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+    catch (_) { return false; }
+  };
+
+  // Fires ONCE and stops watching. A chart that re-animates every time it
+  // scrolls past is the thing that reads as decoration rather than as feedback.
+  function observe(el, fn) {
+    if (!SUPPORTED || !el) return false;
+    try {
+      const io = new IntersectionObserver(es => {
+        for (const e of es) if (e.isIntersecting) { io.disconnect(); fn(); return; }
+      }, { rootMargin: '0px 0px -8% 0px' });
+      io.observe(el);
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Effect 1 — the chart draws on when it is actually looked at.
+  //
+  // This is a bug fix, not decoration. Chart.js runs its entry animation at
+  // CONSTRUCTION, so every chart below the fold — on a phone that is all seven
+  // Progress charts and both session-detail charts — finished animating before
+  // the golfer had scrolled to it. The animation this app already pays for has
+  // never once been seen.
+  //
+  // Built finished, then reset and replayed on first sight. A chart whose
+  // observer never fires is simply a finished chart, which is today's
+  // behaviour exactly — the data is on screen either way.
+  const CHART_MS = 700;
+  function chart(canvas, cfg) {
+    if (!canvas || typeof Chart !== 'function') return null;
+    cfg.options = cfg.options || {};
+    const live = SUPPORTED && !reduced();
+    const wanted = cfg.options.animation === undefined ? { duration: CHART_MS } : cfg.options.animation;
+    // Built finished in every path that has an opinion: held for the observer
+    // when motion is live, switched off outright when the golfer asked for
+    // less. Without IntersectionObserver and without that preference the
+    // config is left alone, which is the behaviour before this existed.
+    if (live || reduced()) cfg.options.animation = false;
+    // The ONE construction site in the file. A `new Chart(` anywhere else is a
+    // chart that animates below the fold, unseen — the bug this fixes — and it
+    // would look perfectly fine while never drawing on. The suite counts them.
+    const inst = new Chart(canvas, cfg);
+    if (!live) return inst;
+    observe(canvas, () => {
+      // reset() returns it to the pre-animation state; update() then animates
+      // to the finished one. Without the reset there is nothing to animate —
+      // the chart is already where update() would take it.
+      try { inst.options.animation = wanted; inst.reset(); inst.update(); } catch (_) {}
+    });
+    return inst;
+  }
+
+  // Effect 2 — the view header condenses. A zero-height sentinel above the
+  // views, so there is no scroll listener at all. The class goes on <html>,
+  // per the ViewPrefs and RangeCard precedent: a class on the root survives
+  // every `innerHTML =` underneath it, and `hidden` on a node does not.
+  function header() {
+    if (!SUPPORTED) return;
+    const host = document.querySelector('.app-main');
+    if (!host || host.querySelector('.sm-sentinel')) return;
+    const s = document.createElement('div');
+    s.className = 'sm-sentinel';
+    s.setAttribute('aria-hidden', 'true');
+    s.style.cssText = 'height:1px;margin:0';
+    host.insertBefore(s, host.firstChild);
+    try {
+      new IntersectionObserver(([e]) => {
+        document.documentElement.classList.toggle('sm-condensed', !e.isIntersecting);
+      }, { threshold: 0 }).observe(s);
+    } catch (_) {}
+  }
+
+  // Effect 3 — the section rule draws in. Marked with data-sm so a block is
+  // never observed twice; the class only ever ADDS an animation to a rule that
+  // is already drawn.
+  function scan() {
+    if (!SUPPORTED || reduced()) return;
+    document.querySelectorAll('.section-block:not([data-sm])').forEach(b => {
+      b.setAttribute('data-sm', '1');
+      observe(b, () => b.classList.add('sm-rule'));
+    });
+  }
+
+  // Section blocks are rebuilt by `innerHTML =` on almost every render, so one
+  // MutationObserver on the main column picks them up wherever they come from,
+  // instead of a scan() call appended to twenty render functions — which is
+  // exactly the kind of list that goes stale by one entry and is never noticed.
+  // childList only: the attribute writes above would otherwise re-trigger it.
+  let mo = null;
+  function watch() {
+    const host = document.querySelector('.app-main');
+    if (!host || mo || typeof MutationObserver !== 'function') return;
+    let t = 0;
+    mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(scan, 60); });
+    mo.observe(host, { childList: true, subtree: true });
+  }
+
+  function init() { header(); scan(); watch(); }
+
+  return { init, scan, observe, chart, reduced, SUPPORTED };
+})();
+
 const UI = (() => {
   // Putts being logged right now, before the session is saved. Held here so a
   // re-render does not throw away what has been tapped in so far.
@@ -8264,7 +8388,7 @@ const UI = (() => {
     });
 
     const _t = chartTheme();
-    _charts.dispersion = new Chart(canvas, {
+    _charts.dispersion = ScrollMotion.chart(canvas, {
       type:'scatter',
       data:{datasets},
       options:{
@@ -8315,7 +8439,7 @@ const UI = (() => {
     const gaps = carries.map((c,i) => i===0?null : (carries[i-1]-c));
 
     const _t = chartTheme();
-    _charts.gapping = new Chart(canvas,{
+    _charts.gapping = ScrollMotion.chart(canvas,{
       type:'bar',
       data:{
         labels,
@@ -9351,7 +9475,7 @@ const UI = (() => {
     defs.forEach(({id,data,color,yLabel})=>{
       destroyChart(id);
       const canvas = document.getElementById(id);
-      if (canvas) _charts[id] = new Chart(canvas, mkCfg(data,color,yLabel));
+      if (canvas) _charts[id] = ScrollMotion.chart(canvas, mkCfg(data,color,yLabel));
     });
 
     // ── Trend summary ─────────────────────────────────────────
@@ -10093,6 +10217,10 @@ function showConfirm(title, body, onOk) {
 async function init() {
   // Reflect persisted theme on the Settings switch (class already set early)
   applyTheme(document.documentElement.classList.contains('dark'));
+
+  // Scroll motion. Safe to start before anything has rendered: it observes,
+  // it never hides, and its MutationObserver picks up every block built later.
+  try { ScrollMotion.init(); } catch (_) {}
 
   // Blocking agreement gate — the Terms and the Privacy Policy must be
   // accepted before the app can be used. Two boxes, not one: agreeing to a

@@ -18,6 +18,13 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   const b = await chromium.launch({ executablePath: CHROME, args:['--no-sandbox'] });
   const ctx = await b.newContext({ viewport:{width:393,height:852} });
   await ctx.route('**', r => r.request().url().startsWith('http://127.0.0.1') ? r.continue() : r.abort());
+  // SM_NO_IO=1 deletes IntersectionObserver before any script runs. Task 15's
+  // whole constraint is that the page is already correct when the observer
+  // never fires, and the only honest way to check that is to take it away and
+  // require this scan to pass unchanged. Run it both ways after touching
+  // ScrollMotion; a constraint nobody exercises is a comment.
+  if (process.env.SM_NO_IO === '1')
+    await ctx.addInitScript(() => { try { delete window.IntersectionObserver; } catch (_) {} });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', x => errs.push(x.message));
   await p.goto((process.env.PW_URL || 'http://127.0.0.1:8766') + '/index.html',{waitUntil:'domcontentloaded'}); await p.waitForTimeout(800);

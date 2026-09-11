@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** (~920 lines) — Main structure; nav, views, modals, toast system
-- **app.js** (~12,250 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 58 feature modules
+- **app.js** (~12,250 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 59 feature modules
 - **style.css** (~2,470 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -82,7 +82,8 @@ to hand someone starting cold.
    (`getNextStep`, the one ranked recommendation), `LearningPath`,
    `ContentLibrary`
 
-6. **Dashboard / UX layer** — `QuickStats`, `Features` (see its own section
+6. **Dashboard / UX layer** — `ScrollMotion` (three effects, one rule — see
+   its section), `QuickStats`, `Features` (see its own section
    below), `SessionTags` (a finder, never a variable), `FirstRun` (the method,
    stated before there is data), `ViewPrefs`, `EnhancedMetricsWidget`,
    `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
@@ -884,7 +885,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **58 suites**. `test/browser/` holds checks that are **not** in
+`npm test` runs **59 suites**. `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1130,7 +1131,7 @@ this page. It exists to fail fast with a clear message.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 58 listed in Core Modules above — not the
+`Features` is one module among the 59 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -1181,14 +1182,12 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` is current, working tree clean, **58 suites green**,
-render scan exit 0, service worker at **v153**, 58 modules.
+State at handover: `main` is current, working tree clean, **59 suites green**,
+render scan exit 0, service worker at **v154**, 59 modules.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
-is **shipped through Task 14**. Only **Task 15 — scroll motion** remains, and it
-is unstarted. Read that task before beginning it: the dead `viewFadeIn`
-keyframe and the `animation: none !important` override that neutralised it are
-now removed, which was its prerequisite.
+is **complete** — Task 15 shipped 11 September. See the scroll-motion section
+below for the one rule it turns on and the deviation it declares.
 
 **Queued behind it:** `docs/superpowers/plans/2026-09-11-design-md-workover.md`
 — six tasks (0 through 5), built from a side-by-side against BMW M's design system as
@@ -1261,6 +1260,63 @@ default surface, and the pine-green logo that contradicts the graphite app.
 - **Chart.js reads tokens through `chartTheme()`** and `retintCharts()` runs
   on the theme toggle, because a canvas does not repaint when a class changes
   on `<html>`.
+
+### Scroll motion — one rule, and it is not style
+
+Three effects, added by Task 15. The rule they all obey:
+
+> **Animate FROM a visible resting state, never TO one.** Nothing may rest at
+> `opacity: 0`, `visibility: hidden`, or translated off its own box before JS
+> has run.
+
+It is not taste. `.section-block` once faded in on a staggered `nth-child`
+delay; somebody later found content invisible for real users and killed it with
+an override titled "ensure content is always visible"
+(`animation: none !important`), and the delays sat dead for months afterwards —
+because a thing that does not appear is indistinguishable from a thing that was
+never there, and nothing in this repo reported it. Do not reintroduce a stagger.
+
+- **The chart draw-on is a bug fix, not decoration.** Chart.js runs its entry
+  animation at CONSTRUCTION, so every chart below the fold — on a phone, all
+  seven Progress charts and both session-detail charts — finished animating
+  before the golfer scrolled to it. The animation this app already paid for had
+  never once been seen. Charts are now built finished with `animation: false`,
+  then `reset()` + `update()` on first intersection. Without the reset there is
+  nothing to animate: the chart is already where `update()` would take it.
+- **There is exactly ONE `new Chart(` in `app.js`**, inside the module. A second
+  one anywhere else is a chart that animates unseen below the fold — it would
+  look perfectly fine and simply never draw on. The suite counts them.
+- **The condensing header deviates from its written spec, deliberately.** The
+  plan said the header condenses "into the nav", justified by a 393px viewport.
+  But `.top-nav` is `display: none` below 768px — a phone has no top bar — and
+  at 768px and up the sticky nav already marks the active view. So it condenses
+  into itself, phone-only, which is where the benefit was claimed. Implementing
+  it literally would have produced an effect that does nothing at the only width
+  it was argued for.
+- **The section rule animates, not the content.** A border is decoration by
+  definition, so if it never draws, nothing is lost. The keyframe has a `from`
+  and no `to`, so it animates to whatever the element already computes to — the
+  resting state IS the finished state, and no class is ever added to hide
+  anything.
+- **Reduced motion is wired twice.** The CSS block cannot reach a Chart.js
+  duration, which is JS, so the module reads `matchMedia` itself. A kill switch
+  that silently covers half of what it claims is the same defect class as a gate
+  nothing calls.
+- **`render-scan.js` takes `SM_NO_IO=1`**, which deletes `IntersectionObserver`
+  before any script runs. The scan must pass unchanged both ways — that IS the
+  constraint above, tested, rather than asserted in a comment. Run it both ways
+  after touching this module.
+
+### Tests that failed at random
+
+`spin-requires-rpt-ball.js` built its fixture with `Math.random()` jitter of
++/-150 rpm, and an unlucky draw put enough shots outside `trimOutliers()` to
+drop a 12-shot session under the 10-shot floor — so a suite that gates every
+push failed roughly one run in ten. Two more suites had the same shape with a
+smaller spread. All three now use a small seeded LCG: the same numbers every
+time, still an uneven spread. **A test that fails at random is a test people
+learn to re-run instead of read**, which is the same end state as a check that
+cannot fail at all.
 
 ### Legal, privacy and safety layer (audited 11 September 2026)
 
@@ -1363,8 +1419,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**58 test suites**, service worker **v153**. Deterministic auth, cloud sync
+**Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 59 modules,
+**59 test suites**, service worker **v154**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

@@ -196,6 +196,64 @@ a  { color: var(--accent); text-decoration: none; }
 .mb-6 { margin-bottom: var(--s6); }
 .w-full { width: 100%; }
 
+/* ── Scroll motion (spec Task 15) ──────────────────────────────────────
+   Three effects, and one rule that is not negotiable:
+
+     Animate FROM a visible resting state, never TO one.
+
+   Nothing in this section may leave an element at opacity:0,
+   visibility:hidden, or translated off its own box in the state the page
+   renders in before any JS has run. If the observer never fires — an engine
+   without IntersectionObserver, a JS error, a print, a screen reader
+   linearising the page, render-scan.js sampling a single frame — the page is
+   ALREADY correct. Nothing arrives; things that are already there sharpen.
+
+   The generic version has failed here once. `.section-block` carried a
+   staggered `viewFadeIn` with eight nth-child delays; somebody later found
+   content invisible for real users and killed it with an override titled
+   "ensure content is always visible" (`animation: none !important`), and the
+   delays then sat dead for months — because a thing that does not appear is
+   indistinguishable from a thing that was never there. Do not reintroduce the
+   stagger. test/suites/scroll-motion.js pins all of this.
+
+   Effect 1 (chart draw-on) is JS-only and lives in ScrollMotion. */
+
+/* Effect 2 — the view header condenses.
+   DEVIATION FROM THE WRITTEN TASK, stated rather than quietly applied: the
+   plan says the header condenses "into the nav", justified by a 393px
+   viewport scrolling the title away. But `.top-nav` is `display:none` below
+   768px — a phone has no top bar to condense into, and at >=768px the sticky
+   nav already marks the active view, so a second sticky header there is
+   chrome that says nothing twice. So the header condenses INTO ITSELF, and
+   only on a phone, which is where the benefit was claimed.
+
+   The negative inline margin exactly matches `.app-main`'s 1rem side padding,
+   so the sticky band is full-bleed and the box is no wider than its parent's
+   border edge — a sticky header that overflows is the 605px bug again. */
+@media (max-width: 767px) {
+  .view-header {
+    position: sticky; top: 0; z-index: 90;
+    background: var(--bg);
+    margin-inline: -1rem; padding-inline: 1rem;
+    transition: padding-block var(--dur) ease, box-shadow var(--dur) ease;
+  }
+  .view-title { transition: font-size var(--dur) ease; }
+  html.sm-condensed .view-header {
+    padding-block: var(--s2);
+    box-shadow: 0 1px 0 var(--line);
+  }
+  html.sm-condensed .view-title { font-size: 1.05rem !important; }
+}
+
+/* Effect 3 — the section rule draws in.
+   Deliberately on the 1px rule and NOT on the content: a border is decoration
+   by definition, so if it never animates nothing is lost. The resting state is
+   scaleX(1) and the keyframe has only a `from`, so it animates TO whatever the
+   element already computes to. There is no pending class and nothing is ever
+   hidden waiting for JS. */
+@keyframes smRuleIn { from { transform: scaleX(0); } }
+.section-block.sm-rule::before { animation: smRuleIn calc(var(--dur) * 2) ease-out; }
+
 /* ── Icons — inline SVG sprite (spec §6.1) ─────────────────────────────
    1em square so an icon inherits the size of the text it sits beside;
    currentColor so it inherits the colour too. Squared caps/joins to match
@@ -635,13 +693,21 @@ textarea { resize: vertical; }
 }
 
 .section-block {
+  position: relative;
   margin-bottom: var(--s6);
-  border-top: 1px solid var(--line);
   padding-top: var(--s5);
+}
+/* The top rule is a pseudo-element rather than a border so Task 15 can draw
+   it in. Its resting state is the DRAWN one — see the scroll-motion section. */
+.section-block::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: var(--line); transform-origin: left center;
 }
 /* The first block under a view header already has the header's rule above it. */
 .view-header + .section-block,
-.section-block:first-child { border-top: none; padding-top: 0; }
+.section-block:first-child { padding-top: 0; }
+.view-header + .section-block::before,
+.section-block:first-child::before { content: none; }
 
 .section-title {
   font-family: var(--font-display);

@@ -650,7 +650,7 @@ Write a `project` memory noting the redesign shipped, the palette name ("Range")
 
 ---
 
-## Task 15: Scroll motion — three effects that mean something (QC-added)
+## Task 15: Scroll motion — three effects that mean something (QC-added) — DONE (11 Sep)
 
 **Files:**
 - Modify: `style.css` — new "Scroll motion" section after the layout primitives
@@ -692,7 +692,7 @@ look: nothing *arrives*. Things that are already there sharpen.
 
 ### The three
 
-- [ ] **Step 1: Chart draw-on when the chart is actually looked at**
+- [x] **Step 1: Chart draw-on when the chart is actually looked at**
 
 The highest-value one, and it is a bug fix rather than decoration. Chart.js
 runs its entry animation at **construction**. Every chart below the fold —
@@ -709,7 +709,7 @@ past is the thing that reads as vibecoded.
 Data is on screen either way: a chart whose observer never fires is simply a
 finished chart, which is exactly today's behaviour.
 
-- [ ] **Step 2: The view header condenses into the nav**
+- [x] **Step 2: The view header condenses** — DEVIATION: into ITSELF, phone-only. `.top-nav` is `display:none` below 768px, so a phone has no bar to condense into, and at >=768px the sticky nav already marks the active view. See the CSS comment.
 
 On scroll past ~`--nav-h`, `.view-title` interpolates down to the nav's own
 scale and the bar takes a hairline shadow. Functional, not ornamental: the
@@ -722,7 +722,7 @@ zero-height sentinel + `IntersectionObserver` (preferred — no scroll handler a
 all). Toggle **one class on `<html>`**, per the `ViewPrefs` / `RangeCard`
 precedent: a class on the root survives every `innerHTML =` underneath it.
 
-- [ ] **Step 3: Section rules draw in**
+- [x] **Step 3: Section rules draw in**
 
 `.section-block`'s top hairline scales from `transform: scaleX(0)` to `1`,
 left to right, over `--dur * 2`, when the block first intersects. This is the
@@ -741,7 +741,7 @@ state is the drawn one, and the observer removes a class rather than adding it.
   caveats are the part a golfer most needs to have already read.
 - **No stagger.** See above — it is what broke last time.
 
-- [ ] **Step 4: Reduced motion, twice**
+- [x] **Step 4: Reduced motion, twice**
 
 `style.css:958` already zeroes every CSS animation under
 `prefers-reduced-motion: reduce`. **It cannot touch step 1**, which is a JS-driven
@@ -750,7 +750,7 @@ Chart.js duration, so `ScrollMotion.reduced()` must read
 straight to the finished state. A CSS-only kill switch that silently misses the
 JS half is the same defect class as a gate nothing calls.
 
-- [ ] **Step 5: The suite**
+- [x] **Step 5: The suite**
 
 `test/suites/scroll-motion.js` asserts the constraint rather than the effect:
 
@@ -764,7 +764,7 @@ JS half is the same defect class as a gate nothing calls.
 4. A negative control: assert the old `viewFadeIn` stagger has **not** come
    back (`.section-block:nth-child(N) { animation-delay` matches nothing).
 
-- [ ] **Step 6: Gates**
+- [x] **Step 6: Gates**
 
 Per-task cycle. `render-scan.js` matters more here than anywhere else: it
 samples a frame, so anything that starts invisible shows up as missing text or
@@ -772,7 +772,7 @@ as an overflow that resolves a moment later. Run it twice. Then run it a third
 time with `IntersectionObserver` stubbed out to `undefined` in an init script —
 **the scan must still pass**, which is the constraint above, tested.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add style.css app.js test/suites/scroll-motion.js

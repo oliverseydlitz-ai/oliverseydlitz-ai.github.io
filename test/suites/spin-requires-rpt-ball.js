@@ -1,7 +1,15 @@
 const M=require('../harness.js').load();
 let fail=0; const ok=(c,m)=>{console.log((c?'  PASS  ':'  FAIL  ')+m); if(!c)fail++;};
+// Deterministic jitter, NOT Math.random(). This fixture rolled a +/-150 rpm
+// spread on every run, and an unlucky draw put enough shots outside
+// trimOutliers() to drop a 12-shot session under the 10-shot floor — so this
+// suite failed roughly one run in ten, on a check that gates every push. A
+// test that fails at random is a test people learn to re-run instead of read.
+// A small LCG: same numbers every time, still an uneven spread.
+let _seed = 20260911;
+const rnd = () => ((_seed = (_seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 const sess=(ball,n=12,spin=3200)=>({conditions:{ball,surface:'grass'},
-  shots:Array.from({length:n},()=>({clubType:'d',spinRate:spin+Math.round((Math.random()-0.5)*300),_ball:ball}))});
+  shots:Array.from({length:n},()=>({clubType:'d',spinRate:spin+Math.round((rnd()-0.5)*300),_ball:ball}))});
 
 console.log('— spin is a reading only with an RPT ball —');
 ok(M.Spin.measured(sess('rpt'))===true, 'RPT session: spin measured');
