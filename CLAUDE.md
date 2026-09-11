@@ -1182,7 +1182,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: `main` is current, working tree clean, **57 suites green**,
-render scan exit 0, service worker at **v151**, 58 modules.
+render scan exit 0, service worker at **v152**, 58 modules.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
 is **shipped through Task 14**. Only **Task 15 — scroll motion** remains, and it
@@ -1229,10 +1229,34 @@ default surface, and the pine-green logo that contradicts the graphite app.
   `app.js`, both legal documents, `404.html`, the standalone pages, the
   manifest and `llms.txt`. Icons are `<symbol>` marks in the sprite at the top
   of `<body>`, referenced through `icon(name)`.
-- **No colour literal in `app.js`** outside `CLUB_COLORS`.
-  `colours-are-tokens.js` scans the whole file, not just after a property
-  name — the first sweep missed a third of its targets because colours hidden
-  inside a ternary survived a `background:<literal>` grep.
+- **No colour literal in `app.js` OR `style.css`** outside `CLUB_COLORS` and
+  the token blocks. `colours-are-tokens.js` scans each whole file, not just
+  after a property name — the first sweep missed a third of its targets
+  because colours hidden inside a ternary survived a `background:<literal>`
+  grep. It read only `app.js` until 11 September, which is how the **entire
+  retired palette survived the redesign inside the stylesheet** while every
+  suite reported green: a graph-paper background still tinted with the old
+  red, the activity heatmap painted in three steps of it, two focus rings
+  glowing it, a peach streak chip and a red-to-green achievements wash from
+  the palette before that, and three dark surfaces typed as hexes beside a
+  ladder that already held the values. A guard covering one of the two files
+  colour can hide in is not a guard.
+  `@media print` is exempt **by brace-matched range**, not by allow-listing
+  `#000` — ink on paper is deliberately not themed, and the exemption must not
+  leak outside the block.
+- **There is no decorative background.** A 28px measurement grid used to be
+  painted behind the whole app in three `!important` declarations 600 lines
+  apart, two of them overriding the first. It is gone and it does not come
+  back: a graph-paper backdrop says "instrument" by drawing the object rather
+  than being one, and the app already has a real grid — hairline card borders,
+  section rules, table rows — which the painted one crossed at its own pitch.
+  Both reference systems refuse exactly this (`docs/reference/README.md`).
+  The suite fails on any repeating 1px-line gradient.
+- **The heatmap's level 0 is a day with NO shots**, so it is `--surface3`, not
+  the faintest accent. Tinting it paints every idle day in the brand colour
+  and the grid reads as activity everywhere — which is what the first version
+  of this fix did, caught by looking at the render and not by any suite.
+  Levels 1-3 are `--hm1/2/3`, level 4 is `--accent`.
 - **`CLUB_COLORS` is an even OKLCH sweep** — fixed chroma and lightness, hue
   45°→345°. Do not swap in a hand-picked palette: fixed L and C is the point.
 - **Chart.js reads tokens through `chartTheme()`** and `retintCharts()` runs
@@ -1341,7 +1365,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**57 test suites**, service worker **v151**. Deterministic auth, cloud sync
+**57 test suites**, service worker **v152**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

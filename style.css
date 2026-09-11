@@ -87,12 +87,20 @@
   --accent-ink:  #0B0D10;   /* text/icon on an accent fill */
   --accent-weak: rgba(226,78,18,.10);
   --accent-glow: var(--accent-weak);
+  /* activity ramp — the heatmap's three middle steps. Level 0 is a day with
+     NO shots, so it is a neutral surface, not the faintest accent: tinting it
+     paints every idle day in the brand colour and the grid reads as activity
+     everywhere. Level 4 is --accent at full strength. */
+  --hm1: rgba(226,78,18,.22);
+  --hm2: rgba(226,78,18,.45);
+  --hm3: rgba(226,78,18,.70);
   --pine:    var(--accent); /* deprecated alias, still read by app.js */
   --forest:  #C23F0C;       /* accent :hover / pressed */
 
   /* data — verdict semantics (temperature-matched, one notch desaturated) */
   --green:       #0E9463;   /* real / gain */
   --green-light: #0B7A52;
+  --green-glow:  rgba(14,148,99,.45);   /* the status dot's expanding ring */
   --withheld:    #6B7480;   /* gated / no answer — intentionally dull */
   --yellow:      #B57A12;   /* caution / tentative */
   --red:         #C43C36;   /* loss / regression / danger */
@@ -812,8 +820,8 @@ tr:hover td { background: var(--surface2); }
 .status-dot.red    { background: var(--red); }
 .status-dot.na     { background: var(--border-hi); }
 @keyframes dotPulse {
-  0%,100% { box-shadow: 0 0 0 0 rgba(22,163,74,.45); }
-  50%     { box-shadow: 0 0 0 3px rgba(22,163,74,.0); }
+  0%,100% { box-shadow: 0 0 0 0 var(--green-glow); }
+  50%     { box-shadow: 0 0 0 3px transparent; }
 }
 
 /* ── Detail header ─────────────────────────────────────── */
@@ -933,7 +941,7 @@ a.settings-row { text-decoration: none; }
 .plan-item.severity-low  { border-left-color: var(--blue); }
 .plan-num {
   width: 24px; height: 24px; border-radius: 50%;
-  background: var(--pine); color: #fff;
+  background: var(--accent); color: var(--accent-ink);
   display: flex; align-items: center; justify-content: center;
   font-size: .75rem; font-weight: 800; flex-shrink: 0;
   font-family: var(--font-display);
@@ -1182,7 +1190,7 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .setup-step{display:grid; grid-template-columns:26px 1fr; gap:.7rem; align-items:start}
 .setup-step-n{
   width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
-  background:var(--pine); color:#fff; font-size:.78rem; font-weight:700;
+  background:var(--accent); color:var(--accent-ink); font-size:.78rem; font-weight:700;
   font-variant-numeric:tabular-nums;
 }
 .setup-step-title{font-weight:650; font-size:.92rem; margin-bottom:.2rem; line-height:1.3}
@@ -1565,15 +1573,22 @@ body.modal-open {
    browser dropped it. DM Serif Display and JetBrains Mono never loaded once.
    --font-mono keeps the spec §4.1 stack it was already falling back to. */
 
-/* ── Measurement-grid background ────────────────────────────── */
-body {
-  background-image:
-    linear-gradient(rgba(220,38,38,.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(220,38,38,.028) 1px, transparent 1px) !important;
-  background-size: 28px 28px !important;
-  background-position: -1px -1px !important;
-  background-color: var(--bg) !important;
-}
+/* The measurement-grid background lived here: a 28px graph-paper lattice
+   painted behind the whole app in three !important declarations spread over
+   600 lines, the first of them still tinted with the retired red.
+
+   It is gone, and subtraction is the whole fix. A graph-paper backdrop is
+   theming by prop — it says "instrument" by drawing the object rather than by
+   being one, and the app already has a real grid: hairline card borders,
+   section rules, table rows. The painted one sat behind those at its own
+   pitch, so every real line crossed a decorative line at an arbitrary offset.
+   At .035 alpha it was under the threshold of reading as a decision and over
+   the threshold of being visible, which is the worst place for a mark to sit.
+
+   Both systems the design reference draws on refuse exactly this: BMW M keeps
+   empty space as empty canvas and adds no atmospheric backdrop; Linear's
+   don't-list names atmospheric gradients outright. The canvas is --bg, flat.
+   See docs/reference/README.md. */
 
 /* ── Custom select dropdown ─────────────────────────────────── */
 .form-group select, .select {
@@ -1812,16 +1827,6 @@ body {
   padding: .45rem .85rem !important;
 }
 
-/* The measurement grid behind everything. It was tinted with the old red
-   accent; on the Range palette it is a neutral hairline, because a coloured
-   grid competes with the club scale, which is the one thing here that is
-   allowed to be saturated. */
-body {
-  background-image:
-    linear-gradient(rgba(14,17,22,.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(14,17,22,.035) 1px, transparent 1px) !important;
-}
-
 /* ═══════════════ LAYOUT v2 — Dashboard · Trajectory · Subnav ═══════════════ */
 
 /* Dashboard bento */
@@ -1872,13 +1877,18 @@ body {
 .dash-sub-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-bottom:.7rem; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
 .hm-legend { display:flex; align-items:center; gap:3px; font-weight:600; text-transform:none; letter-spacing:0; }
 .heatmap { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,13px); gap:3px; overflow-x:auto; padding-bottom:2px; }
-.hm-cell { width:13px; height:13px; border-radius:3px; background:var(--surface3); }
+.hm-cell { width:13px; height:13px; border-radius:var(--radius-sm); background:var(--surface3); }
 .hm-cell.hm-empty { background:transparent; }
-.hm-l0 { background:#e2ece5; }
-.hm-l1 { background:rgba(220,38,38,.28); }
-.hm-l2 { background:rgba(220,38,38,.5); }
-.hm-l3 { background:rgba(220,38,38,.74); }
-.hm-l4 { background:var(--pine); }
+/* Level 0 is a day with no shots — a neutral surface, the same ground as an
+   unfilled cell. Levels 1-3 are alpha steps of the accent and level 4 is the
+   accent itself. These were a pale mint and three steps of the retired red,
+   the palette the app stopped using, so the one component on the home view
+   that is pure colour was the one still wearing the old one. */
+.hm-l0 { background:var(--surface3); }
+.hm-l1 { background:var(--hm1); }
+.hm-l2 { background:var(--hm2); }
+.hm-l3 { background:var(--hm3); }
+.hm-l4 { background:var(--accent); }
 .hm-legend .hm-cell { width:11px; height:11px; }
 
 .recent-title { margin-bottom:.75rem; }
@@ -2014,8 +2024,11 @@ body {
 .streak-chip {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; min-width: 92px; padding: .8rem .6rem;
-  background: linear-gradient(160deg, #fff7ed, #ffedd5);
-  border: 1.5px solid #fed7aa; border-radius: var(--radius);
+  /* Was a peach gradient (#fff7ed -> #ffedd5) with a #fed7aa border, from the
+     palette this app retired. Flat surface + hairline, like every other block:
+     the chip earns its emphasis from .is-active, not from being tinted. */
+  background: var(--surface2);
+  border: 1.5px solid var(--line); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); text-align: center;
 }
 .streak-chip.is-active { border-color: var(--accent); box-shadow: none; }
@@ -2060,7 +2073,10 @@ body {
 /* Achievements strip */
 .ach-strip {
   display: flex; align-items: center; gap: .55rem;
-  background: linear-gradient(135deg, rgba(220,38,38,.06), rgba(34,197,94,.05));
+  /* A two-colour wash from the retired red to the retired green. Two accents
+     in one decorative fill is the thing both reference systems refuse most
+     explicitly, and neither colour was in the palette any more. */
+  background: var(--surface);
   border: 1.5px solid var(--border-hi); border-radius: var(--radius);
   padding: .7rem 1rem; cursor: pointer;
   transition: border-color .15s, transform .12s, box-shadow .15s;
@@ -2100,7 +2116,7 @@ body {
   font-family: var(--font-mono); font-size: .72rem; outline: none;
   appearance: none; -webkit-appearance: none; cursor: pointer;
 }
-.cmp-sel:focus { border-color: var(--pine); box-shadow: 0 0 0 3px rgba(220,38,38,.08); }
+.cmp-sel:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
 .cmp-vs { font-family: var(--font-display); font-size: .8rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; flex-shrink: 0; }
 .compare-result { display: flex; flex-direction: column; gap: 0; }
 .cmp-row {
@@ -2125,7 +2141,7 @@ body {
   border-radius: 99px; padding: .5rem .95rem; margin-bottom: .8rem;
   box-shadow: var(--shadow-sm); transition: border-color .15s, box-shadow .15s;
 }
-.search-bar:focus-within { border-color: var(--pine); box-shadow: 0 0 0 3px rgba(220,38,38,.08); }
+.search-bar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
 .search-ico { font-size: .85rem; opacity: .6; flex-shrink: 0; }
 #sessionSearch {
   flex: 1; border: none; outline: none; background: none; color: var(--text);
@@ -2161,9 +2177,13 @@ html.dark {
   --text-dim:   #6B7480;
   --accent:      #FF6A2B;
   --accent-weak: rgba(255,106,43,.12);
+  --hm1: rgba(255,106,43,.26);
+  --hm2: rgba(255,106,43,.50);
+  --hm3: rgba(255,106,43,.74);
   --forest:  #FF7F49;
   --green:       #35C08A;
   --green-light: #2AA679;
+  --green-glow:  rgba(53,192,138,.45);
   --withheld:    #8B93A0;
   --yellow:      #E0A93A;
   --red:         #E5544E;
@@ -2174,19 +2194,12 @@ html.dark {
   /* --border, --border-hi, --turf, --pine, --accent-glow inherit via their
      :root var() aliases, which re-resolve against the values above */
 }
-html.dark body {
-  background-color: var(--bg) !important;
-  background-image:
-    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px) !important;
-}
 /* Table headers stay legible */
-html.dark th { background: #1d1d20; color: rgba(255,255,255,.8); }
-html.dark th:hover { background: #26262a; }
+html.dark th { background: var(--surface2); color: var(--text); }
+html.dark th:hover { background: var(--surface3); }
 /* Both bars read their tokens directly now, so dark needs no nav override. */
-html.dark .settings-section-title { background: #1d1d20; }
+html.dark .settings-section-title { background: var(--surface2); }
 /* Streak chip stays warm but tuned for dark */
-html.dark .streak-chip { background: linear-gradient(160deg, #2a1a0e, #3a2410); border-color: #6b4422; }
 html.dark .streak-chip.streak-dim { background: var(--surface2); border-color: var(--border); }
 html.dark .paywall-overlay { background: color-mix(in srgb, var(--surface) 88%, transparent); }
 
@@ -2287,14 +2300,16 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .session-card-date { font-weight: 600; color: var(--text); font-size: .95rem; }
 .session-card-meta { font-size: .8rem; color: var(--text-muted); margin: .3rem 0; }
 .session-card-badges { display: flex; gap: .4rem; margin-top: .5rem; flex-wrap: wrap; }
-.session-badge { display: inline-block; padding: 3px 9px; background: var(--pine); color: #fff;
-  font-size: .65rem; font-weight: 700; border-radius: 12px; text-transform: uppercase;
+.session-badge { display: inline-block; padding: 3px 9px; background: var(--accent); color: var(--accent-ink);
+  font-size: .65rem; font-weight: 700; border-radius: var(--radius-sm); text-transform: uppercase;
   letter-spacing: .04em; }
-.session-badge.fault { background: #ef4444; }
-.session-badge.improvement { background: #22c55e; }
+.session-badge.fault { background: var(--red); color: #fff; }
+.session-badge.improvement { background: var(--green); color: #fff; }
 
 .session-score-ring { position: relative; width: 70px; height: 70px; }
-.session-score-ring svg { filter: drop-shadow(0 2px 4px rgba(0,0,0,.1)); }
+/* The score ring had a soft drop-shadow from the skin before this one.
+   Chrome here is flat — --shadow-sm is literally `none`, and elevation is a
+   1px hairline. It is the only lifted thing left on the home view. */
 .session-score-num { font-size: 1.8rem; font-weight: 800; font-family: var(--font-display);
   line-height: 1; text-align: center; }
 .session-score-label { font-size: .65rem; color: var(--text-muted); text-transform: uppercase;
@@ -2512,7 +2527,7 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 .rc-btn{flex:0 0 auto;padding:.9rem 1.1rem;font:inherit;font-size:1rem;font-weight:600;
   border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);
   color:var(--text);cursor:pointer;min-width:3.4rem}
-.rc-btn.primary{flex:1;background:var(--accent);border-color:var(--accent);color:#fff}
+.rc-btn.primary{flex:1;background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .rc-btn.primary.logged{background:var(--green);border-color:var(--green)}
 .rc-btn.ghost{color:var(--text-muted)}
 .rc-btn[disabled]{opacity:.35;cursor:default}
