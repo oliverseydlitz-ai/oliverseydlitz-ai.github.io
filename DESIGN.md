@@ -160,13 +160,11 @@ typography:
       use: view name as rendered (condenses on scroll, phone)
     h2:
       selector: "h2"
-      font-size: "1rem"
+      font-size: ".8rem"
       font-weight: "600"
       letter-spacing: ".04em"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
-      at "(min-width: 640px)":
-        font-size: "1.05rem"
       use: section heading
     h3:
       selector: "h3"
@@ -178,7 +176,7 @@ typography:
       use: sub-heading
     section-title:
       selector: ".section-title"
-      font-size: "1rem"
+      font-size: ".8rem"
       font-weight: "600"
       letter-spacing: ".04em"
       text-transform: "uppercase"
@@ -256,6 +254,33 @@ components:
     padding: "0 var(--s5)"
     height: "var(--nav-h)"
     box-shadow: "none"
+
+claims:
+  note: three counts this document states, measured from the tree rather than
+    typed. Each was wrong here once; each is re-derived on every run so it cannot
+    be wrong again. The prose is hand-written and may still disagree — if it does,
+    it is the prose that is out of date.
+    Every anchor below is a NAME — a function, a selector, a class — and never a
+    line number. A point in a file names nothing once anything above it is edited,
+    and this file is regenerated on a tree that keeps moving.
+  display-tier:
+    selector: ".stat-hero, .score-number"
+    applied-by-app-js: 2
+    applied-in: "renderScoreBanner(), renderYardages()"
+    rule: a display tier with no referent is a rule that does nothing. 0 is a defect.
+  tabular-numerals:
+    carried-by: "td, th"   # element selectors: app-wide
+    also-declared-on: 26 class rules
+    declared-but-applied-nowhere: ".tnum"
+    rule: "td, th" is what holds the declaration on every table in the
+      app; `.tnum` is an available utility that nothing applies. Listing it first
+      as the mechanism describes something that never runs.
+  colour-literals:
+    count: 3
+    on: ".btn-danger  ·  .session-badge.fault  ·  .session-badge.improvement"
+    rule: "#fff on a --red or --green fill, declared on the same line.
+      test/suites/colours-are-tokens.js exempts exactly this pattern, so the
+      enforcement is right and only the count was wrong."
 ---
 
 <!-- prose:start -->
@@ -305,11 +330,16 @@ Near-monochrome, and the accent is a **signal**, not a brand wash.
   like an answer rather than like a failure.
 - **Four-step surface ladder**, and do not skip a rung. Hierarchy is carried by
   the ladder and a 1px hairline — never by a shadow.
-- **Two colour literals in `style.css` are legal** and both are `#fff` on a
-  `--red` or `--green` fill. Everything else reads a token, in `style.css` and
-  `app.js` alike, enforced by `test/suites/colours-are-tokens.js`. The entire
-  retired palette once survived a full redesign inside the stylesheet because
-  that check only read `app.js`.
+- **Colour literals are counted, not described.** The only legal ones are a
+  `#fff` on a `--red` or `--green` fill declared on the same line. There is no
+  separate on-red token and inventing one for a handful of rules would be a
+  token nobody reads. Everything else reads a token, in `style.css` and `app.js`
+  alike, enforced by `test/suites/colours-are-tokens.js`. The generated
+  `claims:` block above carries the current count and their lines, because a
+  number typed into a paragraph is a number that goes stale — this one said
+  "two" for as long as there have been three. The entire retired palette once
+  survived a full redesign inside the stylesheet because that check only read
+  `app.js`.
 
 ## 3. Typography
 
@@ -317,18 +347,26 @@ Archivo, self-hosted, in two cuts: Expanded for display and headings, regular
 for body. Mono is a system stack and is used only where a value should read as
 machine output.
 
-The one thing to know: **the type scale is currently a gradient, not a
-hierarchy** — five steps inside a factor of two, over a 15px body. The display
-tier exists (`.stat-hero`) and is under-used. Opening that gap is queued work,
-not a description of what ships today; see
-`docs/superpowers/plans/2026-09-11-design-md-workover.md`.
+The one thing to know: **the type scale is two tiers, not a gradient.** The
+label tier is one step — a section heading is a signpost, not a display moment —
+and above it sits the figure. The display tier (`.stat-hero`) is not decoration
+and not a size: it is reserved for the measured figure that has cleared its own
+sample floor, one per screen, and a second one beside it is two billboards,
+which is a checklist. Whether the tier is *used* is a fact about the tree, so
+the generated `claims:` block above counts its referents rather than a
+paragraph asserting it — this paragraph asserted the opposite while the class
+had zero. The gap between the two tiers is the work
+`docs/superpowers/plans/2026-09-11-design-md-workover.md` tracks.
 
 Rules that do hold:
 
 - **Uppercase everywhere it appears is display-cut and letter-spaced.** Caps at
   body tracking read as cramped.
-- **Tabular numerals on every figure.** `.tnum`, `td`, `th`. A column of
-  carries that jitters as it updates is unreadable.
+- **Tabular numerals on every figure.** The table elements carry
+  `font-variant-numeric: tabular-nums` app-wide and each figure that has to line
+  up in a column restates it; the generated `claims:` block above names what
+  actually holds the declaration, and which declared utility nothing applies. A
+  column of carries that jitters as it updates is unreadable.
 - **Oversized type steps up only at `min-width: 640px`.** 393px is the design
   viewport, not a width to degrade to, and `render-scan.js` measures horizontal
   overflow there on every push.

@@ -261,6 +261,177 @@ for (const [name, sel] of COMPONENTS) {
     if (v) push(`    ${p}: "${v}"`);
   }
 }
+push('');
+
+// ── The three claims the prose used to state, and got wrong ──────────────
+//
+// This document said `.stat-hero` was "under-used" when it had zero referents
+// and Task 2 had already wired it; named `.tnum` as the mechanism for tabular
+// numerals when nothing in any file applies it; and counted "two" legal colour
+// literals in style.css when there are three. Every one was a hand-typed count
+// of something the tree can answer, which is the same defect as the twelve
+// copies of `Benchmarks.TARGET` — and it is invisible, because nothing
+// downstream consumes a sentence.
+//
+// They are MEASURED here, not corrected and re-typed. A re-run cannot carry a
+// stale number forward, and the prose now has an authority to be checked
+// against rather than a second opinion. Same discipline as `--cut` being read
+// out of the cascade instead of described from memory.
+//
+// (The prose itself is hand-written and this tool never touches it. If a
+// paragraph still disagrees with the block below, the paragraph is wrong —
+// which is exactly what was true of all three until the ship task.)
+// NOTHING IN THE BLOCK BELOW CITES A LINE NUMBER. The first version did — it
+// printed `app.js:8286, app.js:9000` and `style.css:220, 2142, 2143` — and a
+// line number in a committed document is a claim about a tree state that stops
+// being true the next time anything above it is edited. This repository's rule
+// is that a number which can drift will; a line number is the purest case of
+// one, because appending a single rule to style.css invalidates every citation
+// into it without changing a single fact the citation was about.
+//
+// Every anchor below is a NAME: a function, a selector, a class. Names move
+// with the thing they name, so the count and the anchor stay true together.
+const appSrc = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+// Comments out, newlines kept — `rules-are-wired.js` strips comments this way
+// so that a note recording what a fix removed cannot be read as the thing
+// itself.
+const appCode = appSrc
+  .replace(/\/\*[^]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+  .split('\n').map(l => l.replace(/^\s*\/\/.*$/, '')).join('\n');
+// The nearest enclosing top-level `function name(` above a match. A function is
+// a stable address for a call site in a way a line number is not.
+const enclosingFns = (text, needle) => {
+  const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+  const out = [];
+  for (const m of text.matchAll(re)) {
+    const f = [...text.slice(0, m.index)
+      .matchAll(/\n\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)].pop();
+    if (f) out.push(f[1] + '()');
+  }
+  return [...new Set(out)];
+};
+
+// 1. How many referents the display tier has. Zero is the number that matters:
+//    a display tier nothing applies is a rule that does nothing, which is how
+//    this class survived a complete redesign.
+const heroFns = enclosingFns(appCode, 'stat-hero');
+const heroCount = (appCode.match(/stat-hero/g) || []).length;
+
+// Every rule, as {selector, from, to} over `bare`, so a fact can be attached to
+// the SELECTOR that holds it rather than to a line.
+//
+// Walked rule by rule rather than with one regex over the file: a
+// `[^{}]*\{[^{}]*tabular-nums[^{}]*\}` match swallows a whole run of preceding
+// selectors as soon as one body is multi-line, which is how the first version
+// of this reported thirty-four selectors for a single declaration.
+const RULES = [];
+{
+  let start = 0;
+  for (let i = 0; i < bare.length; i++) {
+    if (bare[i] === '{') {
+      const sel = bare.slice(start, i).trim().replace(/\s+/g, ' ');
+      let d = 1, j = i + 1;
+      while (j < bare.length && d > 0) {
+        if (bare[j] === '{') d++; else if (bare[j] === '}') d--;
+        j++;
+      }
+      if (!sel.startsWith('@')) RULES.push({ sel, from: i + 1, to: j - 1 });
+      i = j - 1; start = j;
+    } else if (bare[i] === '}') start = i + 1;
+  }
+}
+
+// 2. What actually carries tabular numerals, read from the cascade. The
+//    document named `.tnum` first; nothing applies it, and the declaration is
+//    held by the table elements. Both halves are reported, because "the class
+//    exists" and "the class is doing the work" are different claims.
+const numeralRules = RULES
+  .filter(r => /font-variant-numeric:\s*tabular-nums/.test(bare.slice(r.from, r.to)))
+  .map(r => r.sel);
+const numeralElements = new Set();
+const numeralClasses = new Set();
+for (const sel of numeralRules)
+  for (const part of sel.split(',')) {
+    const t = part.trim();
+    if (!t) continue;
+    for (const m of t.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) numeralClasses.add(m[1]);
+    if (/^[a-z]+$/i.test(t)) numeralElements.add(t);
+  }
+// A class that declares it and is applied by nothing is a utility, not the
+// mechanism. Searched for as a name across both markup sources — this is the
+// cheap version of what test/suites/class-is-wired.js does properly, and it is
+// only asked of a handful of names.
+const markupText = ['index.html', 'app.js']
+  .map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+const numeralUnapplied = [...numeralClasses].filter(c => !markupText.includes(c)).sort();
+
+// 3. The legal colour literals in style.css, counted with the SAME same-line
+//    pattern test/suites/colours-are-tokens.js exempts — a `#fff` on a rule
+//    that also names `var(--red)` or `var(--green)` on its own line. Inventing
+//    an `--on-red` token for three rules would be a token nobody reads; the
+//    count is the thing that was wrong, not the arrangement.
+const LITERAL = /rgba?\([0-9]+\s*,[0-9\s.,]+\)|#[0-9a-fA-F]{3,8}\b/g;
+const printRanges = [];
+for (const m of bare.matchAll(/@media\s+print[^{]*\{/g)) {
+  let i = m.index + m[0].length, depth = 1;
+  while (i < bare.length && depth > 0) {
+    if (bare[i] === '{') depth++; else if (bare[i] === '}') depth--;
+    i++;
+  }
+  printRanges.push([m.index, i]);
+}
+const legalLiterals = new Set();
+for (const m of bare.matchAll(LITERAL)) {
+  if (printRanges.some(([a, b]) => m.index >= a && m.index < b)) continue;
+  const ls = bare.lastIndexOf('\n', m.index) + 1;
+  let le = bare.indexOf('\n', m.index); if (le < 0) le = bare.length;
+  const line = bare.slice(ls, le);
+  if (/^\s*--[a-z0-9-]+\s*:/i.test(line)) continue;                       // a token declaration
+  if (/#fff\b/i.test(m[0]) && /var\(--(red|green)\)/.test(line)) {
+    // The SELECTOR the literal sits in, not the line it sits on.
+    const rule = RULES.find(r => m.index >= r.from && m.index < r.to);
+    legalLiterals.add(rule ? rule.sel : '(top level)');
+  }
+}
+const literalSels = [...legalLiterals].sort();
+
+push('claims:');
+push('  note: three counts this document states, measured from the tree rather than',
+  '    typed. Each was wrong here once; each is re-derived on every run so it cannot',
+  '    be wrong again. The prose is hand-written and may still disagree — if it does,',
+  '    it is the prose that is out of date.',
+  '    Every anchor below is a NAME — a function, a selector, a class — and never a',
+  '    line number. A point in a file names nothing once anything above it is edited,',
+  '    and this file is regenerated on a tree that keeps moving.');
+push('  display-tier:');
+push(`    selector: ".stat-hero, .score-number"`);
+push(`    applied-by-app-js: ${heroCount}`);
+push(`    applied-in: "${heroFns.join(', ') || 'nothing'}"`);
+push(`    rule: a display tier with no referent is a rule that does nothing. 0 is a defect.`);
+push('  tabular-numerals:');
+push(`    carried-by: "${[...numeralElements].sort().join(', ')}"   # element selectors: app-wide`);
+push(`    also-declared-on: ${numeralRules.length - numeralElements.size} class rules`);
+push(`    declared-but-applied-nowhere: "${numeralUnapplied.map(c => '.' + c).join(', ') || 'none'}"`);
+push(`    rule: "${[...numeralElements].sort().join(', ')}" is what holds the declaration on every table in the`,
+  `      app; ${numeralUnapplied.map(c => '`.' + c + '`').join(', ') || 'the named class'} is an available utility that nothing applies. Listing it first`,
+  '      as the mechanism describes something that never runs.');
+push('  colour-literals:');
+push(`    count: ${literalSels.length}`);
+push(`    on: "${literalSels.join('  ·  ')}"`);
+push(`    rule: "#fff on a --red or --green fill, declared on the same line.`,
+  '      test/suites/colours-are-tokens.js exempts exactly this pattern, so the',
+  '      enforcement is right and only the count was wrong."');
+
+// A count of zero would mean the scan stopped matching rather than that the
+// stylesheet changed, and a claim block that quietly reports 0 is worse than no
+// claim block at all. The same reflex as render-scan.js's exit code.
+if (literalSels.length === 0 || numeralRules.length === 0) {
+  console.error('\nclaims: the scan found nothing to measure — ' +
+    `${literalSels.length} legal colour literals, ${numeralRules.length} tabular-numerals rules. ` +
+    'That is the detector failing, not the stylesheet, and a claim block that quietly ' +
+    'reports 0 is worse than no claim block at all.');
+  process.exit(1);
+}
 push('---');
 
 const frontMatter = fm.join('\n');
