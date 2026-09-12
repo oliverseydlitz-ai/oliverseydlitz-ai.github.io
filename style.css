@@ -752,15 +752,20 @@ textarea { resize: vertical; }
 
    It was defined here and referenced by NOTHING for the life of the redesign:
    a display tier with no referent, which is the same defect as a gate nothing
-   calls. Two call sites now carry the class, and both are gated on the floor
-   the figure is measured against (test/suites/display-tier.js fails if one
-   is not):
+   calls. The session-detail score banner carries the class now, on the branch
+   where its mean has cleared its sample floor, and nothing reaches it that has
+   not (test/suites/display-tier.js fails if a call site is not gated that way):
 
      - the session-detail score banner — one figure, the screen's protagonist.
-     - the yardage book's stock carry, in the table's carry column. A book of
-       one measure is one treatment: the screen is a reference card and its
-       carries are what a golfer reads off it. What is NOT allowed is a
-       second hero beside the first, and the book has no other.
+
+   The yardage book's stock carry was a second call site and is NOT one. Carry
+   is not a measurement in this app: it is a model output the monitor computes
+   from launch conditions, and D3 names a modelled carry among the figures that
+   do not enter this tier. The workover plan's Task 2 listed the carry column
+   as a site and so contradicted the constraint it was written under; the
+   constraint is the authority and the plan is the argument, so the column went
+   back to its own size. Nothing was promoted in its place — a "featured carry"
+   would have been an invented figure, and which club got it an invented choice.
 
    D3: the floor is not decoration. A club under Metrics.MIN_SHOTS_REPORT, a
    withheld dispersion figure, a modelled number with no label — none of them

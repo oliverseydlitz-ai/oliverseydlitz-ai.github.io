@@ -8981,11 +8981,10 @@ const UI = (() => {
     document.getElementById('yardageTable').innerHTML = `
       <thead><tr><th>Club</th><th>Stock carry</th><th>Trend</th><th>Range</th><th>Spread</th><th>Total</th><th>Shots</th></tr></thead>
       <tbody>${book.map(b=>{
-        // The gate for everything below it, including the carry's display tier:
         // `enough` is `count >= Metrics.MIN_SHOTS_REPORT` with an interval that
         // exists (Analytics.yardageBook), and a club that has not cleared it
         // gets a row that says what it needs instead of a number. D3 in one
-        // line — the club under the floor never reaches the billboard.
+        // line — the club under the floor never reaches a mean at all.
         if (!b.enough) return `<tr class="yard-thin">
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
           <td colspan="5">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
@@ -8997,7 +8996,7 @@ const UI = (() => {
         const consC = b.cv < 0.035 ? 'var(--green)' : b.cv < 0.07 ? 'var(--yellow)' : 'var(--red)';
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td><strong class="stat-hero">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
+          <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
           ${trendCell(b.club)}
           <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
           <td><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>
