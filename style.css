@@ -2842,6 +2842,124 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 .sg-dist-rate{font-weight:700;font-variant-numeric:tabular-nums}
 .sg-dist-n{font-size:.75rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
 
+/* ── Bands — three surface modes, assigned by ROLE ────────────────────
+   The home view renders seven insight surfaces and every one of them was a
+   .card on --surface with the same 1px hairline, stacked. Nothing on that
+   screen was more important than anything else, which undercuts the one
+   design decision the screen actually has: SmartRecommendations.getNextStep
+   returns exactly ONE ranked card, deliberately, because rule 9 of the
+   research base is one cue and never a checklist — and it was rendered in
+   the same treatment as the day-streak counter.
+
+   Three modes, and the mode is a property of what a surface IS:
+
+     .band--canvas   the band is the GROUND. Its content already supplies its
+                     own cards, so a second ground behind them would be a card
+                     behind cards. Caveats, rows of cards, lists.
+     .band--surface  the band IS the card. Its content is uncarded, so the
+                     band provides the ground and the hairline.
+     .band--signal   the inverted band: --text ground, --bg type. Exactly one
+                     per view and it is the ranked card.
+
+   Positional alternation (`:nth-child`) is the obvious implementation and it
+   is broken here: ViewPrefs hides sections with a class on <html>, and CSS
+   cannot count VISIBLE siblings — so a band would land on whichever child
+   happened to be fifth, with no error anywhere. No pref hides a whole band on
+   the home view today (the heatmap it hides sits inside one), which is exactly
+   why a positional scheme would pass a test written now and rot on the next
+   pref added — the same defect class as setting `hidden` on a section that
+   gets re-rendered. The mode is declared at each surface's own call site in
+   app.js, and test/suites/bands.js re-renders the view under every pref class
+   the stylesheet knows about to prove the assignment does not move.
+
+   The band spans the app-main gutter and brings its own: a band whose ground
+   stopped at the content column would just be a card. It deliberately does
+   NOT set `display` — #dashboard and #syncBanner are toggled with the
+   `hidden` attribute, and an author `display` here would beat the UA sheet's
+   [hidden] rule and leave both permanently visible. */
+.band {
+  margin-inline: calc(-1 * var(--s4));
+  padding: var(--s5) var(--s4);
+}
+.band--canvas { background: var(--bg); }
+.band--surface {
+  background: var(--surface);
+  border-block: 1px solid var(--line);
+}
+
+/* The one high-contrast moment on the screen, and the one place the accent
+   steps aside. Measured, not assumed (audited 12 Sep 2026):
+
+     --bg type on --text ground   18.29:1 light   17.96:1 dark   PASS
+     --accent on the same ground   4.80:1 light    2.64:1 dark   FAIL
+
+   The dark-mode inversion puts a near-white ground under the dark-mode
+   accent, and no token in the palette is an orange that works on a light
+   ground in dark mode — so the accent does not appear on this band as type
+   in either theme. The inversion IS the signal; a hue on top of it would be
+   a second one. Emphasis inside the band comes from weight and from --bg at
+   a different opacity, never from a hue. An accent FILL is still available
+   if one is ever needed: --accent-ink on --accent passes at 4.94/6.81,
+   because that is ink on a fill rather than a hue on an inverted ground. */
+.band--signal {
+  background: var(--text);
+  color: var(--bg);
+}
+/* The band is the card. The ranked recommendation keeps its markup — the tap
+   target, the icon, the deadline, the "why" — and loses the card ground it
+   no longer needs: a --surface box on an inverted band puts a second,
+   brighter surface under the one thing the inversion exists to make
+   unmissable. The 4px accent left rule goes with it. */
+.band--signal .drill-card,
+.band--signal .next-step {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+.band--signal .drill-card:hover { background: none; opacity: .88; }
+/* Every text node in the card names its own colour, so inheritance is not
+   enough — and on the dark-mode inversion the card's own title is the extreme
+   case: `.drill-title` is `--text`, the band's ground IS `--text`, so the
+   ranked card's heading renders at 1.00:1. Literally invisible, with no error
+   anywhere. The rest are legibility, not absence: the "why" line (the argument
+   for the one recommendation the app makes) at 2.17:1, the description 2.17,
+   the deadline's accent 2.64, "Tap to go" 4.37 — all measured in dark mode,
+   the theme this app is mostly used in. */
+.band--signal .drill-icon,
+.band--signal .drill-title,
+.band--signal .drill-time,
+.band--signal .next-deadline { color: var(--bg); }
+.band--signal .drill-desc,
+.band--signal .next-why { color: var(--bg); opacity: .82; }
+/* The rule beside the "why" was --border, a mid-tone grey chosen for a card.
+   On the inverted ground it reads as a hairline from another system; it fades
+   with the sentence it brackets instead. */
+.band--signal .next-why { border-left-color: var(--bg); }
+
+/* A band supplies the gutter. The sync warning brings `margin: 1rem` of its
+   own and would otherwise inset itself a second time inside its band. */
+.band > .sync-warn { margin: 0; }
+
+/* The tip of the day, as one line on its band. It used to be a box tinted
+   with --accent-weak — an accent wash used as a surface, which is the one
+   thing this palette refuses twice over. The band is the card now. */
+.tip-note { font-size: .92rem; line-height: 1.55; color: var(--text-muted); text-wrap: pretty; }
+
+/* The anchored quick-stat row is a band already and takes no mode class: an
+   opaque --surface ground, a hairline top and bottom, hairline-divided cells,
+   sticky. It IS the surface mode — the band system was taken from it — so a
+   class here would be a no-op that claims to do something. The exemption is
+   asserted in test/suites/bands.js against those three properties, so it
+   cannot rot into an unearned one.
+
+   It does have to reach the same gutter every other band reaches, though, or
+   the one strip that IS a surface mode reads as a card floating inside a page
+   of bands. Margin only: its own padding stays, which is why this is not the
+   .band class (that would also add --s5 of block padding to a sticky row). */
+.quick-stats { margin-inline: calc(-1 * var(--s4)); }
+
 /* ── iOS: never let a focusable text control fall under 16px ──────────
    Safari on iOS zooms the whole page when a focused field is smaller than
    16px, and it does not zoom back out — so one tap on a dropdown leaves the

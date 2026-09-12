@@ -133,9 +133,14 @@
 
   <!-- ── Sessions ────────────────────────── -->
   <section class="view active" id="view-sessions">
+    <!-- Every host below is a band. The mode is put on it by app.js at its own
+         render site — never by position, because ViewPrefs hides sections with
+         a class on <html> and CSS cannot count VISIBLE siblings — and the band
+         brings its own gutter, so these no longer carry .pad: inside a band
+         that padding would inset the content twice. -->
     <!-- Tip of the day + headline metrics (replaced each render) -->
-    <div id="tipHost" class="pad"></div>
-    <div id="metricsWidgetHost" class="pad"></div>
+    <div id="tipHost"></div>
+    <div id="metricsWidgetHost"></div>
 
     <!-- Quick stats always visible -->
     <div class="quick-stats" id="quickStatsHost"></div>
@@ -171,14 +176,15 @@
     <!-- Cloud reachability. A signed-in user seeing only the sessions cached on
          this device must be told the view is partial, BEFORE they act on it. -->
     <div id="syncBanner" hidden></div>
-    <div id="nextStepHost" class="pad pad-y"></div>
+    <!-- The one ranked recommendation — the only .band--signal on the screen -->
+    <div id="nextStepHost"></div>
 
     <!-- Actionable insights -->
-    <div id="insightsHost" class="pad pad-b"></div>
+    <div id="insightsHost"></div>
 
     <!-- Performance alerts + coaching (replaced each render) -->
-    <div id="alertsHost" class="pad"></div>
-    <div id="coachHost" class="pad pad-b"></div>
+    <div id="alertsHost"></div>
+    <div id="coachHost"></div>
 
 
     <div id="dashboard" class="dashboard" hidden></div>
