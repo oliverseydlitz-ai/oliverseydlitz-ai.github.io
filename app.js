@@ -5823,10 +5823,13 @@ const QuickStats = (() => {
     if (!sessions.length) { host.innerHTML = ''; return; }
 
     const { used, shots, club, n, ball } = pick(sessions);
-    const avgScore = (() => {
-      const scores = shots.map(ShotScorer.score).filter(x => x !== null);
-      return scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
-    })();
+    // Form stays pooled across the bag: it is a per-shot score that is already
+    // club-aware inside ShotScorer, so averaging it is legitimate where
+    // averaging a carry is not. `scores` is held out here rather than inside
+    // the closure it used to be because the display tier has to know whether
+    // there was anything to average at all — see heroForm below.
+    const scores = shots.map(ShotScorer.score).filter(x => x !== null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
 
     const label = document.getElementById('quickStatsLabel');
     if (label) label.textContent = club && n >= Metrics.MIN_SHOTS_REPORT
@@ -5853,9 +5856,31 @@ const QuickStats = (() => {
     const best = Metrics.peak(carries, 'carryDistance');
     const cons = consistencyScore(carries);
 
+    // D3 — the display tier is for a figure the app will stand behind, and in
+    // this row that is exactly one cell: Form. Carry is MODELLED (the monitor
+    // computes it from launch conditions) and a modelled carry is banned from
+    // the tier outright; Best is `Metrics.peak`, an extreme value on a device
+    // that has logged a 147 mph swing next to a 0 mph one, which is the
+    // reading most likely to be a misread; Consistency is a derived percentage
+    // with no floor of its own. Form is the app's own measured composite, the
+    // same figure family as the session-detail headline.
+    //
+    // The gate: this line sits under the bail-out above, so it is only
+    // reachable above `Metrics.MIN_SHOTS_REPORT` — and the floor is named
+    // again in the expression that emits the class, so the call site cannot
+    // drift from the gate. `scores.length` is the second half of it: with no
+    // scorable shot in the window `avgScore` is a 0 that was never measured,
+    // and an unmeasured zero is not a figure the app stands behind either.
+    // `.quick-stat-value` sets a font-size of its own further down the
+    // stylesheet, so the tier goes on a span INSIDE it — same rule, no second
+    // copy of the scale to keep in step, and the responsive step-up comes free.
+    const heroForm = (club && n >= Metrics.MIN_SHOTS_REPORT && scores.length)
+      ? `<span class="stat-hero">${avgScore}</span>`
+      : `${avgScore}`;
+
     host.innerHTML = `
       <div class="quick-stat">
-        <div class="quick-stat-value">${avgScore}</div>
+        <div class="quick-stat-value">${heroForm}</div>
         <div class="quick-stat-label">Form</div>
       </div>
       <div class="quick-stat">
@@ -7145,6 +7170,38 @@ const UI = (() => {
     });
   }
 
+  // ── Bands — three surface modes, assigned by ROLE ─────────────
+  // The home view renders every insight surface as the same .card on the same
+  // --surface with the same hairline, so nothing on it is more important than
+  // anything else — which undercuts the one design decision the screen has:
+  // `getNextStep` returns exactly ONE ranked card, because rule 9 of the
+  // research base is one cue and never a checklist.
+  //
+  // The mode is declared at each surface's own call site below and is never
+  // derived from a position. `:nth-child` alternation is the obvious way to do
+  // this and it is broken HERE: ViewPrefs hides sections with a class on
+  // <html>, and CSS cannot count *visible* siblings — so a band would move to
+  // whichever child happened to be fifth, with no error anywhere. No pref
+  // hides a whole band on this view today (the heatmap ViewPrefs hides is
+  // inside one), which is precisely why a positional scheme would pass a test
+  // written now and rot on the next pref added. Same defect class as setting
+  // `hidden` on a section that gets re-rendered.
+  //
+  //   canvas  — the band is the ground: its content already supplies its own
+  //             cards, so a ground behind them would be a card behind cards.
+  //   surface — the band IS the card: its content is uncarded, so the band
+  //             gives it the ground and the hairline.
+  //   signal  — the inverted band. One per view, and it is the ranked card.
+  //
+  // `null` means no band: an empty host must not paint a strip of ground with
+  // nothing in it, which is what a class set at boot would have done.
+  const BAND_MODES = ['canvas', 'surface', 'signal'];
+  function band(el, mode) {
+    if (!el) return;
+    BAND_MODES.forEach(m => el.classList.toggle('band--' + m, m === mode));
+    el.classList.toggle('band', !!mode);
+  }
+
   // ── Home: dashboard + recent sessions ─────────────────────────
   // ── Cloud reachability ────────────────────────────────────────
   // Rendered above everything on the home view, because it changes what the
@@ -7161,9 +7218,13 @@ const UI = (() => {
     const el = document.getElementById('syncBanner');
     if (!el) return;
     const st = Store.cloudStatus();
-    if (!st || st.ok) { el.hidden = true; el.innerHTML = ''; return; }
+    if (!st || st.ok) { el.hidden = true; el.innerHTML = ''; band(el, null); return; }
     const n = st.shown;
     el.hidden = false;
+    // canvas: a caveat is context, not another card. It must never read as one
+    // more insight in the stack below it — it changes what every number in
+    // that stack MEANS, and a card would file it beside them.
+    band(el, 'canvas');
     el.innerHTML = `<div class="sync-warn">
         <div class="sync-warn-head">${icon('warn')} Your cloud sessions did not load</div>
         <p class="sync-warn-p">You are signed in, but this device could not reach the server, so you are
@@ -7198,7 +7259,11 @@ const UI = (() => {
       const todayTip = tips[new Date().getDate() % tips.length];
       const tipHost = document.getElementById('tipHost');
       if (tipHost) {
-        tipHost.innerHTML = `<div style="background:var(--accent-weak);border:1px solid var(--line);padding:.8rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.95rem;color:var(--text)">${todayTip}</div>`;
+        // surface: a line of advice is uncarded content, so the band is its
+        // card. It was a box tinted with --accent-weak — an accent wash used
+        // as a surface, which is the one thing this palette refuses.
+        tipHost.innerHTML = `<p class="tip-note">${todayTip}</p>`;
+        band(tipHost, 'surface');
       }
     } catch(e){ console.error('tip',e); }
 
@@ -7209,8 +7274,12 @@ const UI = (() => {
         if (sessions.length) {
           const stats = EnhancedMetricsWidget.renderMiniStats(sessions);
           widgetHost.innerHTML = EnhancedMetricsWidget.renderWidget(stats) || '';
+          // canvas: three .stat-cards already supply their own ground, so the
+          // band's job here is to be the one they stand on.
+          band(widgetHost, 'canvas');
         } else {
           widgetHost.innerHTML = '';
+          band(widgetHost, null);
         }
       }
     } catch(e){ console.error('metrics-widget',e); }
@@ -7223,6 +7292,11 @@ const UI = (() => {
       const nextHost = document.getElementById('nextStepHost');
       if (nextHost) {
         const next = SmartRecommendations.getNextStep(sessions);
+        // signal: the one ranked recommendation, and the only high-contrast
+        // band on the screen. Every branch of getNextStep renders something,
+        // so this is never an empty band — and if it ever is, that means the
+        // ranked card stopped rendering, which is worth failing a suite over.
+        band(nextHost, 'signal');
         nextHost.innerHTML = `
           <div class="drill-card next-step${next.deadline ? ' has-deadline' : ''}" data-route="${Sanitize.escape(next.action)}">
             <div class="drill-icon">${icon(next.icon)}</div>
@@ -7241,11 +7315,25 @@ const UI = (() => {
       if (insightHost) {
         const insights = InsightEngine.generateInsights(sessions);
         if (insights.length) {
+          // canvas: an observation is context, so it sits on the page ground.
+          // Its blocks are the first rung above that ground — they were
+          // --surface2, the rung that belongs INSIDE a card, sitting directly
+          // on --bg with --surface skipped. The alerts below are the same
+          // shape at the second rung, inside their band's card, which is the
+          // ladder used as designed rather than a distinction by position.
           insightHost.innerHTML = insights.map(i =>
-            `<div style="padding:.7rem;background:var(--surface2);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
+            `<div style="padding:.7rem;background:var(--surface);border-left:3px solid var(--pine);border-radius:var(--radius-sm);margin-bottom:.6rem">
               <span style="font-size:1rem;margin-right:.4rem">${icon(i.icon)}</span>${i.text}
             </div>`
           ).join('');
+          band(insightHost, 'canvas');
+        } else {
+          // This branch used to leave the previous render's insights on
+          // screen — every other host here replaces, this one only appended
+          // when it had something, so a render that found none kept the old
+          // ones under a band that had already gone.
+          insightHost.innerHTML = '';
+          band(insightHost, null);
         }
       }
     } catch(e){ console.error('insights',e); }
@@ -7255,6 +7343,11 @@ const UI = (() => {
       const alertsHost = document.getElementById('alertsHost');
       if (alertsHost) {
         const alerts = PerformanceAlerts.generateAlerts(sessions);
+        // surface: an alert is a verdict about the data — the app's own
+        // reading of a decline or an improvement — so it gets the card, and
+        // each .alert-item is a --surface2 inset inside it. That is the
+        // ladder's second rung used exactly as it is defined.
+        band(alertsHost, alerts.length ? 'surface' : null);
         alertsHost.innerHTML = alerts.length ? `
           <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
             ${alerts.map(a => `
@@ -7273,8 +7366,14 @@ const UI = (() => {
       if (coachHost) {
         const grade = PerformanceGrade.calculateFullGrade(sessions);
         const coach = PersonalCoach.analyzeSessions(sessions);
+        // canvas: the coach panel is one block with its own ground, so the
+        // band is the page it sits on. Its ground was --surface2 with
+        // --surface2 tiles inside it — the same token twice, in a panel that
+        // skips the rung below it. The panel is the first rung above the
+        // page ground now, and the tiles inside it read as insets.
+        band(coachHost, (grade && coach) ? 'canvas' : null);
         coachHost.innerHTML = (grade && coach) ? `
-            <div style="margin-top:1.5rem;padding:1.2rem;background:var(--surface2);border-radius:var(--radius-md);border:1px solid var(--line)">
+            <div style="margin-top:1.5rem;padding:1.2rem;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--line)">
               <div style="font-weight:700;margin-bottom:.5rem;font-size:1.05rem">${coach.greeting}</div>
               <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.8rem">${coach.assessment}</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem">
@@ -7307,11 +7406,16 @@ const UI = (() => {
     if (!sessions.length) {
       if(dash) dash.hidden=true;
       if(recent) recent.hidden=true;
+      band(dash, null); band(recent, null);
       renderSessionList(sessions);
       return;
     }
     if(dash) dash.hidden=false;
     if(recent) recent.hidden=false;
+    // canvas: the session list is a list of cards, not a card. Each session
+    // keeps its own ground and its own hairline; a band ground behind twenty
+    // rows of them would be one very tall white slab.
+    band(recent, 'canvas');
     renderDashboard(sessions, dash);
     // Feature cards are isolated so any failure can't break the dashboard
     try { renderStreakAndFocus(sessions); } catch(e){ console.error('streak/focus',e); }
@@ -7441,6 +7545,11 @@ const UI = (() => {
 
   function renderDashboard(sessions, dash) {
     if(!dash) return;
+    // surface: the dashboard is ONE panel — a form ring, four counters and a
+    // heatmap, all readings of the same account. As a card its tiles become
+    // hairline cells of it rather than seven separate cards, which is the
+    // same treatment the anchored quick-stat row already uses.
+    band(dash, 'surface');
     const all=sessions.flatMap(s=>s.shots);
     const clubs=sortedClubs(all);
     const recent3=sessions.slice(0,3).map(sessionScore).filter(x=>x!==null);
