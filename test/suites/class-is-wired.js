@@ -267,6 +267,9 @@ const TRACED = [
   ['pref-', 'prefix', ['no-heatmap', 'no-faults', 'no-gapping', 'no-comparison', 'dense'],
    'pref-no-heatmap',
    'ViewPrefs.CLASS, applied to <html> with classList.toggle'],
+  ['band--', 'prefix', ['canvas', 'surface', 'signal'],
+   "band--' + m",
+   'the band() helper on the home view; BAND_MODES is the value set and `null` clears it'],
 ];
 
 const resolved = new Map();     // class name -> why it counts as applied
@@ -353,6 +356,7 @@ const DEAD_EXEMPT = {
   'row-between': 'the same shape as .stack/.cluster — superseded by per-surface flex rules',
   'stack':       'layout utility in the 640px block; nothing uses the stacked-children form',
   'tnum':        'tabular numerals; `td, th` carry the identical declaration in the same rule, and every table in the app is a table element',
+  'pad-b':       'one half of the .pad / .pad-y pair in the layout primitives; .pad and .pad-y are applied and the bottom-only form is not',
 };
 {
   ok(STYLED.size > 500 && produced.size > 400,
@@ -388,6 +392,7 @@ const HOOK_EXEMPT = {
   'setup-step-body': 'the body column of a setup-guide step; its children are styled',
   'shot-table':      'JS handle: the shot log table, filled row by row',
   'sm-sentinel':     'ScrollMotion measures with it and removes it on the next frame',
+  'band--':          'the prefix fragment the classList extractor reads before the `+`, not a name: band() builds band--canvas/surface/signal from BAND_MODES, all three carry rules and all three are traced in TRACED',
 };
 {
   const missing = NO_RULE.filter(n => !(n in HOOK_EXEMPT));

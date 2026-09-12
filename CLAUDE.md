@@ -885,7 +885,8 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **60 suites**. `test/browser/` holds checks that are **not** in
+`npm test` runs **64 suites** — of which **63 pass and `contrast.js` fails by
+design** (see "Where things stand"). `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1182,8 +1183,32 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` is current, working tree clean, **60 suites green**,
-render scan exit 0, service worker at **v154**, 59 modules.
+State at handover: `main` is current, working tree clean, **64 suites — 63 green
+and `contrast.js` red by design**, render scan exit 0, service worker at **v155**,
+59 modules.
+
+**The one open defect: the palette fails its own contrast floor.** A new suite,
+`test/suites/contrast.js`, measures every text-on-ground pair in both themes and
+reports **47 pairs below the 4.5:1 floor**. It reproduces all 28 numbers from an
+independent WCAG audit to the digit, and the defects are real and predate the
+workover. The worst is `--text-dim` — the app's most-used text token — which
+fails on every ground in both themes (2.70–4.11) and carries caveat **body copy**
+at 2.85:1, against this file's own rule that a caveat must be legible.
+
+**The suite is deliberately left failing.** A guard deleted or weakened to get a
+green tree is worse than the defect it found, which is the position this file
+takes everywhere else. Fixing it means changing token values in `:root` and the
+`html.dark` override, then regenerating `DESIGN.md`. Two traps are recorded on the
+suite's own output: `--green` cannot satisfy both `#fff` on a green *fill* and
+green-as-text on a dark ground with one value, so the badge's ink changes rather
+than the token; and `--accent` light has a fourth ground to clear — the
+`.sync-warn` wash at 3.44, ~0.37 harder than `--bg`'s 3.81.
+
+The plan `docs/superpowers/plans/2026-09-11-design-md-workover.md` carries a
+STATUS block at the top naming what is done and what is not: **Task 3 (all-caps
+tracking) and Task 7 (the drift sweep) are not started.** The highest-value item
+in Task 7 is that `.drill-card` is defined twice and the later rule wins, so the
+fault-drill card's inset styling has been unreachable across four components.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
 is **complete** — Task 15 shipped 11 September. See the scroll-motion section
@@ -1466,8 +1491,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 11 September 2026 — ShotLab v3, "Range" skin. 59 modules,
-**60 test suites**, service worker **v154**. Deterministic auth, cloud sync
+**Last updated:** 12 September 2026 — ShotLab v3, "Range" skin. 59 modules,
+**64 test suites**, service worker **v155**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

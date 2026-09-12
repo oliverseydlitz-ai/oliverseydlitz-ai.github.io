@@ -1,5 +1,41 @@
 # DESIGN.md Workover — Implementation Plan
 
+## STATUS at 2026-09-12 (read this before the tasks below)
+
+**DONE:** Task 0, Task 1, **Task 2** (display tier), **Task 4** (bands), plus a
+D3 follow-up ruling and two new suites. All merged to `main`; render scan exit 0.
+
+**NOT DONE — carry forward:**
+
+- **Task 3 — all-caps tracking.** Not started. The two `--track-*` tokens are unwritten.
+- **Task 5 — ship, partially.** `DESIGN.md` regeneration, the `sw.js` bump, the
+  CLAUDE.md suite-count update and the push all happened (see below). The
+  `@agent-design-review` pass did not.
+- **Task 7 — the drift sweep.** Not started; brief written. This is the plan's
+  Task 5 Step 2 dead-CSS sweep plus the collisions a read-only audit found.
+  Highest-value item in it: **`.drill-card` is defined twice** (`style.css` ~844
+  and ~2396) and the later rule wins, so the fault-drill card's inset styling has
+  been unreachable — and `.drill-card` is used by four components. That is a
+  decision, not a dedupe.
+
+**NOT IN THE PLAN — added, and the one open defect:**
+
+- **The palette fix.** `test/suites/contrast.js` (new, 613 lines) measures every
+  text-on-ground pair in both themes and is **RED: 43 pairs below the 4.5:1
+  floor.** It reproduces all 28 numbers from an independent WCAG audit to the
+  digit. The defects are real and predate this plan — most importantly
+  `--text-dim`, the app's most-used text token, fails on every ground in both
+  themes (2.70–4.11) and carries caveat *body copy* at 2.85:1, against
+  `CLAUDE.md`'s rule that a caveat must be legible.
+  **The suite is deliberately left in place and failing.** A guard removed to get
+  a green tree is worse than the defect it found.
+  Two known traps for whoever fixes it: `--green` cannot satisfy both `#fff` on a
+  green *fill* and green-as-text on a dark ground with one value, so the badge's
+  ink has to change rather than the token; and `.sync-warn-head` is a descendant
+  override at 3.44:1 that the suite does not yet assert.
+
+---
+
 **Goal:** Give ShotLab a machine-readable design contract (`DESIGN.md` at the
 repo root, generated from `style.css` so it cannot drift), and close the four
 structural gaps that a side-by-side against a professionally-authored design

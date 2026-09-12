@@ -266,7 +266,7 @@ claims:
   display-tier:
     selector: ".stat-hero, .score-number"
     applied-by-app-js: 2
-    applied-in: "renderScoreBanner(), renderYardages()"
+    applied-in: "renderStats(), renderScoreBanner()"
     rule: a display tier with no referent is a rule that does nothing. 0 is a defect.
   tabular-numerals:
     carried-by: "td, th"   # element selectors: app-wide
