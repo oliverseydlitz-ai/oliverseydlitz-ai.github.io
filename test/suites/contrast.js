@@ -194,6 +194,22 @@ function translucent(value, theme) {
     const s = eight[1];
     const a = parseInt(s.slice(6, 8), 16) / 255;
     if (a < 1) return { rgb: [0, 2, 4].map(i => parseInt(s.substr(i, 2), 16)), a, name };
+    return null;
+  }
+  // `color-mix(in srgb, C 8%, transparent)` is C at 8% alpha, exactly — the
+  // `in srgb` with a transparent partner reduces to straight alpha. That is
+  // resolvable, so it is resolved rather than reported: `.sync-warn` paints
+  // its banner with it and text sits on it. The GENERAL color-mix — two opaque
+  // colours — is still refused, because that one has no single ratio.
+  const mix = /^color-mix\(\s*in\s+srgb\s*,\s*(.+?)\s+([\d.]+)%\s*,\s*transparent\s*\)$/i.exec(decl);
+  if (mix) {
+    const inner = resolve(mix[1].trim(), theme);
+    const a = parseFloat(mix[2]) / 100;
+    // Named by what it is made of, not by its declaration: a pair printed as
+    // `--accent on color-mix(--accent 8%)` says the same thing as the raw
+    // formula and fits on a line.
+    const tok = (mix[1].match(/--[a-z0-9-]+/) || [mix[1]])[0];
+    if (inner.hex && a < 1) return { rgb: channels(inner.hex), a, name: 'color-mix(' + tok + ' ' + mix[2] + '%)' };
   }
   return null;
 }
@@ -203,6 +219,7 @@ function over(src, a, base) {
   const b = [1, 3, 5].map(i => parseInt(base.slice(i, i + 2), 16));
   return '#' + src.map((c, i) => Math.round(a * c + (1 - a) * b[i]).toString(16).padStart(2, '0')).join('');
 }
+const channels = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 function expand(h) {
   const b = h.replace('#', '');
   const full = b.length === 3 ? b.split('').map(c => c + c).join('') : b;
@@ -247,6 +264,10 @@ const LADDER = ['--bg', '--surface', '--surface2', '--surface3'];
 // an unresolvable colour that does not exist in either file.
 const CSS_COLOUR = /(^|[;{\s])color\s*:\s*([^;]+)/;
 const BG_COLOUR = /(^|[;{\s])(?:background|background-color)\s*:\s*([^;]+)/;
+// `opacity: .82` fades the ink toward whatever is behind it. The leading
+// separator is what keeps `transition: opacity …` out.
+const OPACITY = /(^|[;{\s])opacity\s*:\s*([\d.]+)/;
+const splitSel = s => s.split(',').map(x => x.trim()).filter(Boolean);
 const VAR_IN = /var\(\s*--[a-z0-9-]+(?:\s*,[^)]*)?\)/g;
 
 // Text colours app.js reaches INDIRECTLY — a `${expr}` whose value is chosen
@@ -292,6 +313,8 @@ const ruleColour = new Map();   // selector -> the colour it declares
 const groundOnly = [];          // a rule that repaints the ground and inherits the ink
 const pseudoBg = new Map();     // 'SEL::before' -> what it paints
 const pseudoBody = new Map();   // 'SEL::before' -> its declarations
+const groundByPart = new Map(); // a single selector -> the ground it paints, comma-parts split
+const ruleList = [];            // every rule in the sheet, for the ancestor pass below
 {
   let pos = 0;
   for (const chunk of css.split('}')) {
@@ -308,17 +331,69 @@ const pseudoBody = new Map();   // 'SEL::before' -> its declarations
     const fg = CSS_COLOUR.exec(body);
     if (inPrint(start + open + 1)) { if (fg) droppedToPrint++; continue; }
     const bg = BG_COLOUR.exec(body);
+    const op = OPACITY.exec(body);
     if (/::(before|after)\s*$/.test(sel)) {
       pseudoBody.set(sel, body);
       if (bg) pseudoBg.set(sel, bg[2]);
     }
-    if (!fg) {
-      if (bg) groundOnly.push({ sel, bg: bg[2] });
-      continue;
+    ruleList.push({ sel, fg: fg ? fg[2] : null, bg: bg ? bg[2] : null, opacity: op ? parseFloat(op[2]) : null });
+    if (bg && !resolve(bg[2], lightTokens).noGround) {
+      // Real grounds only: `background: none` is a pass-through, so a child
+      // under it still sees whatever the NEXT ancestor paints.
+      for (const part of splitSel(sel)) groundByPart.set(part, bg[2]);
     }
-    ruleColour.set(sel, fg[2]);
-    for (const value of siteValues(fg[2])) {
-      sites.push({ where: 'style.css  ' + sel, fg: value, ground: bg ? bg[2] : null });
+    if (fg) ruleColour.set(sel, fg[2]);
+    else if (bg) groundOnly.push({ sel, bg: bg[2] });
+  }
+}
+
+// ── The INHERITED ground ─────────────────────────────────────────────────
+// `.band--signal { background: var(--text) }` and then
+// `.band--signal .drill-title { color: var(--bg) }`. The child declares no
+// ground because it INHERITS one, and a per-rule scan that cannot see the
+// ancestor falls back to the ladder — where `--bg` measures 1.00 against
+// itself and 1.03 against `--surface`, eight pairs that can never render and
+// that no palette can ever satisfy. A ground token used as ink is always ink
+// for a specific inverted fill; the ladder is not its business.
+//
+// So the ground is resolved from the longest ancestor selector that declares
+// one, which is what the browser does — an inner card that paints its own
+// surface shadows the band behind it, and the longest match is the nearest.
+// This is the same defect as the `.sync-warn` wash: a descendant override in
+// a per-rule scan.
+function inheritedGround(part) {
+  let best = null;
+  for (const [anc, bg] of groundByPart) {
+    if (anc === part) continue;
+    // Two ways a rule can be inside another, and BOTH are needed:
+    //  · the descendant selector — `.band--signal .drill-title`
+    //  · the block-element name — `.sync-warn-head` is an element OF
+    //    `.sync-warn`, so it sits inside it in the DOM even though its
+    //    selector never mentions it. The hyphen is required, which is what
+    //    keeps `.band--signal-x` from matching `.band--sign`.
+    const descends = part.startsWith(anc) && /[\s>+~]/.test(part.charAt(anc.length));
+    const blockChild = part.startsWith(anc + '-');
+    if (!descends && !blockChild) continue;
+    if (!best || anc.length > best.anc.length) best = { anc, bg };
+  }
+  return best;
+}
+for (const rule of ruleList) {
+  for (const part of splitSel(rule.sel)) {
+    if (rule.fg) {
+      const own = rule.bg && !resolve(rule.bg, lightTokens).noGround ? rule.bg : null;
+      const inh = own ? null : inheritedGround(part);
+      const ground = own || (inh ? inh.bg : null);
+      const via = inh ? '  ←  inherits ' + inh.bg + ' from ' + inh.anc : '';
+      // `opacity: .82` fades the ink toward its ground, so the measured ratio
+      // is not the declared one. Only modelled when the rule paints no ground
+      // of its own — with one, the opacity fades the background too and the
+      // arithmetic is a different question, which is stated rather than
+      // guessed at.
+      const alpha = own || rule.opacity === null || rule.opacity >= 1 ? null : rule.opacity;
+      for (const value of siteValues(rule.fg)) {
+        sites.push({ where: 'style.css  ' + part + via, fg: value, ground, alpha });
+      }
     }
   }
 }
@@ -475,7 +550,7 @@ for (const [, { raw, list }] of byColour) {
         // The blend is theme-specific — the rung it washes over differs — so
         // the wash and its base are stored and composited in the assert loop.
         if (!fillPairs.has(k)) {
-          fillPairs.set(k, { fg: name, wash: t, rung, name: t.name + ' over ' + rung, where: s.where });
+          fillPairs.set(k, { fg: name, wash: t, rung, name: t.name + ' over ' + rung, where: s.where, alpha: s.alpha });
         }
       }
       continue;
@@ -483,10 +558,18 @@ for (const [, { raw, list }] of byColour) {
     // A ladder colour on a ladder rung is the ladder pair, already asserted
     // four lines up. Re-asserting it here would double every `--text-dim`
     // failure in the output and make the list harder to act on, which is the
-    // whole reason a fill pair is a separate category in the first place.
-    if (onLadder && LADDER.includes(g.name)) continue;
-    const k = name + ' on ' + g.name;
-    if (!fillPairs.has(k)) fillPairs.set(k, { fg: name, ground: s.ground, name: g.name, where: s.where });
+    // whole reason a fill pair is a separate category in the first place. A
+    // faded ink is NOT that pair — `opacity: .82` measures differently — so
+    // it keeps its own line rather than being deduped into the plain one.
+    // `== null`, not `=== null`: only the CSS pass records an opacity, so
+    // every app.js site arrives without the key at all. `undefined !== null`
+    // silently switched this dedupe off for both app.js and the state-variant
+    // pass, and re-printed two ladder failures under a second heading.
+    if (onLadder && LADDER.includes(g.name) && s.alpha == null) continue;
+    const k = name + ' on ' + g.name + (s.alpha == null ? '' : ' @ ' + s.alpha);
+    if (!fillPairs.has(k)) {
+      fillPairs.set(k, { fg: name, ground: s.ground, name: g.name, where: s.where, alpha: s.alpha });
+    }
   }
   if (onLadder) ladderColours.set(name, raw);
   else fillOnly.set(name, raw);
@@ -522,6 +605,12 @@ for (const value of [
   const r = resolve(value, lightTokens);
   ok(!r.hex, `UNKNOWN, not a pass: ${value}  ←  ${r.unknown || 'it resolved anyway'}`);
 }
+// And the boundary of what IS resolvable, so teaching the wash form above
+// cannot quietly turn every color-mix in the sheet into a confident number.
+ok(translucent('color-mix(in srgb, var(--accent) 8%, transparent)', lightTokens) !== null,
+   'a mix against transparent IS resolvable — it is that colour at that alpha, and `.sync-warn` paints one');
+ok(translucent('color-mix(in srgb, var(--accent) 30%, var(--green))', lightTokens) === null,
+   'a mix of two opaque colours is NOT — it has no single ratio, and guessing one would be inventing the ground');
 
 const pad = n => n.toFixed(2).padStart(5);
 // Every pair, both themes, each with the floor it is held to. The floors:
@@ -575,8 +664,14 @@ for (const [themeName, theme] of THEMES) {
       if (!unknown.some(u => u.pair === k)) unknown.push({ pair: k, reason: f.unknown || why, where: p.where });
       continue;
     }
-    const r = ratio(f.hex, groundHex);
-    ok(r >= TEXT_FLOOR, `${p.fg} on ${p.name}  ${pad(r)}  (needs ${TEXT_FLOOR})  [${p.where}]`);
+    // `opacity: .82` is real: it blends the ink toward the ground, so the
+    // ratio the golfer sees is lower than the declared pair computes. The
+    // declared colour is what the sheet says; the composited one is what
+    // renders, and the rendered one is the measurement.
+    const ink = p.alpha === null || p.alpha === undefined ? f.hex : over(channels(f.hex), p.alpha, groundHex);
+    const r = ratio(ink, groundHex);
+    const at = p.alpha ? ' @ opacity ' + p.alpha : '';
+    ok(r >= TEXT_FLOOR, `${p.fg} on ${p.name}${at}  ${pad(r)}  (needs ${TEXT_FLOOR})  [${p.where}]`);
   }
 }
 
