@@ -305,6 +305,33 @@ console.log('— and no class is built by concatenation that the trace does not 
        : ` (${prefixes.size} found in the markup)`}`);
 }
 
+console.log('— and the severity list a fault carries is read, not remembered —');
+// The value sets above are enumerated by hand, and a hand-typed enumeration is
+// the same shape of claim as a hand-typed count: right until somebody adds a
+// fourth thing. This one is checkable, so it is checked — the severities come
+// out of FaultEngine's own rule table, and a new one fails here instead of
+// silently becoming a class the document never lists as uncovered.
+//
+// Derived from the MODULE, not the file. A `/severity:\s*'x'/` scan over the
+// whole of app.js returns four values, not three: the notification centre
+// carries its own unrelated `severity: 'info'`, and it never becomes a class.
+// Reading the wrong object's field is how a check starts asserting something
+// that was never true.
+{
+  const app = src.find(s => s.file === 'app.js').text;
+  const i = app.indexOf('const FaultEngine = (() => {');
+  const j = i < 0 ? -1 : app.indexOf('\n})();', i);
+  ok(i >= 0 && j > i, 'FaultEngine is a module this check can find');
+  const severities = j > i
+    ? [...new Set([...app.slice(i, j).matchAll(/severity\s*:\s*'([a-z-]+)'/g)].map(m => m[1]))].sort()
+    : [];
+  const traced = TRACED.find(([key]) => key === 'severity-')[2];
+  const unlisted = severities.filter(s => !traced.includes(s));
+  ok(unlisted.length === 0,
+     `FaultEngine raises only severities the trace knows (${severities.join(', ')})${unlisted.length
+       ? ` — not ${unlisted.join(', ')}: add ${unlisted.length > 1 ? 'them' : 'it'} to the severity- row and to STYLED` : ''}`);
+}
+
 const wired = n => produced.has(n) || resolved.has(n);
 const DEAD = [...STYLED.keys()].filter(n => !wired(n)).sort();
 const NO_RULE = [...produced.keys()].filter(n => !STYLED.has(n)).sort();
