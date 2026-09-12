@@ -8258,6 +8258,17 @@ const UI = (() => {
     const avgScore = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
     const g = ShotScorer.grade(avgScore);
     const dist = [0,25,50,75,100].map(t => scores.filter(s=>s>=t && s<t+25).length);
+    // D3 — the display tier is for a figure the app is willing to stand behind,
+    // and the app does not report a mean under Metrics.MIN_SHOTS_REPORT: the
+    // floor the fault engine, strike quality, the tail engine and the yardage
+    // book all sit behind. Setting a six-shot mean as the largest thing on the
+    // screen claims a precision the sample does not have. It is still SHOWN —
+    // hiding a number the app already has is the other failure, and the app
+    // shows everything — it just is not the billboard, and the label says what
+    // it needs. With a club filter on this is one club, and the floor is the
+    // same one.
+    const cleared = scores.length >= Metrics.MIN_SHOTS_REPORT;
+    const short = Metrics.MIN_SHOTS_REPORT - scores.length;
     document.getElementById('scoreBanner').innerHTML = `
       <div class="score-banner-content">
         <div class="score-ring">
@@ -8272,8 +8283,9 @@ const UI = (() => {
           </svg>
         </div>
         <div class="score-details">
-          <div class="score-number">${avgScore}<span class="score-max">/100</span></div>
-          <div class="score-label">Session quality score</div>
+          <div class="score-number${cleared ? ' stat-hero' : ''}">${avgScore}<span class="score-max">/100</span></div>
+          <div class="score-label">Session quality score${cleared ? ''
+            : ` — ${short} more shot${short===1?'':'s'} before this is a mean`}</div>
           <div class="score-bar-row">
             ${scores.map(s=>`<span class="score-pip" style="background:${ShotScorer.scoreColor(s)};width:${100/scores.length}%"></span>`).join('')}
           </div>
@@ -8969,6 +8981,11 @@ const UI = (() => {
     document.getElementById('yardageTable').innerHTML = `
       <thead><tr><th>Club</th><th>Stock carry</th><th>Trend</th><th>Range</th><th>Spread</th><th>Total</th><th>Shots</th></tr></thead>
       <tbody>${book.map(b=>{
+        // The gate for everything below it, including the carry's display tier:
+        // `enough` is `count >= Metrics.MIN_SHOTS_REPORT` with an interval that
+        // exists (Analytics.yardageBook), and a club that has not cleared it
+        // gets a row that says what it needs instead of a number. D3 in one
+        // line — the club under the floor never reaches the billboard.
         if (!b.enough) return `<tr class="yard-thin">
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
           <td colspan="5">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
@@ -8980,7 +8997,7 @@ const UI = (() => {
         const consC = b.cv < 0.035 ? 'var(--green)' : b.cv < 0.07 ? 'var(--yellow)' : 'var(--red)';
         return `<tr>
           <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
+          <td><strong class="stat-hero">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
           ${trendCell(b.club)}
           <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
           <td><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>

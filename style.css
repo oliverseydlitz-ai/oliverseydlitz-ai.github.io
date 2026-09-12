@@ -146,18 +146,32 @@ body {
   padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
   -webkit-font-smoothing: antialiased;
 }
+/* Two tiers, and the DISTANCE between them is the point.
+   h2, h3 and .section-title are ONE step — the label tier, 0.8rem, weight
+   600, uppercase. They are signposts; a section heading is not a display
+   moment. Everything below them is body (15px), everything above them is a
+   heading or the figure.
+   What it replaced was five steps inside a factor of two — 2rem, 1.05rem,
+   1rem, .8rem, .7rem over a 15px body — which is a gradient, not a
+   hierarchy, and it left the app with no way to say "this number is the
+   one that matters". The figure that cleared its floor is now said with
+   .stat-hero, at 3.4rem. h1 sits above the label tier untouched: it is the
+   view name and a navigational landmark, not a display moment.
+   The two label trackings (.04em on h2/.section-title, .06em on h3) are
+   carried through unchanged — tokenising tracking is a separate piece of
+   work and rewriting these values here would silently move them. */
 h1 { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
-h2 { font-family: var(--font-display); font-size: 1rem;   font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+h2 { font-family: var(--font-display); font-size: .8rem;  font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 h3 { font-family: var(--font-display); font-size: .8rem;  font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 p  { text-wrap: pretty; }
 a  { color: var(--accent); text-decoration: none; }
 /* tabular numerals wherever data is shown */
 .tnum, td, th { font-variant-numeric: tabular-nums; }
 /* oversized display type steps up only on wider screens — render-scan checks
-   393px for horizontal overflow (spec C6) */
+   393px for horizontal overflow (spec C6). The label tier does NOT step up:
+   it is one size at every width, which is what makes it a tier. */
 @media (min-width: 640px) {
   h1 { font-size: 2rem; }
-  h2 { font-size: 1.05rem; }
 }
 
 /* ── Layout primitives (spec §7.1) ─────────────────────────────────────
@@ -588,11 +602,13 @@ textarea { resize: vertical; }
 .score-ring svg { display: block; overflow: visible; }
 
 .score-details { flex: 1; min-width: 0; }
-/* This is the screen's one hero numeral, so it takes .stat-hero's scale
-   rather than a fourth near-2rem size of its own. */
-/* Sized by .stat-hero, which is the single definition of the hero numeral —
-   see the Cards & section blocks section. Only what is specific to the score
-   banner lives here. */
+/* This is the screen's one display figure, so it takes .stat-hero's scale
+   rather than a fourth near-2rem size of its own. The class is applied at the
+   call site in renderScoreBanner — and only on the branch where the mean has
+   cleared Metrics.MIN_SHOTS_REPORT — so the tier has a referent a suite can
+   find rather than a size that arrives by inheritance. See the Cards &
+   section blocks section for the single definition. Only what is specific to
+   the score banner lives here. */
 .score-max { font-size: .8rem; font-weight: 400; color: var(--text-muted); }
 .score-label { font-size: .7rem; color: var(--text-dim); margin-bottom: .6rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
 .score-bar-row { display: flex; height: 6px; border-radius: 0; overflow: hidden; gap: 1px; }
@@ -709,15 +725,20 @@ textarea { resize: vertical; }
 .view-header + .section-block::before,
 .section-block:first-child::before { content: none; }
 
+/* The label tier — the same step as h2 and h3, deliberately. A section
+   heading names what is below it; it does not compete with it. */
 .section-title {
   font-family: var(--font-display);
-  font-size: 1rem; font-weight: 600; color: var(--text);
+  font-size: .8rem; font-weight: 600; color: var(--text);
   text-transform: uppercase; letter-spacing: .04em;
   margin-bottom: var(--s3);
   display: flex; align-items: center; gap: .5rem;
 }
 
-/* A small upper-case label above a heading or a number. */
+/* A small upper-case label above a heading or a number. Half a step BELOW
+   the label tier on purpose: it is the one label that sits directly above a
+   figure, so it has to read as an attribute of the number rather than as a
+   heading that happens to be there. */
 .kicker {
   font-family: var(--font-body);
   font-size: .7rem; font-weight: 600; color: var(--text-dim);
@@ -725,12 +746,29 @@ textarea { resize: vertical; }
   display: block;
 }
 
-/* The ONE hero numeral per screen (spec §4.2, §7.3). Applied by the score
-   banner; defined here so there is a single copy of it. */
-/* The ONE hero numeral per screen (spec §4.2, §7.3). .score-number is listed
-   here rather than given its own copy of these values: it IS the hero numeral
-   on the session detail, and two rules setting one size is how a type scale
-   drifts. */
+/* THE DISPLAY TIER — the measured figure, and the whole point of the type
+   scale being two tiers instead of five steps. Archivo Expanded at weight
+   800, tracking pulled negative, tabular so a column of them does not jitter.
+
+   It was defined here and referenced by NOTHING for the life of the redesign:
+   a display tier with no referent, which is the same defect as a gate nothing
+   calls. Two call sites now carry the class, and both are gated on the floor
+   the figure is measured against (test/suites/display-tier.js fails if one
+   is not):
+
+     - the session-detail score banner — one figure, the screen's protagonist.
+     - the yardage book's stock carry, in the table's carry column. A book of
+       one measure is one treatment: the screen is a reference card and its
+       carries are what a golfer reads off it. What is NOT allowed is a
+       second hero beside the first, and the book has no other.
+
+   D3: the floor is not decoration. A club under Metrics.MIN_SHOTS_REPORT, a
+   withheld dispersion figure, a modelled number with no label — none of them
+   may enter this tier. A design rule enforcing a measurement rule.
+
+   .score-number is listed here rather than given its own copy of these
+   values: it IS the hero numeral on the score banner, and two rules setting
+   one size is how a type scale drifts. */
 .stat-hero, .score-number {
   font-family: var(--font-display);
   font-weight: 800; font-size: 2.4rem; line-height: 1;
