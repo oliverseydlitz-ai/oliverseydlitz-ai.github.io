@@ -16,7 +16,7 @@ below is measured unless it says otherwise.
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
 | **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
-| 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) built — **waiting on Oliver to run one SQL block** |
+| 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) **live** — function applied and verified 22 Sep |
 
 ---
 
@@ -359,7 +359,7 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 
 ### 8B — real gaps worth doing (noted, not built; small unless marked)
 
-1. **BUILT (22 Sep) — waiting on one step from Oliver.** `.github/workflows/keepalive.yml`
+1. **LIVE (22 Sep).** Oliver ran section 7 in the SQL editor; verified from the database the same evening: `keepalive()` exists, `SECURITY INVOKER`, `search_path=""`, EXECUTE for anon only (authenticated: no), returns `now()`; the security advisor shows no new lint. The first scheduled run is 01:17 UTC 23 Sep — a green run there is the last check. `.github/workflows/keepalive.yml`
    and `supabase-setup.sql` section 7, pinned by `test/suites/keepalive.js`.
    **Cadence corrected on the way:** Oliver asked for twice a week, reasoning
    that one a week was the minimum. Supabase's docs say otherwise: a project is

@@ -1592,10 +1592,12 @@ cannot fail at all.
    `app.js`** and refuses anything but an `sb_publishable_` key.
    `test/suites/keepalive.js` pins all of it, including the cadence:
    Supabase's guidance is a few database requests *each day*, and a weekly or
-   twice-weekly job would not meet it. **Until section 7 has been run in the SQL
-   editor, every run fails with that instruction** — the MCP connection from a
-   Claude session could not authenticate to the database on 22 Sep, so the
-   function could not be applied from here. GitHub disables scheduled workflows
+   twice-weekly job would not meet it. Section 7 was applied by Oliver in the SQL
+   editor on 22 Sep and verified from the database (invoker, empty search_path,
+   anon-only EXECUTE, no new advisor lint). If the function is ever dropped,
+   every run fails with the instruction to re-run section 7. Note: the Supabase
+   MCP connection intermittently fails database auth (`28P01`) — retry before
+   concluding anything from it. GitHub disables scheduled workflows
    in a public repo after 60 days without a commit, emailing first.
 
 ### Known and deliberately not done
