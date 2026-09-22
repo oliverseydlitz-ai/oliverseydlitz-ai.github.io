@@ -128,6 +128,27 @@ const SUPABASE_KEY = '...';  // publishable key (safe to expose)
 - Sessions from MemDB *can* be migrated to Supabase (not automatic; depends on UI flow)
 - Future imports go to both IndexedDB + Supabase if authenticated
 
+## ⚠️ DIRECTION CHANGE — 22 Sep 2026 (read before the section below)
+
+**Oliver has decided to loosen the measurement rules below.** The full spec is
+Phase 9 of `docs/superpowers/plans/2026-09-22-killer-plan.md`. It is **not built
+yet**, so the code and the suites still enforce the old rules until Phase 9
+ships. **Do not treat the rules below as the target**, and do not "fix" code
+back towards them. In short:
+
+- **Every tier prescribes.** Lower tiers are judged harder (higher recurrence
+  rates), never banned. That includes derived face angle, spin with an RPT
+  ball, and modelled outputs.
+- **Range balls are near-normal data:** slightly lower weight, never a source of
+  spin, not switched off.
+- **Minimum-shot floors are unchanged**, and so are the "never claim" wording
+  rules (one strokes figure; no "+N yd per degree"; no "grooves").
+- **Main screens are clean.** Measurement-error explanations live in Settings,
+  the explanation screens and the Terms only.
+
+Pooling across clubs is still wrong in v2: "the numbers are accurate" does not
+make a driver and a wedge the same club.
+
 ## ⚠️ Measurement honesty (read `docs/research-base-v2.md` §1 and §9 first)
 
 The research base supersedes earlier guidance and **corrected two foundations**:

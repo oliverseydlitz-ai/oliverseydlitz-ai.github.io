@@ -17,6 +17,7 @@ below is measured unless it says otherwise.
 | 6 | Supabase dashboard | Oliver only |
 | **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
 | 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) **live** — function applied and verified 22 Sep |
+| **9** | **Measurement model v2 — Oliver's direction change (22 Sep)** | **specified, not built — supersedes parts of CLAUDE.md's measurement rules** |
 
 ---
 
@@ -458,3 +459,53 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 | Floating contact · scroll progress bar · back-to-top button | They clutter a phone app that already has a bottom nav. The real fix for "long page" is Phase 2 (answer-first, tabs that swap content), not a button to escape it. |
 | Site-wide search | There is one page. Session search already exists. |
 | Programmatic SEO · backlinks · citation outreach · buying-intent keywords | Growth, deferred by decision 3. Revisit with 5.x once there is something to send people to. |
+
+
+---
+
+## Phase 9 — measurement model v2 (Oliver's decision, 22 Sep 2026)
+
+**The decision, in Oliver's words:**
+
+> "leave the tiers just make them nicer — stuff all the way at the bottom judge it harder, not too different … range balls obviously no spin measurements and slightly lower level of data impact than rpt balls in net or simulator but treat like pretty normal balls … the minimum shot limit is nice, leave that"
+
+**On screen:** "Clean — no caveats". The golfer is told once, in Settings, the explanation screens and the Terms, that the device has measurement error. After that, the main screens treat the numbers as the numbers.
+
+**The concern that was raised and answered** (recorded so it is not re-litigated): some values are not measured by the radar at all. Spin without an RPT ball is the device's estimate. Face angle is not in the Rapsodo export; the app derives it. Prescribing from these means drills built on values the device did not read, and an off-screen disclaimer does not change which drill the golfer gets. Oliver chose to proceed. The implementation must honour that choice, not reintroduce the ban through the back door.
+
+### What changes
+
+| Area | Today | v2 |
+|---|---|---|
+| **Trust tiers** (`Metrics.TIER`) | Tier 1 prescribes; tier 2 display only; tier 3 never prescribes (`canPrescribe` is tier 1 only). | **Every tier prescribes.** A tier sets how hard a fault is judged, never whether it may be. |
+| **How "harder" works** (FaultEngine) | `MIN_RATE` 0.30, `FIRM_RATE` 0.50 for every rule. | Rates per tier. **Proposed defaults**, tunable, "not too different": **tier 1 0.30 / 0.50 · tier 2 0.35 / 0.55 · tier 3 0.40 / 0.60.** A rule takes its tier from the metric it tests; a rule on two metrics takes the lower tier. |
+| **Spin** (`Spin`) | Suppressed without an RPT ball; never prescribed. | **Prescribed as tier 3 when it exists, meaning an RPT ball.** Still absent on range and premium balls, because the device does not measure it there ("range balls obviously no spin measurements"). |
+| **Face angle, face-to-path** (derived) | Never stated; face angle banned outright. | Shown and prescribed as **tier 3**. The shot modal's face-angle row (C25) becomes intended. |
+| **Modelled outputs** (side carry, total, apex, descent) | Tier 3, never prescribed. | Tier 3, prescribed with the tier-3 rates. |
+| **Range balls** (`Conditions`) | Gapping sizes, dispersion tails, probes and several faults switch off; "never compare across conditions". | **Treated as near-normal data.** Gapping, the yardage book, dispersion and faults all run. They carry slightly lower weight: **proposed ×0.8 in any cross-session pool**, and rate thresholds **+0.05** on range-ball sessions. They are never used for spin. Premium balls in a net or simulator count as normal. |
+| **Minimum-shot floors** (10 / 15 / 30) | Enforced. | **Unchanged.** Oliver: "the minimum shot limit is nice, leave that". |
+| **"Never claim" wording rules** (one strokes figure; no "+N yd per degree"; no "grooves / rewires") | Enforced. | **Unchanged.** They were not part of the decision. Ask before touching them. |
+| **Inline caveats** (`BODY_CAVEAT`, `FEEL_CAVEAT`, condition caveats, `Dispersion.CAVEATS`, "modelled" labels, the tier explanations in FirstRun, "not measured here" splits) | Rendered next to the numbers. | **Removed from the main screens.** The text moves into one "How the numbers work" section in Settings and the explanation screens (MeasurementReference, SetupGuide, FirstRun). The Terms keep the error disclaimer. |
+| **Retention probe** | See 7D. | The C5/C6/C26/C42 honesty fixes still apply: they are logic bugs, not measurement rules. C27 changes: a range → premium switch is allowed, with the range side weighted per the row above. |
+
+### Phase 7 items this re-scopes
+
+- **Become intended, so drop them:** C9 (attack-angle prescription), C25 (face angle row), C29 (spin-axis prescription), C32 (gap sizes on range balls), and C39's "range balls still get verdicts".
+- **Change, don't delete:**
+  - C31: slice/hook become tier 3 rates, not a range-ball ban.
+  - C30: the body-cause split still matters for *wording*, but its caveat moves off-screen.
+  - C8: absolute bias becomes tier 3.
+  - C16/C17: C16 stays, because it is a "never claim" rule. C17 moves to Settings copy.
+- **Unaffected:** every logic, pooling, date, UI, accessibility and security finding (C1–C7, C10–C15, C18–C24, C26, C28, C33–C38, C40–C49; all V and R items). **Pooling across clubs is still wrong in v2.** "Treat the numbers as accurate" does not make a driver and a wedge the same club.
+
+### How to build it (one PR-sized piece, in this order)
+
+1. **`Metrics`:** replace `canPrescribe` with `tierRates(tier)`, and add `CONDITION_WEIGHT` / `CONDITION_RATE_BUMP`, read by everything that judges or pools. One copy of each number, exactly as `Benchmarks.TARGET` has one copy.
+2. **FaultEngine / PracticePlan / getNextStep / RetentionProbe:** drop every tier-2/3 and condition ban; apply the tier rates and the range-ball adjustment.
+3. **Gapping / yardage book / Dispersion:** run on range balls, weighted.
+4. **Caveats:** move to Settings under "How the numbers work". `FirstRun` keeps reading its figures from the modules, so it cannot drift.
+5. **Tests:** roughly 20 suites encode the old rules. **Rewrite them to pin the NEW rules**, never delete them: the tier rates, the range weight, "spin only with RPT", "floors unchanged", "no caveat text on the main screens". A rule written down with no test pinning it is this repo's oldest defect.
+6. **CLAUDE.md:** rewrite "Measurement honesty", "Claims the app must never make" (keeping the wording rules), the Dispersion and Conditions sections, and the Phase 7 rescope, in the same commit.
+7. **TERMS.md:** make sure it states plainly that prescriptions treat device readings as accurate and that the device has measurement error. That is a statement of fact about the system: bump the version, regenerate the legal pages, and update `Agreement.VERSION`.
+
+**Proposed numbers are defaults, not decisions:** the tier rates (0.30/0.35/0.40), the range weight (×0.8) and the +0.05 bump. Oliver can tune them; they live in one place.
