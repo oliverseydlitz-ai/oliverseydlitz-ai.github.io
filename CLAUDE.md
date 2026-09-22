@@ -1325,10 +1325,11 @@ pattern over a string that *does* contain one and fail if it is not found.
 Same reflex as `render-scan.js`'s exit code; keep it if you touch either.
 
 The plan `docs/superpowers/plans/2026-09-11-design-md-workover.md` carries a
-STATUS block at the top naming what is done and what is not: **Task 3 (all-caps
-tracking) and Task 7 (the drift sweep) are not started.** The highest-value item
-in Task 7 is that `.drill-card` is defined twice and the later rule wins, so the
-fault-drill card's inset styling has been unreachable across four components.
+STATUS block at the top naming what is done and what is not. **Task 3 is done**
+and **Task 7 is started, not finished** — its highest-value item (`.drill-card`
+declared twice) is fixed, and the 13 remaining silent overrides are enumerated
+in `cascade-overrides.js` rather than left as a note here. What is left of Task 7
+clashes on layout and motion, which is a visual decision per component.
 
 The "Range" redesign (`docs/superpowers/plans/2026-09-08-athletic-redesign.md`)
 is **complete** — Task 15 shipped 11 September. See the scroll-motion section
@@ -1352,11 +1353,12 @@ comparison exposed:
   default sans for the whole life of the redesign. They now carry a class that
   reads `--font-display`; a literal in the markup is how it happened.
   `fonts-are-tokens.js` is the guard and it was written failing first.
-- The display tier (`.stat-hero`) is defined and **referenced by nothing**.
-- All-caps tracking is 0.51px where the reference systems call 1.5px
-  non-negotiable.
-- The home view is seven identically-treated surfaces, which flattens the one
-  ranked card `getNextStep` exists to produce.
+- ~~The display tier (`.stat-hero`) is defined and **referenced by nothing**.~~
+  Closed by Task 2.
+- ~~All-caps tracking is 0.51px where the reference systems call 1.5px
+  non-negotiable.~~ Closed by Task 3 — see the four-rung scale above.
+- ~~The home view is seven identically-treated surfaces, which flattens the one
+  ranked card `getNextStep` exists to produce.~~ Closed by Task 4 (bands).
 
 Two decisions in it are Oliver's and are named rather than taken: dark as the
 default surface, and the pine-green logo that contradicts the graphite app.
