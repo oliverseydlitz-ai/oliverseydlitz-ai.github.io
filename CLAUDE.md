@@ -885,8 +885,8 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **64 suites** — of which **63 pass and `contrast.js` fails by
-design** (see "Where things stand"). `test/browser/` holds checks that are **not** in
+`npm test` runs **65 suites**, all green. (`contrast.js` was shipped red by
+design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
 
@@ -1183,8 +1183,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **64 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v156**, 59 modules.
+State at handover: **65 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v157**, 59 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1212,6 +1212,84 @@ touching a token:
 - `--withheld` was deliberately **not** touched. It was never in the failure set,
   and changing an unmeasured token is the drift this file warns about everywhere
   else.
+
+### Uppercase tracking is a four-rung scale, and the rungs are by SIZE
+
+Task 3 of the workover plan, done. 73 uppercase rules carried 20 different
+hand-typed tracking values; at the sizes they render, `.04em` on a `.8rem`
+label is **0.51px**, a third of what the reference systems treat as the floor
+for caps. Every one now reads a token and **no uppercase rule keeps a
+literal** — including `.cmp-vs`, which declared no tracking at all.
+
+The plan specified two tokens. It ships with **four**, and the deviation is
+the plan's own argument applied one level further down: tracking scales
+INVERSELY with size, so a single caps value cannot serve a `.55rem` mono tag
+and a `1.7rem` heading any more than one value can serve caps and display.
+
+- `--track-caps-xs: .14em` — uppercase below `.7rem`, the mono micro-tags.
+  A two-rung scale would have *flattened* `.brand-tag` (`.22em`) and
+  `.beta-tag` (`.14em`) down to `.09em`, which is the mistake the plan opens
+  by accusing the labels of.
+- `--track-caps: .09em` — uppercase from `.7rem` to `.95rem`. The target tier.
+- `--track-caps-lg: .03em` — uppercase at heading and display sizes.
+- `--track-display: -.02em` — the display tier, which is **not** uppercase.
+  Linear's negative pull applies to large lowercase; putting it on caps would
+  be wrong, which is why this token is separate rather than reused.
+
+**The bottom nav is the tightest place the xs rung lands, and `render-scan.js`
+cannot see it.** Seven equal slots at 393px give each label 56.1px; the widest
+("Sessions") measures 52.2px tracked against 44.5px untracked. It fits, with
+about 2px of gutter each side. Nothing overflows the *page* if that stops
+being true, so measure the label box against its slot before widening the rung
+or adding an eighth nav item. A first attempt at this measured the label by
+cloning its computed style onto a fresh span — which inherits neither the
+`text-transform` nor the font — and reported a 61.6px overflow that does not
+exist. **Measure the real element.**
+
+### `.drill-card` was two components sharing one name
+
+The named highest-value item of the drift sweep. `.drill-card` was declared
+twice, ~1,500 lines apart, and the later rule won every property both set —
+so the inset styling a fault card asked for had been unreachable for the whole
+life of the redesign, and what rendered was a pointer cursor on something that
+is not tappable, an accent left rule, and a `margin-bottom` stacked on a flex
+`gap`.
+
+They are **not a duplicate to merge.** One sits inside a fault card and has to
+read as inset against it; the other sits on the page and is tappable. So the
+inset one is `.drill-card--inset`, applied alongside the base at the single
+render site that wants it, and the cascade is no longer what decides which
+component you get. The other three call sites wanted the standalone treatment
+they were already getting by accident.
+
+### `test/suites/cascade-overrides.js` — the ratchet, not a ban
+
+A rule redeclared below itself with a different value is a defect CLASS here,
+not three accidents: `.drill-card`, `.session-card` (1,900 lines below itself,
+different shadow, retired red), and `.view-title` (which the DESIGN.md
+generator has a note about). The first copy becomes dead text that reads like
+live styling, so whoever edits it changes nothing and cannot tell why.
+
+The suite scans the **base cascade only** — `@media`, `@supports`,
+`@keyframes` and `@font-face` are lifted out, because an override inside one
+is the mechanism rather than a defect. It found **36**. The tracking work
+folded the type-only half (font-size, font-family, font-weight,
+letter-spacing) back into the base rules, leaving **13**, each **named with
+the properties it clashes on**. A new one fails; a fixed one also fails until
+it is struck off; and a survivor that starts clashing on *different*
+properties fails too, because that is a new defect wearing an old name.
+
+What remains is one thing: a late "editorial enhancement layer" appended to
+the sheet rather than merged into it, reaching back over the base rules with
+`!important`. The 13 left clash on **layout and motion** (padding, display,
+gap, transition, min-height), where merging is a visual decision per component
+rather than a mechanical one. **That is the rest of the drift sweep, and it is
+a task, not a cleanup.**
+
+One trap recorded: `.fault-category {}` is **deliberately empty** and must
+stay. It exists so `class-is-wired.js` sees a rule for a class the markup
+applies. A sweep that deletes empty rules takes it out; that already happened
+once during this work, and the suite caught it.
 
 ### Three copies of the palette that no check re-derived
 
@@ -1534,7 +1612,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 59 modules,
-**64 test suites**, service worker **v156**. Deterministic auth, cloud sync
+**65 test suites**, service worker **v157**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

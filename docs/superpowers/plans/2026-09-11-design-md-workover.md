@@ -7,7 +7,11 @@ D3 follow-up ruling and two new suites. All merged to `main`; render scan exit 0
 
 **NOT DONE — carry forward:**
 
-- **Task 3 — all-caps tracking.** Not started. The two `--track-*` tokens are unwritten.
+- **Task 3 — all-caps tracking. DONE (22 Sep).** Shipped with FOUR `--track-*`
+  tokens rather than two: tracking scales inversely with size, so one caps value
+  cannot serve a .55rem mono tag and a 1.7rem heading. 73 uppercase rules, no
+  literals left. See CLAUDE.md for the rungs and for the bottom-nav constraint
+  `render-scan.js` cannot see.
 - **Task 5 — ship, partially.** `DESIGN.md` regeneration, the `sw.js` bump, the
   CLAUDE.md suite-count update and the push all happened (see below). The
   `@agent-design-review` pass did not.

@@ -142,7 +142,7 @@ typography:
       selector: "h1"
       font-size: "1.5rem"
       font-weight: "700"
-      letter-spacing: ".01em"
+      letter-spacing: "var(--track-caps-lg)"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
       at "(min-width: 640px)":
@@ -152,7 +152,7 @@ typography:
       selector: ".view-title"
       font-size: "1.7rem"
       font-weight: "700"
-      letter-spacing: ".015em"
+      letter-spacing: "var(--track-caps-lg)"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
       at "(min-width: 768px)":
@@ -162,7 +162,7 @@ typography:
       selector: "h2"
       font-size: ".8rem"
       font-weight: "600"
-      letter-spacing: ".04em"
+      letter-spacing: "var(--track-caps)"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
       use: section heading
@@ -170,7 +170,7 @@ typography:
       selector: "h3"
       font-size: ".8rem"
       font-weight: "600"
-      letter-spacing: ".06em"
+      letter-spacing: "var(--track-caps)"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
       use: sub-heading
@@ -178,7 +178,7 @@ typography:
       selector: ".section-title"
       font-size: ".8rem"
       font-weight: "600"
-      letter-spacing: ".04em"
+      letter-spacing: "var(--track-caps)"
       text-transform: "uppercase"
       font-family: "var(--font-display)"
       use: the heading on a section block
@@ -186,7 +186,7 @@ typography:
       selector: ".kicker"
       font-size: ".7rem"
       font-weight: "600"
-      letter-spacing: ".08em"
+      letter-spacing: "var(--track-caps)"
       text-transform: "uppercase"
       font-family: "var(--font-body)"
       use: a small upper-case label above a heading or a number
@@ -237,7 +237,7 @@ components:
     padding: ".7rem 1.5rem"
     min-height: "var(--tap)"
     text-transform: "uppercase"
-    letter-spacing: ".04em"
+    letter-spacing: "var(--track-caps)"
     clip-path: "polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut))"
   card:
     selector: ".card"

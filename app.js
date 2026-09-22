@@ -8725,7 +8725,7 @@ const UI = (() => {
                   // ball and turf verify for you.
                   const { checkable, feel } = FaultEngine.splitDrills(f.drills);
                   const card = d => `
-                    <div class="drill-card">
+                    <div class="drill-card drill-card--inset">
                       <div class="drill-name">${icon('target')} ${Sanitize.escape(d.name)}</div>
                       <div class="drill-desc">${Sanitize.escape(d.desc)}</div>
                     </div>`;
