@@ -205,6 +205,32 @@ CREATE POLICY "read own acceptance"   ON public.terms_acceptances
 REVOKE ALL ON public.terms_acceptances FROM anon, authenticated;
 GRANT SELECT, INSERT ON public.terms_acceptances TO authenticated;
 
+-- ── 7. keepalive() — the one thing the anon key may call ─────────────
+-- Free-tier projects pause after a week without "sufficient user database
+-- activity"; Supabase's own guidance is a few requests to the database EACH
+-- DAY. While paused, every cloud read fails. .github/workflows/keepalive.yml
+-- calls this three times a day, twice per run.
+--
+-- It returns the server clock and nothing else. SECURITY INVOKER, so it runs
+-- as the caller and bypasses no policy; search_path pinned empty so a planted
+-- object in another schema cannot be resolved in its place (the linter flags
+-- a mutable search_path for exactly that reason). EXECUTE is revoked from
+-- PUBLIC and authenticated and granted to anon ALONE — the same discipline as
+-- the table grants above: never leave a default grant standing that a policy
+-- or a comment is assumed to cover.
+CREATE OR REPLACE FUNCTION public.keepalive()
+  RETURNS timestamptz
+  LANGUAGE sql
+  STABLE
+  SECURITY INVOKER
+  SET search_path = ''
+AS $$ SELECT pg_catalog.now() $$;
+
+REVOKE ALL ON FUNCTION public.keepalive() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.keepalive() TO anon;
+COMMENT ON FUNCTION public.keepalive() IS
+  'Returns now(). Called by .github/workflows/keepalive.yml so a free-tier project is never idle long enough to pause. Exposes nothing.';
+
 -- ════════════════════════════════════════════════════════════════════
 -- Two things this script CANNOT do, both dashboard settings:
 --
@@ -215,5 +241,6 @@ GRANT SELECT, INSERT ON public.terms_acceptances TO authenticated;
 --      paused, every cloud read fails and signed-in users silently fall back
 --      to whatever is cached on their device. The app now SAYS so (see
 --      Store.cloudStatus and the sync banner) rather than showing a partial
---      account as if it were whole — but the fix is a paid plan or regular use.
+--      account as if it were whole. Section 7 plus the keepalive workflow is
+--      the "regular use" answer; a paid plan is the other one.
 -- ════════════════════════════════════════════════════════════════════

@@ -885,7 +885,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **65 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **66 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1191,7 +1191,7 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **65 suites, all green**, render scan exit 0 both with and
+State at handover: **66 suites, all green**, render scan exit 0 both with and
 without `SM_NO_IO=1`, service worker at **v159**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
@@ -1584,8 +1584,19 @@ cannot fail at all.
 2. **Leaked-password protection is off** — Auth → Providers → Email. It is the
    only outstanding Supabase security advisor.
 3. **The project auto-pauses** after ~7 days idle on the free tier. Cloud reads
-   then fail for signed-in users. The app now says so (`Store.cloudStatus`), but
-   the cure is a paid plan or regular use.
+   then fail for signed-in users. The app says so (`Store.cloudStatus`).
+   **`.github/workflows/keepalive.yml` is the "regular use" cure**: three times
+   a day it calls `public.keepalive()` (`supabase-setup.sql` section 7, which
+   returns `now()`, runs as the caller and is granted to anon alone), then
+   checks that the site answers. The workflow **reads the URL and key out of
+   `app.js`** and refuses anything but an `sb_publishable_` key.
+   `test/suites/keepalive.js` pins all of it, including the cadence:
+   Supabase's guidance is a few database requests *each day*, and a weekly or
+   twice-weekly job would not meet it. **Until section 7 has been run in the SQL
+   editor, every run fails with that instruction** — the MCP connection from a
+   Claude session could not authenticate to the database on 22 Sep, so the
+   function could not be applied from here. GitHub disables scheduled workflows
+   in a public repo after 60 days without a commit, emailing first.
 
 ### Known and deliberately not done
 
@@ -1646,7 +1657,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**65 test suites**, service worker **v159**. Deterministic auth, cloud sync
+**66 test suites**, service worker **v159**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

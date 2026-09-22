@@ -1,0 +1,89 @@
+# Keep the free-tier Supabase project awake.
+#
+# Supabase pauses a free project after a week without "sufficient user
+# database activity", and its own guidance is "a few user requests to the
+# database each day" (docs: platform/free-project-pausing). A weekly or
+# twice-weekly ping is NOT that. While the project is paused every cloud read
+# in the app fails, which is what Store.cloudStatus and the sync banner exist
+# to announce. This removes the cause rather than announcing it.
+#
+# Three runs a day, two real database round trips each, via public.keepalive()
+# (supabase-setup.sql section 7): it returns now() and exposes nothing. The
+# run then checks the site itself answers, so a red run here is also the
+# cheapest uptime alert there is — GitHub emails the repo owner on failure.
+#
+# This runs on GitHub's servers, never in a visitor's browser, so the site's
+# zero-third-party-requests rule is untouched.
+#
+# GitHub disables scheduled workflows in a public repo after 60 days with no
+# commits (it emails first). Any commit re-arms it; so does "Enable workflow"
+# in the Actions tab. test/suites/keepalive.js pins the schedule and the
+# guards below.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 1,9,17 * * *'   # 01:17, 09:17, 17:17 UTC — off the hour, GitHub delays :00 jobs most
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app.js
+          sparse-checkout-cone-mode: false
+
+      # READ from app.js, never restated here: a second copy of the project URL
+      # is the drift this repo refuses everywhere else. And refuse anything but
+      # a publishable key — this file is public, and a service_role key must
+      # never be one careless edit away from being called from it.
+      - name: Read the project URL and publishable key from app.js
+        run: |
+          URL=$(grep -oE "const SUPABASE_URL *= *'[^']+'" app.js | cut -d"'" -f2)
+          KEY=$(grep -oE "const SUPABASE_KEY *= *'[^']+'" app.js | cut -d"'" -f2)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::could not read SUPABASE_URL / SUPABASE_KEY from app.js"; exit 1
+          fi
+          case "$KEY" in
+            sb_publishable_*) ;;
+            *) echo "::error::refusing to run: the key in app.js is not a publishable key"; exit 1 ;;
+          esac
+          echo "SB_URL=$URL" >> "$GITHUB_ENV"
+          echo "SB_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Two database round trips
+        run: |
+          for i in 1 2; do
+            : > body.txt   # a refused connection writes no body; the checks below must still read one
+            code=$(curl -sS -o body.txt -w '%{http_code}' --retry 3 --retry-delay 15 --max-time 30 \
+                   -H "apikey: $SB_KEY" -H "Accept: application/json" \
+                   "$SB_URL/rest/v1/rpc/keepalive") || code=000
+            echo "round trip $i: HTTP $code — $(head -c 200 body.txt)"
+            if grep -qi 'paused' body.txt; then
+              echo "::error::the project is PAUSED — resume it in the Supabase dashboard"; exit 1
+            fi
+            if [ "$code" = "404" ]; then
+              echo "::error::public.keepalive() does not exist — run section 7 of supabase-setup.sql in the SQL editor"; exit 1
+            fi
+            if [ "$code" != "200" ]; then
+              echo "::error::keepalive failed with HTTP $code"; exit 1
+            fi
+            sleep 5
+          done
+
+      - name: The site answers
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 15 --max-time 30 \
+                 https://oliverseydlitz-ai.github.io/) || code=000
+          echo "site: HTTP $code"
+          [ "$code" = "200" ] || { echo "::error::the site returned HTTP $code"; exit 1; }

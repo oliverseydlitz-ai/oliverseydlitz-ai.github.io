@@ -16,7 +16,7 @@ below is measured unless it says otherwise.
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
 | **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
-| 8 | External launch checklist, triaged against this codebase | recorded — nothing built; 8B is the useful near-term list |
+| 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) built — **waiting on Oliver to run one SQL block** |
 
 ---
 
@@ -35,6 +35,13 @@ below is measured unless it says otherwise.
    other launch monitors) waits until the app is something worth sending people
    to. Measuring a funnel with no one in it measures nothing.
 
+4. **Everything proposed is approved to implement (Oliver, 22 Sep: "all the
+   ideas… write down to implement, I love them").** That covers Phases 1–4, all
+   of Phase 7, and 8B/8C, in the suggested orders. It does **not** settle the
+   calls that were explicitly left to him — those are listed below and stay
+   open until he answers them one by one. First item built: 8B.1, the Supabase
+   keep-alive.
+
 ## Still open — Oliver's calls, not taken
 
 - **Default theme.** Recommendation: follow the phone's system setting rather
@@ -48,6 +55,8 @@ below is measured unless it says otherwise.
   an assumption to build on.
 - **A deploy-time minify step** (Phase 4). It bends the "no build step"
   principle, so it is a yes/no, not a default.
+- **C9 — may the app prescribe from attack angle?** See Phase 7.
+- **A custom domain** (8B.11) — it costs money and changes the canonical URL.
 
 ---
 
@@ -350,7 +359,23 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 
 ### 8B — real gaps worth doing (noted, not built; small unless marked)
 
-1. **Keep Supabase from auto-pausing.** A scheduled GitHub Action (weekly cron) makes one cheap authenticated-as-anon request to the project. That is "regular use", so the free tier stops suspending, and it removes the weekly outage that `cloudStatus` exists to announce. It runs server-side from GitHub, not on page load, so the zero-third-party-requests rule is untouched. **Oliver's call:** it is a workaround for the free tier, and the clean alternative is the paid plan.
+1. **BUILT (22 Sep) — waiting on one step from Oliver.** `.github/workflows/keepalive.yml`
+   and `supabase-setup.sql` section 7, pinned by `test/suites/keepalive.js`.
+   **Cadence corrected on the way:** Oliver asked for twice a week, reasoning
+   that one a week was the minimum. Supabase's docs say otherwise: a project is
+   judged on "sufficient user database activity over the past week", and "a few
+   user requests to the database each day" is what typically keeps it awake. So
+   the job runs **three times a day, two round trips each**. It is free on a
+   public repo, and the suite fails if anyone relaxes it to weekdays. **Oliver's
+   step:** paste section 7 of `supabase-setup.sql` into the SQL editor, then run
+   the workflow once from the Actions tab. Until then every run fails with that
+   instruction, deliberately. Also verified here: the key and URL are read out
+   of `app.js`, and anything but an `sb_publishable_` key stops the run. Two
+   limits: GitHub disables scheduled workflows in a public repo after 60 days
+   with no commits (it emails first; any commit re-arms it), and whether a
+   `now()` round trip counts as "user activity" is Supabase's definition to
+   make — the proof is no pause-warning email over the next weeks.
+   *Original note:* A scheduled GitHub Action (weekly cron) makes one cheap authenticated-as-anon request to the project. That is "regular use", so the free tier stops suspending, and it removes the weekly outage that `cloudStatus` exists to announce. It runs server-side from GitHub, not on page load, so the zero-third-party-requests rule is untouched. **Oliver's call:** it is a workaround for the free tier, and the clean alternative is the paid plan.
 2. **The site can be framed (clickjacking).** GitHub Pages sends no `X-Frame-Options` or `frame-ancestors`, and neither can be set from a `<meta>` tag. There are two options:
    - (a) A tiny self-hosted frame-buster in `app.js`: if `top !== self`, refuse to render. Small, and no hosting change.
    - (b) The real fix: a custom domain behind a header-capable proxy (see item 11), which also brings HSTS, `X-Content-Type-Options` and `Permissions-Policy`. `SECURITY-HEADERS.md` already documents that path.
