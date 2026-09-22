@@ -1063,7 +1063,6 @@ function authLog(...parts) {
 
 const Auth = (() => {
   let _user = null;
-  let _guestTimer = null;
   let _guest = false;        // true when user explicitly chose "continue as guest"
   let _signingOut = false;   // blocks ALL auth events during intentional logout
 
@@ -1105,7 +1104,7 @@ const Auth = (() => {
       if (event === 'SIGNED_OUT') {
         _user = null;
         updateUI();
-        if (!_signingOut) showAuth(false);
+        if (!_signingOut) showAuth();
         return;
       }
 
@@ -1242,7 +1241,6 @@ const Auth = (() => {
     const delAcct = document.getElementById('deleteAccountBtn');
     const authModal = document.getElementById('authModal');
     if (_user) {
-      clearTimeout(_guestTimer);
       emailRow.hidden = false;
       document.getElementById('accountEmail').textContent = _user.email;
       signIn.hidden = true;
@@ -1269,38 +1267,29 @@ const Auth = (() => {
 
   function setGuest() {
     _guest = true;
-    // Remembered so a returning guest is not made to wait out the sign-in
-    // nudge again — see showAuth(). Someone who has already declined once,
-    // and may have sessions stored on this device, should not have to sit
-    // through a five-second countdown to reach them on every visit.
+    // Remembered so a returning guest is not shown the sign-in modal again on
+    // every load — see returningGuest(). Someone who has already declined once
+    // has answered the question.
     try { localStorage.setItem('slGuestChosen', '1'); } catch (_) {}
     updateUI();
   }
-  const choseGuestBefore = () => {
+  const returningGuest = () => {
     try { return localStorage.getItem('slGuestChosen') === '1'; } catch (_) { return false; }
   };
 
-  // mandatory=true: guest option hidden until 5s pass; false: guest shown right away
-  function showAuth(mandatory = false) {
-    const modal = document.getElementById('authModal');
-    const guest = document.getElementById('authGuestWrap');
-    modal.hidden = false;
+  // The guest option is ALWAYS visible. It used to be hidden for five seconds
+  // on a first visit as a nudge towards signing in — which, to someone who
+  // does not yet know what this app is, reads as a login wall with no way
+  // past it, and that visitor leaves inside those five seconds. There is no
+  // payment behind the account; asking for one before showing anything was
+  // gating the product for an email address. Removed 22 Sep 2026, Oliver's call.
+  function showAuth() {
+    document.getElementById('authModal').hidden = false;
     switchToLogin();
-    clearTimeout(_guestTimer);
-    // The five-second delay is a nudge towards signing in, and it is worth
-    // having exactly once. Making a returning guest sit through it every load —
-    // especially one whose sessions are stored on this device and are sitting
-    // right behind the modal — is friction with no argument behind it.
-    if (mandatory && !choseGuestBefore() && !LocalDB.enabled()) {
-      guest.hidden = true;
-      _guestTimer = setTimeout(() => { guest.hidden = false; }, 5000);
-    } else {
-      guest.hidden = false;
-    }
+    document.getElementById('authGuestWrap').hidden = false;
   }
 
   function hideAuth() {
-    clearTimeout(_guestTimer);
     document.getElementById('authModal').hidden = true;
   }
 
@@ -1320,7 +1309,7 @@ const Auth = (() => {
     document.getElementById('authError').textContent = '';
   }
 
-  return { init, signup, login, oauth, logout, getUser, setGuest, showAuth, hideAuth, switchToLogin, switchToSignup };
+  return { init, signup, login, oauth, logout, getUser, setGuest, returningGuest, showAuth, hideAuth, switchToLogin, switchToSignup };
 })();
 
 const CloudDB = (() => {
@@ -6576,7 +6565,7 @@ function applyPaywall(el, cta) {
         <button class="btn-primary btn-sm paywall-btn">Sign In</button>
       </div>
     </div>`;
-  el.querySelector('.paywall-btn').addEventListener('click', () => Auth.showAuth(false));
+  el.querySelector('.paywall-btn').addEventListener('click', () => Auth.showAuth());
   return true;
 }
 
@@ -11286,7 +11275,7 @@ async function init() {
   });
 
   // Settings account controls
-  document.getElementById('accountSignInBtn').addEventListener('click', () => Auth.showAuth(false));
+  document.getElementById('accountSignInBtn').addEventListener('click', () => Auth.showAuth());
   document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
     await Auth.logout();
     await Router.showSessions();
@@ -11553,8 +11542,12 @@ async function init() {
 
   if (Auth.getUser()) {
     await afterAuth();
+  } else if (Auth.returningGuest()) {
+    // Already answered on an earlier visit — straight in, no modal.
+    Auth.setGuest();
+    await Router.showSessions();
   } else {
-    Auth.showAuth(true); // mandatory sign-in; guest option after 5s
+    Auth.showAuth();   // first visit: the question is asked once, guest visible from the start
     await Router.showSessions(); // render empty sessions behind the modal
   }
 
