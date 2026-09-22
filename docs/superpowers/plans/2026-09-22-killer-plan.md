@@ -366,6 +366,42 @@ The main session verified **V25** (`.settings-row{display:flex}` at `style.css:1
 
 **Still not covered (visual):** dark mode at 1440 for Progress/Practice/Drills; the signed-in rendering (needs an `Auth.getUser` stub; do it with Phase 1.5); throttled loading states; the legal PDF print view; the range card's end screen and tick-off flow.
 
+### 7F — robustness rerun (R19–R40, 22 Sep, completed)
+
+The main session verified **R19** (`clubLabel` at `app.js:252` returns an unknown club code uppercased and unescaped) and **R23** (`logout()` removes only the auth token; it touches no user data). The rest are agent-reproduced. **R20 duplicates V26** (invisible focus rings on the chamfered buttons), found independently by two lenses, and is kept as one item.
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| **R19** | **HIGH — security** | **A CSV's Club Type, or any field of a restored backup, is HTML-injected into about 15 `innerHTML` sinks:** the preview, session cards, gap/bench/shot tables, the shot modal, the yardage table, records, progress, and the analytics and club modals. A backup `id` breaks out of `data-id` attributes. A proof-of-concept file fired beacon requests to a third-party image host (breaking the zero-third-party position via the loose `img-src https:`), injected 21 `<style>` nodes and restyled the UI. Notes, wind, temp, date, ball and surface **are** escaped. **Verified at the source.** | Normalise `clubType` in `CSVParser` and `readBackup` (a known code, or a short `[a-z0-9]` token); have `clubLabel` escape; validate backup ids against `^[\w-]{1,64}$` and coerce numerics; add a **taint suite** that renders every view from a marker fixture and asserts zero hits; tighten R15's CSP. |
+| **R23** | **HIGH — privacy** | **Sign-out leaves the account holder's data on the device and shows it to the next person:** IndexedDB sessions (notes included), the practice log, probes, rounds, putts, goals and remembered conditions. With `slGuestChosen` set, the reload lands in guest mode on the previous user's data, and a *new* sign-in is then offered "Back up 1 session?" into their own account. **Verified in code.** | On logout, clear the user-scoped keys and DB rows, or ask "keep this device's copy?"; clear `slGuestChosen`. |
+| **R21** | HIGH | **The five Settings runtime modals are not dialogs:** no role, focus stays behind, Tab walks the page underneath, Escape does nothing, and closing drops focus on `<body>`. | One runtime-modal helper: `.modal-overlay`, close by toggling `hidden`, restore focus to the opener. EXTENDS R2/R5. |
+| **R22** | HIGH | **Space on the range card's "Done ✓" is swallowed by the Space-means-next handler,** so the block advances and **nothing is logged to PracticeLog.** There are no dialog semantics, and focus drops to `<body>` after every repaint. | Ignore Space and arrows on buttons and fields; focus the card heading on open and after each paint; register it as a dialog. |
+| **R24** | MED-HIGH | **The auth return accepts tokens from any link.** A crafted `#access_token=…` purges the stored session before any validation (logout CSRF, verified), and by code reading a valid attacker pair would be installed (login CSRF), after which imports sync to the attacker's account. **No open redirect.** | A one-time nonce in `sessionStorage`, set in `oauth()`; accept hash tokens only with the nonce, and validate before purging. PKCE long term. |
+| **R25** | MED | **"Kept on this device" is claimed when the storage write silently failed;** the session is orphaned in IndexedDB with no UI to reach it. | Verify the flag after writing, or roll back with a reason. |
+| **R26** | MED | **Offline, any unknown URL serves the app** (a bad nested path gets an unstyled, script-less page) instead of 404.html. | Fall back to the shell only for app paths, otherwise `/404.html`; use root-absolute asset paths. EXTENDS R6/R7, same `sw.js` pass. |
+| **R27** | MED | **Dark-scheme users get a ~1.8 s white flash, and an ungated app shell with a dead "+" button is visible before the JS runs** (Slow 4G + 4× CPU). | A tiny render-blocking `/theme.js` in `<head>`; `defer` the vendor scripts. |
+| **R28** | MED | **Reduced motion is ignored by the metric count-up and by the subnav's smooth scroll.** | Gate both on `ScrollMotion.reduced()`. |
+| **R29** | MED | **Memory leak:** a chart that is never scrolled into view keeps its IntersectionObserver and the destroyed chart alive, about 190 KB per detail open, linear. | Disconnect the observer on destroy. |
+| **R30** | MED | **Back leaves the app from any view** (in-app navigation writes no history); a stale deep-link hash wins on reload. | Write the hash in `Router.go`, handle `popstate`, route detail as `#session/<id>`. |
+| **R31** | MED | **Signed in, every tab tap awaits a full cloud read, and out-of-order responses show the wrong view** (3 of 8 rapid sequences). Currently masked by R1. | Drop stale renders; render local first and merge cloud in the background. Pairs with 8C pagination. |
+| **R32** | MED | **Import and auth errors are silent to screen readers.** | `role="alert"`, `aria-invalid`/`aria-describedby`, focus the error. EXTENDS R10. |
+| **R33** | MED | **At 320 px the nav labels overflow and overlap** (they break below ~366 px, so 360 dp Android is borderline); **at 200% zoom, 5 of 7 views scroll sideways.** CLAUDE.md's nav note measured 393 px only. | Icon-only or two-row nav below 380 px; single-column grids; `min-width:0`. |
+| **R34** | LOW-MED | **Notes can be written but only ~30 characters are ever readable** (one ellipsised line); there is no length cap (60,000 characters accepted). | 3-line clamp with "more"; move wind/temp; a maxlength with a counter. |
+| **R35** | LOW | **The theme has no "system" option and no live follow; the legal and contact pages are always light.** | A system/light/dark setting plus a `matchMedia` listener. Ties to the open default-theme call. |
+| **R36** | LOW | **Save → detail is a 591 ms long task; Progress 911 ms across 8 tasks;** Chart.js and Supabase load render-blocking but run only ~11% at first screen. | Render detail sections on tab open, cache the date formatter, `defer` the vendor scripts. Phase 4. |
+| **R37** | LOW | **Repeat visits pay the full network even though everything is cached** (FCP 1.54 s on Slow 4G vs 0.11 s from cache); an open tab never checks for updates. | Stale-while-revalidate for the shell; `reg.update()` on visibility change. EXTENDS R7. |
+| **R38** | LOW | **The "Your Data & Rights" modal appends a new overlay on every open,** and its ✕ has no label. | Give it an id, remove the old copy, add the label. |
+| **R39** | LOW | **The URL's `error_description` is shown verbatim in a toast** (as text), so a link can put any message in the app's voice; a failed token install toasts "Email verified". | Map known error codes to fixed copy. |
+| **R40** | LOW | **Chrome logs the `apple-mobile-web-app-capable` deprecation on every load.** | Add `mobile-web-app-capable`. |
+
+**Checked and robust:** a double-click on save makes 1 session; rapid guest view switching; reload mid-import (0–600 ms) keeps the session; deep links, including garbage and `<script>` hashes; offline reload and offline import (all 22 SW assets cached); installability; throwing storage APIs (honest, except R25); Chart instances bounded at 9; stable DOM and listeners over 30 switches; focus return on the static modals; CLS ~0.001.
+
+**Performance, measured** (Slow 4G + 4× CPU): FCP 2.24 s; the agreement gate is interactive at 4.1–4.7 s; 490 KB over the wire in 9 requests; long tasks on load 66–79 + 114–145 ms; app.js is 39.7% used at first screen. Repeat visit offline: FCP 0.11 s.
+
+**Still not covered:** login CSRF with a valid token (it would contact Supabase); the signed-in per-tap cloud cost measured live (R1 masks it); real iOS Safari / WebKit.
+
+**All three lenses have now run to completion or to a recorded stop.** The remaining gaps are the NOT YET COVERED lines in 7D, 7E and 7F, plus iOS Safari.
+
 ### Open question raised by the audit (Oliver's call)
 
 - **C9 — may the app prescribe from attack angle?** The measurement rules say tier 2 is "display only"; the fault engine has prescribed attack-angle drills since before those rules existed. Either the rule bends ("tier 2 may be prescribed as a *recurring pattern* above 15 shots, never from one reading"), or those faults become display-only and the drill leaves the ranked card. The code and the copy must agree either way.
@@ -401,7 +437,8 @@ The main session verified **V25** (`.settings-row{display:flex}` at `style.css:1
 
 ### Suggested order when work resumes
 
-0. **V25** — one CSS rule and a logout guard. A guest can currently wipe their own data from a button they should not see.
+0. **V25 + R23** — one CSS rule, a logout guard, and a logout that actually clears the account holder's data. Today a guest can wipe their own data from a button they should not see, and a signed-out account leaves its sessions and notes for the next person.
+0b. **R19** — escape club types and backup fields, plus a taint suite. A crafted CSV currently injects HTML and fires third-party requests.
 1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
 2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
 3. **C5 + C6 + C26 + C27 + C42** — the retention probe (the app's only efficacy metric) made honest, as ONE piece of work.
