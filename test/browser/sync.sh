@@ -26,6 +26,20 @@ mkdir -p "$SITE/fonts" && cp "$REPO/fonts"/*.woff2 "$SITE/fonts/" || exit 1
 # from them — which is what test/browser/vendor/ had become.
 [ -d "$REPO/vendor" ] || { echo "MISSING vendor/ — the site's own dependencies"; exit 1; }
 mkdir -p "$SITE/vendor" && cp "$REPO/vendor"/*.js "$SITE/vendor/" || exit 1
+# Every asset the service worker precaches must be in the mirror too. It used
+# to omit favicon.svg, manifest.json, 404.html and the icons — and `addAll` is
+# all-or-nothing, so the SW failed to install in the mirror and no browser check
+# could exercise offline, install or the update flow at all (QC finding R17).
+# The list is READ from sw.js rather than restated here, so adding an asset
+# there cannot leave this copy behind; a listed file missing from the repo is a
+# broken service worker, and fails the sync.
+for a in $(sed -n "/const ASSETS/,/\];/p" "$REPO/sw.js" | grep -o "'/[^']*'" | tr -d "'"); do
+  case "$a" in
+    */) [ -f "$SITE${a}index.html" ] || { echo "SW ASSET NOT IN MIRROR: $a"; exit 1; }; continue ;;
+  esac
+  [ -f "$REPO$a" ] || { echo "SW ASSET MISSING FROM REPO: $a"; exit 1; }
+  mkdir -p "$SITE$(dirname "$a")" && cp "$REPO$a" "$SITE$a" || exit 1
+done
 # The guard stays, inverted: if a CDN tag ever comes back, the mirror would
 # silently start measuring a page the route-blocker cannot serve.
 left=$(grep -c 'cdn.jsdelivr.net' "$SITE/index.html" || true)
