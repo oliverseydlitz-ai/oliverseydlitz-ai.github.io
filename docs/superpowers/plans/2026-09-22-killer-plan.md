@@ -331,6 +331,41 @@ The correctness agent ran its uncovered ground to the end. The main session veri
 
 **Still not covered (correctness):** 1440px; the exported/shared output and the printed card; the range card, backup/restore, confirm modals, settings sub-screens and the import steps; filename-date parsing run live (C38 comes from reading the code); Practice below the plan on a range-ball session.
 
+### 7E — visual rerun (V25–V49, 22 Sep, completed)
+
+The main session verified **V25** (`.settings-row{display:flex}` at `style.css:1059` beats the UA `[hidden]` rule on three `hidden` account rows) and **V36** (`@keyframes slideUp` declared twice, at 2551 and 2665). The rest are agent-reproduced.
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| **V25** | **HIGH — data loss** | **A guest sees "Sync to cloud", "Delete my account & data" and "Sign out"** (the rows are `hidden`, but `display:flex` wins). **Sign out as a guest hard-reloads with no confirm and wipes their in-memory sessions.** A signed-in user also sees "Sign in". **Verified.** | Add `.settings-row[hidden]{display:none}` (or a global `[hidden]{display:none!important}`), plus a guard or confirm on logout with no user. **Do this first.** |
+| **V26** | HIGH | **Keyboard focus rings are invisible on every chamfered button:** the `clip-path` clips the outline. The drill tabs lose the ring's top edge. | Draw the ring inside the clip (negative `outline-offset`, or an inset shadow). |
+| **V29** | HIGH | **The shot-modal table overflows at every width** (403px of table in a 295px body), cutting off the comparison column. Log row "1" opens "Shot #2", because the number is the CSV line. | Stack the comparison under the value; number shots from the log index. |
+| **V30** | MED-HIGH | **Settings → Storage preferences does nothing after the first answer** (`showBanner` returns early), yet toasts "Cookie preferences shown". | Add a force flag or a prefs sheet. |
+| **V31** | MED | **The Progress charts' tick labels print 5 decimals, and the attack-angle fill is painted above the line.** (The range-session inclusion becomes *weighted* under Phase 9 rather than excluded.) | Set precision per metric, `fill:false`. EXTENDS V9. |
+| **V32** | MED | **The measurement-reference modal clips the numbers:** MAE/RMSE/Bias sit entirely off-screen (590px in 260px). | Stack the rows under 640px. |
+| **V33** | MED | **The import preview shows raw data:** club code "d", unrounded values, 8 clipped columns, "Premium (own l…" truncated, native blue checkboxes. | `clubLabel()`/`fmt()`, fewer columns, global `accent-color`. |
+| **V34** | MED | **The selected drill tab scrolls off-screen on every click;** at 1440, G–I are hidden with no cue. | `scrollIntoView` the active tab; wrap at ≥768px. EXTENDS V6. |
+| **V35** | MED | **A focused control lands under the fixed bottom nav** (focus at y=806, nav starts at 784); there is no `scroll-padding`. | `html{scroll-padding-bottom/top}`. |
+| **V36** | MED | **`@keyframes slideUp` is declared twice;** the cookie banner's `translateY(100%)` + opacity 0 wins, so plan cards and the stats strip slide in from invisible, breaking the scroll-motion rule. **Verified.** | Rename the cookie keyframe, and add a duplicate-`@keyframes` check to `cascade-overrides.js`. |
+| **V37** | MED | **Information is shown in the red destructive confirm dialog** (`\n\n` collapsed; "Confirm" goes somewhere other than the text says); every confirm button says "Confirm". | Add `showInfo()`; give confirm buttons verbs. |
+| **V38** | MED | **The six runtime modals are an off-system second style:** inline styles, blue values, 4px radius, a different backdrop. | Render them into the `.modal` shell. |
+| **V39** | MED | **Analytics / Club Analysis pool across balls and disagree with the benchmark modal** (236 vs 237; 87% vs 89%). | Use `conditionGroups` + `bagConsistency`, or delete the tiles. EXTENDS 0.1/C19/C40. |
+| **V40** | MED | **Practice plan cards look tappable and do nothing;** the grid shows 3 blocks while the range card says "Block 1 of 4". | Open the range card at that block; show the transfer block in the grid. |
+| **V41** | MED | **Settings sections are built two ways;** there are two toggle styles; Data & Export is 13 mixed rows. | One section and one switch component; split the launchers out. |
+| **V42** | MED | **The first three session-detail blocks don't share a left edge** (x=32 vs 16). | Drop the horizontal margin. |
+| **V43** | MED | **Disabled `.btn-primary` is dimmed twice; disabled `.btn-icon` looks enabled; `.probe-btn:hover` turns disabled buttons orange.** | One disabled treatment; hover under `:not(:disabled)`. |
+| **V44** | LOW-MED | **At 1440 the "indicative" ball-flight arc is the biggest object on the page (890px),** and the dispersion scatter is squashed flat. | Cap it at ~480px; give the scatter a real aspect ratio. EXTENDS 3.3. |
+| **V45** | LOW-MED | **The desktop active-nav marker is a left border that reads as a divider;** the practice grid leaves dead track; Settings is one 2,852px column. | Underline marker; `auto-fill` tracks; 2-column Settings ≥1024px. |
+| **V46** | LOW | **The printed card has an orphan "PERSONAL BESTS" heading,** and its caveats print 2–3 times. | Hide the section in print; dedupe. |
+| **V47** | LOW | **Title/subtitle headings wrap into two cramped columns at 393.** | Stack below 480px. EXTENDS V14. |
+| **V48** | LOW | **Circles in a zero-radius system** (range-card close button and dots); three different close-button styles. | Square/chamfered; 24px targets. |
+| **V49** | LOW | **Data-rights modal double inset; hamburger-looking data icon; "UNLOCKED" orphan; one star for all ten achievements.** | Polish pass. |
+| ~~V27, V28~~ | — | Gap sizes on range balls; a single-shot face angle in the shot modal. **Intended under Phase 9**, so dropped. | — |
+
+**Dark mode at 393 is clean** on what can be measured: no light surface leaking, no text below 3:1, with a positive control proving the scan works. **Loading states (8B.8):** no blank interval on an unthrottled connection.
+
+**Still not covered (visual):** dark mode at 1440 for Progress/Practice/Drills; the signed-in rendering (needs an `Auth.getUser` stub; do it with Phase 1.5); throttled loading states; the legal PDF print view; the range card's end screen and tick-off flow.
+
 ### Open question raised by the audit (Oliver's call)
 
 - **C9 — may the app prescribe from attack angle?** The measurement rules say tier 2 is "display only"; the fault engine has prescribed attack-angle drills since before those rules existed. Either the rule bends ("tier 2 may be prescribed as a *recurring pattern* above 15 shots, never from one reading"), or those faults become display-only and the drill leaves the ranked card. The code and the copy must agree either way.
@@ -366,6 +401,7 @@ The correctness agent ran its uncovered ground to the end. The main session veri
 
 ### Suggested order when work resumes
 
+0. **V25** — one CSS rule and a logout guard. A guest can currently wipe their own data from a button they should not see.
 1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
 2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
 3. **C5 + C6 + C26 + C27 + C42** — the retention probe (the app's only efficacy metric) made honest, as ONE piece of work.
