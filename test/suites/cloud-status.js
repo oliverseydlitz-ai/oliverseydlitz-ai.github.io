@@ -71,7 +71,13 @@ const sess = id => ({ id, date: '2026-09-01',
   ok(el.hidden === true, 'and the banner goes away rather than sticking around');
 
   console.log('— the warning is above everything it qualifies —');
-  ok(src.indexOf('renderSyncBanner()') < src.indexOf('// Render tip of the day'),
+  // Anchored on a CALL, not a comment. It used to anchor on the "Render tip of
+  // the day" comment, which went with the tip — and indexOf(-1) made this fail
+  // for a reason unrelated to the banner. A code anchor cannot be deleted by
+  // tidying prose.
+  const home = src.slice(src.indexOf('function renderHome('));
+  ok(home.indexOf('renderSyncBanner()') > 0 &&
+     home.indexOf('renderSyncBanner()') < home.indexOf('QuickStats.renderStats('),
      'renderHome calls it first — it changes what every number below it MEANS, not just how the page looks');
 
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');

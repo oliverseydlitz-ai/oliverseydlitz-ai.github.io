@@ -155,5 +155,65 @@ ok(ctlClash.length === 1 && ctlClash[0] === 'background',
 ok(/\.session-card/.test(flat) && bySelector.size > 300,
    `and lifting the at-rules out left the base cascade intact (${bySelector.size} selectors)`);
 
+
+console.log('— and no @media declaration is killed by a base rule below it —');
+// THE OTHER DIRECTION, and the scan above cannot see it because it lifts every
+// @media block out first. A media query does not raise specificity: a rule
+// inside `@media (max-width: 767px)` and a base rule for the same selector tie,
+// and the LATER one wins. So a phone override written above the base rule it
+// means to override is dead at every width.
+//
+// Found on 22 Sep 2026 on a phone, not by any suite: the sticky header's
+// mobile `padding-inline: 1rem` sat above `.view-header { padding: .25rem 0 }`,
+// the shorthand reset it, the header's -1rem margin survived, and every view
+// title on every phone sat flush against the screen edge at x=0 while the cards
+// below it sat at 16px. The same scan found a desktop `.score-ring svg` size
+// that had never applied, beaten twice over by later !important rules.
+//
+// Shorthands count — `padding` kills `padding-inline` — because that is the
+// exact shape of the defect that shipped. An !important inside the media block
+// survives a plain later declaration, so it is not reported.
+const SHORTHANDS = ['padding', 'margin', 'border', 'background', 'font', 'inset', 'grid',
+  'flex', 'overflow', 'transition', 'animation', 'gap', 'outline', 'list-style', 'text-decoration'];
+const covers = (bp, mp) => bp === mp || (mp.startsWith(bp + '-') && SHORTHANDS.includes(bp));
+function deadMedia(text) {
+  const all = [];
+  (function walk(from, to, ctx) {
+    let k = from;
+    while (k < to) {
+      const open = text.indexOf('{', k); if (open < 0 || open >= to) break;
+      const head = text.slice(k, open).trim();
+      let j = open + 1, depth = 1;
+      while (j < to && depth > 0) { if (text[j] === '{') depth++; else if (text[j] === '}') depth--; j++; }
+      if (head.startsWith('@media')) { if (!/print/.test(head)) walk(open + 1, j - 1, head); }
+      else if (!head.startsWith('@')) all.push({ sels: head.split(',').map(x => x.trim()).filter(Boolean), body: text.slice(open + 1, j - 1), at: open, ctx });
+      k = j;
+    }
+  })(0, text.length, null);
+  const out = [];
+  const lineAt = at => text.slice(0, at).split('\n').length;
+  for (const m of all.filter(r => r.ctx)) {
+    const md = declarations(m.body);
+    for (const sel of m.sels)
+      for (const b of all.filter(r => !r.ctx && r.at > m.at && r.sels.includes(sel))) {
+        const bd = declarations(b.body);
+        for (const mp in md) {
+          if (/!important/.test(md[mp])) continue;
+          const hit = Object.keys(bd).find(bp => covers(bp, mp));
+          if (hit) out.push(`${sel} ${mp} (@media, line ${lineAt(m.at)}) killed by \`${hit}\` at line ${lineAt(b.at)}`);
+        }
+      }
+  }
+  return out;
+}
+const dead = deadMedia(css);
+ok(dead.length === 0,
+   `no media-query declaration is overridden by a later base rule${dead.length ? ` — ${dead.join('; ')}` : ''}`);
+// Positive control: the real defect, verbatim in shape.
+const DEAD_CTL = '@media (max-width: 767px) { .h { margin-inline: -1rem; padding-inline: 1rem; } }\n.h { display: flex; padding: .25rem 0; }';
+const ctl = deadMedia(DEAD_CTL);
+ok(ctl.length === 1 && /padding-inline/.test(ctl[0]),
+   `the shipped defect's shape — a phone padding-inline under a later padding shorthand — is found (${ctl.length})`);
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 module.exports = { fail };

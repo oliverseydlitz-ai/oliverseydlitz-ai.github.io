@@ -56,6 +56,14 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   // phone. Nothing in the unit suites can see that — it only exists once CSS
   // has been applied by a real engine.
   let overflow = 0;
+  // Scroll boxes known to clip at 393px, each with the plan item that fixes it
+  // (docs/superpowers/plans/2026-09-22-killer-plan.md). Struck off when fixed.
+  const KNOWN_CLIPPED = {
+    '#gapTable':          'killer plan 2.6 — the gapping tab, ~14px over',
+    '#benchTable':        'killer plan 2.6 — benchmarking, three columns a side',
+    'in #launchWindows':  'killer plan 2.6 — launch windows, seven columns',
+  };
+  const seenClipped = new Set();
   const widthCheck = async label => {
     const m = await p.evaluate(() => {
       const de = document.documentElement;
@@ -76,6 +84,52 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
       console.log(`  OVERFLOW  ${label}: page is ${m.sw}px wide in a ${m.vw}px viewport`);
       m.who.forEach(w => console.log(`            ${w}`));
     }
+    // Three layout defects the page-width check CANNOT see, all found on a real
+    // phone on 22 Sep 2026 while this scan reported clean:
+    //  1. a scroll box whose content is wider than it — the yardage book was
+    //     723px of table in a 359px box, trend column off-screen. The page does
+    //     not widen, because the box clips; the golfer just has to side-scroll.
+    //  2. a view title with no gutter — every title sat at x=0 on a phone,
+    //     because a later `padding` shorthand killed the sticky header's
+    //     padding-inline. Nothing overflowed; it was just wrong.
+    //  3. a label wider than its own box — "CONSISTENCY" spilled out of its
+    //     stat card on desktop.
+    const inner = await p.evaluate(() => {
+      const V = document.querySelector('.view.active');
+      if (!V) return { boxes: [], title: null, labels: [] };
+      const boxes = [...V.querySelectorAll('*')].filter(e => {
+        const ox = getComputedStyle(e).overflowX;
+        return (ox === 'auto' || ox === 'scroll') && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 2
+          // a deliberate horizontal strip (tabs, chips) scrolls by design
+          // Deliberate horizontal strips and data grids declare it in the markup
+          // with data-hscroll (the shot log: fifteen metrics per shot, where a
+          // scrolling grid IS the right form), or are tab rows.
+          && !e.matches('[role="tablist"], .subnav, .drill-tabs, [data-hscroll]');
+      }).map(e => {
+        // Named by the table inside, or the nearest ancestor with an id, so the
+        // known list below can name it and a new one is reported by name.
+        const t = e.querySelector('table[id]');
+        let a = e; while (a && !a.id) a = a.parentElement;
+        return { name: t ? '#' + t.id : a ? 'in #' + a.id : e.className, box: e.clientWidth, content: e.scrollWidth };
+      });
+      const t = V.querySelector('.view-title');
+      const title = t && t.offsetParent ? Math.round(t.getBoundingClientRect().left) : null;
+      const labels = [...V.querySelectorAll('[class$="-label"], [class*="-label "]')]
+        .filter(e => e.offsetParent && e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible')
+        .map(e => `.${(e.className + '').split(/\s+/)[0]} "${e.textContent.trim().slice(0, 24)}" ${e.scrollWidth}px in ${e.clientWidth}px`);
+      return { boxes, title, labels };
+    });
+    // A ratchet, like cascade-overrides.js: the ones that exist today are named
+    // with the plan item that fixes them. A new one fails; a fixed one that is
+    // still listed fails too (checked once at the end), so the list only shrinks.
+    for (const bx of inner.boxes) {
+      if (KNOWN_CLIPPED[bx.name]) { seenClipped.add(bx.name); continue; }
+      overflow++; console.log(`  CLIPPED   ${label}: ${bx.name} is ${bx.content}px of content in a ${bx.box}px box`);
+    }
+    if (inner.title !== null && inner.title < 8) {
+      overflow++; console.log(`  GUTTER    ${label}: the view title starts at x=${inner.title}px — no side margin`);
+    }
+    if (inner.labels.length) { overflow++; console.log(`  SPILL     ${label}: ${inner.labels.slice(0, 3).join('; ')}`); }
     return m;
   };
 
@@ -124,7 +178,9 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     total += scan('drills ' + s, await p.evaluate(() => document.getElementById('drillHost')?.innerText));
   }
   console.log(total ? `\n${total} suspicious line(s)` : '\nno NaN / undefined / [object Object] anywhere');
-  console.log(overflow ? `${overflow} view(s) overflow horizontally` : 'no horizontal overflow at phone width');
+  const staleClipped = Object.keys(KNOWN_CLIPPED).filter(k => !seenClipped.has(k));
+  if (staleClipped.length) { overflow++; console.log(`  STALE     these no longer clip — strike them off KNOWN_CLIPPED: ${staleClipped.join(', ')}`); }
+  console.log(overflow ? `${overflow} layout finding(s)` : 'no horizontal overflow, clipped box, gutterless title or spilled label at phone width');
   console.log('page errors:', errs.length?errs:'none');
   await b.close();
   // Exit non-zero on a finding. This used to only print, so its exit status was

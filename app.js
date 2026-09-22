@@ -5991,6 +5991,9 @@ const SmartRecommendations = (() => {
             : 'It showed often enough to report, but the drill for it needs a measurement this session ' +
               'did not provide — the note above says which.',
           icon: f.icon, action: 'drill',
+          // Carried so the home view can drop the alert that would otherwise
+          // restate this exact fault directly underneath the card.
+          faultId: f.id, clubType: f.clubType || null,
         };
       }
     } catch (_) {}
@@ -7238,45 +7241,17 @@ const UI = (() => {
 
   function renderHome(sessions) {
     try { renderSyncBanner(); } catch (e) { console.error('sync banner', e); }
-    // Render tip of the day
-    try {
-      const tips = [
-        'Pro tip: Consistency matters more than distance. Focus on repeatable swings.',
-        'Track your practice: Use notes to reflect on what\'s working.',
-        'Check your analytics: Understand your swing patterns.',
-        'Set a goal: Use the Goals feature to stay motivated.',
-        'Build a streak: Practice regularly to build momentum.',
-        'Learn something new: Visit the Learning Library today.',
-        'Experiment: Try different clubs to find your strengths.',
-        'Quality over quantity: 20 focused shots beat 100 mindless ones.',
-      ];
-      const todayTip = tips[new Date().getDate() % tips.length];
-      const tipHost = document.getElementById('tipHost');
-      if (tipHost) {
-        // surface: a line of advice is uncarded content, so the band is its
-        // card. It was a box tinted with --accent-weak — an accent wash used
-        // as a surface, which is the one thing this palette refuses.
-        tipHost.innerHTML = `<p class="tip-note">${todayTip}</p>`;
-        band(tipHost, 'surface');
-      }
-    } catch(e){ console.error('tip',e); }
-
-    // Render enhanced metrics widget (replace, never append)
-    try {
-      const widgetHost = document.getElementById('metricsWidgetHost');
-      if (widgetHost) {
-        if (sessions.length) {
-          const stats = EnhancedMetricsWidget.renderMiniStats(sessions);
-          widgetHost.innerHTML = EnhancedMetricsWidget.renderWidget(stats) || '';
-          // canvas: three .stat-cards already supply their own ground, so the
-          // band's job here is to be the one they stand on.
-          band(widgetHost, 'canvas');
-        } else {
-          widgetHost.innerHTML = '';
-          band(widgetHost, null);
-        }
-      }
-    } catch(e){ console.error('metrics-widget',e); }
+    let rankedFault = null;   // set by the ranked card below, read by the alerts
+    // A tip-of-the-day and a three-cell metrics widget used to sit here.
+    // Both went on 22 Sep 2026 (docs/superpowers/plans/2026-09-22-killer-plan.md
+    // 0.1, 0.2). The tips were eight hand-typed lines — one sending the golfer
+    // to a Learning Library with no lessons in it, one asserting "consistency
+    // matters more than distance" with no source. The widget pooled every shot
+    // from every session across all balls and surfaces, so its "Consistency"
+    // disagreed with QuickStats' conditions-anchored one on the same screen
+    // (87% vs 89%), its grade restated QuickStats' Form, and its streak
+    // restated the dashboard chip. Two roads to one label is the drift this
+    // codebase refuses everywhere else.
 
     // Always render quick stats at the top
     try { QuickStats.renderStats(sessions); } catch(e){ console.error('quickstats',e); }
@@ -7286,6 +7261,7 @@ const UI = (() => {
       const nextHost = document.getElementById('nextStepHost');
       if (nextHost) {
         const next = SmartRecommendations.getNextStep(sessions);
+        rankedFault = next && next.faultId ? next : null;
         // signal: the one ranked recommendation, and the only high-contrast
         // band on the screen. Every branch of getNextStep renders something,
         // so this is never an empty band — and if it ever is, that means the
@@ -7298,7 +7274,7 @@ const UI = (() => {
             <div class="drill-desc">${Sanitize.escape(next.desc)}</div>
             ${next.deadline ? `<div class="next-deadline">${Sanitize.escape(next.deadline)}</div>` : ''}
             ${next.why ? `<div class="next-why">${Sanitize.escape(next.why)}</div>` : ''}
-            <div class="drill-time">→ Tap to go</div>
+            <div class="drill-time">Open →</div>
           </div>`;
       }
     } catch(e){ console.error('nextStep',e); }
@@ -7336,7 +7312,13 @@ const UI = (() => {
     try {
       const alertsHost = document.getElementById('alertsHost');
       if (alertsHost) {
-        const alerts = PerformanceAlerts.generateAlerts(sessions);
+        // An alert for the fault the ranked card is already about is the same
+        // sentence twice, one under the other — the home view showed "Work on
+        // Negative Attack Angle on Driver" and then "Negative Attack Angle on
+        // Driver, 21 of 40 shots" directly below it. The card wins; it ranks.
+        const alerts = PerformanceAlerts.generateAlerts(sessions).filter(a =>
+          !(rankedFault && a.faultId === rankedFault.faultId &&
+            (!a.clubType || !rankedFault.clubType || a.clubType === rankedFault.clubType)));
         // surface: an alert is a verdict about the data — the app's own
         // reading of a decline or an improvement — so it gets the card, and
         // each .alert-item is a --surface2 inset inside it. That is the
@@ -9072,11 +9054,11 @@ const UI = (() => {
 
     const trendCell = club => {
       let t = null;
-      try { t = ClubAnalyzer.calculateClubTrend(newestFirst, club); } catch (_) { return '<td>—</td>'; }
-      if (!t) return '<td>—</td>';
+      try { t = ClubAnalyzer.calculateClubTrend(newestFirst, club); } catch (_) { return '<td class="yc-trend">—</td>'; }
+      if (!t) return '<td class="yc-trend">—</td>';
       const series = t.real ? Analytics.clubSeries(used, club) : null;
       const cls = !t.real ? 'flat' : t.delta > 0 ? 'up' : 'down';
-      return `<td class="yard-trend ${cls}">${series ? spark(series) : ''}
+      return `<td class="yc-trend yard-trend ${cls}">${series ? spark(series) : ''}
         <span class="yard-trend-label">${Sanitize.escape(t.label)}</span>
         ${series ? `<small class="yard-trend-n">over ${series.n} sessions</small>` : ''}</td>`;
     };
@@ -9089,23 +9071,23 @@ const UI = (() => {
         // gets a row that says what it needs instead of a number. D3 in one
         // line — the club under the floor never reaches a mean at all.
         if (!b.enough) return `<tr class="yard-thin">
-          <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td colspan="5">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
-          <td>${b.count}</td>
+          <td class="yc-club"><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
+          <td class="yc-note" colspan="5">${b.need} more shot${b.need===1?'':'s'} before a mean means anything</td>
+          <td class="yc-shots" data-label="Shots">${b.count}</td>
         </tr>`;
         // Colour off the RELATIVE spread. The old bands were fixed yardages, so
         // a wedge and a driver were judged on the same ±6 — which flatters the
         // wedge and condemns the driver for the same quality of striking.
         const consC = b.cv < 0.035 ? 'var(--green)' : b.cv < 0.07 ? 'var(--yellow)' : 'var(--red)';
         return `<tr>
-          <td><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
-          <td><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
+          <td class="yc-club"><span class="club-dot" style="background:${clubColor(b.club)}"></span><strong>${clubLabel(b.club)}</strong></td>
+          <td class="yc-carry"><strong style="font-size:1.05rem">${fmt(b.carry.mean,0)}</strong> <small>± ${fmt(b.carry.ci,0)}</small> yds</td>
           ${trendCell(b.club)}
-          <td>${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
-          <td><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>
+          <td data-label="Range">${fmt(b.minCarry,0)}–${fmt(b.maxCarry,0)}</td>
+          <td data-label="Spread"><span style="color:${consC};font-weight:600">${fmt(b.cv*100,0)}%</span>
               <small style="color:var(--text-muted)">±${fmt(b.stdCarry,0)} yds</small></td>
-          <td style="color:var(--text-dim)">${fmt(b.avgTotal,0)} yds</td>
-          <td>${b.count}${b.carry.dropped ? `<small style="color:var(--text-muted)"> −${b.carry.dropped}</small>` : ''}</td>
+          <td data-label="Total" style="color:var(--text-dim)">${fmt(b.avgTotal,0)} yds</td>
+          <td class="yc-shots" data-label="Shots">${b.count}${b.carry.dropped ? `<small style="color:var(--text-muted)"> −${b.carry.dropped}</small>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>`;
 
@@ -12111,12 +12093,19 @@ const PersonalCoach = (() => {
   // changed. `FeedbackEngine.fadedReveal` was made deterministic for exactly
   // this reason: something that changes when you look at it is not a reading.
   function getGreeting(sessions) {
+    // A greeting makes NO claim about the data. Two of these used to:
+    // "Keep grinding — you're getting better!" and "Let's work on your
+    // consistency!" — and the pick below is a hash of the session id, so
+    // whether a golfer was told they were improving depended on nothing but
+    // the id the import happened to get. It showed on the home view with two
+    // sessions and "not enough history to judge" on every trend. A claim of
+    // improvement belongs to Metrics.changeIsReal and nowhere else;
+    // personal-coach.js pins that none comes back.
     const greetings = [
-      'Ready to improve your game?',
-      'Let\'s work on your consistency!',
-      'Time to level up your swing.',
-      'Keep grinding — you\'re getting better!',
-      'Progress is the priority.',
+      'Here is what the last session says.',
+      'One thing at a time.',
+      'Read it club by club.',
+      'The numbers, and what they can support.',
     ];
     const key = String((sessions && sessions[0] && (sessions[0].id || sessions[0].date)) || '');
     let h = 0;
@@ -12546,6 +12535,7 @@ const PerformanceAlerts = (() => {
         const tentative = f.confidence === 'tentative';
         alerts.push({
           icon: 'warn',
+          faultId: f.id, clubType: f.clubType || null,
           severity: tentative ? 'info' : 'high',
           title: f.name,
           message: `${f.count} of ${f.total} ${clubLabel(f.clubType || latest.shots[0]?.clubType)} shots ` +
@@ -12766,61 +12756,6 @@ const PracticeEfficiency = (() => {
   }
 
   return { structure, volume, BLOCKED, VARIED };
-})();
-
-// ════════════════════════════════════════════════════════════════
-// EnhancedMetricsWidget — Beautiful stats display
-// ════════════════════════════════════════════════════════════════
-const EnhancedMetricsWidget = (() => {
-  function renderMiniStats(sessions) {
-    if (!sessions.length) return null;
-
-    const allShots = sessions.flatMap(s => s.shots);
-    const scores = allShots.map(ShotScorer.score).filter(x=>x!==null);
-    const avgScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
-    const grade = ShotScorer.grade(avgScore);
-
-    const consistency = (bagConsistency(allShots) || {}).score ?? null;
-    const st = Features.streak(sessions);
-
-    return {
-      grade: grade.letter,
-      score: avgScore,
-      // No `carry` here. It was a bag-pooled mean, it was never rendered by
-      // `renderWidget`, and a pooled carry is a number for a bag nobody owns.
-      consistency,
-      sessions: sessions.length,
-      shots: allShots.length,
-      streak: st.current,
-      color: grade.color,
-    };
-  }
-
-  function renderWidget(stats) {
-    if (!stats) return '';
-    // Three readings off the same account, so three identical cells. They
-    // used to carry three different fills — a wash mixed at runtime from the
-    // grade colour, a grey, and an accent tint — which made them read as
-    // three different KINDS of number. Only the grade keeps a colour, on the
-    // glyph, because the grade IS a verdict; a streak count is not.
-    return `
-      <div class="grid-auto mb-4" style="--col:100px">
-        <div class="stat-card">
-          <div class="stat-value" style="color:${stats.color}">${stats.grade}</div>
-          <div class="stat-label">Form grade</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${stats.consistency === null ? '—' : stats.consistency + '%'}</div>
-          <div class="stat-label">Consistency</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${stats.streak}</div>
-          <div class="stat-label">Day streak</div>
-        </div>
-      </div>`;
-  }
-
-  return { renderMiniStats, renderWidget };
 })();
 
 // ════════════════════════════════════════════════════════════════

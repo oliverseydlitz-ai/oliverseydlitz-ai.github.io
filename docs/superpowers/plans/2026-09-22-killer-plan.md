@@ -8,7 +8,7 @@ below is measured unless it says otherwise.
 
 | Phase | What | State |
 |---|---|---|
-| 0 | Defects visible on the home screen and yardage book | in progress — see the table |
+| 0 | Defects visible on the home screen and yardage book | **DONE (22 Sep)** — 0.1–0.8 fixed, each with a guard |
 | 1 | The first 60 seconds | **guest button done**; the rest not started |
 | 2 | Session detail is 15 phone screens | not started |
 | 3 | Finish the queued design work | not started |
@@ -63,13 +63,14 @@ withheld is a regression, however good it looks.
 
 | # | Defect | Measured | State |
 |---|---|---|---|
-| 0.1 | **Two "Consistency" figures on one screen that disagree.** `EnhancedMetricsWidget` and `QuickStats` both render one, and "Form grade B" sits beside "Form 83". Two roads to one label is the drift this repo refuses everywhere else. | 87% vs 89% on the same data | open |
-| 0.2 | **Tip-of-the-day is eight hand-typed lines.** One sends the golfer to a Learning Library this repo established has no lessons; "consistency matters more than distance" is unsourced, and the strokes-gained literature the app is built on does not say it off the tee. Fails "before adding any number to a screen, ask where it comes from". | 8 literals in `renderHome` | open |
-| 0.3 | **Every view title has no gutter on a phone.** | `left: 0px` on all views, cards sit at 16px | open |
-| 0.4 | **The yardage book table scrolls sideways** — on the one screen you stand over a shot with — and the trend column is off-screen. | 723px of table in a 359px box | open |
-| 0.5 | **The same fault shows twice on home** — once as the ranked card, again as an alert directly under it. | | open |
-| 0.6 | Desktop: the "Consistency" label spills out of its stat card; "Tap to go" is shown to a mouse. | | open |
-| 0.7 | **`render-scan.js` cannot see 0.3, 0.4 or 0.6** — it measures page-level overflow only. Extend it: clipped inner overflow, view-title gutter, label outside its box. Prove each against the real defect first, the same way every other guard here was proved. | | open |
+| 0.1 | **Two "Consistency" figures on one screen that disagree.** `EnhancedMetricsWidget` and `QuickStats` both render one, and "Form grade B" sits beside "Form 83". Two roads to one label is the drift this repo refuses everywhere else. | 87% vs 89% on the same data | **done** — the widget pooled every shot across all balls and surfaces and every cell duplicated something else on the screen; module removed (58 modules) |
+| 0.2 | **Tip-of-the-day is eight hand-typed lines.** One sends the golfer to a Learning Library this repo established has no lessons; "consistency matters more than distance" is unsourced, and the strokes-gained literature the app is built on does not say it off the tee. Fails "before adding any number to a screen, ask where it comes from". | 8 literals in `renderHome` | **done** — removed |
+| 0.3 | **Every view title has no gutter on a phone.** | `left: 0px` on all views, cards sit at 16px | **done** — a later `padding` shorthand killed the phone rule's `padding-inline`. `cascade-overrides.js` now fails on any @media declaration a later base rule kills (it also found a desktop score-ring size that had never applied) |
+| 0.4 | **The yardage book table scrolls sideways** — on the one screen you stand over a shot with — and the trend column is off-screen. | 723px of table in a 359px box | **done** — under 640px each club is a block: club + carry, trend, then a labelled row. Screen only; print keeps the table |
+| 0.5 | **The same fault shows twice on home** — once as the ranked card, again as an alert directly under it. | | **done** — the alert for the fault the ranked card carries is dropped; pinned in `bands.js` |
+| 0.6 | Desktop: the "Consistency" label spills out of its stat card; "Tap to go" is shown to a mouse. | | **done** — the spill was in the removed widget; the CTA reads "Open →" |
+| 0.7 | **`render-scan.js` cannot see 0.3, 0.4 or 0.6** — it measures page-level overflow only. Extend it: clipped inner overflow, view-title gutter, label outside its box. Prove each against the real defect first, the same way every other guard here was proved. | | **done** — CLIPPED / GUTTER / SPILL checks, proved by restoring both real defects (exit 1). Three detail tables that still clip are a named ratchet pointing at 2.6; the shot log is marked `data-hscroll` as a deliberate data grid |
+| 0.8 | **A greeting told golfers "you're getting better!"** — picked by a hash of the session id, shown with two sessions and "not enough history" on every trend. | found during Phase 0 | **done** — no greeting makes a claim; `personal-coach.js` checks every reachable greeting |
 
 ## Phase 1 — the first 60 seconds (the biggest lever)
 
@@ -123,6 +124,15 @@ reasons it might be wrong.
   screens, rather than index into one 12k page.
 - **2.4 — Same treatment for Practice (6,400px) and Progress (4,000px, seven
   charts).**
+- **2.5 — The home view grades you three ways.** "Form 83" in the top strip,
+  "Overall grade C, 64/100" in the coach panel, and the session quality score
+  on the detail. They are different calculations with different names, so it is
+  not the outright contradiction 0.1 was — but three verdicts on one account is
+  two too many for a screen whose rule is one cue. Pick one headline grade and
+  say what it is computed on.
+- **2.6 — Three detail tables still side-scroll on a phone:** gapping (~14px
+  over), benchmarking and launch windows. `render-scan.js` lists them in
+  `KNOWN_CLIPPED` pointing here; strike each off as its tab is rebuilt.
 
 ## Phase 3 — finish the design work already queued
 

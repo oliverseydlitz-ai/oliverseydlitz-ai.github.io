@@ -138,10 +138,6 @@
          a class on <html> and CSS cannot count VISIBLE siblings — and the band
          brings its own gutter, so these no longer carry .pad: inside a band
          that padding would inset the content twice. -->
-    <!-- Tip of the day + headline metrics (replaced each render) -->
-    <div id="tipHost"></div>
-    <div id="metricsWidgetHost"></div>
-
     <!-- Quick stats always visible -->
     <div class="quick-stats" id="quickStatsHost"></div>
     <div class="quick-stats-label" id="quickStatsLabel"></div>
@@ -420,7 +416,7 @@
     <!-- Shot log -->
     <div class="section-block" id="secShots">
       <h2 class="section-title">Shot Log <span class="section-sub">(tap a row for detail · click headers to sort)</span></h2>
-      <div class="table-wrap">
+      <div class="table-wrap" data-hscroll>
         <table class="shot-table" id="shotTable"></table>
       </div>
     </div>

@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Single-Page App (SPA)
 - **index.html** (~920 lines) — Main structure; nav, views, modals, toast system
-- **app.js** (~12,250 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 59 feature modules
+- **app.js** (~12,250 lines) — All logic: DB, auth, CSV parsing, routing, UI rendering, 58 feature modules
 - **style.css** (~2,470 lines) — Design system; mobile-first, dark theme
 
 ### Core Modules (in app.js)
@@ -85,7 +85,7 @@ to hand someone starting cold.
 6. **Dashboard / UX layer** — `ScrollMotion` (three effects, one rule — see
    its section), `QuickStats`, `Features` (see its own section
    below), `SessionTags` (a finder, never a variable), `FirstRun` (the method,
-   stated before there is data), `ViewPrefs`, `EnhancedMetricsWidget`,
+   stated before there is data), `ViewPrefs`,
    `AccessibilityEnhancements`, `SessionSnapshot`, `SessionSharing`, `Goals`
 
 7. **Reporting** — `PerformanceGrade`, `PerformanceAlerts`, `AnalyticsHub`,
@@ -907,6 +907,14 @@ It **used to only print**, so its exit status was 0 whatever it found and
 "render scan clean" meant "the scan ran". Do not reintroduce that: a check that
 cannot fail is not a check.
 
+**It also checks three things page width cannot see** (added 22 Sep 2026, each
+found on a real phone while the scan reported clean): a scroll box whose content
+is wider than it (**CLIPPED** — the yardage book was 723px of table in a 359px
+box), a view title with no side margin (**GUTTER** — every title sat at x=0),
+and a `*-label` wider than its own box (**SPILL**). Deliberate horizontal
+scrollers declare `data-hscroll` in the markup; the detail tables that still
+clip are a named ratchet, `KNOWN_CLIPPED`, pointing at the killer plan's 2.6.
+
 The workflow is: edit → `bash test/browser/sync.sh` → serve
 `test/browser/site/` → run the scan. **Forgetting the sync is the classic
 mistake** — you then measure the previous version and conclude a fix did not
@@ -1132,7 +1140,7 @@ this page. It exists to fail fast with a clear message.
 
 ## Features module (`Features` in app.js)
 
-`Features` is one module among the 59 listed in Core Modules above — not the
+`Features` is one module among the 58 listed in Core Modules above — not the
 whole app's feature set, just its original five defensively-wrapped
 enhancements:
 1. **streak** — consecutive practice-day counter (habit loop)
@@ -1184,7 +1192,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **65 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v157**, 59 modules.
+without `SM_NO_IO=1`, service worker at **v159**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1212,6 +1220,21 @@ touching a token:
 - `--withheld` was deliberately **not** touched. It was never in the failure set,
   and changing an unmeasured token is the drift this file warns about everywhere
   else.
+
+### The plan now: `docs/superpowers/plans/2026-09-22-killer-plan.md`
+
+The working plan after a full walk of the app at 393px and 1440px with real
+data. **Read its decisions block first**: no users yet and no money until far
+future, so product quality comes before growth, and the growth phase is
+deliberately deferred. Phase 0 (defects) is done; Phase 1 (the first 60
+seconds) has the guest-button fix in and the rest queued.
+
+Two things removed in Phase 0 that must not come back: the **tip of the day**
+(eight hand-typed lines, one pointing at a Learning Library with no lessons)
+and **`EnhancedMetricsWidget`**, which pooled every shot across all balls and
+surfaces and put a second, disagreeing "Consistency" beside `QuickStats`. And
+no `PersonalCoach` greeting may make a claim about the data — one said
+"you're getting better!" on a pick keyed to nothing but a hash of the session id.
 
 ### Uppercase tracking is a four-rung scale, and the rungs are by SIZE
 
@@ -1613,8 +1636,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 59 modules,
-**65 test suites**, service worker **v157**. Deterministic auth, cloud sync
+**Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
+**65 test suites**, service worker **v159**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

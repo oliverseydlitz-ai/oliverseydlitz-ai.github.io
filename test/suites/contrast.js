@@ -278,7 +278,6 @@ const VAR_IN = /var\(\s*--[a-z0-9-]+(?:\s*,[^)]*)?\)/g;
 // else in the sheet uses as text — which is a new colour, not an exemption).
 const INDIRECT = [
   { expr: '${g.color}',                   who: 'gradeColor() — the A–F grade', to: ['--green', '--green-light', '--yellow', '--red'] },
-  { expr: '${stats.color}',               who: 'the form grade, same gradeColor() set', to: ['--green', '--green-light', '--yellow', '--red'] },
   { expr: '${ShotScorer.scoreColor(sc)}', who: 'ShotScorer.scoreColor()', to: ['--green', '--yellow', '--red'] },
   { expr: '${col}',                       who: 'the launch-window band', to: ['--text', '--green-light', '--yellow'] },
   { expr: '${consC}',                     who: 'the consistency coefficient of variation', to: ['--green', '--yellow', '--red'] },

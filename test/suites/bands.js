@@ -63,7 +63,7 @@ const sequence = () => [...view().querySelectorAll('.band')]
   .map(el => ({ id: el.id, mode: (el.className.match(/band--(\w+)/) || [])[1] }));
 // The hosts this view is expected to mode. A new surface has to be added here
 // with its reason, which is the point: nothing lands unmoded.
-const EXPECTED = ['tipHost', 'metricsWidgetHost', 'syncBanner', 'nextStepHost',
+const EXPECTED = ['syncBanner', 'nextStepHost',
                   'insightsHost', 'alertsHost', 'coachHost', 'dashboard', 'recentWrap'];
 
 console.log('— the ranked card is the signal band, and there is exactly one —');
@@ -90,10 +90,13 @@ const clashes = [];
 for (let i = 1; i < seq.length; i++) if (seq[i].mode === seq[i - 1].mode) clashes.push(seq[i - 1].id + ' / ' + seq[i].id + ' (' + seq[i].mode + ')');
 ok(clashes.length === 0, `no two adjacent bands share a mode${clashes.length ? ' — ' + clashes.join(', ') : ''}`);
 ok(seq.filter(b => b.mode === 'signal').length === 1, 'and the signal mode appears once in the sequence');
-// The tip is the first band and it is the one that has to not be canvas: the
-// metrics widget below it is a row of cards and therefore canvas, and two
-// canvas bands in a row is the corporate-site rhythm this exists to prevent.
-ok(seq[0].id === 'tipHost' && seq[0].mode === 'surface', 'the tip leads as a surface band');
+// The tip and the metrics widget used to lead this sequence as surface then
+// canvas. Both were removed (killer plan 0.1, 0.2) — the tip was unsourced
+// filler and the widget duplicated QuickStats with a pooled, disagreeing
+// "Consistency". What leads now is the ranked card, and it has to be the one
+// signal band on the screen, which the first block above already pins.
+ok(seq[0].id === 'nextStepHost' && seq[0].mode === 'signal',
+   'the ranked card leads the banded sequence: ' + (seq[0] && seq[0].id + '=' + seq[0].mode));
 
 console.log('— the mode does not move with position —');
 // The whole reason this is not `:nth-child`. Every combination of the prefs
@@ -128,7 +131,7 @@ render([]);
 const emptyBanded = [...view().querySelectorAll('.band')].filter(el => el.textContent.trim() === '');
 ok(emptyBanded.length === 0,
    `nothing carries a band with nothing in it${emptyBanded.length ? ' — ' + emptyBanded.map(el => el.id).join(', ') : ''}`);
-for (const id of ['metricsWidgetHost', 'insightsHost', 'alertsHost', 'coachHost']) {
+for (const id of ['insightsHost', 'alertsHost', 'coachHost']) {
   const el = doc.getElementById(id);
   ok(el && !/band--/.test(el.className), `${id} drops its band when it renders nothing`);
 }
@@ -278,6 +281,31 @@ ok(/background:\s*var\(--surface\)/.test(qsRule.slice(0, 400)), 'it still owns a
 ok(/border-top:\s*1px solid var\(--line\)/.test(qsRule.slice(0, 400)) &&
    /border-bottom:\s*1px solid var\(--line\)/.test(qsRule.slice(0, 400)), 'and a hairline top and bottom');
 ok(/position:\s*sticky/.test(qsRule.slice(0, 400)), 'and it is still the sticky strip');
+
+console.log('— the ranked card is not restated by an alert under it —');
+// The home view showed "Work on Negative Attack Angle on Driver" as the ranked
+// card and then "Negative Attack Angle on Driver — 21 of 40 shots" as an alert
+// directly beneath it. Rule 9 is one cue; the same cue twice is not one.
+{
+  const { SmartRecommendations, PerformanceAlerts } = R.app;
+  const withFault = [];
+  // A session whose top fault the ranked card will pick up: FULL's own sessions
+  // are the fixture, and whatever fault they raise is the one under test.
+  render(FULL);
+  const next = SmartRecommendations.getNextStep(FULL);
+  if (next && next.faultId) {
+    const raw = PerformanceAlerts.generateAlerts(FULL).filter(a => a.faultId === next.faultId);
+    const shown = doc.getElementById('alertsHost').textContent;
+    ok(raw.length === 0 || !raw.some(a => shown.includes(a.title)),
+       `the alert for ${next.faultId} is dropped while the ranked card carries it` +
+       (raw.length ? '' : ' (no alert raised on this fixture)'));
+    withFault.push(next.faultId);
+  }
+  ok(/faultId: f\.id/.test(code.slice(code.indexOf('function getNextStep'))),
+     'getNextStep carries the fault id the home view dedupes on');
+  ok(/rankedFault\.faultId/.test(code.slice(code.indexOf('function renderHome('))),
+     'and renderHome filters the alerts on it');
+}
 
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exit(fail ? 1 : 0);

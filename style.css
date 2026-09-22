@@ -243,7 +243,6 @@ a  { color: var(--accent); text-decoration: none; }
 .mt-6 { margin-top: var(--s6); }
 .mb-2 { margin-bottom: var(--s2); }
 .mb-3 { margin-bottom: var(--s3); }
-.mb-4 { margin-bottom: var(--s4); }
 .mb-5 { margin-bottom: var(--s5); }
 .mb-6 { margin-bottom: var(--s6); }
 .w-full { width: 100%; }
@@ -444,7 +443,15 @@ button:disabled, button[disabled] {
    entrance animation has left real content invisible for real users. Both
    halves are gone now rather than left cancelling each other out. */
 .view.active { display: block; }
-.view-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; padding: .25rem 0; }
+.view-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.5rem; padding-block: .25rem; }
+/* padding-BLOCK, not the `padding: .25rem 0` shorthand this used to be. The
+   phone rule above gives the sticky header `margin-inline: -1rem;
+   padding-inline: 1rem` to run it full-bleed — but it sits EARLIER in the
+   file, and this later shorthand reset padding-inline to 0 at every width.
+   The negative margin survived, so on a phone every view title sat flush
+   against the screen edge at x=0 while the cards below it sat at 16px.
+   cascade-overrides.js now fails on a media declaration a later base rule
+   kills. */
 .view-title { flex: 1; }
 .section-sub {
   font-size: .7rem; color: var(--text-muted);
@@ -1740,7 +1747,10 @@ body.modal-open {
   .insights-block { flex: 1; }
   .dispersion-stats { grid-template-columns: repeat(6,1fr); }
   .records-grid { grid-template-columns: repeat(3,1fr); }
-  .score-ring svg { width: 100px; height: 100px; }
+  /* A `.score-ring svg { 100px }` lived here and never applied at any width:
+     the base rule below it sets 110px !important, and the desktop block
+     further down sets 130px !important. 130 is what desktop has always
+     shown, so the dead line went rather than the live one. */
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2745,6 +2755,36 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 .yard-trend-label{display:block;font-weight:600}
 .yard-trend-n{display:block;color:var(--text-muted);font-weight:400;font-size:.7rem}
 
+/* ── The yardage book on a phone ─────────────────────────────
+   Seven columns do not fit 393px: the table measured 723px inside a 359px
+   box, so the book scrolled sideways and the trend column — the one new thing
+   it can say — sat off-screen on the screen a golfer stands over a shot with.
+   Under 640px each club becomes a block: club and stock carry on the first
+   line, where the eye goes; the trend under it; the four secondary figures as
+   a labelled row beneath. SCREEN only — a card printed from a phone still
+   prints the full table, which is what the print head is written against. */
+@media screen and (max-width: 640px) {
+  #yardageTable, #yardageTable tbody { display: block; }
+  #yardageTable thead { display: none; }
+  #yardageTable tr {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s1) var(--s3); padding: var(--s3) 0;
+    border-bottom: 1px solid var(--line);
+  }
+  #yardageTable td { display: block; padding: 0; border: 0; min-width: 0; }
+  #yardageTable .yc-club  { grid-column: 1 / 3; align-self: center; }
+  #yardageTable .yc-carry { grid-column: 3 / 5; text-align: right; white-space: nowrap; }
+  #yardageTable .yc-trend { grid-column: 1 / -1; white-space: normal; }
+  #yardageTable .yc-note  { grid-column: 1 / -1; }
+  #yardageTable .yard-thin .yc-shots { grid-column: 1 / -1; }
+  #yardageTable td[data-label]::before {
+    content: attr(data-label); display: block;
+    font-family: var(--font-mono); font-size: .6rem; font-style: normal;
+    text-transform: uppercase; letter-spacing: var(--track-caps-xs);
+    color: var(--text-dim); margin-bottom: 2px;
+  }
+}
+
 /* ── Session tags ─────────────────────────────────────────────────
    A finder, not a variable — see SessionTags. They look like chips
    rather than badges so nothing reads them as a verdict on a session. */
@@ -3045,7 +3085,6 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 /* The tip of the day, as one line on its band. It used to be a box tinted
    with --accent-weak — an accent wash used as a surface, which is the one
    thing this palette refuses twice over. The band is the card now. */
-.tip-note { font-size: .92rem; line-height: 1.55; color: var(--text-muted); text-wrap: pretty; }
 
 /* The anchored quick-stat row is a band already and takes no mode class: an
    opaque --surface ground, a hairline top and bottom, hairline-divided cells,
