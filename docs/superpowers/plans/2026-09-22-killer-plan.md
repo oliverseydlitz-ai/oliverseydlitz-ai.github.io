@@ -15,6 +15,7 @@ below is measured unless it says otherwise.
 | 4 | Speed | not started |
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
+| **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
 
 ---
 
@@ -185,3 +186,140 @@ Recorded so it is not lost, not scheduled.
 A read-only SQL call from this session was refused with a password
 authentication failure, so live user and session counts were not re-read.
 CLAUDE.md's last figure is 10 users, 9 sessions.
+
+
+---
+
+## Phase 7 — the QC audit (22 Sep 2026)
+
+Three background agents audited the served app, each through one lens: **visual/UX**, **correctness and data honesty**, and **accessibility/performance/robustness**. Every finding was reproduced in a real browser or read from the code. They were **stopped early** at Oliver's request, because usage was running low, and asked to report what they had. Each one's uncovered ground is listed at the end of this phase, and their briefs are in `qc-agent-briefs.md` next to this file, so a rerun picks up exactly where they stopped.
+
+**Verified by hand before recording.** These were checked against the code and are confirmed, not just reported: R1 (service-worker cache), R3 (email in console, `app.js:10290`), V3 (heatmap window), C3 (score buckets), C5 (probe metric), C7 (wedge smash threshold). Treat the rest as agent-reported: reproduced by the agent, with evidence in its report, but not re-checked by the main session.
+
+**The headline, in the correctness agent's words:** the honesty machinery (floors, tiers, per-club rules, alignment gates) lives in the new modules. The legacy engine the golfer reads *first* bypasses it: FaultEngine's session rules, the metrics strip, `Features.focus`, the coach's notes and the score banner. So one page contradicts itself:
+- Strike says there is no fade, while the fault list says "fatigue on 73/73 shots".
+- The tail audit says the tail is ordinary, while the fault list says "wide dispersion".
+- The bench says attack angle is never prescribed from, while the #1 recommendation is an attack-angle drill that asks for a divot off a teed driver.
+
+**The fix is mostly deletion and routing onto `Strike`, `Dispersion`, `bagConsistency` and `FaultEngine.rate`**, not new code.
+
+### 7A — trust: wrong numbers, broken rules, security (do these first)
+
+| ID | Sev | Finding | Where | Fix | Effort |
+|---|---|---|---|---|---|
+| R1 | HIGH | **The service worker serves every cross-origin GET cache-first until the next version bump.** That includes Supabase `GET /auth/v1/user` and `GET /rest/v1/sessions`, keyed without the Authorization header. Effects: a stale identity after switching accounts; other devices' sessions never appear; a paused project "succeeds" from cache, so the `cloudStatus` banner never fires; logout clears nothing. It is a likely root cause of the old "wrong email after switching accounts" bug. **Verified in code.** | `sw.js` fetch handler, `else` branch | Do not intercept cross-origin requests at all (`if (!sameOrigin) return;`), since everything is self-hosted now. Bump the cache version. On logout, delete non-app cache entries. | S |
+| C3 | HIGH | **The session quality buckets are mislabelled.** `['Elite',…].reverse()` indexed with `4-i` counts shots scored 75–100 as "Poor" and paints them green. A score of exactly 100 is never counted. **Verified.** | `app.js` ~8379 | Build the buckets from one `[{label,lo,hi}]` array, with the top bucket including 100, and add a unit test. | S |
+| C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
+| C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
+| C1 | HIGH | **"Fatigue Pattern Detected — 73 of 73 shots"** fires whenever a golfer hits driver and then an iron: the rule compares first-half and second-half ball speed across the pooled bag. On the same page, Strike says "No measurable fade", and the plan gives the fault a 10-minute block. | `app.js` 4952–4973, 5062–5072 | Delete the rule and route to `Strike.fatigue`, which is per club with a 15-shot floor. | S |
+| C2 | HIGH | **"Wide Shot Dispersion — 73 of 73"** is `stdDev(sideCarry) > 20` pooled across clubs. That is a tier-3 modelled output with no ball gate and no 30-shot floor, and it is plan block #1. On the same page, the tail audit says "an ordinary tail". | `app.js` 4976–5000 | Delete the rule; `Dispersion` raises it per club, gated. | S |
+| C7 | HIGH | **The poor-contact threshold is `smashMin` = 1.33 for every non-wood.** `Benchmarks.DATA` puts the PGA *average* at 1.32 for 9i, 1.28 PW, 1.24 SW and 1.20 LW, so tour-level wedge strikes trip a high-severity fault. `ShotScorer` has the same flaw, with 1.41 as "elite" for every iron. **Verified.** | `app.js:4528`, ShotScorer ~5095 | Derive both thresholds from `Benchmarks.DATA[club]`, the single copy. | S |
+| C8 | HIGH | **An absolute left/right split is shown without alignment.** "26 (36%) LEFT · 21 (29%) ON LINE · 26 (36%) RIGHT" is pooled across clubs and sums to 101%, on a session marked "Alignment not confirmed". CLAUDE.md says absolute bias is withheld until alignment is confirmed. | Shot dispersion, Swing DNA | Gate both on `_aligned`, and split per club. | S |
+| C9 | HIGH | **The copy says attack angle is never prescribed from; the engine prescribes from it.** The Bench caveat reads "nothing is prescribed from them", but the #1 recommendation, the coach's "#1 priority" and a 15-minute plan block are all attack-angle work. `Metrics.canPrescribe` is never consulted by FaultEngine or PracticePlan. | `app.js:8783`, 4650, 588 | Decide the rule, then make the copy and the code agree: either tier-2 faults are display-only, or the caveat says "prescribed only as a recurring pattern above 15 shots". **Oliver's call** — see open questions below. | S/M |
+| C10 | HIGH | **The drill picker ignores the club and the entry kind.** A driver attack-angle fault gets the "Divot-line drill", but a teed driver takes no divot, and "Tee-height ladder (driver)" sits in the same section. Fatigue gets a measurement session; wide dispersion gets "compute p90 by hand", which the app already renders. | `PracticePlan.libraryDrill` ~5573 | Filter to `kind === 'drill'`, prefer a club match, and keep checkable-first ordering. | S |
+| C4 | HIGH | **The session metrics strip defaults to "All", which pools the bag.** It shows "CARRY 201yds" for a driver-plus-7-iron session, which is nobody's club. "Carry Total" is `totalDistance`, which is tier 3. There is no sample floor: a 3-shot file gets headline numbers. | `app.js` 8398–8425 | Default to the most-hit club, as `QuickStats.pick` does. Drop total. Gate each value at `MIN_SHOTS_REPORT`. | M |
+| C12 | HIGH | **Junk rows become shots.** A blank row is counted as a shot; an empty Club Type creates a phantom club ("7i/", and an unlabelled yardage row). A smash of 1.714 is excluded from records, yet the same shot's ball speed is the personal best. | `CSVParser.parse` ~4420; `CEILING` applied to records only | Drop rows with no club or no ball speed at parse time and report the count in the preview. Apply `CEILING` to the whole shot before any mean. | M |
+| R3 | HIGH | **The signed-in email is logged to the console** on every load and on every cloud save. `showDebug` is not gated on `slDebug` (only `authLog` is), which contradicts CLAUDE.md's "No PII in the console". **Verified** at `app.js:10290`. | `app.js` 1163–1167, 10290 | Remove the email interpolation, gate `showDebug` on `slDebug`, and add a source-scan test. | S |
+| C16 | MED | **A second strokes figure.** Drill library section A says "roughly 0.8–1.3 strokes a round available", and section B restates the Dispersion valuation. The app keeps exactly one strokes figure. | `app.js:2676` | Remove A's strokes clause, and point B at the Dispersion tail. | S |
+| C17 | MED | **Section D quotes the retracted "±1.8° of single-shot noise"**, which CLAUDE.md says no one ever measured (`DEVICE_ERROR = 0`). | DrillLibrary section D | Replace with "quoted from your own shot-to-shot spread". | S |
+| C13 | MED | **Grades and praise from 3 shots.** A 3-shot file gets "80 FORM", "Overall grade C", "Very tight distance grouping" and "Excellent, consistent session!", while Swing DNA and Benchmarks correctly refuse. | Home, coach panel | Put the grades and praise behind `MIN_SHOTS_REPORT` per club. | S |
+| C14 | MED | **The coach's consistency sentence is computed on carry pooled across the bag.** It says "Widely varied" on every two-club account, and "Very tight" for any single-club session. | `generateAssessment` ~12118 | Use `bagConsistency()` or delete the line. | S |
+| C15 | MED | **Three smash figures for one club on one page:** 1.42 (coach), 1.42 (DNA) and 1.440 (Strike). The copy says "past the amateur average" when the values are equal, and section A quotes the amateur average as 1.430 against `Benchmarks.DATA`'s 1.42. | Detail | Use one trimmed per-club smash everywhere, say "at" when equal, and read the benchmark from `Benchmarks.DATA`. | S |
+| C18 | MED | **"237 ± 1 yds" is the interval of the mean, printed beside a number used for club selection.** A golfer reads it as "carries 236–238"; the real shot spread is ±7. | Yardage book, home strip | Label it, or lead with the spread/range. | S |
+| C19 | MED | **The same club's carry differs across surfaces:** driver 236 vs 237, and 7i 157 vs 160. The gapping table's "Big gap 81 yds" is just the clubs that were not hit. | Progress, yardages, gapping | Use one per-club carry function behind all three; "big gap" should name the missing clubs. | S–M |
+| C20 | MED | **Progress shows "−5.6° CHANGE"** while the text says it takes five sessions to judge a change. The delta's arithmetic is also unverified (medium confidence). | Progress, directional spread | Withhold the change below the floor, and check the calculation. | S |
+| C21 | MED | **Three surfaces name three different #1 priorities:** the coach, the plan and the home card. | | One ranking (`getNextStep`) that the others cite. EXTENDS 2.5. | S |
+| C22 | LOW | **Settings contradicts itself about storage:** "held in memory only" vs "Data stored — Locally on device". The version reads "2.0.0". | Settings → About | Render the storage line from `LocalDB.describe()`. EXTENDS 1.4. | S |
+| C23 | LOW | **Records show tier-3 values without a label:** "HIGHEST APEX", "LONGEST TOTAL", and "LONGEST CARRY" not labelled modelled. A 31 ft apex on a 237 yd drive is implausible, so the unit needs checking against a real export. | Personal bests | Label records "modelled"; consider dropping apex and total. | S |
+| C24 | LOW | **Copy errors:** "1 clubs"; "a 11-yard"; a superlative across 1 club; "within 0.0 mph"; "Smart routines personalized…" (US spelling, marketing language); Settings still lists "Compare to Community" and "Learning Library"; "Poor Contact / Thin Strike" names a strike type the monitor cannot see. | various | Copy pass. | S |
+
+### 7B — broken or unusable UI
+
+| ID | Sev | Finding | Fix | Effort |
+|---|---|---|---|---|
+| V3 | HIGH | **The practice heatmap never shows the current week.** The grid steps back 125 days, then shifts back again to Monday, so it ends up to 6 days *before* today. **Verified.** | Anchor the grid on the week containing today, and render future days empty. | S |
+| V1 | HIGH | **Home on a phone: two sticky bars stack while scrolling.** The 138px quick-stats strip and the 52px header are both `top:0`. The header covers the strip's top row and leaves an orphan "FORM" label, and the conditions line that qualifies the numbers scrolls away. | Make the quick-stats strip non-sticky on phones. | S |
+| V2 | HIGH | **On phones, the session card's score block drops below Share/Export**, misaligned over the card's left rule. | Keep a 2-column header row on phones, with the ring on the right. | S |
+| V4 | HIGH | **Two "Form" numbers on home: "83 FORM" and "Current form B 84/100".** Same label, different number. EXTENDS 2.5. | One Form, from one function. | S |
+| V5 / C11 | HIGH | **The same fault appears 4 times on home**, with two drills, two percentages (53% vs 14%) and opposite confidence verdicts. `Features.focus` divides by all shots of all clubs and has its own confidence scale. EXTENDS 0.5. | Drop the coach "Focus" line and the "Work on this" tile, or route them through `fault.rate` and `fault.confidence`. Turn the red per-card badges into a neutral count. | S–M |
+| R2 | HIGH | **Keyboard focus breaks for the whole page life after closing FirstRun with ✕.** Modals closed by `.remove()` never leave the focus-trap stack, so Tab keeps focusing a detached node. | Prune disconnected entries in `AccessibilityEnhancements.top()`, or observe removals. | S |
+| R5 | MED | **Ctrl/Cmd+P is hijacked to open Progress**, which blocks the browser print shortcut the printable yardage card depends on. Ctrl+H is taken too. The shortcuts overlay has no role and leaks its Escape listener. | Drop the P and H bindings; give the overlay the `modal-overlay` class. | S |
+| R4 | HIGH | **Pointer-only controls:** the ranked card, the last-session tile, the yardage drill card and every shot-log row are click-only `div`s and `tr`s with no keyboard access. | Render them as `<button>` or `<a>`; give table rows a button in the first cell. | S–M |
+| V6 | HIGH | **The session detail tab bar clips "FAU…" at 393px** with no scroll cue. EXTENDS 2.3. | Add an edge fade, or shorter labels. | S |
+| V11 | MED | **The yardage book's first club row starts at y≈640**, below a drill card, the print button and a 6-line caveat. EXTENDS 2.1. | Put the book first and collapse the caveat. | S |
+| R6 | MED | **The SW caches 404 responses and every `?query` variant**, so the cache grows without bound. | Only `put` when `res.ok`, and ignore the search string. | S |
+| R7 | MED | **The SW is network-first with no timeout,** so on a hanging connection ("lie-fi" at a range) the page never loads. | Race the fetch against a ~3s timeout, then serve from cache. | S |
+
+### 7C — polish, accessibility, consistency (all small)
+
+- **V7** — The detail title wraps to 2 lines; give the back link its own row.
+- **V8** — Same-day sessions can't be told apart on cards, the compare picker or chart axes; add the time and a ball/surface chip.
+- **V9** — Progress charts use auto-scaled spline curves with area fill, which exaggerates noise; use `tension:0`, no fill, and a minimum y-span.
+- **V10** — The progress sparklines read as divider rules; add endpoint dots and hide them below 3 points.
+- **V12** — The Share/Export buttons are off-system: 4px radius, green and blue text.
+- **V13** — Odd item counts in 2- and 3-column grids leave orphan cells.
+- **V14** — There are three different section-heading patterns.
+- **V15** — The "Log a round" form has inconsistent inputs and an unstyled Save button.
+- **V16** — "Club benchmarks" runs into the next section.
+- **V17** — Empty states set in monospace with bad hyphenation and no CTA; the practice empty state is 6,195px tall.
+- **V18** — One view has three names: "BAG", "YARDAGES" and "YARDAGE BOOK".
+- **V19** — Unexplained 01–06 indices and orange rules on the detail stat tiles.
+- **V20** — Shot-log colour is painted on vertical cell borders and looks like a glitch.
+- **V21** — The apex label is clipped ("31 π").
+- **V22** — The dispersion legend's centre-line swatch is an empty box.
+- **V23** — An unlabelled club dot on the Drill Focus card.
+- **V24** — The coach panel heading is a varying pick; use one fixed line.
+- **R8** — Canvases have no `role="img"` or `aria-label`; set them at the single `new Chart(` site.
+- **R9** — No `aria-current` on the bottom nav or the subnav.
+- **R10** — The toast has no `role="status"` or `aria-live`.
+- **R11** — Undersized targets: `#fixAlignment` is 19px tall, the short-game selects 19px, `#qeProtocol` 13px.
+- **R12** — `#goalMetric` has no accessible name.
+- **R13** — Yardages goes h1 → h3 → h2.
+- **R14** — No skip link.
+- **R15** — The CSP has `img-src … https:`; tighten it to `'self' data:`.
+- **R16** — The manifest theme colours are light-only. EXTENDS the default-theme question.
+- **R17** — `test/browser/sync.sh` omits favicon, manifest, icons and 404.html, so the SW `addAll` fails in the mirror and no browser check can test the service worker.
+- **R18** — `purgeAuthStorage()` has no try/catch, so Google sign-in throws in a storage-blocked browser; `authLog` references an undefined `msg` when `slDebug=1`.
+
+### Open question raised by the audit (Oliver's call)
+
+- **C9 — may the app prescribe from attack angle?** The measurement rules say tier 2 is "display only"; the fault engine has prescribed attack-angle drills since before those rules existed. Either the rule bends ("tier 2 may be prescribed as a *recurring pattern* above 15 shots, never from one reading"), or those faults become display-only and the drill leaves the ranked card. The code and the copy must agree either way.
+
+### NOT YET COVERED — where a rerun picks up
+
+**Visual:**
+- 1440px beyond home: the captures exist but were never reviewed.
+- Dark mode at 393 beyond the detail and the empty home.
+- Drills with data and each library tab; Settings; Practice below its second screen; Progress below the launch-angle chart; detail screens 4, 6, 8, 10, 12, 14 and 15.
+- Modals never opened: the import preview and meta steps, range card, achievements, shot modal, confirm modals, settings sub-screens, backup/restore, the six runtime modals, and the print view.
+- No hover, focus, active or disabled states anywhere.
+- The range-ball session's own detail view.
+
+**Correctness:**
+- CSVs generated but not run: the 9- and 10-shot floor boundaries (outputs exist but were not read), 15i7, 30d, pw (the wedge proof for C7), 500 shots, 7-iron-first (the fatigue control), p-a/p-b (the end-to-end proof for C5/C6), range/premium/RPT pooling, and the non-Rapsodo `bank.csv`.
+- Streak and achievement counts; Progress charts under "All clubs"; compare across mismatched conditions; the Rounds module.
+- Spin with an RPT ball; every rule against a range-ball session; a grep for unsourced percentages in string literals.
+- Fault-card copy, which is blurred for guests.
+- The modals.
+- Dates: same day, out of order, future-dated, timezones near midnight.
+- 1440px; the exported/shared output; the printed card.
+
+**Robustness:**
+- Focus-visible styling, the six runtime modals and the range card by keyboard, focus return on close, and form-error announcements.
+- Reduced motion, colour scheme and 200% zoom: none of it started.
+- **All performance work:** a throttled load, long tasks, JS coverage, memory over 30 view switches, and layout shift.
+- Offline retests using CDP network emulation on the SW target (Playwright's `setOffline` did not stop SW-made requests, so offline reload and the navigate fallback remain untested); the SW update flow; installability.
+- Storage APIs that throw; a double-click on save; rapid view switching; back/forward and deep links; reload mid-import; very long notes; HTML injection in notes and CSV club names.
+- A systematic `innerHTML` escaping audit; storage contents after sign-out; open-redirect tracing of the auth return.
+
+**Fix R17 before any rerun of the robustness lens.** Until the mirror carries the SW's full asset list, no browser check can exercise the service worker.
+
+### Suggested order when work resumes
+
+1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
+2. **C3, C1, C2, C7, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
+3. **C5 + C6** — the retention probe (the app's only efficacy metric) made honest.
+4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
+5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
+6. **R2, R4, R5, V1, V2, V6** — keyboard access and the phone layout.
+7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.

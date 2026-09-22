@@ -1229,6 +1229,15 @@ future, so product quality comes before growth, and the growth phase is
 deliberately deferred. Phase 0 (defects) is done; Phase 1 (the first 60
 seconds) has the guest-button fix in and the rest queued.
 
+**Phase 7 is the next work.** Three QC agents audited the app on 22 Sep and
+found, among other things, a service worker that caches Supabase auth and
+session responses cache-first (stale identity, and the cloud-status banner can
+never fire), mislabelled score buckets, a retention probe that measures smash
+for every fault, and legacy fault rules that pool the bag and contradict the
+gated modules on the same page. Its "Suggested order" section is the queue.
+To rerun the agents, use `docs/superpowers/plans/qc-agent-briefs.md`, pointed
+at the NOT YET COVERED lists.
+
 Two things removed in Phase 0 that must not come back: the **tip of the day**
 (eight hand-typed lines, one pointing at a Learning Library with no lessons)
 and **`EnhancedMetricsWidget`**, which pooled every shot across all balls and
