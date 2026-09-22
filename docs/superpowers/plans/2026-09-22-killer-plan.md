@@ -16,6 +16,7 @@ below is measured unless it says otherwise.
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
 | **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
+| 8 | External launch checklist, triaged against this codebase | recorded — nothing built; 8B is the useful near-term list |
 
 ---
 
@@ -323,3 +324,73 @@ Three background agents audited the served app, each through one lens: **visual/
 5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
 6. **R2, R4, R5, V1, V2, V6** — keyboard access and the phone layout.
 7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.
+
+
+---
+
+## Phase 8 — the external launch checklist, triaged (22 Sep 2026)
+
+Oliver brought a generic "before you launch" list: security, reliability, UI, SEO and growth, about 130 lines. Most of it is written for a server-rendered or React app with a backend of its own. This is a **static PWA on GitHub Pages with Supabase as the only backend**, so every line was checked against the actual code before it was sorted. **Nothing here is built yet.** Payments stay out, per decision 2.
+
+### 8A — already done here (with the evidence, so nobody redoes it)
+
+| Checklist item | State in ShotLab |
+|---|---|
+| Hide API keys · keys in git · env variables | **Clean.** Only the Supabase *publishable* key ships (`app.js:920`, `sb_publishable_…`). That key is public by design, because row-level security (RLS) protects the data. `service_role` exists only as `Deno.env.get(...)` inside the `delete-account` edge function. Checked on 22 Sep: no secret or JWT anywhere in the tree, and `git log -S service_role` finds only a CLAUDE.md prose commit. |
+| Add auth · check user perms · check DB rules | Supabase Auth plus RLS. Seven adversarial isolation checks pass against the live database (see CLAUDE.md). Re-run them after any policy change. |
+| DB indexes · optimise queries | The index serves the only query (`user_id, date desc`). |
+| Limit upload size · secure file uploads | The CSV is parsed **in the browser** and never uploaded as a file. `MAX_BYTES` caps it, and non-Rapsodo, empty and header-only files are refused at the door. Row-level junk is still open: C12. |
+| Payload limits | 5,000 shots / 4 MB per row and 2,000 rows per user, enforced in the database. |
+| Enable HTTPS | `*.github.io` is HTTPS-only. **If a custom domain is ever added, tick "Enforce HTTPS" in the Pages settings.** |
+| Error handling | There is a global error boundary (`showFatalError`), toasts, and `Store.cloudStatus` with a banner for failed cloud reads. R1 currently defeats the banner. |
+| Dark mode · mobile version · mobile menu · sticky headers · print stylesheet · confirmation modals · session search | All present. Remaining polish on these is in Phase 7 (V1, V17…). |
+| Cookie banner · privacy policy · terms · last-updated | Present. Both legal docs are versioned and pinned to `Agreement.VERSION`. |
+| robots.txt (AI crawlers **allowed**) · sitemap.xml · custom 404 (real 404 status, no redirect) · meta description · og:image (rendered, 1200×630) · favicon · canonical · structured data (WebApplication, no fake ratings) · llms.txt · `lang="en"` · one H1 per view · no `<img>` without alt | All present and guarded by `seo-and-production.js`. |
+| "remove vite + react" · "view-source empty" · "vercel.app url" | **Not applicable.** The app is vanilla JS with full HTML in view-source, hosted on github.io. |
+
+### 8B — real gaps worth doing (noted, not built; small unless marked)
+
+1. **Keep Supabase from auto-pausing.** A scheduled GitHub Action (weekly cron) makes one cheap authenticated-as-anon request to the project. That is "regular use", so the free tier stops suspending, and it removes the weekly outage that `cloudStatus` exists to announce. It runs server-side from GitHub, not on page load, so the zero-third-party-requests rule is untouched. **Oliver's call:** it is a workaround for the free tier, and the clean alternative is the paid plan.
+2. **The site can be framed (clickjacking).** GitHub Pages sends no `X-Frame-Options` or `frame-ancestors`, and neither can be set from a `<meta>` tag. There are two options:
+   - (a) A tiny self-hosted frame-buster in `app.js`: if `top !== self`, refuse to render. Small, and no hosting change.
+   - (b) The real fix: a custom domain behind a header-capable proxy (see item 11), which also brings HSTS, `X-Content-Type-Options` and `Permissions-Policy`. `SECURITY-HEADERS.md` already documents that path.
+
+   Do (a) now; (b) comes with a custom domain.
+3. **Strip the dangling `sourceMappingURL` from `vendor/chart.umd.js`.** It points at a `.map` that is not shipped, so devtools logs a 404 on every load. This is the "remove prod source maps / console errors" line. Remove the comment line.
+4. **"Disable debug mode" means R3 + R18.** `showDebug` is ungated and logs the email; `authLog` has an undefined `msg`. Both are already in 7A. List them here too so the checklist line is traceable.
+5. **Password visibility toggle** on the sign-in and sign-up forms. None exists (checked). Implement it as a `<button type="button" aria-pressed>` that flips the input's `type`, with an accessible name.
+6. **Copy / share a text summary.** A "copy" button on the yardage book and on a session summary that puts plain text on the clipboard, for sending to a coach or a mate. It must carry the conditions line and "modelled", the same rule as the printed card: no bare "230 · 7i".
+7. **A broken-link check as a suite.** Every `href` and `src` in `index.html`, the three standalone pages and `404.html` must resolve to a file in the repo. External links are listed by name. This is cheap, and it is the "check broken links" line made permanent.
+8. **Loading states:** verify, then fill the gaps. Import parsing, the cloud fetch after sign-in and the Progress charts may render nothing while working. The visual agent's hover/focus/disabled pass should say which. Build only where something is actually blank.
+9. **Rate limiting (Oliver, in the dashboard).** Supabase Auth rate limits are "documented default, unverified" (CLAUDE.md). Look at Auth → Rate Limits once and record the numbers. Do not test them by hammering the live endpoint.
+10. **Backups (Oliver, in the dashboard).** Confirm what the current Supabase plan actually backs up, and record it. The app-level JSON backup/restore already exists and is tested (`SessionSharing`); this item is the database side.
+11. **Custom domain (future, Oliver's call, roughly the price of a domain a year).** A real brand URL, and the only route to proper security headers (item 2b). If it happens:
+    - enforce HTTPS;
+    - update the canonical tag, `sitemap.xml`, the `robots.txt` Sitemap line, the og:url, the Supabase Site URL **and the redirect allowlist** (Phase 6.1);
+    - check every hard-coded `oliverseydlitz-ai.github.io`. `seo-and-production.js` will catch several of these.
+
+### 8C — later, once there are users (ties to Phase 5)
+
+- **Pagination.** `CloudDB.getSessions` loads every session *with all its shots* on every boot. That is fine at 9 rows and slow at a few hundred. Fetch a session list (id, date, club counts, conditions) and load the shots on demand.
+- **Error logging, first-party.** Uncaught errors and render failures go to a Supabase table: message, file:line, app version, **no PII and no shot data**. It is the same shape as 5.2's funnel counts, and it needs the same PRIVACY.md update. Without it, the first real user's crash is invisible.
+- **Uptime monitoring.** An external check of the site and the Supabase health endpoint. Combine it with 8B.1's scheduled Action if that exists.
+- **Google Search Console.** Verify the site once the landing section (5.1) exists. It reports crawl and indexing errors for free.
+- **FAQ, expandable.** The natural home is the landing section: "Why won't it show my spin?", "Why no number for my 7-iron?", "Why do range balls change things?". These are the refusals a new golfer will hit first, and each answer can be read from the module that owns the rule, the way `FirstRun` does it.
+- **Content / "information gain" SEO.** `docs/research-base-v2.md` is genuinely original synthesis: what an MLM2PRO can and cannot measure, and how big its error bands are. Published as a few static pages, it is exactly the information-gain content the growth list asks for, and it is on-brand. Only once the app is worth landing on.
+- **UTM tagging** of links posted in golf communities, read by the first-party counter in 5.2. No third-party analytics.
+- **Per-view `document.title`.** It helps tabs, history and bookmarks. It does not help SEO (hash routes are one URL). Small, whenever convenient.
+
+### 8D — not applicable, and why (so it is not re-raised)
+
+| Item | Why it does not apply |
+|---|---|
+| Protect admin routes | There are none: a static site with no server. |
+| SQL injection | No SQL is built client-side. PostgREST parameterises, and RLS bounds every query. |
+| CSRF · secure cookies | Auth is a bearer token, not a cookie, so CSRF has nothing to ride on. XSS is the real risk for a token in `localStorage`, which is why the `innerHTML` escaping audit (robustness agent) and a tight CSP matter. PKCE is the long-term fix (CLAUDE.md, "Known and deliberately not done"). |
+| CORS settings | This origin exposes no API. Supabase's CORS is Supabase's. |
+| Dupe payments · spending caps | No payments (decision 2). **If the Supabase plan is ever upgraded, keep its spend cap ON.** That is the one line to remember. |
+| Test simultaneous users | Static files from a CDN; Supabase absorbs concurrency. Nothing to load-test at this scale. |
+| Local business schema · breadcrumbs | CLAUDE.md rejects LocalBusiness explicitly: there is no premises. One indexable URL means no breadcrumb trail. |
+| Floating contact · scroll progress bar · back-to-top button | They clutter a phone app that already has a bottom nav. The real fix for "long page" is Phase 2 (answer-first, tabs that swap content), not a button to escape it. |
+| Site-wide search | There is one page. Session search already exists. |
+| Programmatic SEO · backlinks · citation outreach · buying-intent keywords | Growth, deferred by decision 3. Revisit with 5.x once there is something to send people to. |
