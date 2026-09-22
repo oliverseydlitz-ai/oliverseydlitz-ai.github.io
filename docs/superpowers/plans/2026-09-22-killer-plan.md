@@ -291,6 +291,45 @@ Three background agents audited the served app, each through one lens: **visual/
 - **R17** — `test/browser/sync.sh` omits favicon, manifest, icons and 404.html, so the SW `addAll` fails in the mirror and no browser check can test the service worker.
 - **R18** — `purgeAuthStorage()` has no try/catch, so Google sign-in throws in a storage-blocked browser; `authLog` references an undefined `msg` when `slDebug=1`.
 
+### 7D — correctness rerun (C25–C49, 22 Sep, completed)
+
+The correctness agent ran its uncovered ground to the end. The main session verified **C25** (`app.js:8932`, a `'Face Angle'` row) and **C27** (`RetentionProbe.due` contains no `Conditions.comparable` check). The rest are agent-reproduced; the evidence and scripts were in the session scratchpad.
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| **C25** | HIGH | **The shot modal states a face angle on every shot, plus a club mean** ("Face Angle −2.1° ± 2.2"). This breaks measurement rule #1. **Verified.** | Delete the row. Keep face-to-path only, with its club mean at 10+ shots. |
+| **C26** | HIGH | **A follow-up session where the fault PERSISTS silently replaces the open probe before it can be asked,** so only faults that went away ever get a verdict: survivorship bias in the only efficacy metric. | Settle or ask before opening, never replace a due probe, and open probes once, at import. EXTENDS C6. |
+| **C27** | HIGH | **A range-ball baseline settles against a premium follow-up, and the ball change is credited as "a real change… the strongest evidence this app can produce".** **Verified in code.** | `due()` requires `Conditions.comparable`. Open no probes on range or unknown balls. |
+| **C28** | HIGH | **The FaultEngine floor is pooled across clubs:** 4 × 7i + 3 × 9i + 3 × PW produces "Poor Contact… #1 priority, 10 of 10" and a 34-minute block. | Apply the rate and floor per club. |
+| **C29** | HIGH | **Spin axis (tier 3) is prescribed:** "High Spin Axis" is plan block #1 with a drill, contradicting the app's own "never prescribes from spin". | Make both spin-axis rules display-only. |
+| **C30** | HIGH | **`BODY_CONSTRUCT` misses about 30 body or unmeasurable causes,** which render under "What the numbers show": forearms, hands, over-the-top, trail foot, lower body, shoulder, dynamic loft, face-angle variability, muscle fatigue, dehydration. | Tag each cause explicitly (unlabelled = body), and add the strings to the bulk test. |
+| **C31** | HIGH | **Slice and hook fire at 10 shots on an unaligned unit and on range balls,** under the caveat that says they are held to a larger sample. Only push and pull use `startLineFloor`. | Add `minShotsFor: Conditions.startLineFloor`, and gate off range balls. |
+| **C32** | HIGH | **Gap sizes are printed on range balls directly under "Gap sizes are withheld".** | Render "—" when `!gappingOK`. |
+| **C33** | HIGH | **The seven Progress charts under "All clubs" pool the bag and the conditions, apply no floor, and run newest → oldest,** while the strike trend on the same page runs oldest → newest. | Default to the most-hit club and its conditions, drop sessions below the floor, and sort oldest first. |
+| **C34** | HIGH | **Two more bag-pooled session rules:** "Inconsistent Contact Quality" and "Variable Launch Angle". Identical drivers plus identical wedges trip both. | Delete `SESSION_RULES` wholesale. EXTENDS C1/C2. |
+| **C35** | HIGH | **Tour-average clubs fail the app's own bands:** AW/SW/LW trip "Adding Loft", PGA long-iron and 8i/9i launch fall outside the windows, and a tour-level PW fixture gets three faults. | Derive every band from `Benchmarks.DATA` per club, plus a test that no PGA row trips a rule. EXTENDS C7. |
+| **C36** | MED | **`low-ball-speed` scores smash a second time,** with a third threshold copy, and infers "casting". | Delete the rule. |
+| **C37** | MED | **`Strike.fatigue` reports "fade" on trend-free data ~10% of the time per club** (z 1.96 on SDs from 5–6 shots). This is the module C1's fix routes to. | Use a one-sided t / Welch test, corrected across clubs; consider a 30-shot floor. |
+| **C38** | HIGH | **Dates are wrong across timezones, DST and future dates.** Date-only strings are parsed as UTC; New York shows the previous day; the default import date is off by one; the DST week breaks the streak; a future date is accepted silently; the filename's 6 digits are read as MMDDYY. | Treat dates as local calendar dates, compare days as strings, and set `max`=today. |
+| **C39** | MED | **Range-ball sessions still get strike yards, poor-contact faults, compare verdicts and a "widest spread" Drill Focus.** On a tie, the yardage book picked the range group. | Gate on `dispersionValid`, and break ties toward `gappingValid`. |
+| **C40** | MED | **These pool across balls and the bag:** Club Benchmarks, the club modal, Analytics (whose trend is always "improvement" on any positive delta), personal bests (the longest carry came from range balls), and the strike trend. | Route them through `conditionGroups` and a per-club floor. EXTENDS C19. |
+| **C41** | MED | **The drill gate is judged on the affected shots only:** "needs 15 Driver, you have 13" on a session with 20 drivers. | Pass all of the club's shots. |
+| **C42** | MED | **The first probe is always burnt as "unknown"** (fewer than 3 sessions of history), and the home card keeps asking for a re-test that has already been imported. CLAUDE.md's "falls back to the MDC table" is not what the code does. | Keep the probe pending until the history exists, and fix the doc and the copy. EXTENDS C5. |
+| **C43** | MED | **The shot modal's "vs avg" is one shot against the whole bag,** and "No faults flagged on this shot" appears on every shot, because `MIN_AFFECTED` = 2. | Compare against the club mean, and drop or rework the per-shot fault list. |
+| **C44** | MED | **Club means and tier-2 values sit below the floors** on the session card (9 shots), ball flight, launch windows (attack angle at 9) and benchmarking. | Gate at 10, and at 15 for tier 2. EXTENDS C4. |
+| **C45** | MED | **Rounds has no validation (133% GIR accepted and made the diagnosis) and no date field, and is hidden until 2 imports,** so a golfer with no device data cannot log a round. Its trend uses 1 SD; `rangeLink` contradicts its own caveat; the putts table has a plateau. | Validate, add a date, move it out of the gated block, and use one threshold. |
+| **C46** | MED | **The SwingDNA "below what the device resolves" verdict compares σ with the MDC of a mean,** so it flips with n. The tail trend uses 1 SD. "3 of 3 go right" is called a pattern. | Use per-shot device figures, one significance rule, and a floor on one-way verdicts. |
+| **C47** | LOW–MED | **NEXT GATE counts shots on any ball, then says "every gate is open".** The Learning modal gates on the latest session only. | Count premium/RPT only, and gate on the conditions group. |
+| **C48** | LOW–MED | **`Benchmarks.DATA` amateur (`am`) columns have no source.** Only `pga` is [TM]. The amateur 7i implies a ~61 mph 7-iron beside a 93 mph driver. | Cite a source, or drop the non-driver `am` values. |
+| **C49** | LOW | **Copy problems:** unsourced superlatives ("single most common reason…", "#1 cause of scooping", "Narrow target = narrow mind"…), factual errors (descent/roll inverted, "'75% face' rule" vs 85%, attack angle called path), and typos ("1 more shots", "Only 0 shots", "rapsodo rpt"). | Copy pass. EXTENDS C24. |
+
+**Confirmed end to end:** C1 (the same 40 shots reordered: 7i-first gives no fatigue, driver-first fires it), C3, C5, C6 (a re-view even duplicates a settled probe), C7 (tour PW at 1.28 → #1 priority), C8, C13, C18, C20 (the arithmetic is right; the floor is what's missing).
+**What held:** the floors hold exactly at 9/10/15/30 in the gated modules; 500 shots render with no NaN or errors; `bank.csv` is refused clearly; achievement counts are right; compare withholds carry and ball speed across ball types.
+
+**The agent's verdict:** the retention probe, the one number the app says proves a drill worked, is biased toward "it worked" on every path. C5 measures the wrong metric, C26 deletes persisting faults, C27 credits a ball change, and C42 burns the first probe. Nothing looks wrong on screen. **Fix C5/C6/C26/C27/C42 together, as one piece of work: "make the retention probe honest".**
+
+**Still not covered (correctness):** 1440px; the exported/shared output and the printed card; the range card, backup/restore, confirm modals, settings sub-screens and the import steps; filename-date parsing run live (C38 comes from reading the code); Practice below the plan on a range-ball session.
+
 ### Open question raised by the audit (Oliver's call)
 
 - **C9 — may the app prescribe from attack angle?** The measurement rules say tier 2 is "display only"; the fault engine has prescribed attack-angle drills since before those rules existed. Either the rule bends ("tier 2 may be prescribed as a *recurring pattern* above 15 shots, never from one reading"), or those faults become display-only and the drill leaves the ranked card. The code and the copy must agree either way.
@@ -327,8 +366,8 @@ Three background agents audited the served app, each through one lens: **visual/
 ### Suggested order when work resumes
 
 1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
-2. **C3, C1, C2, C7, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
-3. **C5 + C6** — the retention probe (the app's only efficacy metric) made honest.
+2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
+3. **C5 + C6 + C26 + C27 + C42** — the retention probe (the app's only efficacy metric) made honest, as ONE piece of work.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
 5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
 6. **R2, R4, R5, V1, V2, V6** — keyboard access and the phone layout.
