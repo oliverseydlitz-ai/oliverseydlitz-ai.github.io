@@ -61,7 +61,8 @@ const ROLE = {
   '--text-muted': 'secondary text, captions, units',
   '--text-dim': 'the lowest-emphasis text the palette allows',
   '--accent': 'signal orange. The ONE accent. Never a surface fill, never decorative',
-  '--accent-ink': 'text and icons on an accent fill (~2x the contrast of white)',
+  '--on-fill': 'text and icons on ANY saturated fill — accent, red or green. Flips with the theme, because the fills do',
+  '--accent-ink': 'frozen alias of --on-fill; app.js reads this name inline and must keep resolving',
   '--accent-weak': 'focus ring and the faintest accent wash',
   '--forest': 'accent hover / pressed',
   '--hm1': 'activity heatmap, step 1 of 3 (level 0 is --surface3: no shots that day)',
@@ -380,20 +381,43 @@ for (const m of bare.matchAll(/@media\s+print[^{]*\{/g)) {
   }
   printRanges.push([m.index, i]);
 }
-const legalLiterals = new Set();
-for (const m of bare.matchAll(LITERAL)) {
-  if (printRanges.some(([a, b]) => m.index >= a && m.index < b)) continue;
-  const ls = bare.lastIndexOf('\n', m.index) + 1;
-  let le = bare.indexOf('\n', m.index); if (le < 0) le = bare.length;
-  const line = bare.slice(ls, le);
-  if (/^\s*--[a-z0-9-]+\s*:/i.test(line)) continue;                       // a token declaration
-  if (/#fff\b/i.test(m[0]) && /var\(--(red|green)\)/.test(line)) {
+// Every colour literal that is NOT a token declaration and NOT ink-on-paper.
+// This used to count only the `#fff`-beside-`var(--red)` pattern that
+// colours-are-tokens.js exempted. The contrast fix gave those three rules a
+// token (--on-fill), the exemption went with them, and the answer is now
+// none — so the claim is the stronger one: the sheet holds no stray literal
+// at all. Written as a function because the positive control below has to
+// run the IDENTICAL code path; a control that exercises a copy proves the
+// copy works.
+function strayLiterals(text, ranges, rules) {
+  const out = new Set();
+  for (const m of text.matchAll(LITERAL)) {
+    if (ranges.some(([a, b]) => m.index >= a && m.index < b)) continue;
+    const ls = text.lastIndexOf('\n', m.index) + 1;
+    let le = text.indexOf('\n', m.index); if (le < 0) le = text.length;
+    if (/^\s*--[a-z0-9-]+\s*:/i.test(text.slice(ls, le))) continue;       // a token declaration
     // The SELECTOR the literal sits in, not the line it sits on.
-    const rule = RULES.find(r => m.index >= r.from && m.index < r.to);
-    legalLiterals.add(rule ? rule.sel : '(top level)');
+    const rule = rules.find(r => m.index >= r.from && m.index < r.to);
+    out.add((rule ? rule.sel : '(top level)') + '  ' + m[0]);
   }
+  return [...out].sort();
 }
-const literalSels = [...legalLiterals].sort();
+const literalSels = strayLiterals(bare, printRanges, RULES);
+
+// THE POSITIVE CONTROL, and it is the only reason a count of zero can be
+// trusted. `0 stray literals` and `the scan stopped matching` are the same
+// output, and this repository has shipped the second one as the first before
+// — render-scan.js reported clean for most of a session because its exit code
+// was 0 by construction. So the detector is handed a sheet that does contain
+// one, through the same function, and must find it.
+const CONTROL = '.sl-control { color: #fff; }';
+const controlFound = strayLiterals(CONTROL, [], [{ sel: '.sl-control', from: 0, to: CONTROL.length }]);
+if (controlFound.length !== 1) {
+  console.error('\nclaims: the colour-literal detector failed its own positive control — ' +
+    `it found ${controlFound.length} literals in a sheet holding exactly one. ` +
+    'Every count it reports below is therefore worthless, a zero most of all.');
+  process.exit(1);
+}
 
 push('claims:');
 push('  note: three counts this document states, measured from the tree rather than',
@@ -417,19 +441,22 @@ push(`    rule: "${[...numeralElements].sort().join(', ')}" is what holds the de
   '      as the mechanism describes something that never runs.');
 push('  colour-literals:');
 push(`    count: ${literalSels.length}`);
-push(`    on: "${literalSels.join('  ·  ')}"`);
-push(`    rule: "#fff on a --red or --green fill, declared on the same line.`,
-  '      test/suites/colours-are-tokens.js exempts exactly this pattern, so the',
-  '      enforcement is right and only the count was wrong."');
+push(`    on: "${literalSels.join('  ·  ') || 'nothing — every colour outside the token blocks reads a var()'}"`);
+push(`    detector-positive-control: passed   # a sheet holding one literal, scanned the same way`);
+push('    rule: "Outside :root, html.dark and @media print, no colour literal.',
+  '      The three that used to be legal were `#fff` on a --red or --green fill;',
+  '      --on-fill replaced them, so the exemption that carried them is gone too.',
+  '      A count of 0 is only meaningful beside the control above."');
 
-// A count of zero would mean the scan stopped matching rather than that the
-// stylesheet changed, and a claim block that quietly reports 0 is worse than no
-// claim block at all. The same reflex as render-scan.js's exit code.
-if (literalSels.length === 0 || numeralRules.length === 0) {
+// The tabular-numerals scan has no control of its own, so a zero there is
+// still read as the detector failing rather than as a stylesheet that stopped
+// aligning its numbers. The colour-literal count is exempt from this because
+// it now has the control above, which is what a legitimate zero costs.
+if (numeralRules.length === 0) {
   console.error('\nclaims: the scan found nothing to measure — ' +
-    `${literalSels.length} legal colour literals, ${numeralRules.length} tabular-numerals rules. ` +
-    'That is the detector failing, not the stylesheet, and a claim block that quietly ' +
-    'reports 0 is worse than no claim block at all.');
+    `${numeralRules.length} tabular-numerals rules. That is the detector failing, ` +
+    'not the stylesheet, and a claim block that quietly reports 0 is worse than ' +
+    'no claim block at all.');
   process.exit(1);
 }
 push('---');

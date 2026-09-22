@@ -39,51 +39,51 @@ colors:
     dark: "#F4F6F8"
     role: primary text
   text-muted:
-    light: "#565E6B"
-    dark: "#A2AAB5"
+    light: "#3F4653"
+    dark: "#B9C2CD"
     role: secondary text, captions, units
   text-dim:
-    light: "#8A929E"
-    dark: "#6B7480"
+    light: "#5A616D"
+    dark: "#949DAA"
     role: the lowest-emphasis text the palette allows
   accent:
-    light: "#E24E12"
+    light: "#B03600"
     dark: "#FF6A2B"
     role: signal orange. The ONE accent. Never a surface fill, never decorative
-  accent-ink:
-    light: "#0B0D10"
-    dark: "#0B0D10   # inherited — no dark override"
-    role: text and icons on an accent fill (~2x the contrast of white)
+  on-fill:
+    light: "#FFFFFF"
+    dark: "#0B0D10"
+    role: text and icons on ANY saturated fill — accent, red or green. Flips with the theme, because the fills do
   accent-weak:
-    light: "rgba(226,78,18,.10)"
+    light: "rgba(176,54,0,.10)"
     dark: "rgba(255,106,43,.12)"
     role: focus ring and the faintest accent wash
   hm1:
-    light: "rgba(226,78,18,.22)"
+    light: "rgba(176,54,0,.22)"
     dark: "rgba(255,106,43,.26)"
     role: activity heatmap, step 1 of 3 (level 0 is --surface3: no shots that day)
   hm2:
-    light: "rgba(226,78,18,.45)"
+    light: "rgba(176,54,0,.45)"
     dark: "rgba(255,106,43,.50)"
     role: activity heatmap, step 2 of 3
   hm3:
-    light: "rgba(226,78,18,.70)"
+    light: "rgba(176,54,0,.70)"
     dark: "rgba(255,106,43,.74)"
     role: activity heatmap, step 3 of 3 (level 4 is --accent at full strength)
   forest:
-    light: "#C23F0C"
+    light: "#8F2A00"
     dark: "#FF7F49"
     role: accent hover / pressed
   green:
-    light: "#0E9463"
+    light: "#006F49"
     dark: "#35C08A"
     role: a real gain. A verdict, not a mood
   green-light:
-    light: "#0B7A52"
-    dark: "#2AA679"
+    light: "#025C3C"
+    dark: "#37B082"
     role: a lower grade band
   green-glow:
-    light: "rgba(14,148,99,.45)"
+    light: "rgba(0,111,73,.45)"
     dark: "rgba(53,192,138,.45)"
     role: the status dot's expanding ring
   withheld:
@@ -91,15 +91,15 @@ colors:
     dark: "#8B93A0"
     role: gated / no answer. Intentionally dull — the app withholds often
   yellow:
-    light: "#B57A12"
+    light: "#855705"
     dark: "#E0A93A"
     role: caution, a tentative fault
   red:
-    light: "#C43C36"
-    dark: "#E5544E"
+    light: "#B52D2A"
+    dark: "#FE6F66"
     role: a real loss, a regression, a destructive control
   blue:
-    light: "#1F73C4"
+    light: "#0162B2"
     dark: "#4FA8E8"
     role: information, a "modelled" tag, a secondary link
   overlay:
@@ -276,11 +276,13 @@ claims:
       app; `.tnum` is an available utility that nothing applies. Listing it first
       as the mechanism describes something that never runs.
   colour-literals:
-    count: 3
-    on: ".btn-danger  ·  .session-badge.fault  ·  .session-badge.improvement"
-    rule: "#fff on a --red or --green fill, declared on the same line.
-      test/suites/colours-are-tokens.js exempts exactly this pattern, so the
-      enforcement is right and only the count was wrong."
+    count: 0
+    on: "nothing — every colour outside the token blocks reads a var()"
+    detector-positive-control: passed   # a sheet holding one literal, scanned the same way
+    rule: "Outside :root, html.dark and @media print, no colour literal.
+      The three that used to be legal were `#fff` on a --red or --green fill;
+      --on-fill replaced them, so the exemption that carried them is gone too.
+      A count of 0 is only meaningful beside the control above."
 ---
 
 <!-- prose:start -->

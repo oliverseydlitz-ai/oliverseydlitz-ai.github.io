@@ -7134,10 +7134,15 @@ const UI = (() => {
   // mode. Reading the token means the charts follow the palette, both ways.
   const chartTheme = () => {
     const v = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-    return { grid: v('--line') || '#E4E6EA', tick: v('--text-dim') || '#8A929E',
+    // The `||` fallbacks are the light-theme values, and they are a SECOND
+    // COPY of the palette — they went stale through the whole contrast fix
+    // and would have painted every chart in the retired hues on any load
+    // where the stylesheet had not arrived. They are kept because a chart
+    // with no grid colour draws nothing, and pinned by colours-are-tokens.js.
+    return { grid: v('--line') || '#E4E6EA', tick: v('--text-dim') || '#5A616D',
              font: v('--font-body') || 'system-ui, sans-serif',
-             good: v('--green') || '#0E9463', bad: v('--red') || '#C43C36',
-             accent: v('--accent') || '#E24E12' };
+             good: v('--green') || '#006F49', bad: v('--red') || '#B52D2A',
+             accent: v('--accent') || '#B03600' };
   };
 
   // A canvas does not repaint itself when a class changes on <html>. Chart.js

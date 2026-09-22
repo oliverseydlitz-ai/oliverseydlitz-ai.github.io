@@ -242,7 +242,15 @@ for (const [name, sel] of Object.entries(themes)) {
   ok(inv >= 4.5, `${name}: --bg type on --text ground is ${r2(inv)}:1 (AA body needs 4.5)`);
   const acc = ratio(accent, text);       // --accent pushed as type onto that ground
   if (name === 'light') {
-    ok(acc >= 4.5, `${name}: --accent on the inverted ground is ${r2(acc)}:1 — it would have passed alone`);
+    // This assertion used to read `acc >= 4.5` — the light accent cleared the
+    // inverted ground at 4.80:1 and stepped aside for consistency with dark
+    // rather than because it had to. The contrast fix darkened it to read on
+    // white, which cost it the near-black end, so the band's rule is now
+    // measured in both themes instead of argued in one. It clears 3:1 by
+    // 0.04, which is stated rather than rounded away: that is the large-text
+    // and non-text floor, not a licence for body type.
+    ok(acc < 4.5, `${name}: --accent on the inverted ground is ${r2(acc)}:1 — below AA`);
+    ok(acc < 3.1, `  and inside a rounding error of the 3:1 a 4px rule would need`);
   } else {
     // The finding, pinned. If this ever stops failing the comment in style.css
     // is out of date, not the code — the dark accent is tuned for a dark

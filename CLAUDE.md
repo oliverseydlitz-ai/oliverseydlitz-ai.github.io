@@ -1183,26 +1183,68 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: `main` is current, working tree clean, **64 suites — 63 green
-and `contrast.js` red by design**, render scan exit 0, service worker at **v155**,
-59 modules.
+State at handover: **64 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v156**, 59 modules.
 
-**The one open defect: the palette fails its own contrast floor.** A new suite,
-`test/suites/contrast.js`, measures every text-on-ground pair in both themes and
-reports **47 pairs below the 4.5:1 floor**. It reproduces all 28 numbers from an
-independent WCAG audit to the digit, and the defects are real and predate the
-workover. The worst is `--text-dim` — the app's most-used text token — which
-fails on every ground in both themes (2.70–4.11) and carries caveat **body copy**
-at 2.85:1, against this file's own rule that a caveat must be legible.
+**The palette now clears its own contrast floor.** `test/suites/contrast.js` was
+shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
+against a retuned palette. What the fix actually cost is worth knowing before
+touching a token:
 
-**The suite is deliberately left failing.** A guard deleted or weakened to get a
-green tree is worse than the defect it found, which is the position this file
-takes everywhere else. Fixing it means changing token values in `:root` and the
-`html.dark` override, then regenerating `DESIGN.md`. Two traps are recorded on the
-suite's own output: `--green` cannot satisfy both `#fff` on a green *fill* and
-green-as-text on a dark ground with one value, so the badge's ink changes rather
-than the token; and `--accent` light has a fourth ground to clear — the
-`.sync-warn` wash at 3.44, ~0.37 harder than `--bg`'s 3.81.
+- **A semantic colour cannot be both text on the ladder and a fill under light
+  ink.** The maths is decisive, not a matter of taste: for `--accent` to clear
+  4.5:1 as type on `--surface3` it needs relative luminance ≤ 0.139, and for
+  near-black ink to clear 4.5:1 *on* it, ≥ 0.20. So the light theme's saturated
+  colours were darkened for type, and the ink on every saturated fill became
+  **`--on-fill`** — white in light, near-black in dark, because the fills flip
+  with the theme. `--accent-ink` is kept as a frozen alias; `app.js` reads that
+  name inline.
+- **The grey text ramp was re-spaced, not just nudged.** `--text-dim` was below
+  the floor on every ground in both themes, which means it was never a text step
+  — it was a decorative one. Pulling it to the floor collapses it into
+  `--text-muted`, so `--text-muted` moved to ~7:1 to keep three distinguishable
+  steps. Do not re-lighten either; the ramp has no slack left.
+- **The light accent lost the inverted band.** At `#B03600` it reads 3.04:1 on a
+  `--text` ground. Until this fix it cleared that ground at 4.80:1 and stepped
+  aside for consistency with dark. `bands.js` used to assert `>= 4.5` for light
+  and now asserts `< 4.5`: the band's no-hue rule is measured in both themes
+  rather than argued in one.
+- `--withheld` was deliberately **not** touched. It was never in the failure set,
+  and changing an unmeasured token is the drift this file warns about everywhere
+  else.
+
+### Three copies of the palette that no check re-derived
+
+The contrast fix surfaced these, and each is the same defect as the retired
+palette surviving inside `style.css`: a copy nothing regenerates.
+
+1. **A percent-encoded literal hides from the colour sweep.** The select
+   chevron is an SVG in a data URI, and its accent was spelled `%23E24E12` —
+   the retired red-orange, wrong in *both* themes, through the entire "Range"
+   redesign, because `colours-are-tokens.js` anchors on `#`. A data URI is a
+   separate document: it cannot read a `var()` and does not inherit
+   `currentColor`, so the literal is unavoidable. It is now the `--chevron`
+   token, declared per theme, and the suite decodes `%23` and pins the value
+   against `--accent`.
+2. **The "paired with a token" exemption checked a shape, not a value.**
+   `v('--green') || '#0E9463'` is allowed because it names its token — and
+   nothing ever compared the literal to what `--green` holds. All five of
+   `chartTheme`'s fallbacks were the pre-fix palette. Now pinned. The one
+   legitimate exception is `showFatalError`, whose fallbacks are a deliberate
+   no-theme neutral for a screen that renders when the stylesheet may be
+   absent; it is exempt **by name with that reason**.
+3. **`tools/build-og-image.js` held a hand-typed copy of the dark palette**, and
+   its `dim` was already stale — the share card's caption line was rendering
+   below the floor on a 1200x630 image nobody re-reads. It now reads the token
+   blocks out of `style.css` and throws if a token it needs is missing.
+
+**A zero now needs a positive control.** `build-design-md.js` used to fail when
+it counted 0 legal colour literals, on the reasoning that 0 meant the detector
+had stopped matching. `--on-fill` removed the last three, so 0 became the
+correct answer — and `0 found` and `the pattern stopped matching` still print
+identically. Both the generator and the encoded-colour scan now run their
+pattern over a string that *does* contain one and fail if it is not found.
+Same reflex as `render-scan.js`'s exit code; keep it if you touch either.
 
 The plan `docs/superpowers/plans/2026-09-11-design-md-workover.md` carries a
 STATUS block at the top naming what is done and what is not: **Task 3 (all-caps
@@ -1491,8 +1533,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 12 September 2026 — ShotLab v3, "Range" skin. 59 modules,
-**64 test suites**, service worker **v155**. Deterministic auth, cloud sync
+**Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 59 modules,
+**64 test suites**, service worker **v156**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

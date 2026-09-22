@@ -19,8 +19,35 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
-const TOKENS = { bg: '#0B0D10', surface: '#14171C', line: '#2A2F37',
-                 text: '#F4F6F8', dim: '#6B7480', accent: '#FF6A2B', ink: '#0B0D10' };
+// READ from style.css, never typed. This was a hand-kept copy of the dark
+// palette and it had already gone stale: `dim` still held the pre-contrast-fix
+// --text-dim, so the card's caption line was rendering below the legibility
+// floor on a 1200x630 image nobody re-reads. A share card is the worst place
+// for a second copy — nothing downstream consumes it, so a wrong value never
+// surfaces anywhere else, which is the same argument FirstRun makes about an
+// orientation screen.
+const CSS = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8');
+function tokenBlock(sel) {
+  const at = CSS.indexOf(sel + ' {');
+  if (at < 0) throw new Error('build-og-image: style.css has no ' + sel + ' block');
+  const open = CSS.indexOf('{', at);
+  let i = open + 1, depth = 1;
+  while (i < CSS.length && depth > 0) { if (CSS[i] === '{') depth++; else if (CSS[i] === '}') depth--; i++; }
+  return CSS.slice(open + 1, i - 1);
+}
+const DARK = tokenBlock('html.dark'), LIGHT = tokenBlock(':root');
+function token(name) {
+  for (const blk of [DARK, LIGHT]) {
+    const m = new RegExp('--' + name + '\\s*:\\s*(#[0-9a-fA-F]{3,8})\\s*;').exec(blk);
+    if (m) return m[1];
+  }
+  throw new Error('build-og-image: --' + name + ' is not declared as a hex in either token block');
+}
+// The card is the dark theme, so every token falls back to :root only where
+// html.dark does not redeclare it — the same cascade the app runs.
+const TOKENS = { bg: token('bg'), surface: token('surface'), line: token('line'),
+                 text: token('text'), dim: token('text-dim'), accent: token('accent'),
+                 ink: token('on-fill') };
 
 const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
   @font-face{font-family:'Archivo';font-style:normal;font-weight:400 800;

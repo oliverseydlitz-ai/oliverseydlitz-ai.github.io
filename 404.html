@@ -20,11 +20,12 @@
        copied rather than linked. They are the same values as :root and
        html.dark in style.css; if those change, change these. */
     :root{--bg:#FBFBFC;--surface:#FFFFFF;--line:#E4E6EA;--line-strong:#CDD0D6;
-          --text:#0E1116;--dim:#565E6B;--muted:#8A929E;--accent:#E24E12;
-          --accent-ink:#0B0D10;--radius:0}
+          --text:#0E1116;--dim:#3F4653;--muted:#5A616D;--accent:#B03600;
+          --accent-ink:#FFFFFF;--radius:0}
     @media (prefers-color-scheme: dark){
       :root{--bg:#0B0D10;--surface:#14171C;--line:#2A2F37;--line-strong:#3A404A;
-            --text:#F4F6F8;--dim:#A2AAB5;--muted:#6B7480;--accent:#FF6A2B}
+            --text:#F4F6F8;--dim:#B9C2CD;--muted:#949DAA;--accent:#FF6A2B;
+            --accent-ink:#0B0D10}
     }
     /* Self-hosted, same file the app uses. font-display:swap so a missing
        font never blocks the text of a 404 page. */

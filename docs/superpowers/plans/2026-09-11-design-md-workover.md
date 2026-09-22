@@ -18,21 +18,24 @@ D3 follow-up ruling and two new suites. All merged to `main`; render scan exit 0
   been unreachable — and `.drill-card` is used by four components. That is a
   decision, not a dedupe.
 
-**NOT IN THE PLAN — added, and the one open defect:**
+**NOT IN THE PLAN — added, and now CLOSED:**
 
-- **The palette fix.** `test/suites/contrast.js` (new, 613 lines) measures every
-  text-on-ground pair in both themes and is **RED: 43 pairs below the 4.5:1
-  floor.** It reproduces all 28 numbers from an independent WCAG audit to the
-  digit. The defects are real and predate this plan — most importantly
-  `--text-dim`, the app's most-used text token, fails on every ground in both
-  themes (2.70–4.11) and carries caveat *body copy* at 2.85:1, against
-  `CLAUDE.md`'s rule that a caveat must be legible.
-  **The suite is deliberately left in place and failing.** A guard removed to get
-  a green tree is worse than the defect it found.
-  Two known traps for whoever fixes it: `--green` cannot satisfy both `#fff` on a
-  green *fill* and green-as-text on a dark ground with one value, so the badge's
-  ink has to change rather than the token; and `.sync-warn-head` is a descendant
-  override at 3.44:1 that the suite does not yet assert.
+- **The palette fix. DONE (22 Sep).** `test/suites/contrast.js` shipped red on
+  purpose with 47 pairs below 4.5:1 and is now green against a retuned palette.
+  Both traps recorded here were real and both were resolved by changing the INK
+  rather than the colour: `--on-fill` is the ink on any saturated fill and flips
+  with the theme, because a light theme darkens its fills and a dark theme
+  lightens them. The `.sync-warn` wash was the binding ground for `--accent`, as
+  predicted, and was solved to a fixed point since the ground is made of the
+  accent itself. See `CLAUDE.md`'s "Where things stand" for what the fix cost —
+  the grey ramp had to be re-spaced, and the light accent lost the inverted band.
+
+- **Three uncovered copies of the palette, found by the fix and closed with it:**
+  a percent-encoded `%23` literal in the select chevron (invisible to the colour
+  sweep, retired hue in both themes, for the whole redesign); `chartTheme`'s five
+  `|| '#hex'` fallbacks (the exemption checked the shape and never the value);
+  and `tools/build-og-image.js`'s hand-typed dark palette. All three now have a
+  guard that re-derives rather than trusts.
 
 ---
 

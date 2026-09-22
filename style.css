@@ -79,33 +79,48 @@
   --line-strong: #CDD0D6;
   --border-hi: var(--line-strong);
   --text:       #0E1116;
-  --text-muted: #565E6B;
-  --text-dim:   #8A929E;
+  --text-muted: #3F4653;
+  --text-dim:   #5A616D;
 
   /* accent — signal orange */
-  --accent:      #E24E12;
-  --accent-ink:  #0B0D10;   /* text/icon on an accent fill */
-  --accent-weak: rgba(226,78,18,.10);
+  --accent:      #B03600;
+  /* ink on a SATURATED FILL — accent, red or green. It flips with the theme
+     because the fills do: a light theme darkens them so white reads, a dark
+     theme lightens them so near-black reads. One value cannot serve both,
+     which is why three rules used to hard-code #fff and fail in dark. */
+  --on-fill:     #FFFFFF;
+  --accent-ink:  var(--on-fill);   /* frozen alias — app.js reads this name inline */
+  --accent-weak: rgba(176,54,0,.10);
+  /* The select chevron. An SVG in a data URI is a separate document: it
+     cannot read a var() and does not inherit currentColor, so the accent has
+     to be written into it literally — which is why it is a TOKEN and not a
+     literal buried in a rule. It was exactly that for the whole redesign,
+     percent-encoded as %23 so the colour sweep never saw it, and it still
+     carried the retired red-orange in both themes. colours-are-tokens.js now
+     decodes %23 and pins this value against --accent. The media type carries
+     no `;utf8` on purpose: a semicolon inside a token value truncates it for
+     every scanner that splits declarations on one. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23B03600' stroke-width='1.6' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E");
   --accent-glow: var(--accent-weak);
   /* activity ramp — the heatmap's three middle steps. Level 0 is a day with
      NO shots, so it is a neutral surface, not the faintest accent: tinting it
      paints every idle day in the brand colour and the grid reads as activity
      everywhere. Level 4 is --accent at full strength. */
-  --hm1: rgba(226,78,18,.22);
-  --hm2: rgba(226,78,18,.45);
-  --hm3: rgba(226,78,18,.70);
+  --hm1: rgba(176,54,0,.22);
+  --hm2: rgba(176,54,0,.45);
+  --hm3: rgba(176,54,0,.70);
   --pine:    var(--accent); /* deprecated alias, still read by app.js */
-  --forest:  #C23F0C;       /* accent :hover / pressed */
+  --forest:  #8F2A00;       /* accent :hover / pressed */
 
   /* data — verdict semantics (temperature-matched, one notch desaturated) */
-  --green:       #0E9463;   /* real / gain */
-  --green-light: #0B7A52;
-  --green-glow:  rgba(14,148,99,.45);   /* the status dot's expanding ring */
+  --green:       #006F49;   /* real / gain */
+  --green-light: #025C3C;
+  --green-glow:  rgba(0,111,73,.45);   /* the status dot's expanding ring */
   --withheld:    #6B7480;   /* gated / no answer — intentionally dull */
-  --yellow:      #B57A12;   /* caution / tentative */
-  --red:         #C43C36;   /* loss / regression / danger */
+  --yellow:      #855705;   /* caution / tentative */
+  --red:         #B52D2A;   /* loss / regression / danger */
   --turf:        var(--red);
-  --blue:        #1F73C4;   /* info, "modelled" tags, secondary links */
+  --blue:        #0162B2;   /* info, "modelled" tags, secondary links */
 
   /* geometry — hard edges; buttons are cut, not rounded */
   --radius:    0;
@@ -308,7 +323,7 @@ button {
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
 .btn-primary:hover { background: var(--forest); }
 
-.btn-danger { background: var(--red); color: #fff; }
+.btn-danger { background: var(--red); color: var(--on-fill); }
 .btn-danger:hover { filter: brightness(.92); }
 
 /* border = the element's own background showing through a 1.5px inset ::before */
@@ -1714,7 +1729,7 @@ body.modal-open {
 .form-group select, .select {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23E24E12' stroke-width='1.6' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E");
+  background-image: var(--chevron);
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 42px;
@@ -2293,26 +2308,29 @@ html.dark {
   --line:      #2A2F37;
   --line-strong: #3A404A;
   --text:       #F4F6F8;
-  --text-muted: #A2AAB5;
-  --text-dim:   #6B7480;
+  --text-muted: #B9C2CD;
+  --text-dim:   #949DAA;
   --accent:      #FF6A2B;
+  --on-fill:     #0B0D10;   /* the fills are light here, so the ink is dark */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23FF6A2B' stroke-width='1.6' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolyline points='5 9 12 16 19 9'/%3E%3C/svg%3E");
   --accent-weak: rgba(255,106,43,.12);
   --hm1: rgba(255,106,43,.26);
   --hm2: rgba(255,106,43,.50);
   --hm3: rgba(255,106,43,.74);
   --forest:  #FF7F49;
   --green:       #35C08A;
-  --green-light: #2AA679;
+  --green-light: #37B082;
   --green-glow:  rgba(53,192,138,.45);
   --withheld:    #8B93A0;
   --yellow:      #E0A93A;
-  --red:         #E5544E;
+  --red:         #FE6F66;
   --blue:        #4FA8E8;
   --overlay: rgba(0,0,0,.72);
   --shadow-md: 0 8px 30px rgba(0,0,0,.45);
   --shadow-lg: 0 20px 60px rgba(0,0,0,.6);
-  /* --border, --border-hi, --turf, --pine, --accent-glow inherit via their
-     :root var() aliases, which re-resolve against the values above */
+  /* --border, --border-hi, --turf, --pine, --accent-glow and --accent-ink
+     inherit via their :root var() aliases, which re-resolve against the
+     values above — --accent-ink therefore follows --on-fill into the dark */
 }
 /* Table headers stay legible */
 html.dark th { background: var(--surface2); color: var(--text); }
@@ -2423,8 +2441,8 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .session-badge { display: inline-block; padding: 3px 9px; background: var(--accent); color: var(--accent-ink);
   font-size: .65rem; font-weight: 700; border-radius: var(--radius-sm); text-transform: uppercase;
   letter-spacing: .04em; }
-.session-badge.fault { background: var(--red); color: #fff; }
-.session-badge.improvement { background: var(--green); color: #fff; }
+.session-badge.fault { background: var(--red); color: var(--on-fill); }
+.session-badge.improvement { background: var(--green); color: var(--on-fill); }
 
 .session-score-ring { position: relative; width: 70px; height: 70px; }
 /* The score ring had a soft drop-shadow from the skin before this one.
@@ -2934,15 +2952,20 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
    steps aside. Measured, not assumed (audited 12 Sep 2026):
 
      --bg type on --text ground   18.29:1 light   17.96:1 dark   PASS
-     --accent on the same ground   4.80:1 light    2.64:1 dark   FAIL
+     --accent on the same ground   3.04:1 light    2.64:1 dark   FAIL
 
-   The dark-mode inversion puts a near-white ground under the dark-mode
-   accent, and no token in the palette is an orange that works on a light
-   ground in dark mode — so the accent does not appear on this band as type
-   in either theme. The inversion IS the signal; a hue on top of it would be
+   Both halves now fail, and that is newer than the band. Until the contrast
+   fix the light accent cleared this ground at 4.80:1 and stepped aside for
+   consistency with dark rather than because it had to. Darkening it to read
+   on a WHITE ground necessarily cost it the near-black one — an accent
+   cannot clear both ends of the ladder — so the rule that was a judgement
+   call in light is now a measurement in both. The dark side is unchanged:
+   the inversion puts a near-white ground under the dark-mode accent, and no
+   token in the palette is an orange that works on a light ground in dark
+   mode. The inversion IS the signal; a hue on top of it would be
    a second one. Emphasis inside the band comes from weight and from --bg at
    a different opacity, never from a hue. An accent FILL is still available
-   if one is ever needed: --accent-ink on --accent passes at 4.94/6.81,
+   if one is ever needed: --on-fill on --accent passes at 6.22/6.81,
    because that is ink on a fill rather than a hue on an inverted ground. */
 .band--signal {
   background: var(--text);
