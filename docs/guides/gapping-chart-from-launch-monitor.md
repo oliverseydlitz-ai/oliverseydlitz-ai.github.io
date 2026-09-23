@@ -10,7 +10,7 @@ This matters more than anything else here. Range balls don't knock the same dist
 
 Mats mess with it too. They add launch, cut spin, can make carry read around 10 yards long, and hide fat shots that would have come up short on grass.
 
-So use the ball you play, off the surface you'll use, and don't mix balls or surfaces in one chart. If you've got a mix, use the biggest group of sessions that match. ShotLab's yardage book does exactly that and tells you which group it used.
+So use the ball you play, off the surface you'll use, wherever you can. ShotLab's yardage book uses every session you've imported, counts range-ball sessions a little less than your own ball, and tells you the mix it was built on.
 
 ## Step 2: enough shots per club
 

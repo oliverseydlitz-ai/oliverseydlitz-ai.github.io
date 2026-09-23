@@ -131,10 +131,10 @@ ok(D.value(7.9, 0) === null, 'a zero-degree "improvement" is not worth strokes')
 
 console.log('— every valuation carries the caveats that make it honest —');
 const cav = v.caveats.join(' ');
-ok(/treed course/.test(cav), 'names the course architecture that flips the verdict');
-ok(/difficulty-equated/.test(cav), 'names that the published units are not difficulty-equated');
+ok(/course with trees/.test(cav) && /open course/.test(cav), 'names the course architecture that flips the verdict');
+ok(/bigger jumps in skill/.test(cav), 'names that the published units are not difficulty-equated');
 ok(/at most/.test(cav), 'says the measured spread is an upper bound, so the strokes are too');
-ok(/says nothing about what caused it/.test(cav), 'and refuses to attribute the spread to a cause');
+ok(/does not say what caused it/.test(cav), 'and refuses to attribute the spread to a cause');
 
 console.log('— the valuation is driver-only, because the curves are —');
 const irons = spread(34, 3, 0, { club: '7i' });

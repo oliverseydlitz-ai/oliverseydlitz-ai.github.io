@@ -344,6 +344,20 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'});
 }
 
+// V8: a label that tells two sessions apart. Sessions store a date, not a
+// time, so two on the same day both read "Sep 23, 2026". When a day repeats,
+// the ball goes on the label; if the ball repeats too, a number in the order
+// they were imported (the list is newest first, so #1 is the earliest).
+function sessionLabel(s, all) {
+  const day = formatDate(s && s.date);
+  const same = (all || []).filter(x => x && x.date === (s && s.date));
+  if (same.length < 2) return day;
+  const ball = typeof Conditions !== 'undefined' ? Conditions.ball(s).label.toLowerCase() : '';
+  const sameBall = same.filter(x => Conditions.ball(x).id === Conditions.ball(s).id);
+  const n = sameBall.length > 1 ? ` #${sameBall.length - sameBall.indexOf(s)}` : '';
+  return `${day} · ${ball}${n}`;
+}
+
 function clubBreakdown(shots) {
   const counts = {};
   shots.forEach(s => { counts[s.clubType] = (counts[s.clubType]||0)+1; });
@@ -1995,18 +2009,15 @@ const Dispersion = (() => {
   const TRUNC_FACTOR = 0.8796;
 
   const CAVEATS = [
-    'These curves are for a treed course. On a course with no trees, or with rough ' +
-    'and no penalty areas, Broadie & Ko\'s own simulations flip the verdict and distance ' +
-    'beats accuracy outright. The strokes below are not universal.',
-    'The published accuracy and distance scenarios are not difficulty-equated — the ' +
-    'accuracy steps span a wider slice of real skill than the distance steps do, which ' +
-    'inflates how valuable accuracy looks. Treat the direction as supported and the size as uncertain.',
-    'Side carry is a modelled output, not a reading, and measurement noise adds spread ' +
-    'without ever removing it. Your true directional spread is at most what is shown, so ' +
-    'the strokes on offer are at most this too.',
-    'This values the spread. It says nothing about what caused it — face, path, strike ' +
-    'and wind all land in the same number, and no published work maps any one of them onto ' +
-    'strokes. Any drill offered here is an explanation, not part of the arithmetic.',
+    'The strokes figure comes from a study of a course with trees. On an open course, or one with ' +
+    'rough and no hazards, the same study found extra distance mattered more than a tighter spread. ' +
+    'So the number is not the same everywhere you play.',
+    'The study\'s accuracy steps were bigger jumps in skill than its distance steps, which makes ' +
+    'accuracy look a bit more valuable than it is. Trust the direction; treat the size as rough.',
+    'Side carry is calculated by the monitor, and measurement noise can only add spread, never take ' +
+    'it away. So your real spread, and the strokes on offer, are at most what is shown.',
+    'This puts a value on your spread. It does not say what caused it: face, path, strike and wind ' +
+    'all end up in the same number. Any drill shown with it explains the spread; it is not part of the sum.',
   ];
 
   // ── The measurement ───────────────────────────────────────────
@@ -6794,7 +6805,10 @@ const Trajectory = (() => {
     let frac = td/(tl+td);
     if (!isFinite(frac) || frac<=0.05 || frac>=0.95) frac=0.6;
     const gx0=pad, gx1=W-pad, gy=H-pad;
-    const uw=gx1-gx0, uh=H-pad*1.5;
+    // V21: the apex label sits 7px above the peak, so the peak needs room
+    // above it inside the box. At H-pad*1.5 it was 13px from the top and the
+    // label was cut in half.
+    const uw=gx1-gx0, uh=H-pad*2.2;
     const ax=gx0+uw*frac, ay=gy-uh;
     const c1x=gx0+(ax-gx0)*0.55, c2x=ax+(gx1-ax)*0.45;
     const line=`M ${gx0} ${gy} Q ${c1x} ${ay} ${ax} ${ay} Q ${c2x} ${ay} ${gx1} ${gy}`;
@@ -6816,9 +6830,7 @@ const Trajectory = (() => {
         <text x="${ax}" y="${ay-7}" text-anchor="middle" class="traj-lbl">${fmt(apexFt,0)} ft</text>
         <text x="${gx0}" y="${gy+15}" text-anchor="start" class="traj-lbl">${fmt(launch,1)}° launch</text>
         <text x="${gx1}" y="${gy+15}" text-anchor="end" class="traj-lbl">${fmt(carryYds,0)} yds carry</text>
-      </svg>
-      <div class="traj-note">Apex, carry and descent are computed by the monitor from launch conditions,
-      not measured. The shape is indicative.</div>`;
+      </svg>`;
   }
   const shot = s => arc(s.launchAngle, s.apex, s.carryDistance, s.descentAngle);
   // A mean of a field the parser never filled is null, not a number, so the
@@ -7464,7 +7476,7 @@ const UI = (() => {
         (c.data.datasets || []).forEach(ds => {
           if (!ds._accent) return;
           ds.borderColor = t.accent;
-          ds.backgroundColor = t.accent + '22';
+          ds.backgroundColor = t.accent;   // solid point fill; the lines no longer have an area
         });
         c.update('none');
       } catch (_) {}
@@ -7957,7 +7969,7 @@ const UI = (() => {
         <li>
           <div class="session-card" data-id="${s.id}">
             <div>
-              <button type="button" class="session-card-date session-open" data-key-proxy>${formatDate(s.date)}</button>
+              <button type="button" class="session-card-date session-open" data-key-proxy>${Sanitize.escape(sessionLabel(s, sessions))}</button>
               <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
                 <div class="stat-card">
@@ -8135,7 +8147,11 @@ const UI = (() => {
 
     const prev = Features.lastComparable(session, sessions);
     const esc = t => Sanitize.escape(String(t == null ? '' : t));
-    const cond = `${Conditions.ball(session).label.toLowerCase()}, ${Conditions.surface(session).label.toLowerCase()}`;
+    // "range balls, not recorded" read as broken text; an unrecorded surface
+    // simply drops out of the phrase (the same rule the home insight used).
+    const sf = Conditions.surface(session);
+    const cond = Conditions.ball(session).label.toLowerCase() +
+      (sf.id === 'unknown' ? '' : ` off ${sf.label.toLowerCase()}`);
 
     if (!prev) {
       // Not an empty state, and the two reasons for it are different answers.
@@ -8149,12 +8165,9 @@ const UI = (() => {
       el.innerHTML = `<div class="since-block">
           <div class="since-head">Nothing to compare this against yet</div>
           <p class="since-note">${earlier
-            ? `You have ${earlier} earlier session${earlier === 1 ? '' : 's'}, but none on ${esc(cond)}
-               sharing a club with this one. The app will not read a session against one on a different
-               ball or surface — that difference is the equipment as much as you, and it would show up
-               as progress. Hit the same club on ${esc(cond)} again and this fills in.`
-            : `This is your first session, so there is nothing behind it yet. The next one on
-               ${esc(cond)} will be read against this one.`}</p>
+            ? `No earlier session on ${esc(cond)} with the same club yet. Hit the same club on
+               ${esc(cond)} again and this fills in.`
+            : `This is your first session. The next one on ${esc(cond)} will be compared with it.`}</p>
         </div>`;
       return;
     }
@@ -8273,12 +8286,17 @@ const UI = (() => {
     if (!results.length) {
       const open = RetentionProbe.openProbes();
       el.hidden = !(open.length || lapsed.length);
+      // Two probes on one club (two faults on the driver) used to read "hit 8+
+      // Driver and 8+ Driver", with the same deadline printed twice. One club,
+      // one mention; one deadline sentence, once.
+      const clubs = [...new Set(open.map(p => p.clubType))];
+      const deadlines = [...new Set(open.map(p => RetentionProbe.deadline(p)))];
       el.innerHTML = (open.length
         ? `<div class="probe-block pending"><div class="probe-head">Retention check pending</div>
              <div class="probe-item">Come back at least a day later and hit
-             ${open.map(p => `${RetentionProbe.MIN_SHOTS}+ ${Sanitize.escape(clubLabel(p.clubType))}`).join(' and ')}
-             to find out whether ${open.length === 1 ? 'it' : 'they'} held. Within-session numbers cannot tell you.</div>
-             ${open.map(p => `<div class="probe-deadline">${Sanitize.escape(RetentionProbe.deadline(p))}</div>`).join('')}</div>`
+             ${clubs.map(c => `${RetentionProbe.MIN_SHOTS}+ ${Sanitize.escape(clubLabel(c))}`).join(' and ')}
+             to find out whether ${open.length === 1 ? 'the change' : 'the changes'} held.</div>
+             ${deadlines.map(d => `<div class="probe-deadline">${Sanitize.escape(d)}</div>`).join('')}</div>`
         : '') + lapsedNote;
       return;
     }
@@ -8804,7 +8822,9 @@ const UI = (() => {
       options:{
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:_t.tick,font:{size:11,family:_t.font}}},
+          // V22: the dashed centre line has no fill, so Chart.js drew its key as an
+          // empty box. The heavier zero gridline already marks it; it is off the legend.
+          legend:{labels:{color:_t.tick,font:{size:11,family:_t.font}, filter: item => item.text !== 'Centre line'}},
           tooltip:{
             callbacks:{
               label: ctx => {
@@ -9305,8 +9325,7 @@ const UI = (() => {
           const pick = rows.filter(r => r.ok)[0];
           drillHost.innerHTML = `<h2 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h2>
             <div class="drill-card" data-route="practice" role="button" tabindex="0">
-              <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(widest.club)}"></div>
-              <div class="drill-title">${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
+              <div class="drill-title"><span class="club-dot" style="background:${clubColor(widest.club)}" aria-hidden="true"></span>${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
               <div class="drill-desc">${fmt(widest.carry.mean,0)} ± ${fmt(widest.carry.ci,0)} yds over
                 ${widest.carry.n} shots. The spread is ${fmt(widest.cv*100,0)}% of the carry, the widest in
                 the bag relative to how far the club goes.</div>
@@ -9339,12 +9358,17 @@ const UI = (() => {
       if (!series) return '';
       const { points, lo, hi } = series;
       const span = hi - lo || 1;
-      const w = 64, h = 18;
-      const d = points.map((p, i) =>
-        `${(i / (points.length - 1) * w).toFixed(1)},${(h - (p.mean - lo) / span * h).toFixed(1)}`).join(' ');
+      // V10: 2px of padding and a dot at each end, so it reads as a line of
+      // sessions rather than a rule. Fixed size, so real circles stay round.
+      const w = 64, h = 18, pad = 2;
+      const xy = points.map((p, i) => [pad + i / (points.length - 1) * (w - 2 * pad),
+                                       pad + (h - 2 * pad) - (p.mean - lo) / span * (h - 2 * pad)]);
+      const d = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
       return `<svg class="yard-spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true">
           <polyline points="${d}" fill="none" stroke="currentColor" stroke-width="1.5"
             stroke-linecap="round" stroke-linejoin="round"/>
+          ${[xy[0], xy[xy.length - 1]].map(([x, y]) =>
+            `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="currentColor"/>`).join('')}
         </svg>`;
     };
 
@@ -9753,8 +9777,12 @@ const UI = (() => {
 
   // Deliberately unlabelled and unscaled: it is a shape, not a chart to read
   // values off. The numbers that matter are in the tiles beneath it.
+  // V10: three points minimum (two is a difference, not a shape, the rule
+  // clubSeries already keeps), and a dot at each end so it cannot be read as
+  // a divider rule. The viewBox stretches, so the dots are zero-length round-
+  // capped strokes with a non-scaling width: a circle would squash.
   function sparkline(values) {
-    if (!values || values.length < 2) return '';
+    if (!values || values.length < 3) return '';
     const lo = Math.min(...values), hi = Math.max(...values), span = hi - lo || 1;
     const w = 100, h = 28;
     const pts = values.map((v, i) => {
@@ -9766,6 +9794,9 @@ const UI = (() => {
         aria-label="Directional spread across ${values.length} sessions, oldest to newest. A lower line is a tighter spread.">
         <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5"
           vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>
+        ${[pts.split(' ')[0], pts.split(' ').pop()].map(p =>
+          `<polyline points="${p} ${p}" fill="none" stroke="currentColor" stroke-width="5"
+            vector-effect="non-scaling-stroke" stroke-linecap="round"/>`).join('')}
       </svg>`;
   }
 
@@ -9773,7 +9804,7 @@ const UI = (() => {
   function renderCompare(sessions) {
     const host = document.getElementById('compareHost');
     if (!host) return;
-    const opts = sessions.map((s,i)=>`<option value="${s.id}">${formatDate(s.date)} · ${s.shots.length} shots</option>`).join('');
+    const opts = sessions.map((s,i)=>`<option value="${s.id}">${Sanitize.escape(sessionLabel(s, sessions))} · ${s.shots.length} shots</option>`).join('');
     host.innerHTML = `
       <div class="section-title">Compare sessions</div>
       <div class="compare-card">
@@ -9812,8 +9843,10 @@ const UI = (() => {
   }
 
   function renderProgressCharts(sessions, clubFilter) {
+    // V8: same-day sessions get a second label line (Chart.js draws an array
+    // as stacked lines), so the axis never repeats one date three times.
     const filtered = sessions.map(s=>({
-      label:formatDate(s.date),
+      label: sessionLabel(s, sessions).split(' · '),
       shots: clubFilter==='all'?s.shots:s.shots.filter(sh=>sh.clubType===clubFilter),
     })).filter(s=>s.shots.length>0);
 
@@ -9827,10 +9860,24 @@ const UI = (() => {
     });
 
     const _t = chartTheme();
-    const mkCfg = (data,color,yLabel) => ({
+    // V9: straight segments, no area fill, and a minimum y-span. A spline
+    // with a fill auto-scaled to the data turns two yards of noise into a
+    // cliff. The minimum span is twice the change the metric needs before it
+    // is likely real (Metrics.mdc at ten shots), so a move inside the noise
+    // stays visibly small. The session score has no MDC and keeps auto-scale.
+    const yRange = (data, metric) => {
+      const m = metric && Metrics.mdc(metric, Metrics.MIN_SHOTS_REPORT);
+      const v = (data || []).filter(Number.isFinite);
+      if (!m || !v.length) return {};
+      const lo = Math.min(...v), hi = Math.max(...v), span = 2 * m;
+      if (hi - lo >= span) return {};
+      const mid = (lo + hi) / 2;
+      return { suggestedMin: mid - span / 2, suggestedMax: mid + span / 2 };
+    };
+    const mkCfg = (data,color,yLabel,metric) => ({
       type:'line', data:{labels,datasets:[{
-        data, borderColor:color, backgroundColor:color+'22',
-        tension:0.3, pointRadius:4, fill:true, borderWidth:2,
+        data, borderColor:color, backgroundColor:color,
+        tension:0, pointRadius:4, fill:false, borderWidth:2,
         // marks this series as accent-driven so a theme switch re-reads it.
         // Club-coloured series deliberately do NOT carry this: the club scale
         // is one fixed set of hues in both themes, because a club that
@@ -9842,7 +9889,7 @@ const UI = (() => {
         plugins:{legend:{display:false}},
         scales:{
           x:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid}},
-          y:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid},
+          y:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid}, ...yRange(data, metric),
             title:{display:!!yLabel,text:yLabel||'',color:_t.tick,font:{size:10,family:_t.font}}},
         },
       },
@@ -9855,19 +9902,19 @@ const UI = (() => {
     // reserved for data that is actually categorical, which is the club
     // scale.
     const defs=[
-      {id:'chartSmash',     data:d('smashFactor'),  yLabel:'Smash Factor'},
-      {id:'chartCarry',     data:d('carryDistance'),yLabel:'Carry (yds)'},
-      {id:'chartLaunch',    data:d('launchAngle'),  yLabel:'Launch Angle (°)'},
-      {id:'chartBallSpeed', data:d('ballSpeed'),    yLabel:'Ball Speed (mph)'},
-      {id:'chartPath',      data:d('clubPath'),     yLabel:'Club Path (°)'},
-      {id:'chartAA',        data:d('attackAngle'),  yLabel:'Attack Angle (°)'},
+      {id:'chartSmash',     data:d('smashFactor'),  yLabel:'Smash Factor', metric:'smashFactor'},
+      {id:'chartCarry',     data:d('carryDistance'),yLabel:'Carry (yds)', metric:'carryDistance'},
+      {id:'chartLaunch',    data:d('launchAngle'),  yLabel:'Launch Angle (°)', metric:'launchAngle'},
+      {id:'chartBallSpeed', data:d('ballSpeed'),    yLabel:'Ball Speed (mph)', metric:'ballSpeed'},
+      {id:'chartPath',      data:d('clubPath'),     yLabel:'Club Path (°)', metric:'clubPath'},
+      {id:'chartAA',        data:d('attackAngle'),  yLabel:'Attack Angle (°)', metric:'attackAngle'},
       {id:'chartQuality',   data:qualityData,       yLabel:'Session Score'},
     ].map(c => ({ ...c, color: _t.accent }));
 
-    defs.forEach(({id,data,color,yLabel})=>{
+    defs.forEach(({id,data,color,yLabel,metric})=>{
       destroyChart(id);
       const canvas = document.getElementById(id);
-      if (canvas) _charts[id] = ScrollMotion.chart(canvas, mkCfg(data,color,yLabel));
+      if (canvas) _charts[id] = ScrollMotion.chart(canvas, mkCfg(data,color,yLabel,metric));
     });
 
     // ── Trend summary ─────────────────────────────────────────
@@ -12421,16 +12468,9 @@ const PersonalCoach = (() => {
     // sessions and "not enough history to judge" on every trend. A claim of
     // improvement belongs to Metrics.changeIsReal and nowhere else;
     // personal-coach.js pins that none comes back.
-    const greetings = [
-      'Here is what the last session says.',
-      'One thing at a time.',
-      'Read it club by club.',
-      'The numbers, and what they can support.',
-    ];
-    const key = String((sessions && sessions[0] && (sessions[0].id || sessions[0].date)) || '');
-    let h = 0;
-    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-    return greetings[h % greetings.length];
+    // V24: one fixed line. A heading that changes with the session id reads
+    // as if it means something, and it does not.
+    return 'Your coaching summary';
   }
 
   function generateAssessment(recentSessions) {

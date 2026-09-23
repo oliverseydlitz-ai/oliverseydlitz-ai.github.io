@@ -80,7 +80,7 @@ const other = PC.analyzeSessions([sess('zzzz','2026-08-02', many(20))]).greeting
 ok(typeof other === 'string' && other.length > 0, 'and a different session still gets one');
 
 console.log('— and the greeting claims nothing about the data —');
-// It is picked by a hash of the session id, so any claim in it is a claim the
+// It used to be picked by a hash of the session id, so any claim in it was a claim the
 // data never made. "Keep grinding — you're getting better!" showed on a home
 // view with two sessions and "not enough history to judge" on every trend.
 // Every id that hashes to every slot is checked, not a sample: a pool of N
@@ -90,7 +90,7 @@ for (let i = 0; i < 400 && seen.size < 50; i++)
   seen.add(PC.analyzeSessions([sess('g' + i + 'x' + (i * 7919), '2026-08-01', many(12))]).greeting);
 const CLAIM = /better|improv|progress|worse|declin|getting|level up|consisten/i;
 const claims = [...seen].filter(g => CLAIM.test(g));
-ok(seen.size >= 3, `${seen.size} distinct greetings reached`);
+ok(seen.size === 1, `one fixed heading, whatever the session (V24) — ${seen.size} reached`);
 ok(claims.length === 0, `none asserts improvement, decline or a weakness${claims.length ? ' — ' + claims.join(' | ') : ''}`);
 
 console.log('— and an empty history returns nothing rather than guessing —');

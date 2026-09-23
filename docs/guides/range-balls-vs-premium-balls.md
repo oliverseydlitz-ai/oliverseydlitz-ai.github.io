@@ -41,7 +41,7 @@ Treat those numbers as rough, they come from industry testing. The most importan
 
 Range balls are still useful. Just don't treat them like your real ball.
 
-- **Note the ball every session.** ShotLab asks for the ball and the surface on every import for this reason. It decides whether two sessions can be compared at all.
+- **Note the ball every session.** ShotLab asks for the ball and the surface on every import for this reason, and counts range-ball sessions a little less than your own ball.
 - **Compare like with like.** Range balls against range balls, your ball against your ball, mat against mat. A range session against a premium one just tells you about the balls.
 - **Build your yardages on your own ball.** If you're going to club off a number on the course, get it from the ball you play.
 - **Use range sessions for things the ball doesn't change much.** Club speed is the same whatever you hit. Strike work is fine too, as long as you compare it with other range sessions.

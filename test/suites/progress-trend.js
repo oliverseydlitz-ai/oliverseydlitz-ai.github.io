@@ -75,5 +75,15 @@ ok(Conditions.comparable(prem, rng) === false,
    'a premium session and a range-ball one are not — a ball change moves every carry at once');
 ok(Conditions.comparable(rng, rng) === true, 'and a session is comparable with itself');
 
+console.log('— the progress charts do not dramatise noise (V9) —');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
+  const cfg = src.slice(src.indexOf('const mkCfg = (data,color,yLabel,metric)'), src.indexOf('// Seven single-series charts'));
+  ok(cfg.length > 100, 'the progress chart config can be found');
+  ok(/tension:0,/.test(cfg) && /fill:false/.test(cfg), 'straight segments and no area fill — a smoothed, filled curve reads as a trend');
+  ok(/yRange\(data, metric\)/.test(cfg) && /Metrics\.mdc/.test(src.slice(src.indexOf('const yRange'), src.indexOf('const mkCfg'))),
+     'and a minimum y-span read from Metrics.mdc, so a move inside the noise stays visibly small');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

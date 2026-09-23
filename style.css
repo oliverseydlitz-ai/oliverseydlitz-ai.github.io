@@ -410,6 +410,11 @@ button:disabled, button[disabled] {
   white-space: nowrap; display: inline-flex; align-items: center; gap: .35rem;
 }
 .btn-back:hover { color: var(--accent); }
+/* V7: the back link takes its own row, so the title never wraps beside it. */
+.view-header:has(> .btn-back) { flex-wrap: wrap; row-gap: .25rem; }
+.view-header > .btn-back { flex-basis: 100%; }
+/* R11: the one link-button a golfer taps with a thumb gets a real target. */
+.caveat-fix .link-btn { min-height: var(--tap); display: inline-flex; align-items: center; }
 
 /* ── Top nav (desktop) — flat, hairline, no fill ───────────────────────
    The bar used to be a three-stop gradient with a red glow under it, a
@@ -899,6 +904,9 @@ canvas { max-height: 180px; }
   vertical-align: middle; flex-shrink: 0;
 }
 
+/* V16: the benchmarks table ran straight into the next section heading. */
+#benchHost:not(:empty) { margin-bottom: var(--s5); }
+
 /* ── Launch windows ────────────────────────────────────── */
 #launchWindows table { font-size: .78rem; }
 #launchWindows th { font-size: .62rem; }
@@ -1214,8 +1222,10 @@ a.settings-row { text-decoration: none; }
 .sm-warn{color:var(--yellow); font-size:.72rem; font-weight:600}
 .sm-note{color:var(--text-muted); font-size:.72rem; font-style:italic}
 
-.check-row{display:flex;align-items:flex-start;gap:.55rem;cursor:pointer;font-size:.85rem;line-height:1.4}
-.check-row input{margin-top:.15rem;flex:0 0 auto}
+/* R11: the whole row is the target (the label wraps the box), so it gets the
+   tap height; the box itself is drawn at 20px rather than the browser's 13. */
+.check-row{display:flex;align-items:center;gap:.55rem;cursor:pointer;font-size:.85rem;line-height:1.4;min-height:var(--tap)}
+.check-row input{flex:0 0 auto;width:20px;height:20px}
 
 .tbl-wrap{overflow-x:auto;margin:.6rem 0 1rem}
 .ref-tbl{width:100%;border-collapse:collapse;font-size:.8rem;min-width:420px}
@@ -1374,11 +1384,11 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
   padding:.15rem .45rem;border:1px solid var(--line);border-radius:var(--radius-sm);color:var(--text-muted)}
 .qe-form{display:flex;flex-direction:column;gap:.6rem}
 .qe-field{display:flex;flex-direction:column;gap:.25rem;font-size:.78rem;color:var(--text-dim)}
-.qe-field input{padding:.55rem .7rem;font-size:16px;font-variant-numeric:tabular-nums;
+.qe-field input,.qe-field select{padding:.55rem .7rem;font-size:16px;font-variant-numeric:tabular-nums;
   min-height:var(--tap);
   background:var(--surface2);color:var(--text);border:1px solid var(--line-strong);
   border-radius:var(--radius)}
-.qe-field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-weak)}
+.qe-field input:focus,.qe-field select:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-weak)}
 .probe-ask{margin-bottom:.6rem}
 .probe-btns{display:flex;gap:.45rem;flex-wrap:wrap;margin:.5rem 0 0 1rem}
 .probe-btn{padding:.5rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;
@@ -1892,22 +1902,10 @@ body.modal-open {
    has nothing left to beat. */
 .session-card { padding: var(--s4); }
 
-/* ── METRIC CARDS — auto numbered ──────────────────────────── */
-.metrics-strip { counter-reset: metric; }
+/* ── METRIC CARDS ──────────────────────────────────────────────
+   V19: these carried an auto-numbered 01-06 index that meant nothing. Gone. */
 .metric-card {
-  counter-increment: metric;
   padding: 1.15rem .85rem .9rem !important;
-}
-.metric-card::after {
-  content: counter(metric, decimal-leading-zero);
-  position: absolute;
-  top: 9px; right: 12px;
-  font-family: var(--font-mono);
-  font-size: .58rem;
-  font-weight: 500;
-  color: var(--text-dim);
-  letter-spacing: .1em;
-  opacity: .7;
 }
 .metric-label {
   font-family: var(--font-mono) !important;

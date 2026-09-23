@@ -11,8 +11,14 @@ const real = T.arc(13.5, 31, 235, 40);
 ok(/<svg/.test(real), 'an svg comes back');
 ok(/13\.5° launch/.test(real), 'labelled with the reading it was given');
 ok(/235 yds carry/.test(real), 'and the carry');
-ok(/not measured/.test(real),
-   'with a note that apex, carry and descent are computed rather than measured — all tier 3');
+ok(!/not measured/.test(real),
+   'v2: no "computed, not measured" note under the flight — that explanation lives in Settings');
+{
+  // V21: the apex label is drawn 7px above the peak; it must stay inside the
+  // viewBox, or it is cut in half (it was, at 13px from the top).
+  const ay = +(real.match(/<circle cx="[\d.]+" cy="([\d.]+)" r="4"/) || [])[1];
+  ok(Number.isFinite(ay) && ay - 7 - 10 >= 0, `the apex label fits inside the box (peak at y=${ay})`);
+}
 
 console.log('— an absent reading is not drawn at all —');
 for (const [args, what] of [

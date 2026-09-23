@@ -45,5 +45,16 @@ console.log('— and spin is dropped rather than shown unmeasured —');
 ok(!Features.compare(driverOnly, plusWedges).some(x => x.label === 'Spin'),
    'no RPT ball, no spin row');
 
+console.log('— same-day sessions can be told apart (V8) —');
+{
+  const { sessionLabel } = M;
+  const mk = (id, ball) => ({ id, date: '2026-09-23', conditions: { ball }, shots: [] });
+  const a = mk('a', 'premium'), b = mk('b', 'range'), c = mk('c', 'range');
+  const all = [c, b, a];                      // newest first, as the app keeps them
+  ok(!/·/.test(sessionLabel(a, [a])), 'a lone session on its day is just the date');
+  ok(/premium/.test(sessionLabel(a, all)) && /range balls/.test(sessionLabel(b, all)), 'a repeated day names the ball');
+  ok(sessionLabel(b, all) !== sessionLabel(c, all), 'and two on the same ball get different labels');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
