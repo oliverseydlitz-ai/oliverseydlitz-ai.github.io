@@ -54,6 +54,14 @@ const GUIDES = [
     title: "Driver attack angle: why the tour average isn't your target",
     description: 'The PGA Tour hits slightly down on the driver. Why that is not what you should copy, why yards-per-degree charts mislead, and how far to trust your launch monitor on it.',
     source: 'docs/guides/driver-attack-angle.md', published: '2026-09-23', updated: '2026-09-23' },
+  { slug: 'range-balls-vs-premium-balls',
+    title: 'Range balls vs premium balls: what changes in your numbers',
+    description: 'What a swing robot found when it hit range balls and premium balls: distance, dispersion and spin, what mats add on top, and how to compare sessions honestly.',
+    source: 'docs/guides/range-balls-vs-premium-balls.md', published: '2026-09-23', updated: '2026-09-23' },
+  { slug: 'how-many-shots',
+    title: 'How many shots before a launch-monitor average means anything?',
+    description: 'How many shots per club before an average, a change or a dispersion figure is worth reading, and how big a change has to be before it is real.',
+    source: 'docs/guides/how-many-shots.md', published: '2026-09-23', updated: '2026-09-23' },
 ];
 
 // ── Tokens: numbers the app owns ─────────────────────────────────────────
