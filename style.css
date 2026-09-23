@@ -379,7 +379,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
    inset ring sits on the control's own fill, and an accent ring on the accent
    primary button or an active tab is the same invisible ring by another route.
    render-scan.js measures every focusable control for both. */
-:is(.settings-section, .drill-tabs, .filter-row, .tbl-wrap, .doc-table-wrap, .subnav) :focus-visible {
+:is(.settings-section, .drill-tabs, .filter-row, .tbl-wrap, .doc-table-wrap, .subnav, .fault-card) :focus-visible {
   outline-offset: -2px; outline-color: currentColor;
 }
 :is(.btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .btn-icon):focus-visible {
@@ -1008,18 +1008,32 @@ th {
   font-weight: 600; font-size: .7rem;
   text-transform: uppercase; letter-spacing: var(--track-caps);
   border-bottom: 1.5px solid var(--line-strong);
-  white-space: nowrap; cursor: pointer; user-select: none; line-height: 1.4;
+  white-space: nowrap; line-height: 1.4;
 }
-th:hover { color: var(--text); background: var(--surface2); }
+/* Only a header that sorts looks like it does something (R4). Every <th> in
+   the app used to take a pointer and a hover, and one table sorts. */
+th[data-field] { cursor: pointer; user-select: none; }
+th[data-field]:hover { color: var(--text); background: var(--surface2); }
+/* Tokens, not `inherit`: a button does not inherit colour by default, and an
+   inherited colour is one contrast.js cannot measure. Same values as the th. */
+.th-sort { background: none; border: none; padding: 0; font: inherit; color: var(--text-dim);
+  text-transform: inherit; letter-spacing: inherit; text-align: inherit; cursor: pointer; }
+th[data-field]:hover .th-sort { color: var(--text); }
+.shot-open { background: none; border: none; padding: 0; font: inherit; color: var(--text); cursor: pointer;
+  min-width: 1.5rem; text-align: left; }
+.session-open { background: none; border: none; padding: 0; font-family: inherit; text-align: left; cursor: pointer; }
 td {
   padding: .55rem .875rem; border-top: 1px solid var(--line);
   white-space: nowrap; color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 tr:hover td { background: var(--surface2); }
-.row-good td { border-left: 2px solid var(--green); }
-.row-ok   td { border-left: 2px solid var(--yellow); }
-.row-bad  td { border-left: 2px solid var(--red); }
+/* The row's score as a mark on its FIRST cell. Written as `td`, it drew a
+   coloured rule down the left of every cell, so the table read as a grid of
+   green, yellow and red columns. */
+.row-good td:first-child { border-left: 2px solid var(--green); }
+.row-ok   td:first-child { border-left: 2px solid var(--yellow); }
+.row-bad  td:first-child { border-left: 2px solid var(--red); }
 .shot-score {
   font-family: var(--font-display);
   font-weight: 800; font-size: .9rem; font-variant-numeric: tabular-nums;
@@ -2540,9 +2554,12 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
   padding: var(--s4); background: var(--surface);
   border: 1px solid var(--line); border-left: 2px solid var(--accent);
   border-radius: var(--radius);
-  cursor: pointer; transition: border-color var(--dur), background var(--dur); margin-bottom: .8rem;
+  transition: border-color var(--dur), background var(--dur); margin-bottom: .8rem;
 }
-.drill-card:hover { border-color: var(--line-strong); border-left-color: var(--accent); background: var(--surface2); }
+/* Pointer and hover only on a card that goes somewhere (R4) — the practice
+   plan's cards are read, not pressed, and looked pressable. */
+.drill-card[role="button"] { cursor: pointer; }
+.drill-card[role="button"]:hover { border-color: var(--line-strong); border-left-color: var(--accent); background: var(--surface2); }
 .drill-icon { font-size: 1.5rem; margin-bottom: .4rem; }
 .drill-title { font-weight: 700; color: var(--text); margin-bottom: .2rem; }
 .drill-desc { font-size: .85rem; color: var(--text-muted); line-height: 1.4; }

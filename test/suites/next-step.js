@@ -54,6 +54,9 @@ R.clear();
 console.log('— the fault step checks the drill can actually be run —');
 const drill = SR.getNextStep([s1]);
 ok(drill.type === 'drill', 'a recurring fault is named');
+// The card's "Open →" routed to 'drill', which Router maps to the home view
+// the card sits on — pressing the one ranked card did nothing.
+ok(drill.action === 'practice', `and opening it goes to the practice plan, not back to home (${drill.action})`);
 ok(/of \d+ shots/.test(drill.why), 'with how often it recurred');
 ok(/past what measurement noise produces/.test(drill.why), 'and why that clears the bar');
 ok(drill.desc.length > 30 && drill.desc !== drill.title,

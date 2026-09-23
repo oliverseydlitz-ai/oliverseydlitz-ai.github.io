@@ -170,6 +170,34 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   // A control scrolled partly out of its box is legitimately clipped and is
   // not reported. No exemption list: there is nothing here worth exempting.
   let rings = 0;
+  // POINTER: anything styled as clickable (`cursor: pointer`) must be
+  // reachable from the keyboard — itself, an ancestor, or a descendant that
+  // declares itself the keyboard way in with `data-key-proxy` (R4). The first
+  // run of this found every session card, the last-session tile, the ranked
+  // card, the fault headers, every shot row and every table header: the
+  // app's main navigation was pointer-only.
+  const pointerCheck = async label => {
+    const res = await p.evaluate(() => {
+      const REACH = 'button, a[href], input, select, textarea, label, summary, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+      const inView = el => { const v = el.closest('.view'); return !v || v.classList.contains('active'); };
+      const out = [];
+      for (const el of document.querySelectorAll('body *')) {
+        if (!inView(el) || el.closest('[hidden]')) continue;
+        const r = el.getBoundingClientRect(); if (!r.width || !r.height) continue;
+        if (getComputedStyle(el).cursor !== 'pointer') continue;
+        if (el.closest(REACH)) continue;
+        // `cursor` inherits, so judge the OUTERMOST element of the pointer
+        // chain — the card, not every line of text inside it.
+        let root = el;
+        while (root.parentElement && getComputedStyle(root.parentElement).cursor === 'pointer') root = root.parentElement;
+        if (root.closest(REACH) || root.querySelector('[data-key-proxy]')) continue;
+        out.push(root.tagName.toLowerCase() + '.' + ((root.className + '').trim().split(/\s+/)[0] || '') + (root.id ? '#' + root.id : ''));
+      }
+      return [...new Set(out)];
+    });
+    res.slice(0, 12).forEach(x => console.log(`  POINTER   ${label}: ${x} looks clickable and no keyboard reaches it`));
+    rings += res.length;
+  };
   const ringCheck = async label => {
     await p.keyboard.press('Shift');   // a keyboard interaction, so focus() matches :focus-visible
     const res = await p.evaluate(() => {
@@ -232,6 +260,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     total += scan(v, await p.evaluate(() => document.body.innerText));
     await widthCheck(v);
     await ringCheck(v);
+    await pointerCheck(v);
   }
   // session detail, every section
   await p.evaluate(async () => { const ss = await Store.getSessions(); Router.showDetail(ss[0].id); });
@@ -241,6 +270,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   total += scan('session detail', await p.evaluate(() => document.body.innerText));
   await widthCheck('session detail');
   await ringCheck('session detail');
+  await pointerCheck('session detail');
   // every drill-library tab
   await p.click('.bottom-nav-item[data-view="drills"]'); await p.waitForTimeout(1200);
   for (const s of ['A','B','C','D','E','F','G','H','I']) {
@@ -252,7 +282,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   const staleClipped = Object.keys(KNOWN_CLIPPED).filter(k => !seenClipped.has(k));
   if (staleClipped.length) { overflow++; console.log(`  STALE     these no longer clip — strike them off KNOWN_CLIPPED: ${staleClipped.join(', ')}`); }
   console.log(overflow ? `${overflow} layout finding(s)` : 'no horizontal overflow, clipped box, gutterless title or spilled label at phone width');
-  console.log(rings ? `${rings} focus ring(s) not drawn` : 'every focusable control draws a visible focus ring');
+  console.log(rings ? `${rings} focus-ring or pointer-only finding(s)` : 'every focusable control draws a visible focus ring, and nothing clickable is pointer-only');
   console.log('page errors:', errs.length?errs:'none');
   await b.close();
   // Exit non-zero on a finding. This used to only print, so its exit status was

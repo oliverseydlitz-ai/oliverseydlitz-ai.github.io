@@ -988,6 +988,15 @@ off while it measures, because buttons transition `outline-color` and a
 mid-flight read made the colour check unable to fail — found by checking the
 check. The fix is an inset `currentColor` ring wherever outside would be cut.
 
+**And POINTER (R4):** anything styled `cursor: pointer` must be reachable by
+keyboard — itself, an ancestor, or a descendant marked `data-key-proxy` (the
+session card's date button, a shot row's number). The first run found the
+app's main navigation pointer-only: every session card, the last-session tile,
+the ranked card, fault headers, shot rows and table headers. Non-native
+`role="button"` elements get Enter/Space from one handler in
+`AccessibilityEnhancements`. Paywalled copies are `inert` as well as
+`aria-hidden`, or their controls stay in the tab order.
+
 The workflow is: edit → `bash test/browser/sync.sh` → serve
 `test/browser/site/` → run the scan. **Forgetting the sync is the classic
 mistake** — you then measure the previous version and conclude a fix did not
@@ -1300,7 +1309,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v176**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v177**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1767,7 +1776,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v176**. Deterministic auth, cloud sync
+**72 test suites**, service worker **v177**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

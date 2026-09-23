@@ -6102,7 +6102,10 @@ const SmartRecommendations = (() => {
             ? `It showed on ${f.count} of ${f.total} shots, which is past what measurement noise produces.`
             : 'It showed often enough to report, but the drill for it needs a measurement this session ' +
               'did not provide — the note above says which.',
-          icon: f.icon, action: 'drill',
+          // 'practice', where the plan for this fault is built. It was 'drill',
+          // which Router maps to the home view the card is already on, so
+          // "Open →" on the one ranked card did nothing at all.
+          icon: f.icon, action: 'practice',
           // Carried so the home view can drop the alert that would otherwise
           // restate this exact fault directly underneath the card.
           faultId: f.id, clubType: f.clubType || null,
@@ -6667,13 +6670,16 @@ const Trajectory = (() => {
 //
 // So: call this FIRST, and attach listeners only when it returns false. The
 // return value is the point of the return value.
+// The blurred copy is `inert` as well as aria-hidden: hidden from a screen
+// reader but still in the tab order is the worst of both — focus lands on
+// controls nobody can see or use, which every button in a paywalled plan did.
 function applyPaywall(el, cta) {
   if (Auth.getUser()) return false;
   if (!el || !el.innerHTML.trim()) return false;
   const inner = el.innerHTML;
   el.innerHTML = `
     <div class="paywall-wrap">
-      <div class="paywall-blur" aria-hidden="true">${inner}</div>
+      <div class="paywall-blur" aria-hidden="true" inert>${inner}</div>
       <div class="paywall-overlay">
         <span class="paywall-lock">${icon('lock')}</span>
         <span class="paywall-msg">${cta || 'Sign in to unlock'}</span>
@@ -7407,7 +7413,7 @@ const UI = (() => {
         // ranked card stopped rendering, which is worth failing a suite over.
         band(nextHost, 'signal');
         nextHost.innerHTML = `
-          <div class="drill-card next-step${next.deadline ? ' has-deadline' : ''}" data-route="${Sanitize.escape(next.action)}">
+          <div class="drill-card next-step${next.deadline ? ' has-deadline' : ''}" data-route="${Sanitize.escape(next.action)}" role="button" tabindex="0">
             <div class="drill-icon">${icon(next.icon)}</div>
             <div class="drill-title">${Sanitize.escape(next.title)}</div>
             <div class="drill-desc">${Sanitize.escape(next.desc)}</div>
@@ -7702,7 +7708,7 @@ const UI = (() => {
         <div class="dash-tile"><div class="dt-val">${clubs.length}</div><div class="dt-label">Clubs tracked</div></div>
         ${longest?`<div class="dash-tile accent"><div class="dt-val">${longest.value}<small>yds</small></div><div class="dt-label">Longest carry · ${longest.club}</div></div>`:''}
         ${topBall?`<div class="dash-tile"><div class="dt-val">${topBall.value}<small>mph</small></div><div class="dt-label">Top ball speed</div></div>`:''}
-        <div class="dash-tile wide clickable" data-goto-last="${last.id}">
+        <div class="dash-tile wide clickable" data-goto-last="${last.id}" role="button" tabindex="0">
           <div class="dt-label">Last session · ${formatDate(last.date)}</div>
           <div class="dt-lastline">${topFault?`<span class="dt-fault">${icon(topFault.icon)} ${topFault.name}</span>`:`<span class="dt-clean">${icon('check')} No major faults — clean session</span>`}</div>
           <div class="dt-cta">View report →</div>
@@ -7792,7 +7798,7 @@ const UI = (() => {
         <li>
           <div class="session-card" data-id="${s.id}">
             <div>
-              <div class="session-card-date">${formatDate(s.date)}</div>
+              <button type="button" class="session-card-date session-open" data-key-proxy>${formatDate(s.date)}</button>
               <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
                 <div class="stat-card">
@@ -8818,7 +8824,7 @@ const UI = (() => {
           <div class="fault-cat-label">${cat}</div>
           ${catFaults.map(f => `
             <div class="fault-card severity-${f.severity}" data-fault="${f.id}">
-              <div class="fault-header">
+              <div class="fault-header" role="button" tabindex="0" aria-expanded="false">
                 <div class="fault-header-left">
                   <span class="fault-icon">${icon(f.icon)}</span>
                   <div>
@@ -8874,7 +8880,8 @@ const UI = (() => {
     // are thrown away and a guest gets cards that will not open.
     if (applyPaywall(el, "Sign in to unlock fault detection & drills")) return;
     el.querySelectorAll('.fault-card').forEach(card => {
-      card.querySelector('.fault-header').addEventListener('click', () => card.classList.toggle('open'));
+      const head = card.querySelector('.fault-header');
+      head.addEventListener('click', () => head.setAttribute('aria-expanded', String(card.classList.toggle('open'))));
     });
   }
 
@@ -8947,7 +8954,8 @@ const UI = (() => {
     if (_sortField) sorted.sort((a,b)=>(a[_sortField]-b[_sortField])*_sortDir);
 
     const COLS = [
-      {label:'#',       render:(s,i)=>i+1,               field:null},
+      // The row opens on a click anywhere; the number is its keyboard way in (R4).
+      {label:'#',       render:(s,i)=>`<button type="button" class="shot-open" data-key-proxy aria-label="Open shot ${i+1}">${i+1}</button>`, field:null},
       {label:'Club',    render:s=>`<span class="club-dot" style="background:${clubColor(s.clubType)}"></span>${clubLabel(s.clubType)}`, field:'clubType'},
       {label:'Score',   render:s=>{ const sc=ShotScorer.score(s); return sc!==null?`<span class="shot-score" style="color:${ShotScorer.scoreColor(sc)}">${sc}</span>`:'—'; }, field:null},
       {label:'Ball<br><small>mph</small>',  render:s=>fmt(s.ballSpeed,0),   field:'ballSpeed'},
@@ -8975,7 +8983,11 @@ const UI = (() => {
     const el = document.getElementById('shotTable');
     const heads = COLS.map(c=>{
       const a=_sortField===c.field; const arrow=a?(_sortDir===1?' ↑':' ↓'):'';
-      return `<th ${c.field?`data-field="${c.field}"`:''}>${c.label}${arrow}</th>`;
+      // A sortable header holds a button, so sorting is reachable by keyboard
+      // and announced; aria-sort says which way it is sorted now (R4).
+      return c.field
+        ? `<th data-field="${c.field}"${a ? ` aria-sort="${_sortDir===1?'ascending':'descending'}"` : ''}><button type="button" class="th-sort" data-key-proxy>${c.label}${arrow}</button></th>`
+        : `<th>${c.label}</th>`;
     }).join('');
 
     // Every shot, every number. See FeedbackEngine.WHY_SHOWN: the guidance
@@ -9163,7 +9175,7 @@ const UI = (() => {
             { shots: clubShots, clubType: widest.club, sessions: used.length });
           const pick = rows.filter(r => r.ok)[0];
           drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h3>
-            <div class="drill-card" data-route="practice">
+            <div class="drill-card" data-route="practice" role="button" tabindex="0">
               <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(widest.club)}"></div>
               <div class="drill-title">${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
               <div class="drill-desc">${fmt(widest.carry.mean,0)} ± ${fmt(widest.carry.ci,0)} yds over
@@ -13117,6 +13129,17 @@ const AccessibilityEnhancements = (() => {
       });
     })).observe(document.body, { childList: true, subtree: true });
     document.addEventListener('keydown', onKey, true);
+    // A `role="button"` that is not a <button> gets none of a button's
+    // keyboard behaviour for free: Enter and Space do nothing unless someone
+    // wires them. One place wires them for all of them (R4), so a card made
+    // keyboard-reachable is also keyboard-USABLE.
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const t = e.target;
+      if (!t || !t.matches || !t.matches('[role="button"]:not(button):not(a):not(input)')) return;
+      e.preventDefault();
+      t.click();
+    });
   }
 
   return { init, openCount: () => _open.length, top };
