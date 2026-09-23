@@ -2557,9 +2557,14 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .session-card:active { transform: scale(0.99); }
 
 /* Smooth animations */
+/* Translate only, from a `from` with no `to`: the content is visible for the
+   whole animation, and the resting state is whatever the element computes to
+   (the scroll-motion rule). It used to fade in from opacity 0 — and a second
+   `@keyframes slideUp` below, the cookie banner's, won the name outright, so
+   plan cards and the stats strip entered from translateY(100%) and invisible
+   (V36). The banner's keyframe is `cookieIn` now. */
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { transform: translateY(10px); }
 }
 
 .quick-stats { animation: slideUp .3s ease; }
@@ -2610,7 +2615,7 @@ canvas {
   border-top: 1px solid var(--line-strong);
   padding: 1.2rem;
   padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
-  animation: slideUp .3s ease;
+  animation: cookieIn .3s ease;
 }
 
 .cookie-consent-content {
@@ -2671,15 +2676,11 @@ canvas {
   }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+/* The banner is fixed to the bottom edge, so it rises from below the screen
+   rather than fading: off-screen is not a resting state it ever holds, and
+   without the animation it simply sits where it belongs. */
+@keyframes cookieIn {
+  from { transform: translateY(100%); }
 }
 
 /* ── Range card ───────────────────────────────────────────────────

@@ -215,5 +215,25 @@ const ctl = deadMedia(DEAD_CTL);
 ok(ctl.length === 1 && /padding-inline/.test(ctl[0]),
    `the shipped defect's shape — a phone padding-inline under a later padding shorthand — is found (${ctl.length})`);
 
+console.log('— and no @keyframes name is declared twice —');
+// V36. `@keyframes slideUp` was declared twice, 110 lines apart, and the later
+// one (the cookie banner's: translateY(100%), opacity 0) won the name for
+// every element using it — plan cards and the stats strip entered from below
+// their own box and invisible. The scan above lifts @keyframes out, so it
+// could never see this. Unlike a selector, a keyframe name is not merged:
+// the last one wins whole.
+const dupKeyframes = text => {
+  const seen = new Map(), dups = [];
+  for (const m of text.matchAll(/@keyframes\s+([\w-]+)/g)) {
+    const line = text.slice(0, m.index).split('\n').length;
+    if (seen.has(m[1])) dups.push(`${m[1]} at lines ${seen.get(m[1])} and ${line}`); else seen.set(m[1], line);
+  }
+  return dups;
+};
+const kd = dupKeyframes(css);
+ok(kd.length === 0, `every @keyframes name is declared once${kd.length ? ' — ' + kd.join('; ') : ''}`);
+ok(dupKeyframes('@keyframes a { from{} }\n@keyframes b {}\n@keyframes a { to{} }').length === 1,
+   'and the shipped shape — one name declared twice — is found');
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 module.exports = { fail };
