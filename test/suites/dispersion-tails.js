@@ -36,14 +36,22 @@ ok(D.offlineAngle({ sideCarry: null, carryDistance: 200 }) === null, 'no side ca
 ok(D.offlineAngle({ sideCarry: 2, carryDistance: 5 }) === null, `a ${D.MIN_CARRY}-yard "shot" is screened out as geometry, not trimmed as an outlier`);
 ok(D.offlineAngle({ sideCarry: 400, carryDistance: 100 }) === null, 'a 76-degree offline reading is a mis-read');
 
-console.log('— range balls disqualify the whole tail —');
+console.log('— v2: range balls are near-normal data, weighted in a mixed pool —');
 const rangeSet = spread(40, 4, 0, { ball: 'range' });
 const rg = D.eligible(rangeSet);
-ok(rg.ok === false, 'a 40-shot range-ball session is refused outright');
-ok(/2–4×|Range balls/.test(rg.reasons.join(' ')), 'and says the spread would be the ball\'s, not the golfer\'s');
-ok(D.eligible(spread(40, 4, 0, { ball: 'unknown' })).ok === false, 'an unrecorded ball type is refused too');
-ok(D.eligible(spread(40, 4, 0, { ball: 'rpt' })).ok === true, 'an RPT ball is accepted');
-ok(rg.reasons.length === 1, 'and the refusal is stated once, not as a ball problem plus a phantom sample-size one');
+ok(rg.ok === true && rg.reasons.length === 0, 'a 40-shot range-ball session computes, with nothing to apologise for');
+ok(D.eligible(spread(40, 4, 0, { ball: 'unknown' })).ok === true, 'so does an unrecorded ball');
+ok(D.eligible(spread(40, 4, 0, { ball: 'rpt' })).ok === true, 'and an RPT ball');
+ok(Math.abs(D.tail(rangeSet).sigma - D.tail(spread(40, 4, 0, { ball: 'premium' })).sigma) < 1e-9,
+   'an all-range pool gets the same sigma as the same shots on premium: weights only matter when balls are mixed');
+{
+  // Premium shots tight, range shots wide. Down-weighting range (x0.8) must
+  // pull the pooled spread toward the premium one, never away from it.
+  const mixed = spread(20, 2, 0, { ball: 'premium' }).concat(spread(20, 6, 0, { ball: 'range' }));
+  const asIfEqual = mixed.map(x => ({ ...x, _ball: 'premium' }));
+  ok(D.tail(mixed).sigma < D.tail(asIfEqual).sigma,
+     `a mixed pool leans on your own ball (${D.tail(mixed).sigma.toFixed(2)} vs ${D.tail(asIfEqual).sigma.toFixed(2)} unweighted)`);
+}
 
 console.log(`— and so does a sample under ${Metrics.MIN_SHOTS_TAIL} —`);
 const small = D.eligible(spread(20, 4));
@@ -95,8 +103,9 @@ const off = spread(34, 3, 6);          // 6 degrees of aiming error, unconfirmed
 const on  = spread(34, 3, 6, { aligned: true });
 ok(Math.abs(D.tail(off).sigma - D.tail(spread(34, 3, 0)).sigma) < 0.01,
    'a constant aiming offset cancels out of sigma entirely');
-ok(D.tail(off).bias === null, 'bias is withheld without confirmed alignment');
-ok(D.tail(on).bias !== null, 'and reported once alignment is confirmed');
+ok(Number.isFinite(D.tail(off).bias) && D.tail(off).aligned === false,
+   'v2 (C8): bias is shown without confirmed alignment, flagged as unaligned so it is judged as tier 3');
+ok(Number.isFinite(D.tail(on).bias) && D.tail(on).aligned === true, 'and flagged aligned once confirmed');
 
 console.log('— the two-sided miss census —');
 const oneWay = [...spread(34, 2), shot(9), shot(10), shot(11)];
@@ -153,7 +162,7 @@ ok(D.trend(flat).real === false, 'a move inside it does not');
 ok(/not the same as no change/.test(D.trend(flat).note), 'and refuses to call that no change');
 ok(D.trend([sess(1, 4.0)]).ok === false, 'one session is not a trend');
 const ranged = [1,2].map(i => ({ ...sess(i, 4.0), conditions: { ball: 'range', surface: 'grass' } }));
-ok(D.trend(ranged).ok === false, 'range-ball sessions never enter the trend');
+ok(D.trend(ranged).ok === true, 'v2: range-ball sessions enter the trend like any other');
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

@@ -107,14 +107,14 @@ const CookieConsent = (() => {
 // ────────────────────────────────────────────────────────────────
 const Agreement = (() => {
   const KEY = 'slTermsAccepted';
-  // Bumped for the 2026-09-12 hardening audit: an explicit beta section, the
-  // no-guarantee and no-professional-advice clauses, the physical-activity
-  // safety clause and the Rapsodo non-affiliation statement. This is a material
-  // change — the governing law, the dispute-resolution route and the legal
-  // bases for processing all moved — so every user is asked again rather than
-  // being bound by terms they accepted a different version of.
-  const VERSION = '2026-09-12';
-  const PRIVACY_VERSION = '2026-09-12';
+  // 2026-09-23: measurement model v2. The Terms now say plainly that advice
+  // treats device readings as accurate, that the device has error, and that
+  // calculated values are used too. That is a statement of fact about what the
+  // Service does, so every user is asked again. (2026-09-12 was the hardening
+  // audit: beta section, no-guarantee, safety, Rapsodo non-affiliation.)
+  // Both documents carry the same version, which legal-docs.js pins.
+  const VERSION = '2026-09-23';
+  const PRIVACY_VERSION = '2026-09-23';
 
   function hasAccepted() {
     try {
@@ -601,8 +601,34 @@ const Metrics = (() => {
     // one model output with enough downstream value to keep at tier 1.
     totalDistance: 3, sideCarry: 3, apex: 3, descentAngle: 3,
   };
-  const tier = m => TIER[m] || 3;
-  const canPrescribe = m => tier(m) === 1;
+  // Derived metrics take the tier of their weakest input. Face-to-path is
+  // worked backwards from launch direction (tier 3) and club path; spin loft
+  // is estimated from launch and attack angle (both tier 2).
+  const DERIVED_TIER = { facePath: 3, faceAngle: 3, spinLoft: 2 };
+  const tier = m => TIER[m] || DERIVED_TIER[m] || 3;
+
+  // ── Measurement model v2 (Oliver, 22 Sep 2026) ─────────────────
+  // EVERY tier prescribes. A tier sets how hard a fault is judged, never
+  // whether it may be: the recurrence rate a fault must reach before it is
+  // reported (`min`), and the rate at which it counts as confirmed rather than
+  // tentative (`firm`). "Stuff all the way at the bottom, judge it harder, not
+  // too different." These are the only copy of these numbers.
+  const TIER_RATES = {
+    1: { min: 0.30, firm: 0.50 },
+    2: { min: 0.35, firm: 0.55 },
+    3: { min: 0.40, firm: 0.60 },
+  };
+  const tierRates = t => TIER_RATES[t] || TIER_RATES[3];
+
+  // Range balls are near-normal data: slightly lower weight in any pool that
+  // spans sessions, and a slightly higher bar before a fault on them reports.
+  // Never a source of spin (see Spin). A ball that was not recorded is treated
+  // like a range ball: it might be one. Premium and RPT balls, including in a
+  // net or a simulator, count as normal.
+  const CONDITION_WEIGHT   = { range: 0.8, unknown: 0.8 };
+  const CONDITION_RATE_BUMP = { range: 0.05, unknown: 0.05 };
+  const conditionWeight = ballId => CONDITION_WEIGHT[ballId] ?? 1;
+  const rateBump = ballId => CONDITION_RATE_BUMP[ballId] ?? 0;
 
   // REFERENCE ONLY — never used to compute a +/- shown to the golfer.
   // These are published population figures. They are surfaced in Settings so
@@ -712,9 +738,11 @@ const Metrics = (() => {
 
   // Wild misreads destroy a 10-shot mean (one user logged a 147 mph swing and
   // a 0 mph swing back to back). Trim on MAD, and always report how many went.
-  function trimOutliers(values) {
+  // The keep-test behind trimOutliers, so a weighted pool can trim on exactly
+  // the same rule without a second copy of it.
+  function outlierTest(values) {
     const v = (values || []).filter(Number.isFinite);
-    if (v.length < 4) return { kept: v, dropped: 0 };
+    if (v.length < 4) return () => true;
     const sorted = [...v].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)];
     const mad = sorted.map(x => Math.abs(x - med)).sort((a, b) => a - b)[Math.floor(sorted.length / 2)] || 0;
@@ -724,8 +752,13 @@ const Metrics = (() => {
     // non-zero deviation is the outlier's own, so it sets the scale it is then
     // measured against and always passes. Records are screened on physical
     // impossibility instead — see `Metrics.CEILING`.
-    if (mad === 0) return { kept: v, dropped: 0 };
-    const kept = v.filter(x => Math.abs(x - med) / (1.4826 * mad) <= 3.5);
+    if (mad === 0) return () => true;
+    return x => Math.abs(x - med) / (1.4826 * mad) <= 3.5;
+  }
+  function trimOutliers(values) {
+    const v = (values || []).filter(Number.isFinite);
+    const keep = outlierTest(v);
+    const kept = v.filter(keep);
     return { kept, dropped: v.length - kept.length };
   }
 
@@ -776,6 +809,28 @@ const Metrics = (() => {
   }
 
   // Format a mean the honest way: an interval, never a bare point estimate.
+  // A pool that spans ball types (v2): each value carries a weight, range
+  // balls 0.8 (CONDITION_WEIGHT). Same trim, same 1.96 x SE, with the SE taken
+  // over the Kish effective sample size, so down-weighted shots count for less
+  // certainty as well as less pull on the mean. `n` stays the real shot count.
+  function weightedInterval(pairs, unit = '', decimals = 1) {
+    const ok = (pairs || []).filter(p => Number.isFinite(p.v) && p.w > 0);
+    const keep = outlierTest(ok.map(p => p.v));
+    const kept = ok.filter(p => keep(p.v));
+    if (kept.length < 2) return null;
+    const W = kept.reduce((a, p) => a + p.w, 0);
+    const m = kept.reduce((a, p) => a + p.w * p.v, 0) / W;
+    const varW = kept.reduce((a, p) => a + p.w * (p.v - m) ** 2, 0) / W;
+    const nEff = W * W / kept.reduce((a, p) => a + p.w * p.w, 0);
+    const ci = 1.96 * Math.sqrt(varW * nEff / Math.max(1, nEff - 1)) / Math.sqrt(nEff);
+    const dropped = ok.length - kept.length;
+    return {
+      mean: m, ci, n: kept.length, nEff, dropped, weighted: kept.some(p => p.w !== 1),
+      text: `${fmt(m, decimals)} ± ${fmt(ci, decimals)}${unit} (${kept.length} shots` +
+        (dropped ? `, ${dropped} trimmed` : '') + ')',
+    };
+  }
+
   function interval(values, unit = '', decimals = 1) {
     const { kept, dropped } = trimOutliers(values);
     if (kept.length < 2) return null;
@@ -788,9 +843,9 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
+  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
-           trimOutliers, typicalError, changeIsReal, interval };
+           trimOutliers, typicalError, changeIsReal, interval, weightedInterval };
 })();
 
 
@@ -1677,10 +1732,13 @@ const FeedbackEngine = (() => {
 // because a rigid surface lets the sole bounce instead of the edge digging.
 const Conditions = (() => {
   const BALLS = {
-    premium:  { id:'premium',  label:'Premium (own ball)', dispersionValid:true,  gappingValid:true  },
-    rpt:      { id:'rpt',      label:'Rapsodo RPT',        dispersionValid:true,  gappingValid:true, spinMeasured:true },
-    range:    { id:'range',    label:'Range balls',        dispersionValid:false, gappingValid:false },
-    unknown:  { id:'unknown',  label:'Not recorded',       dispersionValid:false, gappingValid:false },
+    // v2: every ball feeds dispersion and gapping. What differs is the weight
+    // in a cross-session pool and the fault bar (Metrics.conditionWeight /
+    // rateBump), and whether spin is a reading at all (RPT only).
+    premium:  { id:'premium',  label:'Premium (own ball)' },
+    rpt:      { id:'rpt',      label:'Rapsodo RPT',        spinMeasured:true },
+    range:    { id:'range',    label:'Range balls' },
+    unknown:  { id:'unknown',  label:'Not recorded' },
   };
   const SURFACES = {
     grass: { id:'grass', label:'Grass',  masksFatStrikes:false },
@@ -1712,28 +1770,17 @@ const Conditions = (() => {
   // The sample floor for a launch-direction-derived claim, given alignment.
   const startLineFloor = x => aligned(x) ? Metrics.MIN_SHOTS_REPORT : Metrics.MIN_SHOTS_TAIL;
 
-  // Reasons to withhold a prescription, in plain language.
-  function caveats(sn) {
-    const out = [];
-    const b = ball(sn), sf = surface(sn);
-    if (!b.dispersionValid) {
-      out.push(b.id === 'range'
-        ? 'Range balls: dispersion here is 2–4× wider than your own ball would give, and gapping is unreliable — a wedge can fly further on half the spin. Treat the shape as real and the spread as not.'
-        : 'Ball type not recorded, so dispersion and gapping figures are not comparable between sessions.');
-    }
-    if (!aligned(sn)) {
-      out.push('Alignment not confirmed for this session. Launch direction is measured against wherever ' +
-        'the unit was pointing, so any aiming error becomes a constant offset on every shot — and unlike ' +
-        'random error, averaging more shots will not remove it. Start-line and face-to-path readings are ' +
-        'held to a larger sample until you confirm the Impact Vision alignment.');
-    }
-    if (sf.masksFatStrikes) {
-      out.push(sf.id === 'mat'
-        ? 'Mat: the sole bounces instead of the leading edge digging, so a strike several centimetres behind the ball still reads near-normal. Mats systematically hide fat strikes — the exact thing a low-point drill is meant to catch.'
-        : 'Surface not recorded — if you were on a mat, fat strikes may be hidden.');
-    }
-    return out;
-  }
+  // What the ball, the surface and the alignment do to the numbers. v2 keeps
+  // these OFF the main screens: they are read once, in Settings → How the
+  // numbers work (MeasurementReference), not stamped on every session.
+  const NOTES = {
+    range: 'Range balls: in robot testing they spread 2–4 times wider than a premium ball and do not ' +
+           'shorten every club by the same amount. ShotLab uses them, at slightly less weight than your own ball.',
+    unknown: 'If you don\'t record the ball, ShotLab treats it like a range ball, in case it was one.',
+    mat: 'Mats: the club bounces off the mat instead of digging, so a fat strike can read almost normal.',
+    alignment: 'Alignment: an unaligned unit shifts every start line by the same amount, and more shots ' +
+               'don\'t fix that. Unconfirmed, start-line work waits for 30 shots instead of 10.',
+  };
 
   // Never compare across measurement conditions as if the difference were skill.
   function comparable(a, b2) {
@@ -1799,7 +1846,7 @@ const Conditions = (() => {
     return 'Filled in from your last import (' + parts.join(', ') + '). Change them if today was different.';
   }
 
-  return { BALLS, SURFACES, ball, surface, aligned, startLineFloor, caveats, comparable,
+  return { BALLS, SURFACES, ball, surface, aligned, startLineFloor, NOTES, comparable,
            remember, recall, forget, recallNote };
 })();
 
@@ -1977,30 +2024,20 @@ const Dispersion = (() => {
   // ── Gates ─────────────────────────────────────────────────────
   // Shots carry their measurement context from Store.stamp(), so this works on
   // a session's shots and on a set flattened across sessions alike.
-  const ballOk = s => s?._ball === 'premium' || s?._ball === 'rpt';
+  // v2: every ball counts. Range-ball shots join the pool at
+  // Metrics.conditionWeight (0.8), so a mixed pool leans on your own ball.
+  const weightOf = s => Metrics.conditionWeight(s?._ball || 'unknown');
   const aligned = shots => shots.length > 0 && shots.every(s => s._aligned === true);
 
   function eligible(shots, clubType) {
     const all = (shots || []).filter(s => !clubType || s.clubType === clubType);
-    const onBall = all.filter(ballOk);
-    const usable = onBall.filter(s => offlineAngle(s) !== null);
+    const usable = all.filter(s => offlineAngle(s) !== null);
     const reasons = [];
-    if (all.length && onBall.length < all.length) {
-      reasons.push(onBall.length === 0
-        ? 'Range balls, or a ball type that was never recorded. Range-ball dispersion runs 2–4× ' +
-          'wider than your own ball off a zero-variance robot, so a tail measured on them is the ' +
-          'ball\'s tail as much as yours. Nothing below can be computed from these shots.'
-        : `${all.length - onBall.length} of ${all.length} shots were not hit with a premium or RPT ` +
-          'ball and are excluded — range-ball spread is not comparable to your own ball\'s.');
-    }
-    if (usable.length < onBall.length) {
-      reasons.push(`${onBall.length - usable.length} shot${onBall.length - usable.length === 1 ? '' : 's'} ` +
+    if (usable.length < all.length) {
+      reasons.push(`${all.length - usable.length} shot${all.length - usable.length === 1 ? '' : 's'} ` +
         'had no side carry or no carry distance, so no offline angle could be computed.');
     }
-    // Only a real shortfall, not one the ball gate has already caused — saying
-    // "you have 0 of the 30 needed" under "none of these balls count" reads as
-    // a second, independent problem when it is the same one twice.
-    if (usable.length < Metrics.MIN_SHOTS_TAIL && onBall.length > 0) {
+    if (usable.length < Metrics.MIN_SHOTS_TAIL && all.length > 0) {
       reasons.push(`A tail needs ${Metrics.MIN_SHOTS_TAIL} usable shots and this has ${usable.length}. ` +
         'The bad shot is rare by definition — a small sample usually contains none of them, and ' +
         'reporting a tail without one would say your dispersion is tighter than it is.');
@@ -2073,11 +2110,19 @@ const Dispersion = (() => {
     const core = coreScale(dev);
 
     // The full SD is what Broadie & Ko's sigma_alpha means: the spread of the
-    // whole mixture, bad shots included. Not the core.
-    const sigma = stdDev(angles);
+    // whole mixture, bad shots included. Not the core. Weighted by ball (v2),
+    // which leaves an all-one-ball pool exactly as it was.
+    const w = set.map(weightOf);
+    const W = w.reduce((a, x) => a + x, 0);
+    const wMean = angles.reduce((a, x, i) => a + w[i] * x, 0) / W;
+    const sigma = w.every(x => x === w[0]) ? stdDev(angles)
+      : Math.sqrt(angles.reduce((a, x, i) => a + w[i] * (x - wMean) ** 2, 0) / W *
+                  angles.length / Math.max(1, angles.length - 1));
 
     const cut = TAIL_K * core;
-    const bad = core > 0 ? angles.filter(a => Math.abs(a - centre) > cut) : [];
+    const badIdx = core > 0 ? angles.map((a, i) => Math.abs(a - centre) > cut ? i : -1).filter(i => i >= 0) : [];
+    const bad = badIdx.map(i => angles[i]);
+    const badRate = badIdx.reduce((a, i) => a + w[i], 0) / W;
     const expected = GAUSSIAN_TAIL * angles.length;
     const pValue = core > 0 ? binomTail(bad.length, angles.length, GAUSSIAN_TAIL) : 1;
 
@@ -2087,12 +2132,11 @@ const Dispersion = (() => {
       centre, sigma, core,
       p90: percentile(dev, 0.90), p95: percentile(dev, 0.95),
       worst: dev[dev.length - 1],
-      // Absolute miss is only meaningful measured from a target the unit
-      // actually knew about. Without confirmed alignment the centre is
-      // wherever the unit happened to point, so this is withheld rather than
-      // quoted against a target line that was never established.
-      bias: aligned(set) ? mean(angles) : null,
-      bad: bad.length, badRate: bad.length / angles.length,
+      // Absolute miss (v2, C8): shown whether or not alignment was confirmed,
+      // and judged as tier 3. Without alignment it is measured from wherever
+      // the unit pointed, which is why `aligned` travels with it.
+      bias: wMean,
+      bad: bad.length, badRate,
       expectedBad: expected, pValue,
       // Heavy-tailed means: more bad shots than a normal curve fitted to your
       // own core would produce, at the 5% level. This is the component that
@@ -2183,7 +2227,6 @@ const Dispersion = (() => {
   // next to a premium-ball one shows a change in the ball, not the swing.
   function trend(sessions, clubType) {
     const points = (sessions || [])
-      .filter(sn => Conditions.ball(sn).dispersionValid)
       .map(sn => {
         const t = tail(Store.stamp(sn).shots, clubType);
         return t.ok ? { date: sn.date, id: sn.id, sigma: t.sigma, p95: t.p95, n: t.n } : null;
@@ -2193,7 +2236,7 @@ const Dispersion = (() => {
     if (points.length < 2) {
       return { ok: false, points, note: points.length === 1
         ? 'One qualifying session so far. A tail is only a trend once there are several to compare.'
-        : 'No session yet has 30 usable shots on a premium or RPT ball, so there is no tail to trend.' };
+        : `No session yet has ${Metrics.MIN_SHOTS_TAIL} usable shots with one club, so there is no tail to trend.` };
     }
     const sigmas = points.map(p => p.sigma);
     const delta = sigmas[sigmas.length - 1] - sigmas[sigmas.length - 2];
@@ -2767,8 +2810,8 @@ const DrillLibrary = (() => {
          why: 'Fairways hit is flat across handicaps, 50% to 46%. Penalties vary eightfold. ' +
               'Broadie & Ko: what narrower directional spread saves comes from catastrophe avoidance ' +
               'rather than fairways. What it is worth for you is the dispersion-tail figure on your ' +
-              'driver, once you have 30 shots on your own ball.',
-         gate: { shots: 30, ball: 'premium', metric: 'sideCarry' },
+              'driver, once you have 30 shots with it.',
+         gate: { shots: 30, metric: 'sideCarry' },
          structure: 'Track p90 and p95 absolute offline, never SD alone. Blocked → serial → random.' },
     C: { id: 'C', name: 'Start-line control', count: 10,
          why: 'Face contributes about 84% of start direction with a driver, falling to about 71% for a ' +
@@ -2789,10 +2832,10 @@ const DrillLibrary = (() => {
          gate: { shots: 15, metric: 'attackAngle', surface: 'grass' },
          structure: 'Prefer turf. A mat session is flagged, not refused: the shape is still real.' },
     F: { id: 'F', name: 'Distance control and gapping', count: 12,
-         why: 'Carry is a model output with a 13-yard minimum detectable change at ten shots, and ' +
-              'range balls destroy gapping outright — a wedge can fly further on half the spin.',
-         gate: { shots: 10, ball: 'premium', metric: 'carryDistance' },
-         structure: 'Premium balls only. Ten shots per club, and gapping is never read off range balls.' },
+         why: 'Carry moves about 13 yards between two ten-shot sessions on its own, so a gap between ' +
+              'two clubs needs ten shots each before it means anything.',
+         gate: { shots: 10, metric: 'carryDistance' },
+         structure: 'Ten shots per club. Your own ball gives the truest yardages; range-ball sessions count at slightly less weight.' },
     G: { id: 'G', name: 'Speed development', count: 10,
          why: 'Strength and power first, overspeed as an adjunct. Expect +2–4 mph over 8–12 weeks, ' +
               'not +8, and never read a response off one before-and-after pair.',
@@ -3063,20 +3106,22 @@ const DrillLibrary = (() => {
     const all = (ctx.shots || []);
     const set = ctx.clubType ? all.filter(s => s.clubType === ctx.clubType) : all;
 
-    const needShots = drill.shots || gate.shots;
+    // v2: no condition bans. Range balls run every section (they are weighted
+    // where sessions are pooled, and judged slightly harder by FaultEngine).
+    // An unconfirmed alignment no longer locks start-line work: it raises the
+    // shot count instead, the same startLineFloor FaultEngine uses (10 aligned,
+    // 30 not). The minimum-shot floors themselves are unchanged.
+    let needShots = drill.shots || gate.shots;
+    let why = '';
+    if (gate.alignment && set.length && !Conditions.aligned(set)) {
+      const f = Conditions.startLineFloor(set);
+      if (f > (needShots || 0)) {
+        needShots = f;
+        why = ` The unit's alignment wasn't confirmed, so start-line work waits for more shots. Confirm it and ${Metrics.MIN_SHOTS_REPORT} will do.`;
+      }
+    }
     if (needShots && set.length < needShots) {
-      reasons.push(`Needs ${needShots} shots${ctx.clubType ? ' of ' + clubLabel(ctx.clubType) : ''} and you have ${set.length}.`);
-    }
-    if (gate.ball === 'premium' && set.length && !set.every(s => s._ball === 'premium' || s._ball === 'rpt')) {
-      reasons.push('Needs your own premium or RPT ball. Range-ball spread is 2–4× wider and gapping off them is not comparable.');
-    }
-    if (gate.alignment && set.length && !set.every(s => s._aligned === true)) {
-      reasons.push('Needs a confirmed Impact Vision alignment, because an aiming error becomes a constant offset on every start line and averaging will not remove it.');
-    }
-    if (gate.surface === 'grass' && set.length && set.every(s => s._surface === 'mat')) {
-      // Flagged, not refused — the spec is explicit that a mat session still
-      // shows the shape, it just hides the fat strikes.
-      reasons.push('MAT: a strike several centimetres behind the ball still reads near-normal off a mat, so this drill can show you the pattern but not the fat strikes it exists to catch.');
+      reasons.push(`Needs ${needShots} shots${ctx.clubType ? ' of ' + clubLabel(ctx.clubType) : ''} and you have ${set.length}.${why}`);
     }
     if (drill.sessions && (ctx.sessions || 0) < drill.sessions) {
       reasons.push(`Needs ${drill.sessions} qualifying sessions and you have ${ctx.sessions || 0}. A trend is not a before-and-after.`);
@@ -3889,6 +3934,38 @@ const MeasurementReference = (() => {
     'numbers, it shifts all of them the same way, and averaging cannot remove a constant. ' +
     'That is why setup is a separate checklist rather than a tolerance.';
 
+  // ── How the numbers work (measurement model v2) ────────────────
+  // Every caveat the main screens used to carry lives here instead, read once
+  // (Oliver, 22 Sep: "clean — no caveats" on the main screens). Each line is
+  // read from the module that owns it, so this screen and the rules cannot
+  // drift apart.
+  function howItWorks() {
+    const e = t => Sanitize.escape(String(t));
+    const r = Metrics.tierRates;
+    const pct = x => Math.round(x * 100) + '%';
+    const bump = Metrics.rateBump('range');
+    const para = t => `<p class="ref-note">${e(t)}</p>`;
+    return `
+      <h3 class="setup-h">How the numbers work</h3>
+      ${para('Every number gives advice. The shakier ones just need to show up more often first. ' +
+        `A fault on ball speed, club speed, smash factor or carry reports once it shows up on ${pct(r(1).min)} of a club's shots. ` +
+        `Launch angle, attack angle and club path need ${pct(r(2).min)}. ` +
+        `Spin, start direction, face angle and anything the monitor calculates need ${pct(r(3).min)}.`)}
+      ${para(`No club gets an average until it has ${Metrics.MIN_SHOTS_REPORT} shots. Club path and attack angle wait for ` +
+        `${Metrics.MIN_SHOTS_DELIVERY}, and your bad misses wait for ${Metrics.MIN_SHOTS_TAIL}.`)}
+      ${para(Conditions.NOTES.range + ` On range balls a fault has to show up on ${Math.round(bump * 100)} more shots in 100 before it reports.`)}
+      ${para(Conditions.NOTES.unknown)}
+      ${para(Conditions.NOTES.mat)}
+      ${para(Conditions.NOTES.alignment)}
+      ${para(Spin.NOT_MEASURED)}
+      ${para(Spin.CHANGE_CAVEAT)}
+      ${para(Spin.ALTERNATIVE)}
+      ${para(FaultEngine.BODY_CAVEAT)}
+      ${para(FaultEngine.FEEL_CAVEAT)}
+      <h3 class="setup-h">The strokes figure</h3>
+      ${Dispersion.CAVEATS.map(para).join('')}`;
+  }
+
   function show() {
     document.getElementById('measRefModal')?.remove();
     const m = document.createElement('div');
@@ -3897,7 +3974,7 @@ const MeasurementReference = (() => {
     m.innerHTML = `
       <div class="modal modal-wide">
         <div class="modal-head">
-          <h2 class="modal-title">Measurement reference</h2>
+          <h2 class="modal-title">How the numbers work</h2>
           <button class="btn-icon" data-close-modal aria-label="Close">✕</button>
         </div>
         <div class="modal-scroll">
@@ -3914,7 +3991,7 @@ const MeasurementReference = (() => {
           <h3 class="setup-h">Your own variability, session to session</h3>
           <p class="ref-note">From TrackMan — a reference device where error is negligible, so these
             are approximately the golfer, not the machine. Note the last row: spin is the least
-            stable thing a golfer does, which is why this app never prescribes from it.</p>
+            stable thing a golfer does, which is why spin faults need the most evidence before they report.</p>
           <div class="tbl-wrap"><table class="ref-tbl">
             <thead><tr><th>Metric</th><th>ICC</th><th>Typical error</th></tr></thead>
             <tbody>${BIOLOGY.map(r => `<tr><td>${Sanitize.escape(r.metric)}</td>
@@ -3923,13 +4000,15 @@ const MeasurementReference = (() => {
 
           <h3 class="setup-h">The exception</h3>
           <p class="ref-note">${Sanitize.escape(ALIGNMENT)}</p>
+
+          ${howItWorks()}
         </div>
       </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', e => { if (e.target === m) m.remove(); });
   }
 
-  return { ROWS, BIOLOGY, POLICY, ALIGNMENT, show };
+  return { ROWS, BIOLOGY, POLICY, ALIGNMENT, howItWorks, show };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -4481,11 +4560,10 @@ const SetupGuide = (() => {
     { metric: 'Launch direction, face-to-path, any open/closed face reading',
       needs: 'Impact Vision alignment done properly (steps 3–6). This is the one people skip, and it is the one that silently biases every angular drill the app suggests.' },
     { metric: 'Spin rate, spin axis',
-      needs: 'A Rapsodo RPT ball. Spin is NOT measured with range balls or with your own premium ball — the number you see is estimated, not read. ShotLab never prescribes from spin for this reason.',
+      needs: 'A Rapsodo RPT ball. Spin is NOT measured with range balls or with your own premium ball — the number you see is estimated, not read. ShotLab only uses spin from an RPT ball.',
       warn: true },
     { metric: 'Dispersion and gapping',
-      needs: 'Your own premium balls. Range balls give 2–4× the spread off a machine with zero variability, and a wedge can fly further on half the spin.',
-      warn: true },
+      needs: 'Your own ball gives the truest numbers. Range balls work too: they spread wider and don\'t shorten every club evenly, so ShotLab counts them a little less.' },
   ];
 
   const SUMMARY = 'Ten minutes of setup decides whether the next hour of numbers means anything. ' +
@@ -4681,10 +4759,9 @@ const FaultEngine = (() => {
     };
   }
   const BODY_CAVEAT =
-    'The monitor sees the ball and the club head, not you. These are the body positions that commonly ' +
-    'produce this pattern, and they are worth checking on video — but the app cannot see any of them, and ' +
-    'several different actions produce the same club delivery. Treat them as things to look for, not as ' +
-    'findings.';
+    'The monitor sees the ball and the club, not your body. The "worth checking on video" list on a fault ' +
+    'is what usually causes it, but the app can\'t see any of it, and different swings can produce the ' +
+    'same numbers. Treat it as things to look for, not as findings.';
 
   // ── The same boundary, applied to the drills ─────────────────
   // Splitting the CAUSES at the inference boundary and then prescribing across
@@ -4715,10 +4792,8 @@ const FaultEngine = (() => {
     };
   }
   const FEEL_CAVEAT =
-    'These are body feels. Nothing here can tell you whether one happened — not the app, which sees only ' +
-    'the ball and the club head, and not you without video. Different bodies produce the same club ' +
-    'delivery, so treat a feel as something to try until the numbers above move, and drop it if they ' +
-    'do not.';
+    'Drills listed as feels are about what your body does during the swing. Nothing can confirm you did ' +
+    'it, not the app and not you without video. Try one until the numbers move, and drop it if they don\'t.';
 
 
   // Per club, off the one copy of the tour numbers (C7). These were 1.40 for
@@ -4755,7 +4830,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'fat-shot', probe:{metric:'smashFactor',better:1}, name:'Fat / Heavy Strike', icon:'target', category:'Contact', severity:'high',
+      id:'fat-shot', probe:{metric:'smashFactor',better:1}, tier:2, name:'Fat / Heavy Strike', icon:'target', category:'Contact', severity:'high',
       test: s => s.smashFactor > 0 && s.clubSpeed > 0 &&
         (s.ballSpeed / s.clubSpeed) < 1.22 && s.attackAngle < -6 && isIron(s.clubType),
       description: shots => `Ball speed / club speed ratio of ${fmt(avg(shots,'ballSpeed')/avg(shots,'clubSpeed'),2)} with steep attack angle — classic fat/heavy strike. ` +
@@ -4778,8 +4853,7 @@ const FaultEngine = (() => {
         const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
         const sc = avg(shots,'sideCarry');
         return `Face is open to path by ~${fmt(afp,1)}° (D-Plane). Ball is starting toward the open face ` +
-          `then curving further right due to clockwise spin axis. Average side carry (a modelled figure, ` +
-          `not measured): +${fmt(sc,1)} yds right. ` +
+          `then curving further right due to clockwise spin axis. Average side carry: +${fmt(sc,1)} yds right. ` +
           `Start direction is mostly face — about 84% for a driver, 78% for a mid-iron, 71% for a wedge — ` +
           `and the rest is path. The "75% face" rule taught everywhere is loft-dependent, not universal.`;
       },
@@ -4801,7 +4875,7 @@ const FaultEngine = (() => {
       description: shots => {
         const sc = avg(shots,'sideCarry');
         return `Face is closed to path. Ball is starting left and curving further left due to counter-clockwise spin. ` +
-          `Average side carry (modelled, not measured): ${fmt(sc,1)} yds left. Strong hooks cost distance and are hard to control under pressure.`;
+          `Average side carry: ${fmt(sc,1)} yds left. Strong hooks cost distance and are hard to control under pressure.`;
       },
       causes:['Grip too strong (hands rotated too far right)','Excessive forearm rotation (rolling over) through impact',
         'Inside-out path combined with closed face','Trail shoulder dropping too low in downswing'],
@@ -5091,7 +5165,7 @@ const FaultEngine = (() => {
 
     // ── SHORT GAME ────────────────────────────────────────────
     {
-      id:'wedge-thin', probe:{metric:'smashFactor',better:1}, name:'Thin Wedge Strikes', icon:'target', category:'Wedge', severity:'medium',
+      id:'wedge-thin', probe:{metric:'smashFactor',better:1}, tier:2, name:'Thin Wedge Strikes', icon:'target', category:'Wedge', severity:'medium',
       test: s => isShort(s.clubType) && Number.isFinite(s.smashFactor) && s.smashFactor < 1.20 &&
         Number.isFinite(s.launchAngle) && s.launchAngle > 35,
       description: shots => `Smash factor ${fmt(avg(shots,'smashFactor'),2)} on wedges combined with high launch angle — classic thin/bladed wedge. ` +
@@ -5133,8 +5207,25 @@ const FaultEngine = (() => {
   // reported, 15 before a club-path or attack-angle claim, 30 for dispersion
   // tails. A rule may raise its own floor via `minShots`.
   const MIN_AFFECTED = 2;      // never report a fault off a single shot
-  const MIN_RATE     = 0.30;   // share of that club's shots that must trip it
-  const FIRM_RATE    = 0.50;   // below this, report but downgrade severity
+  // The rates a fault must reach come from Metrics.TIER_RATES (v2): every tier
+  // prescribes, a lower tier is judged harder. MIN_RATE / FIRM_RATE are the
+  // tier-1 values, kept as names because they are the floor of the scale.
+  const MIN_RATE     = Metrics.tierRates(1).min;
+  const FIRM_RATE    = Metrics.tierRates(1).firm;
+
+  // A rule's tier is the tier of the metric it judges, unless it declares one
+  // (a rule that reads two metrics takes the lower tier of the two).
+  const ruleTier = rule => rule.tier || Metrics.tier(rule.probe ? rule.probe.metric : null);
+
+  // The range-ball adjustment for a club's shots, in proportion: all range
+  // balls adds the full bump, half range balls half of it.
+  // A shot stamped by Store.stamp() carries its ball; otherwise the session
+  // says. Shots with neither (unit tests, raw parser output) get no bump.
+  const bumpFor = (shots, session) => {
+    if (!shots.length) return 0;
+    const fallback = session ? Conditions.ball(session).id : null;
+    return shots.reduce((a, s) => a + Metrics.rateBump(s._ball || fallback), 0) / shots.length;
+  };
 
   const DOWNGRADE = { high: 'medium', medium: 'low', low: 'low' };
 
@@ -5156,12 +5247,15 @@ const FaultEngine = (() => {
       for (const s of affected) byClub.set(s.clubType, (byClub.get(s.clubType) || 0) + 1);
       const qualifying = [];
       let floor = rule.minShots || Metrics.MIN_SHOTS_REPORT;
+      const tier = ruleTier(rule);
+      const rates = Metrics.tierRates(tier);
       for (const [club, hit] of byClub) {
         const ofClub = shots.filter(s => s.clubType === club);
         const f = rule.minShotsFor ? rule.minShotsFor(ofClub.length ? ofClub : session)
                 : (rule.minShots || Metrics.MIN_SHOTS_REPORT);
-        if (ofClub.length < f || hit < MIN_AFFECTED || hit / ofClub.length < MIN_RATE) continue;
-        qualifying.push({ club, hit, n: ofClub.length, floor: f });
+        const bump = bumpFor(ofClub, session);
+        if (ofClub.length < f || hit < MIN_AFFECTED || hit / ofClub.length < rates.min + bump) continue;
+        qualifying.push({ club, hit, n: ofClub.length, floor: f, bump });
       }
       if (!qualifying.length) continue;
       qualifying.sort((a, b) => b.hit - a.hit);
@@ -5171,7 +5265,8 @@ const FaultEngine = (() => {
       const inClubs = affected.filter(s => clubs.has(s.clubType));
       const rate = inClubs.length / relevant.length;
 
-      const firm = rate >= FIRM_RATE;
+      const firmBump = Math.max(...qualifying.map(q => q.bump));
+      const firm = rate >= rates.firm + firmBump;
       faults.push({
         ...rule,
         severity: firm ? rule.severity : DOWNGRADE[rule.severity] || rule.severity,
@@ -5183,6 +5278,7 @@ const FaultEngine = (() => {
         evidence: `${inClubs.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
           (firm ? '' : ' — borderline, worth another session to confirm'),
         minShots: floor,
+        tier,
         affectedShots: inClubs.map(s=>s._row),
         // For RetentionProbe: which club, and the metric that IS this fault,
         // with the direction that counts as better (C5). Every probe used to
@@ -5202,7 +5298,7 @@ const FaultEngine = (() => {
 
   return { detectFaults, splitCauses, causeIsObservable, BODY_CAVEAT, BODY_CONSTRUCT,
     splitDrills, drillFocus, DRILL_FOCUS, FEEL_CAVEAT,
-           MIN_AFFECTED, MIN_RATE, FIRM_RATE };
+           MIN_AFFECTED, MIN_RATE, FIRM_RATE, ruleTier };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -5362,12 +5458,12 @@ const SwingDNA = (() => {
         value: `${fmt(avgSmash, 2)} · amateur ${fmt(b.am.sf, 2)}, tour ${fmt(b.pga.sf, 2)}` });
     }
 
-    // ── Tier 2: club delivery. Described against the band, not graded. ──
+    // ── Tier 2: club delivery, judged against the target band (v2). ──
     const inBand = (v, band) => Number.isFinite(v) && band && v >= band.lo && v <= band.hi;
     const tgt = Benchmarks.targetsFor(club);
     const aa = avg(cs, 'attackAngle');
     if (Number.isFinite(aa) && n >= Metrics.MIN_SHOTS_DELIVERY) {
-      pills.push({ category: 'Attack angle', icon: 'progress', tone: NEUTRAL,
+      pills.push({ category: 'Attack angle', icon: 'progress', tone: inBand(aa, tgt.attack) ? 'good' : 'ok',
         value: `${aa > 0 ? '+' : ''}${fmt(aa, 1)}° · target ${tgt.attack.label}` +
                (inBand(aa, tgt.attack) ? ' — inside it' : '') });
     }
@@ -5377,18 +5473,18 @@ const SwingDNA = (() => {
         value: `${path > 0 ? '+' : ''}${fmt(path, 1)}° ${path > 0.5 ? 'in-to-out' : path < -0.5 ? 'out-to-in' : 'neutral'}` });
     }
 
-    // ── Tier 3: modelled and never prescribed from. Described only. ─────
+    // ── Tier 3: spin (RPT ball only) and modelled outputs, judged too (v2). ──
     const spinShots = cs.filter(s => s.spinRate && Spin.measured(s));
     if (spinShots.length >= Metrics.MIN_SHOTS_REPORT) {
       const ds = avg(spinShots, 'spinRate');
-      pills.push({ category: 'Spin', icon: 'sync', tone: NEUTRAL,
-        value: `${fmt(ds, 0)} rpm · published window ${tgt.spin.label} — measured, but never a prescription` });
+      pills.push({ category: 'Spin', icon: 'sync', tone: inBand(ds, tgt.spin) ? 'good' : 'ok',
+        value: `${fmt(ds, 0)} rpm · window ${tgt.spin.label}` });
     }
     const avgSC = avg(cs, 'sideCarry');
     if (Number.isFinite(avgSC)) {
       const dir = avgSC < -3 ? 'left of target' : avgSC > 3 ? 'right of target' : 'straight';
       pills.push({ category: 'Where it finishes', icon: 'target', tone: NEUTRAL,
-        value: `${fmt(Math.abs(avgSC), 0)} yds ${dir} on average — a modelled figure, not a measurement` });
+        value: `${fmt(Math.abs(avgSC), 0)} yds ${dir} on average` });
     }
 
     // Face-to-path deliberately has no pill. It is derived rather than
@@ -5608,8 +5704,7 @@ const Insights = (() => {
     const sideVals = shots.map(s => s.sideCarry).filter(Number.isFinite);
     const sideStd = stdDev(sideVals);
     if (sideVals.length >= Metrics.MIN_SHOTS_REPORT && sideStd > 0 && sideStd < 12)
-      strengths.push(`Most shots finished within a <strong>${fmt(sideStd*2,0)}-yard</strong> window ` +
-        `left-to-right — a modelled figure rather than a measurement.`);
+      strengths.push(`Most shots finished within a <strong>${fmt(sideStd*2,0)}-yard</strong> window left-to-right.`);
 
     // This praised "hitting up on the driver" at +1° off TWO SHOTS. The target
     // band is +2 to +5 and lives in `Benchmarks.TARGET`; this was the ninth
@@ -5847,14 +5942,19 @@ const Analytics = (() => {
       b.sessions.reduce((n,s)=>n+s.shots.length,0) - a.sessions.reduce((n,s)=>n+s.shots.length,0));
   }
 
+  // v2 (Oliver, 22 Sep): the book is built on EVERY session. Range balls are
+  // near-normal data and count at Metrics.conditionWeight (0.8), so a bag hit
+  // mostly on your own ball reads mostly as your own ball.
   function yardageBook(sessions) {
-    const all = (sessions || []).flatMap(s=>s.shots);
+    const all = (sessions || []).flatMap(s => (s.shots || []).map(x =>
+      Object.assign(Object.create(x), { _w: Metrics.conditionWeight(x._ball || Conditions.ball(s).id) })));
     return sortedClubs(all).map(c => {
       const cs = all.filter(s=>s.clubType===c);
       const carries = cs.map(s=>s.carryDistance).filter(v=>v>0).sort((a,b)=>a-b);
       // Ten shots before any club mean — the same floor the fault engine, the
       // strike track and the tail engine all sit behind.
-      const iv = Metrics.interval(carries, '', 0);
+      const iv = Metrics.weightedInterval(cs.filter(s => s.carryDistance > 0)
+        .map(s => ({ v: s.carryDistance, w: s._w })), '', 0);
       const enough = cs.length >= Metrics.MIN_SHOTS_REPORT && !!iv;
       const m = iv ? iv.mean : avg(cs,'carryDistance');
       return {
@@ -6500,7 +6600,9 @@ const Features = (() => {
       const out = rows.map(([label, f, dec, unit, higherBetter, sensitive]) => {
         const av = num(a, f), bv = num(b, f);
         const delta = (av!=null && bv!=null) ? av - bv : null;
-        const verdictOk = higherBetter != null && (sameConditions || !sensitive);
+        // v2: a different ball no longer withholds the verdict — range balls
+        // are near-normal data. Only the golfer's own noise does (`real`).
+        const verdictOk = higherBetter != null;
         // Is the move bigger than this golfer's own shot-to-shot variation?
         // null when there is no history to ask, which is not the same as "no",
         // and is why `real` is three-valued everywhere it is read.
@@ -6512,7 +6614,7 @@ const Features = (() => {
           } catch (_) { real = null; }
         }
         return {
-          label, unit, sensitive, withheld: sensitive && !sameConditions, real,
+          label, unit, sensitive, real,
           a: metric(a, f, dec), b: metric(b, f, dec),
           delta: delta!=null ? fmt(Math.abs(delta), dec) : null,
           dir: delta==null||Math.abs(delta)<1e-9 ? 'flat' : delta>0 ? 'up' : 'down',
@@ -6537,19 +6639,6 @@ const Features = (() => {
         out.caveats.push(`Compared on your ${clubLabel(club)} only — ${out.clubShots}+ shots in each session. ` +
           `A bag-wide average moves with which clubs you happened to hit, not with how you hit them.`);
       }
-      if (!sameConditions) {
-        const ba = Conditions.ball(a), bb = Conditions.ball(b);
-        const sa = Conditions.surface(a), sb = Conditions.surface(b);
-        if (ba.id !== bb.id) out.caveats.push(
-          `These sessions used different balls — ${ba.label} against ${bb.label}. Ball type changes carry ` +
-          `and dispersion by more than most training effects do, so the distance rows are shown without a ` +
-          `verdict: the difference is the ball as much as you.`);
-        if (sa.id !== sb.id) out.caveats.push(
-          `Different surfaces — ${sa.label} against ${sb.label}. A mat lets the sole bounce instead of the ` +
-          `edge digging, so a fat strike still reads near-normal and the two sets are not measuring the ` +
-          `same thing.`);
-      }
-      if (!spinBoth) out.caveats.push(Spin.NOT_MEASURED);
       out.tested = !!(history && history.length);
       if (out.tested && out.some(r => r.real === false)) out.caveats.push(
         'Rows marked "within your own variation" moved less than your shot-to-shot spread on this club. ' +
@@ -6800,7 +6889,7 @@ const FirstRun = (() => {
   const markSeen = () => { try { localStorage.setItem(KEY, '1'); } catch (_) {} };
   const reset = () => { try { localStorage.removeItem(KEY); } catch (_) {} };
 
-  // The metrics the app will prescribe from, named from the tier table itself.
+  // Every metric, named from the tier table itself (v2: every tier prescribes).
   const LABEL = {
     ballSpeed: 'ball speed', clubSpeed: 'club speed', smashFactor: 'smash factor',
     carryDistance: 'carry', launchAngle: 'launch angle', attackAngle: 'attack angle',
@@ -6817,6 +6906,7 @@ const FirstRun = (() => {
       tier1: atTier(1),
       tier2: atTier(2),
       tier3: atTier(3),
+      rates: Object.fromEntries([1, 2, 3].map(t => [t, Math.round(Metrics.tierRates(t).min * 100) + '%'])),
       floor: Metrics.MIN_SHOTS_REPORT,
       tailFloor: Metrics.MIN_SHOTS_TAIL,
       probeDays: RetentionProbe.MAX_GAP_DAYS,
@@ -6841,38 +6931,36 @@ const FirstRun = (() => {
           <button class="modal-close" data-fr="close" aria-label="Close">✕</button>
         </div>
         <div class="modal-body intro-body">
-          <p class="intro-lead">Most launch-monitor apps show you every number the device produces and
-            treat them all the same. This one does not, and the difference is the whole product — so it is
-            worth two minutes before you import anything.</p>
+          <p class="intro-lead">Every number your launch monitor gives you gets used. Some just need more
+            evidence than others before the app acts on them. Here's how it works.</p>
 
-          <h3 class="intro-h">Three tiers, not one</h3>
-          <p class="intro-p"><strong>Prescribed freely:</strong> ${esc(c.tier1.join(', '))}. These are the
-            readings the device measures directly and repeatably.</p>
-          <p class="intro-p"><strong>Shown, never prescribed from:</strong> ${esc(c.tier2.join(', '))}.
-            Real readings, but the device's error is close to the size of the thing being judged.</p>
-          <p class="intro-p"><strong>Never used for advice:</strong> ${esc(c.tier3.join(', '))}. Some are
-            not measured at all without the right ball; the rest are models, not measurements. You will see
-            them and the app will not build a drill on them.</p>
+          <h3 class="intro-h">Every number gives advice</h3>
+          <p class="intro-p"><strong>Judged normally:</strong> ${esc(c.tier1.join(', '))}. A fault here
+            reports once it shows up on ${esc(c.rates[1])} of a club's shots.</p>
+          <p class="intro-p"><strong>Needs a bit more:</strong> ${esc(c.tier2.join(', '))}. These need
+            ${esc(c.rates[2])}.</p>
+          <p class="intro-p"><strong>Needs the most:</strong> ${esc(c.tier3.join(', '))}. These need
+            ${esc(c.rates[3])}. Spin only counts with an RPT ball.</p>
 
-          <h3 class="intro-h">Numbers arrive late, on purpose</h3>
-          <p class="intro-p">No club shows a mean until ${esc(c.floor)} shots, and a dispersion tail needs
-            ${esc(c.tailFloor)}. Below that you get a row telling you what it still needs rather than a
-            number that would read like a yardage.</p>
+          <h3 class="intro-h">How many shots</h3>
+          <p class="intro-p">No club gets an average until it has ${esc(c.floor)} shots, and your bad misses
+            wait for ${esc(c.tailFloor)}. Until then you'll see how many more it needs, not a number that
+            looks like a yardage.</p>
           <p class="intro-p">${esc(c.whyShown)}</p>
 
-          <h3 class="intro-h">Conditions change the meaning, not just the context</h3>
-          <p class="intro-p">Every import asks which ball and what you hit off — ${esc(c.balls.join(', '))},
-            grass or mat. Range balls widen dispersion severalfold and break gapping; mats hide fat strikes.
-            Sessions on different conditions are never compared as if the difference were skill.</p>
+          <h3 class="intro-h">Ball and surface</h3>
+          <p class="intro-p">Every import asks which ball you used (${esc(c.balls.join(', '))}) and whether
+            you hit off grass or a mat. Range balls count a little less than your own ball, and spin only
+            comes from an RPT ball.</p>
 
-          <h3 class="intro-h">What you can do today, with no device at all</h3>
+          <h3 class="intro-h">What you can do today, with no launch monitor</h3>
           <p class="intro-p">${c.shortGame ? esc(c.shortGame) + ' putting and chipping drills' : 'The short game'}
-            and the quiet-eye protocol need no launch monitor and work on a brand-new account. The
-            best-evidenced intervention in the whole research base is a putting one.</p>
-          <p class="intro-p">When you do import, the app opens a retention check: come back between a day
-            and ${esc(c.probeDays)} days later, hit the same club, and it will tell you whether the change
-            actually held. That is the only evidence this app can produce that anything worked, and
-            within-session numbers cannot give it to you.</p>
+            and the quiet-eye routine need no launch monitor and work on a brand-new account. The
+            best-backed thing in all the research here is a putting one.</p>
+          <p class="intro-p">When you import, the app starts a retention check: come back between a day
+            and ${esc(c.probeDays)} days later, hit the same club, and it tells you whether the change
+            held. That's the only proof this app can give you that something worked, because
+            within-session numbers cannot show it.</p>
 
           <div class="intro-actions">
             <button class="btn-primary" data-fr="shortgame">Start with the short game</button>
@@ -7017,9 +7105,9 @@ const RangeCard = (() => {
   // Everything the block cannot support, kept verbatim from the plan. A card
   // that drops these is a card that promises more than the data does.
   function notesFor(b) {
+    // v2: no feel caveat at the mat (it lives in Settings → How the numbers
+    // work). A locked block still says what it needs: that is an instruction.
     const out = [];
-    if (b.libraryDrill && b.libraryDrill.feel) out.push('A feel — nothing measures whether it happened.');
-    if (!b.libraryDrill && b.drillIsFeel) out.push('A feel — nothing measures whether it happened. Every drill for this fault is one.');
     if (b.lockedNote) out.push(b.lockedNote);
     return out;
   }
@@ -8086,8 +8174,7 @@ const UI = (() => {
           ${shown.map(r => {
             const cls = r.good === true ? 'good' : r.good === false ? 'bad' : 'flat';
             const arrow = r.dir === 'up' ? '↑' : r.dir === 'down' ? '↓' : '·';
-            const tag = r.withheld ? 'conditions differ'
-                      : r.real === false ? 'within your own variation'
+            const tag = r.real === false ? 'within your own variation'
                       : r.real === null && rows.tested ? 'not enough history to call it'
                       : '';
             return `<div class="since-row ${cls}">
@@ -8206,36 +8293,25 @@ const UI = (() => {
   function renderConditionCaveats(session) {
     const el = document.getElementById('conditionCaveats');
     if (!el) return;
-    const notes = Conditions.caveats(session);
-    // Spin gets its own line either way: named as measured when an RPT ball
-    // was used, named as absent when it was not. Silence would read as "no
-    // spin problem" rather than "no spin data".
-    // When spin IS a reading, show the reading. The app was telling RPT users
-    // "spin is measured here because you used an RPT ball" and then never
-    // showing them a session figure — the caveat without the number it
-    // qualifies. Spin.summary() existed for this and nothing called it.
-    //
-    // It stays an interval from the golfer's own shots with the change caveat
-    // attached, because the reason spin is tier 3 is that it does not track
-    // BETWEEN sessions, not that today's reading is unreadable.
+    // v2 (Oliver, 22 Sep): main screens are clean. What used to be a block of
+    // "before you read these numbers" caveats is one line of facts about the
+    // session. The explanations live in Settings → How the numbers work
+    // (MeasurementReference), where they are read once rather than every time.
+    const b = Conditions.ball(session), sf = Conditions.surface(session);
+    const facts = [b.label, sf.id === 'unknown' ? null : sf.label,
+                   Conditions.aligned(session) ? 'alignment confirmed' : 'alignment not confirmed']
+                  .filter(Boolean).join(' · ');
+    const notes = [];
+    // When spin IS a reading, show the reading: an interval from the golfer's
+    // own shots. Without an RPT ball there is no spin figure, and no apology.
     const spinIv = (() => { try { return Spin.summary(session); } catch (_) { return null; } })();
-    notes.unshift(Spin.measured(session)
-      ? (spinIv
-          ? `Spin this session: ${spinIv.text}. ${Spin.CHANGE_CAVEAT}`
-          : Spin.CHANGE_CAVEAT)
-      : Spin.NOT_MEASURED + ' ' + Spin.ALTERNATIVE);
+    if (spinIv) notes.push(`Spin this session: ${spinIv.text}.`);
     const vol = FeedbackEngine.volumeAdvice((session.shots || []).length);
     if (vol) notes.push(vol);
-    if (!notes.length) { el.innerHTML = ''; el.hidden = true; return; }
     el.hidden = false;
-    // The alignment flag is the one condition a golfer can correct afterwards.
-    // Ball and surface are facts about the session that cannot be re-observed;
-    // whether they levelled the unit that day is something they know and the
-    // import form only ever asked once. Without this the caveat above is a
-    // dead end: it names what is being withheld and offers no way to answer it.
     const isAligned = Conditions.aligned(session);
     el.innerHTML = `<div class="caveat-block">
-        <div class="caveat-head">Before you read these numbers</div>
+        <div class="caveat-head">This session: ${Sanitize.escape(facts)}</div>
         ${notes.map(n => `<div class="caveat-item">${Sanitize.escape(n)}</div>`).join('')}
         <div class="caveat-fix">
           <button class="link-btn" id="fixAlignment" data-on="${isAligned ? '1' : '0'}">
@@ -8254,14 +8330,10 @@ const UI = (() => {
       showConfirm(
         turningOn ? 'Confirm alignment for this session' : 'Withdraw the alignment confirmation',
         turningOn
-          ? 'Only do this if you actually levelled the unit and set the target line with Impact Vision ' +
-            'that day. Confirming unlocks start-line and face-to-path work at 10 shots instead of 30 — ' +
-            'and if the unit was not aligned, every one of those readings is shifted by the same amount ' +
-            'in the same direction. That is bias, and unlike random error, more shots will not remove it: ' +
-            'the app just gets more confident in the wrong answer.'
-          : 'This session will go back to being read as unaligned. Start-line work returns to the larger ' +
-            'sample, and the absolute miss is withheld again — the spread is unaffected, since an aiming ' +
-            'error cancels out of it.',
+          ? 'Only do this if you actually levelled the unit and set the target line that day. ' +
+            'Confirming opens start-line work at 10 shots instead of 30. If the unit wasn\'t aligned, ' +
+            'every start line is off by the same amount, and more shots won\'t fix that.'
+          : 'This session goes back to being read as unaligned. Start-line work will need 30 shots again.',
         () => {
           Store.setAlignment(session.id, turningOn)
             .then(updated => {
@@ -8444,8 +8516,7 @@ const UI = (() => {
              ${fmt(r.value.sigmaUsed, 1)}° directional spread — and the mechanism is not fairways hit, it is
              the drop in shots that finish out of bounds.</div>
          </div>
-         ${r.value.note ? `<div class="tail-note">${esc(r.value.note)}</div>` : ''}
-         ${r.value.caveats.map(x => `<div class="tail-note">${esc(x)}</div>`).join('')}`
+         ${r.value.note ? `<div class="tail-note">${esc(r.value.note)}</div>` : ''}`
       : `<div class="tail-note">${esc(r.value ? r.value.note : r.valuationWithheld)}</div>`;
     return `<div class="tail-block">
         <div class="tail-head">${name} — tail audit <span class="tail-n">${t.n} shots</span></div>
@@ -8454,13 +8525,8 @@ const UI = (() => {
             <div class="disp-stat-label">${c.label}</div></div>`).join('')}</div>
         <div class="tail-item${t.heavyTailed ? ' heavy' : ''}">${esc(tailLine)}</div>
         ${r.census.ok && r.census.note ? `<div class="tail-item">${esc(r.census.note)}</div>` : ''}
-        ${t.bias === null
-          ? `<div class="tail-note">Spread is measured around your own centre, so it survives a misaligned unit
-               — an aiming error shifts every shot by the same amount and cancels out. How far that centre sits
-               from the target does not, so it is not shown until you confirm alignment. If you did level the
-               unit that session, you can say so at the top of this page.</div>`
-          : `<div class="tail-item">Your centre sits ${fmt(Math.abs(t.bias), 1)}°
-               ${t.bias > 0 ? 'right' : 'left'} of the target line, on a confirmed alignment.</div>`}
+        <div class="tail-item">Your centre sits ${fmt(Math.abs(t.bias), 1)}°
+          ${t.bias > 0 ? 'right' : 'left'} of ${t.aligned ? 'the target line' : 'where the unit was pointing'}.</div>
         ${value}
       </div>`;
   }
@@ -8503,7 +8569,7 @@ const UI = (() => {
                  ${p.libraryDrill.feel ? `<div class="plan-gate">A feel — nothing measures whether it happened.</div>` : ''}
                  <div class="plan-gate">${Sanitize.escape(p.sectionName)} · ${Sanitize.escape(p.structure)}</div>`
               : `<div class="plan-drill"><strong>${Sanitize.escape(p.drill.name)}:</strong> ${Sanitize.escape(p.drill.desc)}</div>
-                 ${p.drillIsFeel ? `<div class="plan-gate">A feel — nothing measures whether it happened. Every drill for this fault is one.</div>` : ''}`}
+`}
             ${p.lockedNote
               ? `<div class="plan-locked">Nothing in the ${Sanitize.escape(p.sectionName || 'matching')} section can be
                    run on what this session measured. ${Sanitize.escape(p.lockedNote)}</div>`
@@ -8820,23 +8886,15 @@ const UI = (() => {
     // render gap table
     const gapTable = document.getElementById('gapTable');
     if (!gapTable) return;
-    const gapBall = Conditions.ball(session);
-    const gappingOK = gapBall.gappingValid;
+    // v2: gap sizes show on every ball. Range balls are near-normal data.
     const note = document.getElementById('gapNote');
-    if (note) note.innerHTML = gappingOK ? '' : `<div class="tail-note">Gap sizes are withheld for this
-      session: ${Sanitize.escape(gapBall.label.toLowerCase())} do not gap like your own ball — a wedge can
-      fly further on half the spin — so the order of the clubs here is real and the distance between them is
-      not. Clubs under ${Metrics.MIN_SHOTS_REPORT} shots are left off entirely.</div>`;
+    if (note) note.innerHTML = '';
     gapTable.innerHTML = `
       <thead><tr><th>Club</th><th>Avg Carry</th><th>Gap</th><th>Status</th></tr></thead>
       <tbody>${clubs.map((c,i) => {
         const carry = carries[i];
         const g = gaps[i];
-        // `Conditions.gappingValid` was defined and read by nothing. Range
-        // balls are the case it exists for: a wedge can fly further on half
-        // the spin, so the ORDER of the clubs survives and the SIZE of the gap
-        // between them does not. The carries stay, the verdict goes.
-        const gapStatus = g === null ? '' : !gappingOK ? `<span style="color:var(--text-muted)">not on these balls</span>` :
+        const gapStatus = g === null ? '' :
           g < 8  ? `<span style="color:var(--red)">${icon('warn')} Only ${fmt(g,0)} yds</span>` :
           g > 25 ? `<span style="color:var(--yellow)">${icon('warn')} Big gap ${fmt(g,0)} yds</span>` :
                    `<span style="color:var(--green-light)">✓ ${fmt(g,0)} yds</span>`;
@@ -8932,9 +8990,8 @@ const UI = (() => {
                     <div class="fault-section-title">What the numbers show</div>
                     <ul class="fault-causes">${observable.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>` : '')
                   + (body.length ? `
-                    <div class="fault-section-title">Often behind it — but not measured here</div>
-                    <ul class="fault-causes fault-causes-body">${body.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>
-                    <p class="fault-inference-note">${Sanitize.escape(FaultEngine.BODY_CAVEAT)}</p>` : '');
+                    <div class="fault-section-title">Worth checking on video</div>
+                    <ul class="fault-causes fault-causes-body">${body.map(c=>`<li>${Sanitize.escape(c)}</li>`).join('')}</ul>` : '');
                 })()}
                 ${(() => {
                   // Same boundary as the causes above. A drill whose instruction
@@ -8951,9 +9008,8 @@ const UI = (() => {
                     <div class="fault-section-title">Drills you can check yourself</div>
                     <div class="fault-drills">${checkable.map(card).join('')}</div>` : '')
                   + (feel.length ? `
-                    <div class="fault-section-title">Feels — nothing here can confirm these</div>
-                    <div class="fault-drills fault-drills-feel">${feel.map(card).join('')}</div>
-                    <p class="fault-inference-note">${Sanitize.escape(FaultEngine.FEEL_CAVEAT)}</p>` : '');
+                    <div class="fault-section-title">Feels</div>
+                    <div class="fault-drills fault-drills-feel">${feel.map(card).join('')}</div>` : '');
                 })()}
                 ${f.optimalRange ? `<div class="fault-optimal">Target: ${typeof f.optimalRange==='function'?f.optimalRange(shots[0]?.clubType):f.optimalRange}</div>` : ''}
                 ${f.affectedShots?.length ? `<div class="fault-shots">Affected shots: rows ${f.affectedShots.slice(0,8).join(', ')}${f.affectedShots.length>8?'…':''}</div>` : ''}
@@ -9157,7 +9213,7 @@ const UI = (() => {
       : '—';
     const clubFA = (sessionShots || [])
       .filter(x => x.clubType === shot.clubType).map(faceAngle).filter(Number.isFinite);
-    let faClub = '<span class="sm-note">derived, not measured</span>';
+    let faClub = '';
     if (clubFA.length >= Metrics.MIN_SHOTS_REPORT) {
       const fiv = Metrics.interval(clubFA, '', 1);
       faClub = `<span class="sm-cmp ${Math.abs(fiv.mean) < 2 ? 'up' : 'down'}">` +
@@ -9178,16 +9234,15 @@ const UI = (() => {
       ['Total', `${fmt(shot.totalDistance,1)} yds`, cmp('totalDistance',1)],
       ['Launch Angle', `${fmt(shot.launchAngle,1)}°`, cmp('launchAngle',1)],
       ['Launch Dir', `${fmt(shot.launchDirection,1)}°`, ''],
-      ['Side Carry', `${fmt(shot.sideCarry,1)} yds`, '<span class="sm-note">modelled</span>'],
+      ['Side Carry', `${fmt(shot.sideCarry,1)} yds`, ''],
       ['Club Path', `${fmt(shot.clubPath,1)}°`, ''],
       ['Attack Angle', `${fmt(shot.attackAngle,1)}°`, ''],
       ['Face-to-Path', f2pSingle, f2pClub],
       ['Face Angle', faSingle, faClub],
-      ['Apex', `${fmt(shot.apex,0)} ft`, '<span class="sm-note">modelled</span>'],
+      ['Apex', `${fmt(shot.apex,0)} ft`, ''],
       // Spin is a reading only with an RPT ball; otherwise it is not shown at all.
-      (spinOK && shot.spinRate) ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, '<span class="sm-note">RPT measured</span>'] : null,
-      (spinOK && shot.spinAxis) ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, '<span class="sm-note">RPT measured</span>'] : null,
-      (!spinOK && shot.spinRate) ? ['Spin', 'not measured', '<span class="sm-note">needs an RPT ball</span>'] : null,
+      (spinOK && shot.spinRate) ? ['Spin Rate', `${fmt(shot.spinRate,0)} rpm`, ''] : null,
+      (spinOK && shot.spinAxis) ? ['Spin Axis', `${fmt(shot.spinAxis,1)}°`, ''] : null,
     ].filter(Boolean);
 
     document.getElementById('shotModalTitle').innerHTML =
@@ -9212,35 +9267,23 @@ const UI = (() => {
     if (!sessions.length) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
-    // Build the book on ONE set of conditions. Pooling a premium-ball session
-    // with a range-ball one produces a stock yardage for a bag nobody owns —
-    // the app refuses that comparison everywhere else and made it here.
-    const groups = Analytics.conditionGroups(sessions);
-    const main = groups[0];
-    const used = main ? main.sessions : sessions;
-    const excluded = sessions.length - used.length;
+    // v2: the book is built on every session, range balls weighted (see
+    // Analytics.yardageBook). The line under the title says what went in.
+    const used = sessions;
     const book = Analytics.yardageBook(used);
     const totalShots = used.reduce((a,s)=>a+s.shots.length,0);
     document.getElementById('yardageMeta').textContent =
       `${book.filter(b=>b.enough).length} of ${book.length} clubs · ${totalShots} shots · ` +
       `${used.length} session${used.length>1?'s':''}`;
+    const mix = Analytics.conditionGroups(used).map(g =>
+      `${g.sessions.length} on ${g.surface.id === 'unknown' ? g.ball.label.toLowerCase()
+        : `${g.ball.label.toLowerCase()}, ${g.surface.label.toLowerCase()}`}`).join(' · ');
+    const hasRange = used.some(x => Metrics.conditionWeight(Conditions.ball(x).id) < 1);
 
     const condHost = document.getElementById('yardageConditions');
     if (condHost) {
-      const label = !main ? 'conditions not recorded'
-        : main.surface.id === 'unknown' ? `${main.ball.label}, surface not recorded`
-        : `${main.ball.label}, ${main.surface.label.toLowerCase()}`;
-      condHost.innerHTML = `
-        <div class="tail-note"><strong>Built from ${used.length} session${used.length>1?'s':''} on
-        ${Sanitize.escape(label)}.</strong>
-        ${excluded ? ` ${excluded} other session${excluded>1?'s':''} used different conditions and ${excluded>1?'are':'is'}
-          not pooled in — ball type changes what a carry number means, so a book averaged across them is a
-          yardage for a bag you do not have.` : ''}
-        ${main && !main.ball.dispersionValid
-          ? ' These are not your own ball, so read the order of the clubs as real and the distances as indicative.'
-          : ''}
-        Carry is <strong>modelled</strong> by the monitor from launch conditions, not measured, and no club
-        shows a mean until it has ${Metrics.MIN_SHOTS_REPORT} shots.</div>`;
+      condHost.innerHTML = `<div class="tail-note">Sessions: ${Sanitize.escape(mix)}.${hasRange
+        ? ' Range-ball sessions count a little less than your own ball.' : ''}</div>`;
     }
 
     // Drill focus, built from the gated library rather than three hardcoded
@@ -9253,7 +9296,7 @@ const UI = (() => {
         const widest = book.filter(b => b.enough && b.cv != null).sort((a,b) => b.cv - a.cv)[0];
         if (!widest) {
           drillHost.innerHTML = `<h2 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h2>
-            <div class="tail-note">No club has reached ${Metrics.MIN_SHOTS_REPORT} shots in these conditions
+            <div class="tail-note">No club has reached ${Metrics.MIN_SHOTS_REPORT} shots
             yet, so nothing here is your widest. That is the answer rather than a gap in the app.</div>`;
         } else {
           const clubShots = used.flatMap(s => s.shots).filter(s => s.clubType === widest.club);
@@ -9364,9 +9407,6 @@ const UI = (() => {
     // its code refusing to produce.
     const printHead = document.getElementById('yardagePrintHead');
     if (printHead) {
-      const label = !main ? 'conditions not recorded'
-        : main.surface.id === 'unknown' ? `${main.ball.label}, surface not recorded`
-        : `${main.ball.label}, ${main.surface.label.toLowerCase()}`;
       const span = (() => {
         const ds = used.map(x => new Date(x.date || 0)).filter(d => !isNaN(d)).sort((a, b) => a - b);
         if (!ds.length) return '';
@@ -9374,16 +9414,16 @@ const UI = (() => {
         const to = formatDate(ds[ds.length - 1].toISOString());
         return from === to ? from : `${from} – ${to}`;
       })();
+      // A card outlives the screen it came from, so what it was built on
+      // travels with it: the balls and surfaces, how many shots, and when.
       printHead.innerHTML = `
         <div class="print-title">Yardage card</div>
-        <div class="print-sub">${Sanitize.escape(label)} · ${used.length} session${used.length > 1 ? 's' : ''}
+        <div class="print-sub">${used.length} session${used.length > 1 ? 's' : ''}
           · ${totalShots} shots${span ? ` · ${Sanitize.escape(span)}` : ''}</div>
         <div class="print-sub">Printed ${Sanitize.escape(formatDate(new Date().toISOString()))}</div>
-        <div class="print-caveat">Carry is modelled by the monitor from launch conditions, not measured. No club
-          shows a number until it has ${Metrics.MIN_SHOTS_REPORT} shots in these conditions.${
-          main && !main.ball.dispersionValid
-            ? ' These were not your own ball — read the ORDER of the clubs as real and the distances as indicative.'
-            : ''}</div>`;
+        <div class="print-caveat">Sessions: ${Sanitize.escape(mix)}.${hasRange
+          ? ' Range-ball sessions count a little less than your own ball.' : ''} Carry, from the monitor.
+          No club shows a number until it has ${Metrics.MIN_SHOTS_REPORT} shots.</div>`;
     }
     document.getElementById('printYardages')?.addEventListener('click', () => window.print());
 
@@ -9707,9 +9747,7 @@ const UI = (() => {
             <div class="disp-stat-label">Qualifying sessions</div></div>
         </div>
         <div class="tail-item${t.real ? '' : ' heavy'}">${Sanitize.escape(t.note)}</div>
-        <div class="tail-note">Only sessions with ${Metrics.MIN_SHOTS_TAIL}+ usable shots of this club on a
-          premium or RPT ball appear here. Range-ball sessions are left out rather than plotted, because a
-          change in the ball would read as a change in you.</div>
+        <div class="tail-note">Sessions with ${Metrics.MIN_SHOTS_TAIL}+ usable shots of this club.</div>
       </div>`;
   }
 
@@ -9761,8 +9799,8 @@ const UI = (() => {
       res.innerHTML = caveats + rows.map(r => {
         const arrow = r.dir==='up'?'▲':r.dir==='down'?'▼':'–';
         const cls = r.good===true?'good':r.good===false?'bad':'neutral';
-        return `<div class="cmp-row${r.withheld ? ' cmp-withheld' : ''}">
-            <span class="cmp-label">${r.label}${r.withheld ? ' <small>· not comparable</small>' : ''}</span>
+        return `<div class="cmp-row">
+            <span class="cmp-label">${r.label}</span>
             <span class="cmp-a">${r.a}<small>${r.unit}</small></span>
             <span class="cmp-delta ${cls}">${arrow} ${r.delta!=null?r.delta:''}</span>
             <span class="cmp-b">${r.b}<small>${r.unit}</small></span>
@@ -10039,7 +10077,6 @@ const UI = (() => {
             <div class="drill-row-desc">${esc(r.drill.desc)}</div>
             ${DrillLibrary.kindOf(r.drill) === 'fitness'
               ? `<div class="drill-row-why drill-row-risk">${esc(DrillLibrary.FITNESS_CAVEAT)}</div>` : ''}
-            ${r.drill.feel ? `<div class="drill-row-why">${esc(FaultEngine.FEEL_CAVEAT)}</div>` : ''}
             ${r.reasons.map(x => `<div class="drill-row-why">${esc(x)}</div>`).join('')}
           </div>`;
         return ORDER.map(k => {
@@ -11907,22 +11944,9 @@ const InsightEngine = (() => {
     if (!sessions || !sessions.length) return out;
     const latest = sessions[0];
 
-    // 1. The conditions changed. This is the most useful thing the box can
-    //    say and nothing else on the home view says it: every carry, gap and
-    //    spread figure below is only comparable to sessions on the same ball.
-    const prior = sessions[1];
-    if (prior && !Conditions.comparable(latest, prior)) {
-      // "range balls on not recorded" reads as broken text rather than as a
-      // missing field, so an unrecorded surface drops out of the phrase.
-      const where = sn => {
-        const ball = Conditions.ball(sn).label.toLowerCase();
-        const surf = Conditions.surface(sn);
-        return surf.id === 'unknown' ? ball : `${ball} off ${surf.label.toLowerCase()}`;
-      };
-      out.push({ icon: 'sync', type: 'info',
-        text: `This session was ${where(latest)}, your last was ${where(prior)} — ` +
-              `distances and spread do not compare across that.` });
-    }
+    // v2 (Oliver, 22 Sep): a change of ball or surface is no longer called out
+    // here. Range balls are near-normal data, and the explanation lives in
+    // Settings → How the numbers work.
 
     // 2. Consistency, for ONE club, from the real coefficient of variation,
     //    and only when there are enough shots to say anything.
@@ -12112,7 +12136,6 @@ const SessionSnapshot = (() => {
       clubShots: cs.length,
       carry: iv,                                  // null below the floor
       ballLabel: ball.label,
-      gappingValid: ball.gappingValid,
       avgBallSpeed: fmt(avg(shots, 'ballSpeed'), 1),
       topFault: faults[0]?.name || 'None',
       faultCount: allFaults.length,
@@ -12134,7 +12157,7 @@ const SessionSnapshot = (() => {
       `Score: ${snapshot.formScore}/100 (${snapshot.grade})\n` +
       `Shots: ${snapshot.shotCount}\n` +
       carryLine +
-      `Ball: ${snapshot.ballLabel}${snapshot.gappingValid ? '' : ' — distances are indicative only'}\n` +
+      `Ball: ${snapshot.ballLabel}\n` +
       `Top Issue: ${snapshot.topFault}\n` +
       `\n${snapshot.summary}\n\n` +
       `Tracked with ShotLab`;

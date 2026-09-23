@@ -108,10 +108,12 @@ ok(/tail of your dispersion, not the centre/.test(rx.why), 'and the reason names
 ok(/vary eightfold/.test(rx.why), 'citing the finding rather than asserting it');
 ok(/worth a winter/.test(rx.headline), 'the headline says it is the one to spend time on');
 
-// The gate travels with it: same diagnosis, range balls, nothing prescribed.
-const gated = R.prescribe(penProfile, { shots: many(40, { _ball:'range' }), clubType:'d', sessions: 1 });
-ok(gated.drills.length === 0, 'on range balls the tail section is entirely locked');
-ok(/2–4× wider/.test(gated.lockedNote), 'and it says what would unlock it, rather than substituting');
+// v2: range balls are near-normal data, so the same diagnosis prescribes on
+// them too. The shot floor still travels with it.
+const onRange = R.prescribe(penProfile, { shots: many(40, { _ball:'range' }), clubType:'d', sessions: 1 });
+ok(onRange.drills.length > 0, 'on range balls the tail section prescribes (v2)');
+const thin = R.prescribe(penProfile, { shots: many(12, { _ball:'range' }), clubType:'d', sessions: 1 });
+ok(thin.drills.length === 0 && /Needs 30 shots/.test(thin.lockedNote || ''), 'but not under the 30-shot floor, which is unchanged');
 
 console.log('— and the two off-device categories route off-device —');
 const udProfile = R.profile([1,2,3,4].map(() => rd({ girHit:8, penalties:1, putts:30, upDowns:1, upDownAttempts:16 })));

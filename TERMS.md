@@ -2,9 +2,9 @@
 
 **ShotLab TOUR**
 
-**Effective date:** 10 September 2026
-**Version:** 2026-09-12
-**Supersedes:** the terms dated 16 June 2026
+**Effective date:** 23 September 2026
+**Version:** 2026-09-23
+**Supersedes:** version 2026-09-12
 
 ## 1. Agreement
 
@@ -28,7 +28,9 @@ Beta status does not remove any liability that cannot lawfully be excluded. It d
 
 The Service is an informational data-analysis tool. It imports launch monitor exports, principally Rapsodo CSV files, and presents statistics, charts, classifications of recurring faults, and suggested practice work derived from them.
 
-Every metric, classification, verdict and recommendation the Service produces is an automated estimate calculated from data the Service did not itself measure, using models and thresholds that are approximations. Several are explicitly derived rather than measured, and the Service marks them as such where it can.
+Every metric, classification, verdict and recommendation the Service produces is an automated estimate calculated from data the Service did not itself measure, using models and thresholds that are approximations.
+
+When it identifies faults and suggests practice work, the Service treats the readings in your export as accurate. They are not exact: launch monitors have measurement error, and several values the Service uses are calculated or derived rather than measured (among them carry, total distance, side carry, apex, descent angle and face angle). The Service requires more evidence before acting on the less reliable values, but it does act on them. Spin is used only from sessions recorded with a Rapsodo RPT ball. How this works is explained in the Service under Settings, How the numbers work, rather than beside each figure.
 
 ### 2.1 No professional advice
 

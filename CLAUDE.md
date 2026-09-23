@@ -128,28 +128,65 @@ const SUPABASE_KEY = '...';  // publishable key (safe to expose)
 - Sessions from MemDB *can* be migrated to Supabase (not automatic; depends on UI flow)
 - Future imports go to both IndexedDB + Supabase if authenticated
 
-## ⚠️ DIRECTION CHANGE — 22 Sep 2026 (read before the section below)
+## Measurement model v2 — BUILT 23 Sep 2026 (read before the section below)
 
-**Oliver has decided to loosen the measurement rules below.** The full spec is
-Phase 9 of `docs/superpowers/plans/2026-09-22-killer-plan.md`. It is **not built
-yet**, so the code and the suites still enforce the old rules until Phase 9
-ships. **Do not treat the rules below as the target**, and do not "fix" code
-back towards them. In short:
+Oliver loosened the measurement rules on 22 Sep (Phase 9 of
+`docs/superpowers/plans/2026-09-22-killer-plan.md`), and **it is built**. Where
+the older sections below say "never prescribe", "display only", "withheld" or
+"range balls off", **this section wins**. `test/suites/measurement-v2.js` pins it
+by behaviour.
 
-- **Every tier prescribes.** Lower tiers are judged harder (higher recurrence
-  rates), never banned. That includes derived face angle, spin with an RPT
-  ball, and modelled outputs.
-- **Range balls are near-normal data:** slightly lower weight, never a source of
-  spin, not switched off.
-- **Minimum-shot floors are unchanged**, and so are the "never claim" wording
-  rules (one strokes figure; no "+N yd per degree"; no "grooves").
-- **Main screens are clean.** Measurement-error explanations live in Settings,
-  the explanation screens and the Terms only.
+- **Every tier prescribes.** A tier sets how hard a fault is judged, never
+  whether it may report. `Metrics.TIER_RATES` / `tierRates(t)`: tier 1 reports
+  at 30% of a club's shots (confirmed 50%), tier 2 at 35% (55%), tier 3 at 40%
+  (60%). A rule takes its tier from its probe metric via `Metrics.tier`
+  (derived: face-to-path 3, spin loft 2) or declares `tier:` when it reads two
+  metrics (`fat-shot`, `wedge-thin`: 2). `FaultEngine.ruleTier`. There is no
+  `canPrescribe` any more.
+- **Range balls are near-normal data.** `Metrics.conditionWeight` (range and
+  unrecorded 0.8, premium/RPT 1) weights every pool that spans sessions:
+  `Metrics.weightedInterval` (same trim rule via `outlierTest`, SE over the Kish
+  effective n) under the yardage book, and a weighted sigma/bad-rate/bias in
+  `Dispersion.tail`. `Metrics.rateBump` (range/unrecorded +0.05) raises the fault
+  bar in proportion to the club's range-ball share. An unrecorded ball is
+  treated like a range ball, in case it was one. `Conditions.BALLS` no longer
+  carries `dispersionValid`/`gappingValid`: gapping sizes, dispersion tails, the
+  tail trend, the yardage book (now built on EVERY session, naming the mix) and
+  the B/F drill sections all run on range balls.
+- **Spin only from an RPT ball**, never from range or premium balls
+  (`Spin.measured`). With RPT it prescribes as tier 3.
+- **Alignment is no longer a ban.** Unconfirmed alignment raises the start-line
+  floor to 30 (`Conditions.startLineFloor`, also in `DrillLibrary.admissible`,
+  which says why); `Dispersion.tail` reports `bias` either way with an `aligned`
+  flag (C8, tier 3).
+- **Floors unchanged** (10 / 15 / 30), and so are the **"never claim" wording
+  rules** (one strokes figure; no "+N yd per degree"; no "groove"/"rewire").
+- **Main screens are clean.** Every measurement caveat (`BODY_CAVEAT`,
+  `FEEL_CAVEAT`, `Conditions.NOTES` — which replaced the per-session
+  `Conditions.caveats()` — `Dispersion.CAVEATS`, the `Spin` notes) is rendered
+  ONLY in `MeasurementReference.howItWorks()`, the Settings row "How the numbers
+  work". The session detail shows one facts line ("This session: ball · surface
+  · alignment") plus the alignment switch; compare/since-last no longer withhold
+  a verdict across ball types; the home view no longer calls out a ball change;
+  "modelled"/"derived" tags and the feel/mat notes are gone from the screens.
+  `measurement-v2.js` fails if any of those constants is referenced outside
+  `MeasurementReference` again.
+- `Conditions.comparable()` still exists: like-for-like picks (which session to
+  read against, the QuickStats anchor) still prefer the same ball and surface.
+  That is choosing a reference, not banning data.
+- **Terms 2026-09-23** say advice treats readings as accurate, the device has
+  error, calculated values are used, spin only with RPT. Both documents and
+  `Agreement.VERSION` / `PRIVACY_VERSION` moved together (everyone re-accepts).
+- `FirstRun` copy is v2 and plain English ("Every number gives advice"), bars
+  read from `Metrics.tierRates`; it opens only from Settings.
+
+The numbers (0.30/0.35/0.40, ×0.8, +0.05) are Oliver's to tune; each lives once
+in `Metrics`.
 
 Pooling across clubs is still wrong in v2: "the numbers are accurate" does not
 make a driver and a wedge the same club.
 
-## ⚠️ Measurement honesty (read `docs/research-base-v2.md` §1 and §9 first)
+## ⚠️ Measurement honesty (history — v2 above supersedes the bans; read `docs/research-base-v2.md` §1 and §9)
 
 The research base supersedes earlier guidance and **corrected two foundations**:
 
@@ -579,8 +616,8 @@ it.
   home view on a new account's first visit; a first visit now lands on the app.
   The only way in is the Settings row (`#introBtn`), and `first-run.js` pins that
   `FirstRun.show()` has exactly that one caller. Do not reintroduce an auto-open.
-- **Its tier copy is wrong under Phase 9** ("never prescribed from", "never used
-  for advice"). The rewrite is queued in the killer plan's Phase 9, step 4.
+- **Its tier copy is v2** ("Every number gives advice"; the bars come from
+  `Metrics.tierRates`), and `first-run.js` fails if "never prescribed" returns.
 - It ends on the day-one answer (the off-device short game), the same branch
   `getNextStep` takes with nothing imported.
 
@@ -961,7 +998,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **73 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **74 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1352,8 +1389,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **73 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v189**, 58 modules.
+State at handover: **74 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v190**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1824,7 +1861,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**73 test suites**, service worker **v189**. Deterministic auth, cloud sync
+**74 test suites**, service worker **v190**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

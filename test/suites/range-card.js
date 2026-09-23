@@ -41,10 +41,9 @@ ok(lib.name === 'Gate drill',
    'the LIBRARY drill wins when there is one — it is the one whose gate the session actually passed');
 
 ok(RC.notesFor(block()).length === 0, 'a checkable drill carries no caveat');
-ok(/feel/i.test(RC.notesFor(block({ libraryDrill: { name: 'X', desc: 'y', feel: true } }))[0] || ''),
-   'a feel library drill keeps its caveat — a small screen is not a licence to drop the part that says what the data cannot support');
-ok(/Every drill for this fault is one/.test(RC.notesFor(block({ drillIsFeel: true }))[0] || ''),
-   'a fault whose every drill is a feel says so, exactly as the list does');
+ok(RC.notesFor(block({ libraryDrill: { name: 'X', desc: 'y', feel: true } })).length === 0 &&
+   RC.notesFor(block({ drillIsFeel: true })).length === 0,
+   'v2: a feel carries no caveat at the mat — that explanation lives in Settings, read once');
 ok(RC.notesFor(block({ lockedNote: 'Needs 30 shots of one club.' })).some(t => /30 shots/.test(t)),
    'a locked section keeps its reason rather than being silently dropped');
 

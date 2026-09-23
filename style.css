@@ -1315,13 +1315,9 @@ html.pref-dense .section-title { font-size: .95rem; margin-bottom: .5rem; }
 html.pref-dense .quick-stat { padding: .55rem; }
 html.pref-dense .drill-card { padding: .7rem; }
 html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
-.fault-inference-note{margin:.4rem 0 .2rem;padding-left:.7rem;border-left:2px solid var(--yellow);
-  font-size:.74rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
 .cmp-caveat{margin-bottom:.55rem;padding:.55rem .7rem;font-size:.75rem;line-height:1.5;
   color:var(--text-dim);background:var(--surface2);border-left:3px solid var(--yellow);
   border-radius:var(--radius-sm);text-wrap:pretty}
-.cmp-row.cmp-withheld{opacity:.72}
-.cmp-row.cmp-withheld .cmp-label small{color:var(--yellow);font-weight:600}
 .plan-gate{margin-top:.35rem;font-size:.72rem;line-height:1.45;color:var(--text-muted)}
 /* Ticking a block off is the only write path PracticeLog has, so it has to
    read as a control rather than as a label. */

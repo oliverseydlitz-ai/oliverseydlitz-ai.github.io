@@ -26,10 +26,10 @@ ok(/±/.test(text), 'gives an interval rather than a bare point');
 ok(/Ball: Premium/.test(text), 'and says what ball it was hit with');
 ok(!/Avg Carry/.test(text), 'the old bag-pooled line is gone');
 
-console.log('— off range balls it says so, in the text people will read —');
+console.log('— off range balls it names the ball, without an apology (v2) —');
 const rangeText = SS.toShareText(SS.create(sess('b', 'range', many(20, { clubType: 'd' }))));
 ok(/Range balls/.test(rangeText), 'the ball is named');
-ok(/indicative only/.test(rangeText), 'and the distances are qualified where someone will see it');
+ok(!/indicative only/.test(rangeText), 'and the distances are not qualified away — range balls are near-normal data');
 
 console.log('— below the floor it declines rather than rounding something up —');
 const thin = SS.create(sess('c', 'premium', many(4, { clubType: 'd' })));

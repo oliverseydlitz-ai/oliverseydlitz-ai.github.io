@@ -24,12 +24,12 @@ ok(!M.FaultEngine.detectFaults(rpt).some(f=>/spin rate|excessive spin/i.test(f.n
 ok(M.Metrics.tier('sideCarry')===3, 'side carry stays tier 3 — it is modelled, not aimed');
 ok(M.Metrics.MIN_SHOTS_REPORT===10, 'the 10-shot floor stands — it is shot-to-shot variability');
 
-console.log('— the unaligned caveat is a BIAS warning, not a noise one —');
-const cav=M.Conditions.caveats({conditions:{ball:'premium',surface:'grass'},shots:[]});
-ok(cav.some(c=>/averaging more shots will not remove it/.test(c)),
+console.log('— the alignment note is a BIAS warning, not a noise one (v2: read once, in Settings) —');
+ok(/more shots\s+don't fix that/.test(M.Conditions.NOTES.alignment),
    'says plainly that more shots cannot fix an aiming error');
-ok(!M.Conditions.caveats({conditions:{ball:'premium',surface:'grass',alignment:'confirmed'},shots:[]})
-    .some(c=>/Alignment not confirmed/.test(c)), 'and disappears once confirmed');
+ok(/How the numbers work|NOTES\.alignment/.test(M.MeasurementReference.howItWorks.toString()) &&
+   M.MeasurementReference.howItWorks().includes(M.Sanitize.escape(M.Conditions.NOTES.alignment)),
+   'and it is rendered on the Settings explanation screen, not stamped on every session');
 console.log('— comparing two sessions across different conditions —');
 // Conditions.comparable() existed for exactly this and nothing called it: any
 // two sessions were put side by side with green and red arrows, so a
@@ -47,12 +47,12 @@ const range   = sess(2, 'range',   'grass', 170, 1.33);
 const premium2= sess(3, 'premium', 'grass', 160, 1.36);
 
 const across = Features.compare(premium, range);
-ok(across.comparable === false, 'two different ball types are not comparable');
+ok(across.comparable === false, 'two different ball types are still flagged as different conditions');
 const carryRow = across.find(r => r.label === 'Avg carry');
 ok(carryRow.a !== carryRow.b, 'the carry numbers are still shown — the golfer hit them');
-ok(carryRow.good === null, 'but no verdict is attached to a difference the ball produced');
-ok(carryRow.withheld === true, 'and the row is marked as not comparable');
-ok(/the difference is the ball as much as you/.test(across.caveats.join(' ')), 'with the reason said plainly');
+ok(carryRow.good !== null && !('withheld' in carryRow),
+   'v2: range balls are near-normal data, so the carry row keeps its verdict across ball types');
+ok(across.caveats.every(c => !/different balls/.test(c)), 'and no ball caveat is stamped on the main screen');
 
 const smashRow = across.find(r => r.label === 'Smash');
 ok(smashRow.good !== null, 'smash still gets its verdict — ball type does not change what it means');
@@ -64,14 +64,14 @@ ok(within.caveats.every(c => !/different balls/.test(c)), 'and no ball caveat is
 
 console.log('— spin is dropped unless BOTH sessions measured it —');
 ok(!across.some(r => r.label === 'Spin'), 'no spin row without an RPT ball, rather than a figure never read');
-ok(/only measured with a Rapsodo RPT ball/.test(across.caveats.join(' ')), 'and it says why');
+ok(across.caveats.every(c => !/RPT ball/.test(c)), 'and says nothing about it on screen — that note lives in Settings (v2)');
 const rptA = sess(4, 'rpt', 'grass', 150, 1.33), rptB = sess(5, 'rpt', 'grass', 152, 1.34);
 ok(Features.compare(rptA, rptB).some(r => r.label === 'Spin'), 'with RPT balls on both sides it appears');
 
 console.log('— surfaces too —');
 const mat = sess(6, 'premium', 'mat', 150, 1.33);
 ok(Features.compare(premium, mat).comparable === false, 'grass against mat is not comparable');
-ok(/sole bounce/.test(Features.compare(premium, mat).caveats.join(' ')), 'and says what a mat hides');
+ok(Features.compare(premium, mat).caveats.every(c => !/mat/i.test(c)), 'and no mat caveat on screen (v2: it lives in Settings)');
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

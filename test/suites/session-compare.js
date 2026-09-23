@@ -35,12 +35,11 @@ const none = Features.compare(sess('d', many(20, 'd', 250)), sess('e', many(20, 
 ok(none.club === null, 'no shared club');
 ok(none.caveats.some(c => /share no club/.test(c)), 'and it says that rather than comparing two different clubs');
 
-console.log('— the conditions rules still hold —');
+console.log('— v2: across ball types the rows are compared like any other —');
 const crossBall = Features.compare(sess('f', many(20, 'd', 250)), sess('g', many(20, 'd', 250), 'range'));
-ok(crossBall.comparable === false, 'a premium session and a range-ball one are not comparable');
-ok(carryRow(crossBall).withheld === true, 'so the distance row is withheld');
-ok(carryRow(crossBall).good === null, 'and carries no verdict');
-ok(crossBall.caveats.some(c => /different balls/i.test(c)), 'with the reason stated');
+ok(crossBall.comparable === false, 'the result still knows the conditions differ');
+ok(!('withheld' in carryRow(crossBall)), 'but nothing is withheld for it');
+ok(crossBall.caveats.every(c => !/different balls/i.test(c)), 'and no ball caveat is shown');
 
 console.log('— and spin is dropped rather than shown unmeasured —');
 ok(!Features.compare(driverOnly, plusWedges).some(x => x.label === 'Spin'),

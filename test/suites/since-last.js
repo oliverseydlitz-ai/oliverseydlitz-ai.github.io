@@ -72,16 +72,15 @@ ok(bigCarry.real === true, `an 18-yard move clears it (real=${bigCarry.real})`);
 ok(bigCarry.good === true, 'and gets its verdict');
 ok(bigCarry.dir === 'up', 'in the right direction');
 
-console.log('— conditions still outrank everything —');
-// Even a real move is left without a verdict when the ball changed: the
-// difference is the equipment as much as the golfer.
+console.log('— v2: a ball change no longer withholds the verdict —');
+// Range balls are near-normal data (Oliver, 22 Sep). Only the golfer's own
+// noise decides whether a move gets a colour now.
 const rangeAfter = sess('ra', '2026-09-03', { ball: 'range' }, { carryDistance: 178 });
 const mixed = F.compare(rangeAfter, before, [...history, before, rangeAfter]);
 const mc = mixed.find(r => r.label === 'Avg carry');
-ok(mc.withheld === true, 'the carry row is withheld across ball types');
-ok(mc.good === null, 'with no verdict on it');
-ok(mixed.comparable === false, 'and the block knows the two are not comparable');
-ok(mixed.caveats.some(c => /different balls/i.test(c)), 'and says which difference it was');
+ok(!('withheld' in mc), 'the carry row is not withheld across ball types');
+ok(mixed.comparable === false, 'the block still knows the conditions differ');
+ok(mixed.caveats.every(c => !/different balls/i.test(c)), 'and stamps no ball caveat on the screen');
 
 console.log('— never the bag —');
 ok(tested.club === '7i', 'the comparison names one club');

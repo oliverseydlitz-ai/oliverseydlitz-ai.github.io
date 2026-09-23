@@ -28,10 +28,10 @@ const strokeClaims = whys.filter(w => /\d[\d.,–-]*\s*strokes?\b/i.test(w));
 ok(strokeClaims.length === 0, `no section states a strokes figure${strokeClaims.length ? ' — ' + strokeClaims.join(' | ') : ''}`);
 ok(!whys.some(w => /1\.8\s*°/.test(w)), 'and none quotes the retracted 1.8° noise constant');
 ok(/\d[\d.,–-]*\s*strokes?\b/i.test('roughly 0.8–1.3 strokes a round'), 'and the pattern finds the shipped claim');
-ok(L.SECTIONS.B.gate.shots === 30 && L.SECTIONS.B.gate.ball === 'premium',
-   'dispersion needs 30 shots on a premium ball');
+ok(L.SECTIONS.B.gate.shots === 30 && !L.SECTIONS.B.gate.ball,
+   'dispersion needs 30 shots, on any ball (v2: range balls are near-normal data)');
 ok(L.SECTIONS.C.gate.alignment === true, 'start line needs confirmed alignment');
-ok(L.SECTIONS.F.gate.ball === 'premium', 'gapping is premium-ball only');
+ok(!L.SECTIONS.F.gate.ball && L.SECTIONS.F.gate.shots === 10, 'gapping needs 10 shots a club, on any ball (v2)');
 ok(L.SECTIONS.H.gate.none === true, 'and putting is gated on nothing, because no metric here is measured');
 ok(Object.values(L.SECTIONS).every(s => s.why && s.structure),
    'each section states why it exists and how it is structured');
@@ -43,29 +43,32 @@ ok(/Needs 30 shots/.test(thin.reasons.join(' ')), 'and says how many it needs');
 ok(L.forSection('B', { shots: many(12), clubType: '7i' }).length === 14,
    'the locked drills are still returned, with their verdicts');
 
-console.log('— range balls lock the sections that depend on the ball —');
+console.log('— range balls no longer lock anything (v2) —');
 const range = many(40, { _ball: 'range' });
-ok(L.admissible(L.byId('b19'), { shots: range, clubType: '7i' }).ok === false, 'dispersion is refused');
-ok(/2–4× wider/.test(L.admissible(L.byId('b19'), { shots: range, clubType: '7i' }).reasons.join(' ')),
-   'with the reason a golfer can act on');
-ok(L.admissible(L.byId('f65'), { shots: range, clubType: '7i' }).ok === false, 'so is gapping');
+ok(L.admissible(L.byId('b19'), { shots: range, clubType: '7i' }).ok === true, 'dispersion runs on range balls');
+ok(L.admissible(L.byId('f65'), { shots: range, clubType: '7i' }).ok === true, 'so does gapping');
+ok(L.admissible(L.byId('b19'), { shots: many(12, { _ball: 'range' }), clubType: '7i' }).ok === false,
+   'the 30-shot floor still applies — floors are unchanged');
 ok(L.admissible(L.byId('a1'), { shots: range, clubType: '7i' }).ok === true,
    'but strike quality is not — smash does not care what ball it was');
 
 console.log('— an unaligned unit locks start line and nothing else —');
 const unaligned = many(20, { _aligned: false });
 ok(L.admissible(L.byId('c33'), { shots: unaligned, clubType: '7i' }).ok === false, 'start line is held back');
-ok(/constant offset/.test(L.admissible(L.byId('c33'), { shots: unaligned, clubType: '7i' }).reasons.join(' ')),
-   'because aiming error is a bias, not noise');
+ok(/Needs 30 shots/.test(L.admissible(L.byId('c33'), { shots: unaligned, clubType: '7i' }).reasons.join(' ')) &&
+   /alignment wasn't confirmed/.test(L.admissible(L.byId('c33'), { shots: unaligned, clubType: '7i' }).reasons.join(' ')),
+   'an unconfirmed alignment raises the floor to 30 and says why, rather than banning the section');
+ok(L.admissible(L.byId('c33'), { shots: many(32, { _aligned: false }), clubType: '7i' }).ok === true,
+   'and at 30 shots start-line work opens, aligned or not');
+ok(L.admissible(L.byId('c33'), { shots: many(12, { _aligned: true }), clubType: '7i' }).ok === false &&
+   L.admissible(L.byId('c33'), { shots: many(16, { _aligned: true }), clubType: '7i' }).ok === true,
+   'aligned, the section keeps its own 15-shot floor');
 ok(L.admissible(L.byId('d43'), { shots: many(22, { _aligned: false }), clubType: '7i' }).ok === true,
    'while face-to-path, which is a spread around your own centre, is not');
 
-console.log('— a mat is flagged, never refused —');
+console.log('— a mat is neither refused nor flagged (v2: the mat note lives in Settings) —');
 const mat = L.admissible(L.byId('e53'), { shots: many(20, { _surface: 'mat' }), clubType: '7i' });
-ok(mat.ok === true, 'a low-point drill still runs on a mat');
-ok(mat.flaggedOnly === true, 'but it is flagged');
-ok(/hides? the fat strikes|hide the fat strikes|not the fat strikes/.test(mat.reasons.join(' ')),
-   'with the thing it will fail to show you');
+ok(mat.ok === true && mat.reasons.length === 0, 'a low-point drill runs on a mat with no caveat attached');
 
 console.log('— off-device drills need nothing at all —');
 ok(L.admissible(L.byId('h88'), {}).ok === true, 'the quiet-eye protocol runs with no data');
@@ -150,13 +153,14 @@ ok(!L.fitsClub(L.ALL.find(d => d.name === 'Divot-line drill'), 'd') && L.fitsClu
 // the pooled 'dispersion-wide' session rule was deleted (C2) and spread is
 // raised per club by Dispersion — so its gate is checked directly.
 const bGates = L.forSection('B', { shots: mk(40, { _ball: 'range' }), sessions: 1 }).filter(x => !x.offDevice);
-ok(bGates.length > 0 && bGates.every(x => !x.ok), 'the tail section is entirely locked on range balls');
-ok(bGates.every(x => x.reasons.some(r => /2–4× wider/.test(r))), 'and says what would unlock it rather than substituting a drill');
+ok(bGates.length > 0 && bGates.some(x => x.ok) &&
+   bGates.filter(x => !x.ok).every(x => x.reasons.every(r => /qualifying sessions/.test(r))),
+   'the tail section is open on range balls (v2): the only locks left are session counts, none about the ball');
 
 // A start-line fault from an unaligned unit.
 const unaligned2 = P.libraryDrill(fault('pull-left', []), mk(20, { _aligned: false }));
-ok(unaligned2.libraryDrill === null && /constant offset/.test(unaligned2.lockedNote),
-   'start-line work is withheld from an unaligned unit, with the reason');
+ok(unaligned2.libraryDrill === null && /alignment wasn't confirmed/.test(unaligned2.lockedNote),
+   'under 30 unaligned shots, start-line work waits, and says what would open it');
 
 ok(Object.keys(P.libraryDrill({ id: 'not-a-fault', drills: [] }, mk(20))).length === 0,
    'an unmapped fault falls back to the fault\'s own drill rather than guessing');

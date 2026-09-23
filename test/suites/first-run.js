@@ -74,6 +74,15 @@ ok(new RegExp(String(Metrics.MIN_SHOTS_REPORT)).test(text), 'the sample floor is
 ok(/already saw all of it on the monitor/i.test(text),
    'and it explains why the app shows every number rather than offering to hide them');
 ok(new RegExp(String(RP.MAX_GAP_DAYS)).test(text), 'so is the probe window');
+console.log('— v2: it says every number gives advice, and never the opposite —');
+ok(!/never prescribed|never used for advice|will not build a drill/i.test(text),
+   'the retired "never prescribed from" / "never used for advice" wording is gone');
+ok(/Every number gives advice/.test(text), 'it says every number gives advice');
+for (const t of [1, 2, 3]) {
+  const pct = Math.round(Metrics.tierRates(t).min * 100) + '%';
+  ok(text.includes(pct), `the tier-${t} bar (${pct}) is on screen, read from Metrics.tierRates`);
+}
+ok(/Spin only counts with an RPT ball/.test(text), 'and spin still needs an RPT ball');
 FR.show().remove();
 
 console.log('— the empty state stops overselling —');

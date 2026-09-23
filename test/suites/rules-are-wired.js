@@ -14,7 +14,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'ut
 //   · `Benchmarks.TARGET`   — targets were hardcoded in a second copy
 //   · `Spin.summary`        — fully tested, called by nothing
 //   · `DrillLibrary.FAULT_SECTION` — mapped faults that did not exist
-//   · `Conditions.gappingValid` — the gapping table graded range balls anyway
+//   · `Conditions.gappingValid` — the gapping table graded range balls anyway (retired in v2)
 //
 // Every one of them passed `npm test`, because a unit suite answers "does this
 // work" and never "is this reached". This suite asks the second question. It is
@@ -32,8 +32,13 @@ function moduleBody(name) {
 
 // [identifier, defining module, what breaks silently if nothing calls it]
 const WIRED = [
-  ['gappingValid',    'Conditions',     'range-ball sessions get graded gap sizes'],
-  ['dispersionValid', 'Conditions',     'range-ball spread is reported as if it were your own ball'],
+  // Measurement model v2 (22 Sep 2026): every tier prescribes, lower tiers
+  // judged harder; range balls are near-normal data, weighted. The ban flags
+  // gappingValid / dispersionValid are gone; these are what replaced them.
+  ['tierRates',       'Metrics',        'every fault is judged at one bar, so a derived or modelled metric reports as easily as ball speed'],
+  ['conditionWeight', 'Metrics',        'a range-ball session pulls a yardage as hard as your own ball'],
+  ['rateBump',        'Metrics',        'a range-ball session is judged exactly like a premium one'],
+  ['weightedInterval','Metrics',        'a pool across ball types falls back to an unweighted mean'],
   ['comparable',      'Conditions',     'sessions get compared across ball types'],
   ['MIN_SHOTS_REPORT','Metrics',        'club means print off any number of shots'],
   ['MIN_SHOTS_TAIL',  'Metrics',        'dispersion tails are computed off too few shots'],
@@ -45,7 +50,7 @@ const WIRED = [
   ['openProbes',      'RetentionProbe', 'nothing ever asks whether a change actually held'],
   ['libraryDrill',    'PracticePlan',   'the plan stops using the gated library'],
   ['transferBlock',   'PracticePlan',   'no plan ends with the block that transfers'],
-  ['conditionGroups', 'Analytics',      'the yardage book pools across ball types again'],
+  ['conditionGroups', 'Analytics',      'the yardage book stops saying which balls and surfaces it was built on'],
   ['MIN_SHOTS_DELIVERY','Metrics',      'the four tier-2 fault rules keep their own copy of the 15-shot floor'],
   ['peak',            'Metrics',        'a record unlocks off a device misread again'],
   ['BALLS',           'Conditions',     'the import menu becomes a second hand-maintained copy of the ball list'],
@@ -117,13 +122,13 @@ for (const [id, mod, consequence] of WIRED) {
 //
 // So a caveat passes if EITHER its constant name or the key it ships under is
 // read from outside. Weakening it further would defeat the point.
-console.log('— and the caveats are rendered, not merely written —');
+console.log('— and the caveats are rendered somewhere (v2: in Settings, not on the main screens) —');
 const CAVEAT_ALIASES = [
   ['CAVEATS',      'caveats',  'Dispersion'],
   ['BODY_CAVEAT',  null,       'FaultEngine'],
   ['FEEL_CAVEAT',  null,       'FaultEngine'],
   ['FIR_NOTE',     'firNote',  'Rounds'],
-  ['caveats',      null,       'Conditions'],
+  ['NOTES',        null,       'Conditions'],
   ['describe',     null,       'LocalDB'],
 ];
 for (const [id, alias, mod] of CAVEAT_ALIASES) {

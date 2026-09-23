@@ -3,7 +3,7 @@
 **ShotLab TOUR**
 
 **Effective date:** 10 September 2026
-**Version:** 2026-09-12
+**Version:** 2026-09-23
 **Supersedes:** the policy dated 16 June 2026
 
 ## 1. Controller and scope

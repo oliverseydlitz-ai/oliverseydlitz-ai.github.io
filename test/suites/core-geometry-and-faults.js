@@ -132,8 +132,8 @@ const split = FE.splitCauses([
 ]);
 ok(split.observable.length === 2 && split.body.length === 2, 'a mixed list splits both ways');
 ok(split.observable.every(FE.causeIsObservable), 'and nothing lands on the wrong side');
-ok(/cannot see any of them/.test(FE.BODY_CAVEAT), 'the caveat says the app cannot see them');
-ok(/several different actions produce the same club delivery/.test(FE.BODY_CAVEAT),
+ok(/can't see any of it/.test(FE.BODY_CAVEAT), 'the caveat says the app cannot see them');
+ok(/different swings can produce the\s+same numbers/.test(FE.BODY_CAVEAT),
    'and why the same delivery has many possible causes');
 
 // The real content, checked in bulk: every body-construct string the engine

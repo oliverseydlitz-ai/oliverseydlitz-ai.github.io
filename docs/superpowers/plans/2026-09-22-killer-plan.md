@@ -593,6 +593,16 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 
 ## Phase 9 — measurement model v2 (Oliver's decision, 22 Sep 2026)
 
+> **STATUS: BUILT 23 Sep 2026.** Steps 1–7 below are done: tier rates, range weight and
+> bump in `Metrics`; FaultEngine, DrillLibrary, Dispersion, gapping and the yardage book on
+> v2; caveats moved to Settings → How the numbers work; FirstRun copy rewritten; Terms
+> 2026-09-23. `test/suites/measurement-v2.js` pins it; ~15 suites were rewritten to pin the
+> new rules, none deleted. **Decisions taken while building, for Oliver to overrule:**
+> an unrecorded ball is treated like a range ball (×0.8, +0.05); the mat note and the
+> "modelled" tags came off the screens too; `Conditions.comparable()` still picks
+> like-for-like references (since-last, QuickStats) but no longer withholds a verdict;
+> the strokes-figure caveats (Broadie & Ko) moved to Settings with the rest.
+
 **The decision, in Oliver's words:**
 
 > "leave the tiers just make them nicer — stuff all the way at the bottom judge it harder, not too different … range balls obviously no spin measurements and slightly lower level of data impact than rpt balls in net or simulator but treat like pretty normal balls … the minimum shot limit is nice, leave that"

@@ -41,13 +41,13 @@ const mk = (id, alignment) => ({ id, date: '2026-08-01',
   await Store.setAlignment('a', false);
   const unaligned = D.tail(Store.stamp(await Store.getSession('a')).shots, 'd');
   ok(unaligned.ok === true, 'the tail computes either way');
-  ok(unaligned.bias === null,
-     'the absolute miss is withheld while unaligned — the centre is wherever the unit happened to point');
+  ok(Number.isFinite(unaligned.bias) && unaligned.aligned === false,
+     'v2 (C8): the absolute miss is shown while unaligned, flagged so it is judged as tier 3');
   ok(Number.isFinite(unaligned.sigma), 'but the SPREAD survives, because a constant offset cancels out of it');
 
   await Store.setAlignment('a', true);
   const alignedT = D.tail(Store.stamp(await Store.getSession('a')).shots, 'd');
-  ok(Number.isFinite(alignedT.bias), 'confirming it releases the absolute miss');
+  ok(Number.isFinite(alignedT.bias) && alignedT.aligned === true, 'confirming it marks the absolute miss as aligned');
   ok(Math.abs(alignedT.sigma - unaligned.sigma) < 1e-9,
      'and does NOT change the spread by a hair — that is the point of the asymmetry, not a coincidence');
 
@@ -62,8 +62,8 @@ const mk = (id, alignment) => ({ id, date: '2026-08-01',
   console.log('— it is not a silent toggle —');
   const ui = src.slice(src.indexOf('fixAlignment'), src.indexOf('fixAlignment') + 3000);
   ok(/showConfirm\(/.test(ui), 'it goes through a confirm — this is a claim about what happened on a day');
-  ok(/bias/i.test(ui) && /more shots will not remove it/i.test(ui),
-     'and the confirm states the cost of getting it wrong: bias is the error more shots cannot remove');
+  ok(/more shots won\\'t fix that/i.test(ui),
+     'and the confirm states the cost of getting it wrong: an aiming error is the one more shots cannot remove');
   ok(/10 shots instead of 30|instead of 30/.test(ui), 'and what confirming actually unlocks');
 
   console.log('— only ONE thing writes this flag —');
@@ -73,9 +73,12 @@ const mk = (id, alignment) => ({ id, date: '2026-08-01',
   ok(/stamp\(sn\);\n    await saveSession/.test(src),
      'which stamps before it saves — the ordering is the bug this would otherwise have');
 
-  console.log('— the dead end is gone —');
-  ok(/you can say so at the top of this page/.test(src),
-     'the withheld-bias note points at the control instead of just naming what is missing');
+  console.log('— the control sits with the fact it corrects —');
+  // v2: nothing is withheld for want of alignment any more; the session line
+  // states it ("alignment not confirmed") and the switch sits under it.
+  const line = src.slice(src.indexOf("'alignment confirmed' : 'alignment not confirmed'"), src.indexOf("'alignment confirmed' : 'alignment not confirmed'") + 2500);
+  ok(line.length > 100 && /id="fixAlignment"/.test(line),
+     'the session line says whether alignment was confirmed, and the switch to correct it is right there');
 
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exit(fail ? 1 : 0);

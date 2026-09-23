@@ -18,15 +18,15 @@ const prem = { ball: 'premium', surface: 'grass' };
 const rng  = { ball: 'range', surface: 'mat' };
 const texts = list => list.map(i => i.text).join(' | ');
 
-console.log('— a change of ball is the first thing it says —');
+console.log('— v2: a change of ball is not called out on the home screen —');
+// Range balls are near-normal data (Oliver, 22 Sep), and the explanation of
+// what a ball does lives in Settings → How the numbers work, read once.
 const changed = IE.generateInsights([
   sess('a','2026-07-08', rng,  many(20)),
   sess('b','2026-07-01', prem, many(20)),
 ]);
-ok(changed.length > 0 && /do not compare/.test(changed[0].text),
-   'the conditions notice leads, because every number below depends on it');
-ok(/range balls/i.test(changed[0].text) && /premium/i.test(changed[0].text),
-   'and it names both, so the golfer can see what changed');
+ok(!/do not compare/.test(texts(changed)),
+   'no "distances do not compare" notice when the ball changes');
 
 console.log('— and stays quiet when nothing changed —');
 const same = IE.generateInsights([

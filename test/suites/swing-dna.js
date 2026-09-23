@@ -38,15 +38,15 @@ ok(thin.length === 1 && thin[0].category === 'Not yet',
    `5 shots produces one honest pill, not six verdicts (floor ${Metrics.MIN_SHOTS_REPORT})`);
 ok(/more shots/.test(thin[0].value), 'and it says what it needs');
 
-console.log('— a verdict tone only on tier 1 —');
+console.log('— v2: every tier is judged; only tier 1 can be called bad —');
 const full = many(20);
-const graded = pills(full).filter(p => p.tone === 'good' || p.tone === 'bad').map(p => p.category);
-ok(graded.every(c => /Strike|Smash/.test(c)),
-   `only strike metrics carry a good/bad tone (${graded.join(', ') || 'none'})`);
-ok(tone(full, 'Club path') === 'ok', 'club path is tier 2 — described, never graded');
-ok(tone(full, 'Where it finishes') === 'ok', 'and side carry is tier 3');
-ok(/modelled figure, not a measurement/.test(val(full, 'Where it finishes')),
-   'which it says on the pill');
+const bad = pills(full).filter(p => p.tone === 'bad').map(p => p.category);
+ok(bad.every(c => /Strike|Smash/.test(c)),
+   `only strike metrics can read "bad" (${bad.join(', ') || 'none'}); lower tiers read good or ok against their band`);
+ok(tone(many(20, { attackAngle: 3 }), 'Attack angle') === 'good', 'attack angle inside its target band reads good');
+ok(tone(many(20, { attackAngle: -4 }), 'Attack angle') === 'ok', 'and outside it reads ok, not bad');
+ok(!/modelled|not a measurement/.test(val(full, 'Where it finishes')),
+   'side carry carries no caveat on the pill — main screens are clean');
 
 console.log('— "Hooker" and "Slicer" are gone —');
 // The old module called a golfer a Hooker, tone `bad`, off a mean side carry —
@@ -70,12 +70,12 @@ ok(/\+2° to \+5°/.test(val(full, 'Attack angle')),
 ok(/inside it/.test(val(many(20, { attackAngle: 3 }), 'Attack angle')),
    'and says when the golfer is inside it');
 
-console.log('— spin is described and disclaimed, never judged —');
+console.log('— spin (RPT only) is judged against its window, with no disclaimer —');
 const rpt = many(20, { _ball: 'rpt', spinRate: 4200 });
 const spinPill = pills(rpt.map(s => ({ ...s, _ball: 'rpt' }))).find(p => p.category === 'Spin');
 if (spinPill) {
-  ok(spinPill.tone === 'ok', 'no good/bad on spin');
-  ok(/never a prescription/.test(spinPill.value), 'and the pill says so outright');
+  ok(spinPill.tone === 'good' || spinPill.tone === 'ok', 'spin reads good inside its window, ok outside — never bad');
+  ok(!/never a prescription/.test(spinPill.value) && /window/.test(spinPill.value), 'and names the window rather than disclaiming itself');
 } else {
   ok(true, 'spin is suppressed without an RPT ball, which is the other correct answer');
 }

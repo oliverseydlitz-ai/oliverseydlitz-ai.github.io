@@ -28,13 +28,11 @@ ok(/\.print-only\s*\{\s*display:\s*block/.test(print), '  …and shown only when
 
 const head = src.slice(src.indexOf("const printHead = document.getElementById('yardagePrintHead')"),
                        src.indexOf("document.getElementById('printYardages')"));
-ok(/main\.ball\.label/.test(head) && /main\.surface\.label/.test(head),
-   'the card names the ball and surface it was built on — "230 · 7i" with no ball on it is the artefact this app refuses everywhere else');
-ok(/modelled by the monitor/.test(head),
-   'and says carry is modelled, not measured');
+ok(/Sessions: \$\{Sanitize\.escape\(mix\)\}/.test(head),
+   'the card names the balls and surfaces it was built on — "230 · 7i" with no ball on it is still the artefact to avoid');
 ok(/MIN_SHOTS_REPORT/.test(head), 'and states the sample floor');
-ok(/dispersionValid/.test(head) && /ORDER of the clubs as real/.test(head),
-   'and off range balls says the order is real and the distances are not');
+ok(/hasRange/.test(head) && /count a little less/.test(head),
+   'v2: with range balls in the pool, it says they count a little less, not that the distances are unusable');
 ok(/Printed \$\{Sanitize\.escape\(formatDate/.test(head),
    'it is dated, because a card in a bag is read months after it was printed');
 ok(/session\$\{used\.length > 1/.test(head) && /totalShots/.test(head),

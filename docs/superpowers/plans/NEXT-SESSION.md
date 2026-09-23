@@ -26,11 +26,9 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 ## What is next, in order
 0. **Rename: drop "TOUR" ("ShotLab TOUR" → "ShotLab").** Decided by Oliver 23 Sep; the scope
    checklist is in the killer plan under "Decided, queued". Small, own commit, legal version bump.
-1. **Phase 9 — measurement model v2** (plan section "Phase 9"). Oliver's direction:
-   every tier prescribes (lower tiers judged harder), range balls near-normal (x0.8,
-   never spin), floors unchanged, "never claim" wording unchanged, caveats off the
-   main screens into Settings. ~20 suites encode the old rules: rewrite them to pin
-   the new rules, never delete. Resolve C8, C25, C27, C29, C31, C32 inside it.
+1. ~~**Phase 9 — measurement model v2**~~ **DONE 23 Sep** (see the plan's Phase 9
+   STATUS block for the decisions taken while building; CLAUDE.md "Measurement model v2").
+   Follow-up worth doing: plain-English the Broadie & Ko caveats now shown in Settings.
 2. **Home screen: one fault, one form, one priority** (queue item 4: V5/C11, V4,
    C13, C14, C21) — a design decision; show Oliver options first.
 3. Remaining 7C polish (V7–V24, R11, R16) and the rest of 7D/7E/7F not in the Done log.

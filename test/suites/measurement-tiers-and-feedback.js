@@ -13,10 +13,12 @@ ok(Math.abs(M.faceRatio('pw')-0.71)<1e-9 && M.faceRatio('pw') < M.faceRatio('7i'
    `PW 0.71 < 7i ${M.faceRatio('7i').toFixed(3)} (R falls with loft)`);
 ok(M.faceRatio('7i') < M.faceRatio('d'), 'path contributes more as loft rises');
 
-console.log('— §1.7 trust tiers gate prescriptions —');
+console.log('— §1.7 trust tiers set how hard a fault is judged (v2: every tier prescribes) —');
 ok(M.Metrics.tier('spinRate')===3 && M.Metrics.tier('spinAxis')===3, 'spin metrics are tier 3');
 ok(M.Metrics.tier('sideCarry')===3 && M.Metrics.tier('launchDirection')===3, 'modelled/unreliable are tier 3');
-ok(M.Metrics.canPrescribe('smashFactor') && !M.Metrics.canPrescribe('spinRate'), 'only tier 1 may prescribe');
+ok(!('canPrescribe' in M.Metrics), 'there is no "may this tier prescribe" switch any more — every tier prescribes (v2)');
+ok(M.Metrics.tierRates(3).min > M.Metrics.tierRates(2).min && M.Metrics.tierRates(2).min > M.Metrics.tierRates(1).min,
+   'a lower tier is judged harder: its recurrence bar is higher');
 
 console.log('— §9 banned claims are gone —');
 const spinShots=mk(20,'d,150,110,1.30,12,1,225,5,-4.5,-3.0,18,4200');
@@ -75,17 +77,16 @@ ok(M.FeedbackEngine.shouldReveal===undefined, 'and nothing decides whether to sh
 ok(/240/.test(M.FeedbackEngine.volumeAdvice(160)||''),
    'volume advice stays — it is about the session you had, which IS this app\'s business');
 
-console.log('— §1.5/1.6 ball and surface —');
+console.log('— §1.5/1.6 ball and surface (v2: near-normal data, explained once) —');
 const range={conditions:{ball:'range',surface:'mat'},shots:[]};
 const good={conditions:{ball:'premium',surface:'grass'},shots:[]};
-ok(M.Conditions.caveats(range).length>=2, 'range balls + mat both raise caveats');
-ok(/2–4×/.test(M.Conditions.caveats(range)[0]), 'names the actual dispersion inflation');
-// the spin caveat moved out of Conditions into the renderer, so it is stated
-// on EVERY session either way rather than only when the ball type raises it
-ok(!M.Conditions.caveats(good).some(c=>/RPT/.test(c)), 'ball caveats no longer carry the spin line');
-ok(/RPT ball/.test(M.Spin.NOT_MEASURED), 'Spin module owns it instead, and states it unconditionally');
-ok(!M.Conditions.comparable(range,good), 'sessions on different balls are not comparable');
-ok(M.Conditions.ball(range).dispersionValid===false, 'dispersion prescriptions blocked on range balls');
+ok(/2–4 times wider/.test(M.Conditions.NOTES.range), 'the range-ball note names the actual dispersion inflation');
+ok(/fat strike/.test(M.Conditions.NOTES.mat), 'the mat note names what a mat hides');
+ok(/RPT ball/.test(M.Spin.NOT_MEASURED), 'Spin owns the RPT line');
+ok(!M.Conditions.comparable(range,good), 'a session on a different ball is still not a like-for-like comparison');
+ok(M.Metrics.conditionWeight('range') < 1 && M.Metrics.conditionWeight('premium') === 1 &&
+   M.Metrics.conditionWeight('rpt') === 1, 'range balls count a little less in a pool; premium and RPT count fully');
+ok(!('dispersionValid' in M.Conditions.ball(range)), 'and nothing is switched off by the ball any more');
 
 console.log('— §2.2 curvature transfer functions —');
 const drv={clubType:'d',launchDirection:2,clubPath:0,launchAngle:10.9,attackAngle:-1.3,carryDistance:275};
