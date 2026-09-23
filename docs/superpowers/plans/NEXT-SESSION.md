@@ -26,7 +26,7 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
    C13, C14, C21) — a design decision; show Oliver options first.
 3. Remaining 7C polish (V7–V24, R11, R16) and the rest of 7D/7E/7F not in the Done log.
 4. Rerun the QC agents (`qc-agent-briefs.md`) on the NOT YET COVERED lists.
-5. **Phase 10 — discoverability.** Domain decided: `shotlab.oliverseydlitz.com` (plan 10.3 has the exact steps; do it once Oliver's CNAME is in). (plan section "Phase 10"). 10.1 (Search Console
+5. **Phase 10 — discoverability.** Domain decided: `shotlab.oliverseydlitz.com` Oliver added the Cloudflare CNAME `shotlab` → `oliverseydlitz-ai.github.io` (grey cloud) on 23 Sep — **do the repo side of 10.3 first thing**, then walk him through Enforce HTTPS, the verified-domain TXT, Supabase URLs and Search Console. (The sandbox cannot resolve DNS, so confirm the record via GitHub Settings → Pages, which checks it.) (plan section "Phase 10"). 10.1 (Search Console
    tag) and 10.2 (guide pages) can run alongside anything; 10.4 (posting) waits.
 
 ## Habits that paid off overnight (keep them)
