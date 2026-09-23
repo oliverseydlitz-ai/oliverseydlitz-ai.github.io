@@ -42,6 +42,14 @@ const session = Store.stamp({ id: 'm1', date: '2026-09-20',
   ok(/Part of this session's faults/.test(iron), 'a mishit 7-iron names the session fault it belongs to');
   ok(!/No faults flagged on this shot/.test(drv + iron), 'and "No faults flagged" (true of every shot) is gone');
 
+  // V29: the number on the row is the shot's place in the session, and the
+  // pop-up title uses the same number (it used the CSV line: "1" opened "#2").
+  const firstBtn = doc.querySelector('.shot-open');
+  if (firstBtn) firstBtn.click();
+  const title = (doc.getElementById('shotModalTitle') || {}).textContent || '';
+  ok(firstBtn && new RegExp('^Shot #' + firstBtn.textContent.trim() + ' ').test(title),
+     `row ${firstBtn && firstBtn.textContent.trim()} opens "${title.slice(0, 12)}"`);
+
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exitCode = fail ? 1 : 0;
 })();

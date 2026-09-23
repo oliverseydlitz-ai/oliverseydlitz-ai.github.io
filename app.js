@@ -9193,7 +9193,11 @@ const UI = (() => {
 
     const COLS = [
       // The row opens on a click anywhere; the number is its keyboard way in (R4).
-      {label:'#',       render:(s,i)=>`<button type="button" class="shot-open" data-key-proxy aria-label="Open shot ${i+1}">${i+1}</button>`, field:null},
+      // V29: the shot's place in the session, not in the current sort (which
+      // renumbered every row on a header click) and not the CSV line (which
+      // opened row "1" as "Shot #2"). The pop-up title uses the same number.
+      {label:'#',       render:s=>{ const n = shots.indexOf(s) + 1;
+        return `<button type="button" class="shot-open" data-key-proxy aria-label="Open shot ${n}">${n}</button>`; }, field:null},
       {label:'Club',    render:s=>`<span class="club-dot" style="background:${clubColor(s.clubType)}"></span>${clubLabel(s.clubType)}`, field:'clubType'},
       {label:'Score',   render:s=>{ const sc=ShotScorer.score(s); return sc!==null?`<span class="shot-score" style="color:${ShotScorer.scoreColor(sc)}">${sc}</span>`:'—'; }, field:null},
       {label:'Ball<br><small>mph</small>',  render:s=>fmt(s.ballSpeed,0),   field:'ballSpeed'},
@@ -9351,7 +9355,7 @@ const UI = (() => {
     ].filter(Boolean);
 
     document.getElementById('shotModalTitle').innerHTML =
-      `Shot #${shot._row||'?'} · ${clubLabel(shot.clubType)}` +
+      `Shot #${((sessionShots || []).indexOf(shot) + 1) || shot._row || '?'} · ${clubLabel(shot.clubType)}` +
       (g ? ` <span class="sm-grade" style="color:${g.color}">${sc}/100 (${g.letter})</span>` : '');
 
     document.getElementById('shotModalBody').innerHTML = `

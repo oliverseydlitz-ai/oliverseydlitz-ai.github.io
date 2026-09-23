@@ -1502,11 +1502,17 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .modal-head .btn-icon { width: 30px; height: 30px; font-size: .9rem; }
 .sm-grade { font-size: .85rem; font-weight: 700; margin-left: .4rem; }
 .sm-table { width: 100%; border-collapse: collapse; }
-.sm-table td { padding: .42rem .25rem; border-top: 1px solid var(--line); white-space: nowrap; }
-.sm-table tr:first-child td { border-top: none; }
+.sm-table td { padding: .42rem .25rem; white-space: nowrap; border-top: none; }
 .sm-k { color: var(--text-muted); font-size: .8rem; }
 .sm-v { font-weight: 600; font-size: .85rem; text-align: right; font-variant-numeric: tabular-nums; }
 .sm-c { font-size: .7rem; text-align: right; padding-left: .5rem !important; }
+/* V29: the pop-up body is ~295px at every width, and three nowrap columns
+   needed ~400. Each row is a two-column grid; the comparison drops to its own
+   line under the value instead of being cut off at the edge. */
+.sm-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-top: 1px solid var(--line); }
+.sm-table tr:first-child { border-top: none; }
+.sm-table td.sm-c { grid-column: 1 / -1; white-space: normal; padding-top: 0; }
+.sm-table td.sm-c:empty { display: none; }
 .sm-cmp.up   { color: var(--green); }
 .sm-cmp.down { color: var(--red); }
 .sm-faults-title { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-caps-xs); color: var(--text-muted); margin: 1rem 0 .5rem; }
