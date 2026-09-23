@@ -8755,7 +8755,8 @@ const UI = (() => {
     }).join('');
     el.querySelectorAll('.mval[data-v]').forEach((span, i) => {
       const target = parseFloat(span.dataset.v), dec = parseInt(span.dataset.d);
-      if (isNaN(target) || target === 0) return;
+      // R28: reduced motion gets the finished number, not a count-up.
+      if (isNaN(target) || target === 0 || ScrollMotion.reduced()) return;
       span.textContent = (0).toFixed(dec);
       const t0 = performance.now() + i * 55;
       const run = ts => {
@@ -10960,7 +10961,7 @@ async function init() {
     link.addEventListener('click', e => {
       e.preventDefault();
       const target=document.getElementById(link.dataset.target);
-      if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+      if(target) target.scrollIntoView({behavior: ScrollMotion.reduced() ? 'auto' : 'smooth', block:'start'});
       markSubnav(link);
     });
   });
@@ -11141,13 +11142,17 @@ async function init() {
   // Data controls / GDPR/CCPA rights
   document.getElementById('dataControlsBtn')?.addEventListener('click', ()=>{
     const user = Auth.getUser();
+    // R38: one copy. Each open used to append another overlay.
+    document.getElementById('dataRightsModal')?.remove();
+    const email = user ? Sanitize.escape(String(user.email || '')) : '';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.id = 'dataRightsModal';
     modal.innerHTML = `
       <div class="modal modal-wide">
         <div class="modal-head">
           <h2 class="modal-title">${icon('sessions')} Your Data &amp; Rights</h2>
-          <button class="btn-icon" data-close-modal>✕</button>
+          <button class="btn-icon" data-close-modal aria-label="Close">✕</button>
         </div>
         <div style="padding:1.2rem;color:var(--text)">
           <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
@@ -11169,12 +11174,12 @@ async function init() {
           </div>
           <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Object</strong><br>
-            ${user ? `You can request to opt-out. Email us with your account (${user.email}).` : `Email us to opt-out of data processing.`}
+            ${user ? `You can request to opt-out. Email us with your account (${email}).` : `Email us to opt-out of data processing.`}
           </div>
 
           <h3 style="margin-top:2rem">What Data Do We Have?</h3>
           <ul style="margin:1rem 0;padding-left:1.5rem">
-            <li>Email: <strong>${user?.email || 'Not logged in'}</strong></li>
+            <li>Email: <strong>${email || 'Not logged in'}</strong></li>
             <li>Golf sessions: Your Rapsodo data (clubs, metrics, notes)</li>
             <li>Preferences: Theme, goals, ratings (local only)</li>
             <li>Timestamp: When you created your account & sessions</li>

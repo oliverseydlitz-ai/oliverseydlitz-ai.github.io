@@ -181,7 +181,9 @@
 }
 
 /* ── Base ──────────────────────────────────────────────── */
-html { height: 100%; }
+/* V35: a control focused from the keyboard scrolls clear of the fixed
+   bottom nav (phones) rather than landing underneath it. */
+html { height: 100%; scroll-padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
 body {
   background: var(--bg);
   color: var(--text);
@@ -353,10 +355,10 @@ button {
 .btn-sm { --cut: 7px; padding: .45rem 1rem; min-height: 0; font-size: .72rem; }
 
 .btn-primary { background: var(--accent); color: var(--accent-ink); }
-.btn-primary:hover { background: var(--forest); }
+.btn-primary:not(:disabled):hover { background: var(--forest); }
 
 .btn-danger { background: var(--red); color: var(--on-fill); }
-.btn-danger:hover { filter: brightness(.92); }
+.btn-danger:not(:disabled):hover { filter: brightness(.92); }
 
 /* border = the element's own background showing through a 1.5px inset ::before */
 .btn-secondary { background: var(--line-strong); color: var(--text); }
@@ -364,11 +366,11 @@ button {
   content: ""; position: absolute; inset: 1.5px; z-index: -1;
   background: var(--surface); clip-path: inherit;
 }
-.btn-secondary:hover { background: var(--accent); }
-.btn-secondary:hover::before { background: var(--surface); }
+.btn-secondary:not(:disabled):hover { background: var(--accent); }
+.btn-secondary:not(:disabled):hover::before { background: var(--surface); }
 
 .btn-ghost { background: none; color: var(--text-muted); }
-.btn-ghost:hover { color: var(--text); }
+.btn-ghost:not(:disabled):hover { color: var(--text); }
 
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The ring goes INSIDE wherever outside would be cut off (R20/V26). clip-path
@@ -386,9 +388,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   outline-offset: -5px; outline-color: currentColor;
 }
 :where(.btn-primary, .btn-secondary, .btn-danger, .btn-icon):active { transform: translateY(1px); }
+/* One disabled treatment (V43): the ground, the dim ink and a fade, so a
+   disabled icon button no longer matches its enabled grey. Hover rules are
+   written :not(:disabled) so nothing lights up under a pointer it ignores. */
 button:disabled, button[disabled] {
   background: var(--surface2); color: var(--text-dim);
-  cursor: not-allowed; filter: none;
+  cursor: not-allowed; filter: none; opacity: .6;
 }
 .btn-secondary:disabled::before { background: var(--surface2); }
 
@@ -399,9 +404,9 @@ button:disabled, button[disabled] {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
-.btn-icon:hover { background: var(--surface3); color: var(--text); }
+.btn-icon:not(:disabled):hover { background: var(--surface3); color: var(--text); }
 .btn-icon.btn-danger { background: transparent; color: var(--red); clip-path: none; }
-.btn-icon.btn-danger:hover { background: var(--accent-weak); }
+.btn-icon.btn-danger:not(:disabled):hover { background: var(--accent-weak); }
 
 .btn-back {
   background: none; color: var(--text-muted);
@@ -1401,7 +1406,7 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
   min-height:var(--tap);
   background:var(--surface);color:var(--text);border:1px solid var(--line-strong);
   border-radius:var(--radius)}
-.probe-btn:hover{border-color:var(--accent);color:var(--accent)}
+.probe-btn:not(:disabled):hover{border-color:var(--accent);color:var(--accent)}
 .probe-btn.ghost{color:var(--text-muted);font-weight:500}
 .tail-spark{display:block;width:100%;height:28px;margin:.1rem 0 .2rem;color:var(--accent);opacity:.9}
 .tail-spark-key{font-size:.65rem;letter-spacing: var(--track-caps-xs);text-transform:uppercase;color:var(--text-muted);margin-bottom:.7rem}
@@ -1690,7 +1695,6 @@ body.modal-open {
   color: var(--accent); text-decoration: underline;
   font: inherit;
 }
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .modal {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1820,6 +1824,7 @@ body.modal-open {
      60px band above the bar — visible the whole time the gradient was there
      to disguise it. */
   body { padding-bottom: 0; padding-top: 0; }
+  html { scroll-padding-bottom: 0; scroll-padding-top: calc(var(--nav-h) + 12px); }
   .top-nav { display: flex; }
   .bottom-nav { display: none; }
   .app-main { max-width: 980px; margin: 0 auto; padding: 1.75rem 2.25rem 3rem; }
