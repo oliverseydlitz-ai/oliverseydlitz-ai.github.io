@@ -919,7 +919,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **68 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **69 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1141,6 +1141,30 @@ that reads it has already moved on.
 - `.nojekyll` makes serving deterministic — Jekyll would otherwise decide which
   files to process.
 
+### The service worker (`sw.js`) — pinned by `service-worker.js`
+
+It used to answer **every cross-origin GET cache-first** until the next version
+bump — Supabase's `/auth/v1/user` and `/rest/v1/sessions` included, keyed
+without the Authorization header. Stale identity after an account switch, other
+devices' sessions never appearing, and a paused project "succeeding" from cache
+so `cloudStatus` could never fire (R1). Now:
+
+- **Cross-origin is not intercepted at all.** Everything the app loads is
+  self-hosted; the only cross-origin traffic left is Supabase, which must never
+  come from a cache.
+- **Only `res.ok` is cached, keyed by path without the query** (R6).
+- **Network-first with a 3 s timeout** (R7): a hanging range-bay connection is
+  answered from the cache, and with nothing cached the slow request is still
+  awaited rather than abandoned.
+- **Offline, an unknown navigation gets `404.html` with a 404** (R26); only `/`
+  and `/index.html` get the app shell.
+
+The suite evaluates the real `sw.js` in a `vm` context with fake `caches`,
+`fetch` and `setTimeout` rather than grepping it. It sets `process.exitCode = 1`
+up front because the old worker **hung** on the timeout case and node exited 0
+with nothing printed — and `test/run.js` now fails any suite that ends without
+a result line, for the same reason.
+
 ### The service worker's offline fallback
 
 It handed `index.html` to **every** failed same-origin GET. An image, a JSON file
@@ -1234,8 +1258,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **68 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v162**, 58 modules.
+State at handover: **69 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v163**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1702,7 +1726,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**68 test suites**, service worker **v162**. Deterministic auth, cloud sync
+**69 test suites**, service worker **v163**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

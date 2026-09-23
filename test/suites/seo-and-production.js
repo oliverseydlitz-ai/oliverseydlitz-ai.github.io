@@ -129,7 +129,7 @@ ok(/slDebug.*!== '1'.*return|getItem\('slDebug'\) !== '1'/.test(app),
 
 console.log('— the service worker fails honestly —');
 const sw = read('sw.js');
-ok(/req\.mode === 'navigate'/.test(sw),
+ok(/req\.mode [!=]== 'navigate'/.test(sw),   // behaviour is exercised in service-worker.js
    'only a navigation falls back to the app shell — every failed GET used to receive index.html, so an offline asset came back as a page of HTML');
 ok(/'\/404\.html'/.test(sw), 'and 404.html is precached so it works offline');
 

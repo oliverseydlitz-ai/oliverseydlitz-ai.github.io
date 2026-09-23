@@ -25,6 +25,10 @@ for (const f of fs.readdirSync(SUITES).filter(f => f.endsWith('.js')).sort()) {
   try { out = execFileSync(process.execPath, [path.join(SUITES, f)], { encoding: 'utf8' }); }
   catch (e) { out = (e.stdout || '') + (e.stderr || ''); ok = false; }
   const last = out.trim().split('\n').filter(l => /passed|FAILED/.test(l)).pop() || '(no result)';
+  // A suite that exits 0 without ever printing its result died part-way —
+  // an async suite whose awaited promise never settles does exactly that.
+  // Counting it as a pass is a check that cannot fail.
+  if (last === '(no result)') ok = false;
   const fails = out.split('\n').filter(l => l.includes('FAIL'));
   console.log(`  ${ok ? '\x1b[32mPASS\x1b[0m' : '\x1b[31mFAIL\x1b[0m'}  ${f.padEnd(18)} ${last.trim()}`);
   fails.forEach(l => console.log('        ' + l.trim()));

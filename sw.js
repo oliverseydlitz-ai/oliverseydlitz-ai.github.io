@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v162';
+const CACHE = 'shotlab-v163';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
@@ -29,36 +29,59 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// How long a hanging network gets before the cache answers. A range bay on
+// one bar of signal ("lie-fi") does not fail, it hangs, and network-first with
+// no timeout meant the page never loaded at all (R7). The network request is
+// NOT abandoned: if nothing is cached it is still awaited.
+const NETWORK_TIMEOUT_MS = 3000;
+
+// Navigations that ARE the app. Any other uncached navigation offline gets
+// 404.html rather than an app shell at the wrong path (R26).
+const APP_PATHS = ['/', '/index.html'];
+
+// Cross-origin requests are not intercepted at all (R1). Everything the app
+// loads is self-hosted, so the only cross-origin GETs left are Supabase's —
+// `/auth/v1/user` and `/rest/v1/sessions` — and this used to serve them
+// CACHE-FIRST, keyed without the Authorization header, until the next version
+// bump: a stale identity after switching accounts, other devices' sessions
+// never appearing, and a paused project "succeeding" from cache so the
+// cloud-status banner could never fire. A worker that does not touch them
+// cannot do any of that.
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  const sameOrigin = new URL(req.url).origin === self.location.origin;
-
-  if (sameOrigin) {
-    // Network-first: always try the latest, fall back to cache when offline
-    e.respondWith(
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then(c => {
-        if (c) return c;
-        // Only a NAVIGATION falls back to the app shell. This used to hand
-        // index.html to every failed same-origin GET, so an image, a JSON file
-        // or a CSV that was merely offline came back as a page of HTML — which
-        // does not fail loudly, it fails as a parse error somewhere unrelated.
-        if (req.mode === 'navigate') return caches.match('/index.html');
-        return Response.error();
-      }))
-    );
-  } else {
-    // Cross-origin CDN libs: cache-first (they're versioned and rarely change)
-    e.respondWith(
-      caches.match(req).then(cached => cached || fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy));
-        return res;
-      }))
-    );
-  }
+  if (new URL(req.url).origin !== self.location.origin) return;
+  e.respondWith(handle(req));
 });
+
+async function handle(req) {
+  const url = new URL(req.url);
+  // One entry per path (R6). Every `?query` variant used to get its own copy,
+  // so the cache grew without bound; nothing this app serves varies by query.
+  const key = url.origin + url.pathname;
+  const net = fetch(req).then(res => {
+    // Only a real success is kept (R6). A 404 or a 500 cached here would be
+    // served back offline as if it were the file.
+    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)); }
+    return res;
+  });
+  net.catch(() => {});   // settled below; this only stops an unhandled rejection
+  const timer = new Promise(r => setTimeout(r, NETWORK_TIMEOUT_MS, 'timeout'));
+  try {
+    const first = await Promise.race([net, timer]);
+    if (first !== 'timeout') return first;
+    return (await caches.match(key)) || await net;
+  } catch (_) {
+    const cached = await caches.match(key);
+    if (cached) return cached;
+    // Only a NAVIGATION falls back to a page. This used to hand index.html to
+    // every failed same-origin GET, so an image, a JSON file or a CSV that was
+    // merely offline came back as a page of HTML — which does not fail loudly,
+    // it fails as a parse error somewhere unrelated.
+    if (req.mode !== 'navigate') return Response.error();
+    if (APP_PATHS.includes(url.pathname)) return caches.match('/index.html');
+    const nf = await caches.match('/404.html');
+    return nf ? new Response(await nf.text(), { status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+              : Response.error();
+  }
+}
