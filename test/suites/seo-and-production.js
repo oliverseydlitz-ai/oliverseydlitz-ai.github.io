@@ -24,18 +24,23 @@ ok(/Disallow: \/test\//.test(robots) && /Disallow: \/node_modules\//.test(robots
    'test and dependency scaffolding is kept out of the index');
 ok(!/^Disallow: \/$/m.test(robots), 'and it never blocks the whole site — the failure that costs everything');
 
-console.log('— the sitemap lists the app once, plus the standalone legal pages —');
+console.log('— the sitemap lists the app once, plus the standalone legal pages and guides —');
 const sm = new JSDOM(read('sitemap.xml'), { contentType: 'text/xml' }).window.document;
 const locs = [...sm.querySelectorAll('loc')].map(n => n.textContent);
 // The APP is one URL: its views are hash routes and a crawler discards
 // everything after the #. /terms/, /privacy/ and /contact/ are separate
 // documents with their own pre-rendered content and their own URLs, and a
 // policy nobody can link to is not much better than one nobody can read.
-const EXPECTED = [`${DOMAIN}/`, `${DOMAIN}/terms/`, `${DOMAIN}/privacy/`, `${DOMAIN}/contact/`];
+// The guides (/guides/ and one URL per guide) are the same kind of page and
+// are listed by their generator, tools/build-guide-pages.js; guide-pages.js
+// pins that block. They are read from the generator here rather than restated.
+const { GUIDES } = require(path.join(root, 'tools', 'build-guide-pages.js'));
+const GUIDE_URLS = [`${DOMAIN}/guides/`, ...GUIDES.map(g => `${DOMAIN}/guides/${g.slug}/`)];
+const EXPECTED = [`${DOMAIN}/`, `${DOMAIN}/terms/`, `${DOMAIN}/privacy/`, `${DOMAIN}/contact/`, ...GUIDE_URLS];
 ok(locs.length === EXPECTED.length,
-   `${EXPECTED.length} URLs (${locs.length}) — the app once, and each legal page once`);
+   `${EXPECTED.length} URLs (${locs.length}) — the app once, each legal page once, each guide once`);
 ok(EXPECTED.every(u => locs.includes(u)),
-   'the root and all three legal pages are listed');
+   'the root, all three legal pages and every guide are listed');
 ok(!locs.some(u => /\/#|index\.html/.test(u)),
    'no hash route and no index.html duplicate of the root');
 ok(locs[0] === `${DOMAIN}/`, 'and the root comes first on the production domain');
@@ -158,7 +163,8 @@ console.log('— one domain, everywhere —');
   const cname = read('CNAME').trim();
   ok(`https://${cname}` === DOMAIN, `the CNAME file (${cname}) is the canonical domain`);
   const PUBLIC = ['index.html', '404.html', 'sitemap.xml', 'robots.txt', 'llms.txt', '.well-known/security.txt',
-                  'terms/index.html', 'privacy/index.html', 'contact/index.html', 'PRIVACY.md', 'TERMS.md'];
+                  'terms/index.html', 'privacy/index.html', 'contact/index.html', 'PRIVACY.md', 'TERMS.md',
+                  'guides/index.html', ...GUIDES.map(g => `guides/${g.slug}/index.html`)];
   const stale = PUBLIC.filter(f => /https:\/\/oliverseydlitz-ai\.github\.io/.test(read(f)));
   ok(stale.length === 0, `no public file still points at the old github.io address${stale.length ? ' — ' + stale.join(', ') : ''}`);
 }

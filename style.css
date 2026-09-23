@@ -1566,7 +1566,17 @@ body.modal-open {
    These share style.css with the app so there is one design system, but they
    are ordinary documents rather than app views: always-visible nav, a
    measured column, and no view machinery. */
-.legal-nav { display: flex !important; position: static; }
+/* The nav WRAPS on a phone. It was a fixed-height nowrap row sized for the
+   app's desktop bar, so at 393px the brand plus three links plus the print
+   button ran to 589px and the whole page scrolled sideways — on /terms/ and
+   /contact/ from the day they shipped, found when the guide pages (which share
+   this header) were first put through render-scan.js. */
+.legal-nav {
+  display: flex !important; position: static;
+  flex-wrap: wrap; height: auto; min-height: var(--nav-h);
+  padding: var(--s2) var(--s4); row-gap: var(--s1);
+}
+.legal-nav .top-nav-links { flex-wrap: wrap; }
 .legal-home { text-decoration: none; display: flex; align-items: baseline; gap: .5rem; }
 .legal-page {
   max-width: 46rem; margin: 0 auto;
@@ -1588,6 +1598,27 @@ body.modal-open {
   .legal-nav { display: none !important; }
   .legal-page { max-width: none; padding: 0; }
 }
+
+/* ── Guide pages (/guides/, tools/build-guide-pages.js) ────────────────
+   The same document column as the legal pages. What they add: a byline under
+   the heading, one plain line saying what the app is, and links to the other
+   guides — the internal links are most of what a crawler learns the site
+   from. Nothing here rests hidden: every block is visible before any script. */
+.guide-meta { color: var(--text-muted); font-size: .85rem; margin: calc(-1 * var(--s2)) 0 var(--s5); }
+.guide-cta {
+  margin: var(--s6) 0 var(--s5);
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--surface2);
+}
+.guide-cta p { margin: 0 0 var(--s3); }
+.guide-cta p:last-child { margin-bottom: 0; }
+.guide-cta-link { display: inline-block; padding: var(--s2) var(--s4); text-decoration: none; font-weight: 700; }
+.guide-related h2 { font-size: 1rem; margin: 0 0 var(--s2); }
+.guide-related ul, .guide-list { padding-left: var(--s4); }
+.guide-related li, .guide-list li { margin-bottom: var(--s2); }
+.guide-list p { margin: var(--s1) 0 0; color: var(--text-muted); }
 
 /* ── Safety notices (audit §9) ─────────────────────────────────────────
    Rendered above the drill catalogue and on every surface that prescribes

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>How accurate is the Rapsodo MLM2PRO? — ShotLab TOUR</title>
+<meta name="description" content="What the MLM2PRO measures, what it calculates, what it cannot see at all, and which of its numbers you can build practice on.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://shotlab.oliverseydlitz.com/guides/mlm2pro-accuracy/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="ShotLab TOUR">
+<meta property="og:title" content="How accurate is the Rapsodo MLM2PRO?">
+<meta property="og:description" content="What the MLM2PRO measures, what it calculates, what it cannot see at all, and which of its numbers you can build practice on.">
+<meta property="og:url" content="https://shotlab.oliverseydlitz.com/guides/mlm2pro-accuracy/">
+<meta property="og:image" content="https://shotlab.oliverseydlitz.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "How accurate is the Rapsodo MLM2PRO?",
+  "description": "What the MLM2PRO measures, what it calculates, what it cannot see at all, and which of its numbers you can build practice on.",
+  "url": "https://shotlab.oliverseydlitz.com/guides/mlm2pro-accuracy/",
+  "mainEntityOfPage": "https://shotlab.oliverseydlitz.com/guides/mlm2pro-accuracy/",
+  "datePublished": "2026-09-23",
+  "dateModified": "2026-09-23",
+  "inLanguage": "en",
+  "author": {
+    "@type": "Person",
+    "name": "Oliver Seydlitz",
+    "url": "https://shotlab.oliverseydlitz.com/contact/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "ShotLab TOUR",
+    "url": "https://shotlab.oliverseydlitz.com/"
+  },
+  "image": "https://shotlab.oliverseydlitz.com/og-image.png"
+}
+</script>
+</head>
+<body>
+<!-- GENERATED FROM /docs/guides/mlm2pro-accuracy.md by tools/build-guide-pages.js — DO NOT EDIT.
+     Edit the markdown and re-run the generator. test/suites/guide-pages.js
+     fails if this file and the markdown disagree. -->
+<header class="top-nav legal-nav">
+  <div class="top-nav-brand">
+    <a href="/" class="legal-home">
+      <span class="brand-name">ShotLab</span>
+      <span class="brand-tag">TOUR</span>
+    </a>
+    <span class="beta-tag">Beta</span>
+  </div>
+  <nav class="top-nav-links">
+    <a href="/guides/" class="nav-link">Guides</a>
+    <a href="/privacy/" class="nav-link">Privacy</a>
+    <a href="/contact/" class="nav-link">Contact</a>
+  </nav>
+</header>
+<main class="legal-page">
+<article class="modal-document doc-standalone">
+<h1>How accurate is the Rapsodo MLM2PRO?</h1>
+<p class="guide-meta">By Oliver Seydlitz · Updated <time datetime="2026-09-23">23 September 2026</time></p>
+<p>Short version: the speeds are good, the angles are rough, and a few of the numbers on your screen aren&#39;t measured at all. Ball speed and club speed are the ones to trust. Launch angle, attack angle and club path give you a fair picture over a bucket but wobble a lot shot to shot. Spin only counts with the RPT ball, and even then it&#39;s the weakest number you get. Carry, total, apex and side carry are worked out by a ball-flight model, not measured. And face angle isn&#39;t in there at all.</p>
+<p>One thing to know before any of the detail: <strong>nobody has published an independent, peer-reviewed accuracy test of any Rapsodo unit.</strong> Everything below is built from Rapsodo&#39;s own testing, peer-reviewed studies of similar consumer launch monitors, and studies of how much golfers vary on their own. That&#39;s the honest state of the evidence, and anyone telling you more precisely than that is guessing.</p>
+<!-- PHOTO SLOT (Oliver to supply): the MLM2PRO set up behind a hitting mat, side view, with the distance to the ball visible -->
+<h2>What it measures and what it works out</h2>
+<p>Rapsodo&#39;s own product page lists 15 metrics. They aren&#39;t all the same kind of number, and that difference matters more than any accuracy figure.</p>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Number</th><th>How you get it</th><th>Worth knowing</th></tr></thead><tbody><tr><td>Ball speed</td><td>Measured (radar and camera)</td><td>The most reliable number on the unit</td></tr><tr><td>Club speed</td><td>Measured (radar)</td><td></td></tr><tr><td>Launch angle</td><td>Measured (camera)</td><td></td></tr><tr><td>Launch direction</td><td>Measured (camera)</td><td>Only as good as your alignment</td></tr><tr><td>Spin rate</td><td>Measured with the RPT ball</td><td>Needs the RPT ball</td></tr><tr><td>Spin axis</td><td>Measured with the RPT ball</td><td>Needs the RPT ball</td></tr><tr><td>Club path</td><td>Measured</td><td>Needs the ball placed precisely</td></tr><tr><td>Attack angle</td><td>Measured</td><td>Same placement rule</td></tr><tr><td>Smash factor</td><td>Calculated</td><td>Ball speed divided by club speed</td></tr><tr><td>Carry</td><td>Calculated</td><td>A ball-flight model&#39;s output</td></tr><tr><td>Total distance</td><td>Calculated</td><td>The model plus a roll assumption</td></tr><tr><td>Side carry, apex, descent</td><td>Calculated</td><td>Model outputs</td></tr><tr><td>Shot type</td><td>Calculated</td><td>A label, not a measurement</td></tr><tr><td>Face angle</td><td><strong>Not provided</strong></td><td>See below</td></tr></tbody></table></div>
+<p>The big one: <strong>carry is a model output.</strong> The unit measures how the ball leaves the club and then calculates where it would have landed. It&#39;s a useful number, and on good balls it&#39;s a fair guide, but it inherits every error in the launch numbers plus the model&#39;s own. When your carry moves a few yards between sessions, that&#39;s not a measurement of anything moving.</p>
+<h2>The only accuracy numbers that exist</h2>
+<p>Rapsodo tested club path and attack angle against a Foresight GCQuad over 1,021 shots and published the results:</p>
+<div class="doc-table-wrap"><table class="doc-table"><thead><tr><th>Metric</th><th>Average error</th><th>Typical error (RMSE)</th></tr></thead><tbody><tr><td>Attack angle</td><td>1.05°</td><td>1.42°</td></tr><tr><td>Club path</td><td>1.19°</td><td>1.46°</td></tr></tbody></table></div>
+<p>That&#39;s a decent test as manufacturer testing goes: lots of shots, real golfers, a serious reference device. But it&#39;s their own test, it wasn&#39;t independently reviewed, and it doesn&#39;t say how many shots the unit failed to pick up. Read it as the best case.</p>
+<p>For ball speed, club speed, launch angle, spin, spin axis, launch direction and smash factor, <strong>there is no published error data for the MLM2PRO from anyone.</strong> The nearest thing is peer-reviewed testing of the FlightScope Mevo+, another consumer unit, against a TrackMan 4:</p>
+<ul><li>Club speed and ball speed tracked TrackMan well (correlations of 0.92 and above).</li><li>Smash factor was close too.</li><li>Spin was not: the gap to TrackMan could run anywhere from −2,628 to +5,103 rpm. There&#39;s a separate guide on that.</li><li>In a second study, the Mevo+&#39;s attack angle with a 7-iron agreed with TrackMan&#39;s at an ICC of 0.02 — which is statistics for &quot;no relationship&quot;.</li></ul>
+<p>That&#39;s a different unit, so don&#39;t read it as the MLM2PRO&#39;s result. The pattern is the useful part: on consumer launch monitors, <strong>ball numbers hold up and club-delivery numbers mostly don&#39;t, especially with irons.</strong></p>
+<h2>Your swing is noisier than the unit</h2>
+<p>This is the part people skip. Even on a TrackMan, the thing in front of the net that costs as much as a car, good players moved a lot between two sessions of ten drivers each. The typical wobble in their average carry was 7.80 to 14.21 yards, and in ball speed 2.46 to 4.42 mph. That&#39;s not the device. That&#39;s golf.</p>
+<p>So a carry number that moves eight yards between Tuesday and Saturday hasn&#39;t told you anything yet. You&#39;d see that from the same swing on a perfect launch monitor.</p>
+<h2>Face angle isn&#39;t in there</h2>
+<p>Plenty of people assume the MLM2PRO tells you where the face was pointing. It doesn&#39;t, and it&#39;s not on Rapsodo&#39;s metric list. Anything that shows you a face angle from MLM2PRO data has worked it backwards from launch direction and club path, using the rule that the face sets most of the start line. How much &quot;most&quot; is depends on the club: about 84% with a driver, 78% with a 7-iron and 71% with a pitching wedge, per PING&#39;s research. The &quot;85% face, 15% path&quot; rule you&#39;ve heard is a driver number.</p>
+<p>Working it backwards makes the error bigger, not smaller. Club path alone carries a typical error of 1.46° in Rapsodo&#39;s own test, and the maths divides that by the face share, so the derived face number is shakier than the path it came from. One shot&#39;s &quot;face 2° open&quot; is inside that noise.</p>
+<h2>What to actually do with this</h2>
+<ul><li><strong>Trust the speeds first.</strong> Ball speed, club speed and smash factor are where the device is strongest and where most amateurs have the most to gain.</li><li><strong>Average before you read anything.</strong> Give each club at least 10 shots before you look at its average, and 15 before you decide your path or attack angle has changed.</li><li><strong>Read ranges, not single numbers.</strong> &quot;Club path 2° give or take 3°&quot; is honest. &quot;Club path 2°&quot; isn&#39;t.</li><li><strong>Keep your setup the same.</strong> Launch direction depends on alignment, and path and attack angle depend on where you put the ball. Mats and range balls change the numbers too, so only compare sessions hit on the same ball and the same surface.</li><li><strong>Throw out obvious misreads.</strong> One user reported a 147 mph swing and a 0 mph swing almost back to back under fluorescent lights. One reading like that wrecks a ten-shot average.</li><li><strong>Don&#39;t practise off spin.</strong> See the spin guide for why.</li></ul>
+<h2>Sources</h2>
+<ul><li>Rapsodo, <a href="https://rapsodo.com/products/mlm2pro-mobile-launch-monitor-golf-simulator" rel="noopener noreferrer">MLM2PRO product page</a> — the metric list, measured versus calculated.</li><li>Rapsodo, <a href="https://rapsodo.co.uk/blogs/golf/mlm2pro-vs-foresight-gcquad-a-data-driven-comparison-of-club-path-and-attack-angle" rel="noopener noreferrer">MLM2PRO vs Foresight GCQuad: club path and attack angle</a> — manufacturer testing, not independently reviewed.</li><li>Brennan et al. (2024), <a href="https://pubmed.ncbi.nlm.nih.gov/38090982/" rel="noopener noreferrer">Validity and reliability of the FlightScope Mevo+ launch monitor</a>, <em>Journal of Strength and Conditioning Research</em>.</li><li>Bliss and Langdown (2025), <a href="https://oro.open.ac.uk/107777" rel="noopener noreferrer">Mevo+ vs Trackman 4 indoor tracking</a>, <em>JSAMS Plus</em>.</li><li>Bliss and Langdown (2024), <a href="https://www.tandfonline.com/doi/full/10.1080/02640414.2024.2314864" rel="noopener noreferrer">Trackman 4 within- and between-session reliability</a>, <em>Journal of Sports Sciences</em>.</li><li>Henrikson, Wood, Broadie and Nuttall (2020), <a href="https://www.mdpi.com/2504-3900/49/1/27" rel="noopener noreferrer">Role of friction and tangential compliance on resultant launch angle</a>, <em>Proceedings</em> — the face-share figures.</li></ul>
+</article>
+<aside class="guide-cta">
+<p><strong>ShotLab</strong> is a free web app that reads the CSV your Rapsodo exports and tells you which of your numbers are solid enough to practise on — per club, with the sample size it needs before it says anything.</p>
+<p><a class="btn-primary guide-cta-link" href="/">Open ShotLab</a></p>
+</aside>
+<nav class="guide-related" aria-label="More guides">
+<h2>More guides</h2>
+<ul>
+<li><a href="/guides/launch-monitor-spin-accuracy/">Is launch-monitor spin accurate?</a></li>
+</ul>
+</nav>
+</main>
+</body>
+</html>

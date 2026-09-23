@@ -346,6 +346,7 @@ console.log('— every generated artefact has a generator AND a guard —');
   for (const [tool, suite, artefact] of [
     ['tools/build-design-md.js', 'test/suites/design-md.js', 'DESIGN.md'],
     ['tools/build-legal-pages.js', 'test/suites/legal-pages.js', 'terms/index.html'],
+    ['tools/build-guide-pages.js', 'test/suites/guide-pages.js', 'guides/index.html'],
     ['tools/build-og-image.js', 'test/suites/seo-and-production.js', 'og-image.png'],
   ]) {
     const have = [tool, suite, artefact].filter(f => fs2.existsSync(path2.join(root2, f)));

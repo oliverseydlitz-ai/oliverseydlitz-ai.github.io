@@ -25,7 +25,12 @@ let failed = 0;
 // something has already gone wrong is exactly where one survives.
 for (const f of ['index.html', 'app.js', 'PRIVACY.md', 'TERMS.md', '404.html',
                  'legal.js', 'contact/index.html', 'terms/index.html',
-                 'privacy/index.html', 'manifest.json', 'llms.txt']) {
+                 'privacy/index.html', 'manifest.json', 'llms.txt',
+                 // The guides: pages written to be found by strangers, rendered
+                 // from their markdown. Both copies, so neither can carry one.
+                 'guides/index.html',
+                 ...require('../../tools/build-guide-pages.js').GUIDES
+                   .flatMap(g => [g.source, `guides/${g.slug}/index.html`])]) {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', f), 'utf8');
   src.split('\n').forEach((ln, i) => {
     const stripped = [...ln].filter(c => !ALLOW.includes(c)).join('');

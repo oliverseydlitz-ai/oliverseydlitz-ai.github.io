@@ -278,6 +278,36 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     await p.waitForTimeout(350);
     total += scan('drills ' + s, await p.evaluate(() => document.getElementById('drillHost')?.innerText));
   }
+  // The guide pages (/guides/). They are not app views, so none of the passes
+  // above ever load them — and they are the pages written for strangers on a
+  // phone. Same three findings: page wider than the viewport, a table wider
+  // than its own scroll box, and a template tell in the text. The list is read
+  // from the generator, so a new guide is scanned without editing this file.
+  {
+    const { GUIDES } = require(path.join(__dirname, '..', '..', 'tools', 'build-guide-pages.js'));
+    const base = process.env.PW_URL || 'http://127.0.0.1:8766';
+    const gp = await ctx.newPage();
+    gp.on('pageerror', x => errs.push('guide: ' + x.message));
+    // The legal pages share the guides' header and were 483-589px wide at this
+    // viewport from the day they shipped, because nothing loaded them. They get
+    // the page-width check only: /privacy/'s storage table is a deliberate
+    // horizontal scroller.
+    const LEGAL = ['/terms/', '/privacy/', '/contact/'];
+    for (const url of ['/guides/', ...GUIDES.map(g => `/guides/${g.slug}/`), ...LEGAL]) {
+      const res = await gp.goto(base + url, { waitUntil: 'load' });
+      if (!res || !res.ok()) { overflow++; console.log(`  MISSING   ${url} did not load (${res && res.status()}) — did you run sync.sh?`); continue; }
+      const m = await gp.evaluate(() => ({
+        vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth,
+        tables: [...document.querySelectorAll('.doc-table-wrap')].filter(w => w.scrollWidth > w.clientWidth + 1)
+          .map(w => `${w.scrollWidth}px in ${w.clientWidth}px`),
+        text: document.body.innerText,
+      }));
+      if (m.sw > m.vw + 1) { overflow++; console.log(`  OVERFLOW  ${url}: ${m.sw}px wide in a ${m.vw}px viewport`); }
+      if (m.tables.length && !LEGAL.includes(url)) { overflow++; console.log(`  CLIPPED   ${url}: table ${m.tables.join(', ')}`); }
+      total += scan(url, m.text);
+    }
+    await gp.close();
+  }
   console.log(total ? `\n${total} suspicious line(s)` : '\nno NaN / undefined / [object Object] anywhere');
   const staleClipped = Object.keys(KNOWN_CLIPPED).filter(k => !seenClipped.has(k));
   if (staleClipped.length) { overflow++; console.log(`  STALE     these no longer clip — strike them off KNOWN_CLIPPED: ${staleClipped.join(', ')}`); }

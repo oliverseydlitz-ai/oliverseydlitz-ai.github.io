@@ -962,7 +962,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **72 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **73 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1178,6 +1178,34 @@ item shrinks enough to fit. That is why the control has to restore all three.
 
 ## SEO, crawlability and production metadata
 
+### Guide pages (Phase 10.2) — the only pages written to be found
+
+`tools/build-guide-pages.js` renders `docs/guides/<slug>.md` into
+`/guides/<slug>/`, builds the `/guides/` index, and **rewrites the guides block
+of `sitemap.xml`** (between its `guides:start` / `guides:end` markers — never
+hand-edit inside them). `test/suites/guide-pages.js` is the guard. The list of
+guides is the `GUIDES` array in the tool; `seo-and-production.js`, `no-emoji.js`
+and `render-scan.js` all read it from there rather than restating it.
+
+- **A number the app owns is never typed.** Write it as a token —
+  `{{Metrics.MIN_SHOTS_REPORT}}`, `{{Benchmarks.get('7i').pga.sf|2}}` — and the
+  generator resolves it against the real modules from a whole-file load. A token
+  naming something the app does not export fails the build.
+- **Every other number must appear in the research base** (or
+  `docs/short-game-evidence.md`). The suite extracts every figure from the prose
+  and fails on one found in neither, by name. It carries a positive control.
+- **The §9 wording is checked on the claim, not the word**: "worn wedge grooves"
+  is fine, "groove a new move" is not.
+- No ratings, reviews or testimonials in the markup or the JSON-LD; no script
+  beyond the JSON-LD block; outbound links are plain citations.
+- **Photo slots**: a line `[[photo: what it shows]]` renders as an HTML comment
+  until Oliver sends the image. The suite prints the open slots every run.
+- Describe the research, not app policy that Phase 9 is about to change.
+
+The shared legal-page header now wraps on a phone. It was 483–589px wide at
+393px on `/terms/` and `/contact/` from the day it shipped, because the render
+scan never loaded those pages. It now does.
+
 Guarded by `test/suites/seo-and-production.js`, because this is the category
 that rots invisibly: nothing renders it, no user reports it, and the only thing
 that reads it has already moved on.
@@ -1325,8 +1353,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v184**, 58 modules.
+State at handover: **73 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v185**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1797,7 +1825,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v184**. Deterministic auth, cloud sync
+**73 test suites**, service worker **v185**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

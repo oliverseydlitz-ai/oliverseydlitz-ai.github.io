@@ -36,7 +36,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 // when style.css is the thing that 404'd. Its class names (`brand`, `btn`,
 // `mark`, `note`) belong to that block, not to this stylesheet, and scanning
 // it would grow fourteen hooks that are not hooks.
-const SOURCES = ['index.html', 'app.js', 'tools/build-legal-pages.js'];
+// The guide generator is the fourth, for the same reason: `.guide-cta` and
+// its siblings are applied nowhere else.
+const SOURCES = ['index.html', 'app.js', 'tools/build-legal-pages.js', 'tools/build-guide-pages.js'];
 const CSS = read('style.css');
 const src = SOURCES.map(f => ({ file: f, text: read(f) }));
 
