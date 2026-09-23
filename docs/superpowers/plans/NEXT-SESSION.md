@@ -45,7 +45,20 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 - CLAUDE.md headings: no backticked names in `###` headings (module-map.js).
 - Re-run `npm test` AFTER editing CLAUDE.md, before pushing.
 
-## Guide pages (Phase 10.2) — Oliver's go-ahead, 23 Sep
+## Guide pages (Phase 10.2) — 7 of 8 SHIPPED, 23 Sep
+- Live under `/guides/`: mlm2pro-accuracy, launch-monitor-spin-accuracy,
+  smash-factor-by-club, driver-attack-angle, range-balls-vs-premium-balls,
+  how-many-shots, gapping-chart-from-launch-monitor. Sources in `docs/guides/`,
+  generator `tools/build-guide-pages.js`, guard `test/suites/guide-pages.js`
+  (CLAUDE.md "Guide pages" section has the rules). SW v188, 73 suites.
+- **Still open:** guide 1 (Rapsodo CSV export) waits for Oliver's screenshots;
+  one `[[photo: ...]]` slot per guide waits for his photos (the suite lists them).
+  The generator has no image syntax yet — add it when the first photo arrives
+  (self-hosted under `/guides/img/`, `img-src 'self'` already allows it).
+- **Phase 9 check:** after Phase 9 lands, re-read the guides' app-behaviour lines
+  (floors, "ShotLab asks for the ball", range-ball wording) against the new rules.
+
+### Original brief (Oliver's go-ahead, 23 Sep)
 - **Build all 8 from the plan's 10.2 list, two per batch.** Push each pair, then
   give Oliver a short "read these two" note before starting the next pair.
 - First batch also builds the generator (same pattern as `tools/build-legal-pages.js`)

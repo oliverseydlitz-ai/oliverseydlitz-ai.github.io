@@ -62,6 +62,10 @@ const GUIDES = [
     title: 'How many shots before a launch-monitor average means anything?',
     description: 'How many shots per club before an average, a change or a dispersion figure is worth reading, and how big a change has to be before it is real.',
     source: 'docs/guides/how-many-shots.md', published: '2026-09-23', updated: '2026-09-23' },
+  { slug: 'gapping-chart-from-launch-monitor',
+    title: 'How to build a gapping chart from launch monitor data',
+    description: 'A step-by-step method for an honest yardage book from your launch monitor: one ball and surface, enough shots per club, averages with ranges, and gaps that are real.',
+    source: 'docs/guides/gapping-chart-from-launch-monitor.md', published: '2026-09-23', updated: '2026-09-23' },
 ];
 
 // ── Tokens: numbers the app owns ─────────────────────────────────────────
