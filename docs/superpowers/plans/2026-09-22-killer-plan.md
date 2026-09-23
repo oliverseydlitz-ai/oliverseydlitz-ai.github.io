@@ -15,7 +15,7 @@ below is measured unless it says otherwise.
 | 4 | Speed | not started |
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
-| **7** | **QC audit findings (three agents, 22 Sep)** | **recorded, not started — 7A is the next work** |
+| **7** | **QC audit findings (three agents, 22 Sep)** | **in progress** — see the Done log under Suggested order |
 | 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) **live** — function applied and verified 22 Sep |
 | **9** | **Measurement model v2 — Oliver's direction change (22 Sep)** | **specified, not built — supersedes parts of CLAUDE.md's measurement rules** |
 
@@ -437,7 +437,8 @@ The main session verified **R19** (`clubLabel` at `app.js:252` returns an unknow
 
 ### Suggested order when work resumes
 
-0. **V25 + R23** — one CSS rule, a logout guard, and a logout that actually clears the account holder's data. Today a guest can wipe their own data from a button they should not see, and a signed-out account leaves its sessions and notes for the next person.
+Finished items move to the **Done log** below this list, one line each with the commit.
+
 0b. **R19** — escape club types and backup fields, plus a taint suite. A crafted CSV currently injects HTML and fires third-party requests.
 1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
 2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
@@ -446,6 +447,13 @@ The main session verified **R19** (`clubLabel` at `app.js:252` returns an unknow
 5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
 6. **R2, R4, R5, V1, V2, V6** — keyboard access and the phone layout.
 7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.
+
+### Done log
+
+| Item | What | Commit |
+|---|---|---|
+| V25 | `[hidden]` means hidden (global rule); guest cannot reach sign-out; render-scan HIDDEN check | `2c4649d` |
+| R23 | Sign-out asks: clear this device or keep; every `sl*` key classified account/device; `signout-clears.js` | `9967816` |
 
 
 ---
