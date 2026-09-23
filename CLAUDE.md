@@ -252,6 +252,14 @@ is the working — read the relevant section before touching any of these.
   at is not what the tour averages. The PGA driver attack angle is **-1.3°**
   (descending); **+2..+5°** is the optimal target and **+3.0°** is the *LPGA*
   average. Conflating those was the original bug.
+- **Smash thresholds and wedge spin-loft bands are per club, off `Benchmarks.DATA`**
+  (`Benchmarks.smashRef`, `spinLoftBand`). They were one number per club
+  family, and a tour 9-iron to lob wedge tripped "Poor Contact" while a tour
+  sand wedge scored 59. The floor is tour − 0.08 and "good" tour − 0.04 — the
+  driver's existing 1.40 / 1.44 read relative to its 1.48 — and the floor is
+  never above the club's amateur average. `faults-vs-targets.js` runs every
+  PGA row through the engine: silent, except `driver-negative-aa`, exempt by
+  name because the attack-angle target is deliberately not the tour average.
 - **`CoachingMode.TIPS`** — written to an *external* focus of attention: the
   subject of a cue is the club, ball, turf, tee or target. Don't rewrite cues
   inward. A body word may appear as a **landmark** ("chest height") or in a
@@ -1276,7 +1284,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **71 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v171**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v172**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1743,7 +1751,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**71 test suites**, service worker **v171**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v172**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

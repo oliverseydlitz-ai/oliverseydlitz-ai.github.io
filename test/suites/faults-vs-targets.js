@@ -74,6 +74,39 @@ const steep = run('d', 'attackAngle', -6,
   .filter(f => f.category === 'Attack Angle');
 ok(steep.length > 0, `a driver chopping down at -6° does raise one (${steep.map(f=>f.id).join(', ')})`);
 
+console.log('— a tour-average club raises no fault, and scores like one (C7, C35) —');
+// Every threshold used to be one number per club FAMILY: smash 1.33 for every
+// non-wood, 1.41 as "elite" for every iron, one spin-loft band from the 8-iron
+// to the lob wedge. Against Benchmarks' own PGA rows, a tour 9-iron to lob
+// wedge tripped "Poor Contact", tour AW/SW/LW tripped "Adding Loft", and a
+// tour sand wedge scored 59. Every PGA row is now run through the engine.
+//
+// ONE named exemption: driver-negative-aa. The PGA average attack angle is
+// -1.3° (descending) and the TARGET is +2..+5°, deliberately — "what to aim at
+// is not what the tour averages" (Benchmarks.TARGET). That fault firing on the
+// tour row is the target working, not a threshold that forgot the club.
+const EXEMPT = { 'driver-negative-aa': 'the target band is deliberately not the tour average' };
+const ALL_CLUBS = ['d','2w','3w','4w','5w','7w','2h','3h','4h','5h','1i','2i','3i','4i','5i','6i','7i','8i','9i','pw','aw','sw','lw'];
+const asShots = (club, r) => Array.from({ length: 24 }, (_, i) => ({ _row: i + 2, clubType: club, smashFactor: r.sf,
+  carryDistance: r.carry, totalDistance: r.carry + 10, ballSpeed: r.bs, clubSpeed: +(r.bs / r.sf).toFixed(1),
+  launchAngle: r.la, attackAngle: r.aa, clubPath: 0, launchDirection: 0, sideCarry: 0 }));
+const tripped = [], lowScores = [], amWorse = [];
+for (const club of ALL_CLUBS) {
+  const row = B.get(club);
+  const pga = session(asShots(club, row.pga));
+  FE.detectFaults(pga.shots, pga).filter(f => !(f.id in EXEMPT)).forEach(f => tripped.push(`${club}: ${f.id}`));
+  const sc = M.ShotScorer.score(pga.shots[0]);
+  if (club !== 'd' && sc < 90) lowScores.push(`${club} ${sc}`);
+  const am = session(asShots(club, row.am));
+  FE.detectFaults(am.shots, am).filter(f => f.id === 'poor-contact' || f.id === 'high-spin-loft')
+    .forEach(f => amWorse.push(`${club}: ${f.id}`));
+}
+ok(tripped.length === 0, `no PGA-average club raises a fault${tripped.length ? ' — ' + tripped.join(', ') : ''}`);
+ok(lowScores.length === 0, `and every PGA-average club but the driver scores 90+${lowScores.length ? ' — ' + lowScores.join(', ') : ''}`);
+ok(amWorse.length === 0, `the average AMATEUR strike is not "poor contact" or "adding loft" on any club${amWorse.length ? ' — ' + amWorse.join(', ') : ''}`);
+ok(M.Benchmarks.smashRef('d').floor === 1.40 && M.Benchmarks.smashRef('d').good === 1.44,
+   'the driver keeps the thresholds it always had (1.40 floor, 1.44 good) — the margins are read off it');
+
 console.log('— a bag is not one club (C1, C2, C34) —');
 // Twenty identical drivers, then twenty identical wedges. Per club there is
 // nothing to say. Pooled, the old session rules saw a 55 mph "fatigue" drop,

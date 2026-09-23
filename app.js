@@ -4587,8 +4587,12 @@ const FaultEngine = (() => {
     'do not.';
 
 
-  function smashMin(t) { return isWood(t) || isHybrid(t) ? 1.40 : 1.33; }
-  function smashGood(t){ return isWood(t) || isHybrid(t) ? 1.44 : 1.37; }
+  // Per club, off the one copy of the tour numbers (C7). These were 1.40 for
+  // every wood and 1.33 for every other club, and Benchmarks puts the PGA Tour
+  // AVERAGE at 1.32 for a 9-iron, 1.28 PW, 1.24 SW and 1.20 LW — so tour-level
+  // wedge strikes were reported as a high-severity "poor contact" fault.
+  const smashMin  = t => Benchmarks.smashRef(t).floor;
+  const smashGood = t => Benchmarks.smashRef(t).good;
 
   // All per-shot rules — return true if fault present
   const PER_SHOT_RULES = [
@@ -5065,7 +5069,9 @@ const ShotScorer = (() => {
 
     // Strike quality (0-45) — tier 1, and the biggest lever an amateur has
     if (Number.isFinite(shot.smashFactor) && shot.smashFactor > 0) {
-      const elite = isWood(shot.clubType) || isHybrid(shot.clubType) ? 1.48 : 1.41;
+      // Full marks at the tour average for THIS club (C7). It was 1.41 for
+      // every iron, which no tour wedge reaches, so a tour sand wedge scored 59.
+      const elite = Benchmarks.smashRef(shot.clubType).tour;
       const raw = Math.min(1, Math.max(0, (shot.smashFactor - 1.10) / (elite - 1.10)));
       pts += raw * 45; max += 45;
     }
@@ -5348,7 +5354,35 @@ const Benchmarks = (() => {
     shortIron:{lo: 26, hi: 36, tour: 31.0},
   };
 
+  // Smash references per club, all read off the tour row (C7). The margins are
+  // not new numbers: they are the driver thresholds this file already used
+  // (floor 1.40 and "good" 1.44 against the tour 1.48), expressed relative to
+  // the tour figure so they carry to every other club. The driver is unchanged.
+  //
+  // The floor is also never above the club's AMATEUR average: "poor contact"
+  // is a claim that the strike is bad, and the average amateur's strike is not
+  // bad by definition. Without that, an average-amateur 3-iron (1.35 against a
+  // tour 1.45) would trip a fault it never used to.
+  const SMASH_FLOOR_MARGIN = 0.08, SMASH_GOOD_MARGIN = 0.04;
+  function smashRef(t) {
+    const row = DATA[t] || DATA[isWood(t) || isHybrid(t) ? '3w' : '7i'];
+    const tour = row.pga.sf;
+    return { tour, floor: +Math.min(tour - SMASH_FLOOR_MARGIN, row.am.sf).toFixed(2),
+             good: +(tour - SMASH_GOOD_MARGIN).toFixed(2) };
+  }
+
+  // Wedges get a band centred on their OWN tour delivery (C35). The short-iron
+  // band (26–36°) ran from the 8-iron to the lob wedge, and a tour AW, SW and
+  // LW all sit above it — the estimator on their own rows gives about 43°, 49°
+  // and 57° — so each tripped "Adding Loft Through Impact". Same estimator,
+  // same half-width as the short-iron band (±5°), centred on the club's row.
+  const WEDGES = ['pw', 'aw', 'sw', 'lw'];
   function spinLoftBand(t) {
+    if (WEDGES.includes(t) && DATA[t]) {
+      const tour = spinLoft({ clubType: t, launchAngle: DATA[t].pga.la, attackAngle: DATA[t].pga.aa });
+      const half = (SPIN_LOFT.shortIron.hi - SPIN_LOFT.shortIron.lo) / 2;
+      return { lo: Math.round(tour - half), hi: Math.round(tour + half), tour: +tour.toFixed(1) };
+    }
     if (t === 'd') return SPIN_LOFT.driver;
     if (isWood(t)) return SPIN_LOFT.wood;
     if (isHybrid(t)) return SPIN_LOFT.hybrid;
@@ -5373,7 +5407,7 @@ const Benchmarks = (() => {
     }
   }
 
-  return { movedToward, get, status, TARGET, targetsFor, spinLoftBand };
+  return { movedToward, get, status, TARGET, targetsFor, spinLoftBand, smashRef };
 })();
 
 // ────────────────────────────────────────────────────────────────
