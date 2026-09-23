@@ -502,7 +502,8 @@ Finished items move to the **Done log** below this list, one line each with the 
 | C4 | Metrics strip anchors on the most-hit club (named in a caption), no pooled 'vs all' delta, per-club floor; total kept per Phase 9 | `d987ceb` |
 | V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 | Phase 9 | Measurement model v2: every tier prescribes, range balls weighted, caveats to Settings, Terms 2026-09-23 | `04a2623` |
-| V7 V8 V9 V10 V16 V18 V19 V21 V22 V23 V24 R11 | Back link on its own row; same-day sessions labelled by ball; straight unfilled progress charts with an MDC-based minimum span; sparklines need 3 points and get end dots; benchmarks spacing; one name "Yardages"; no 01–06 tile index; apex label unclipped; no empty centre-line legend key; club dot beside its name; one fixed coach heading; 44px targets for the alignment link, short-game selects and checkboxes. Also: retention block no longer repeats a club or deadline; since-last empty text plain | this commit |
+| V7 V8 V9 V10 V16 V18 V19 V21 V22 V23 V24 R11 | Back link on its own row; same-day sessions labelled by ball; straight unfilled progress charts with an MDC-based minimum span; sparklines need 3 points and get end dots; benchmarks spacing; one name "Yardages"; no 01–06 tile index; apex label unclipped; no empty centre-line legend key; club dot beside its name; one fixed coach heading; 44px targets for the alignment link, short-game selects and checkboxes. Also: retention block no longer repeats a club or deadline; since-last empty text plain | `25050c6` |
+| V12 V13 V15 V17 | Share/Export on the button system; odd last grid cell spans the row; round form Save is a primary button; empty states in the body face with a real CTA and honest copy (no "AI-generated"). Open: V14 (heading patterns) and R16 (manifest theme) are Oliver's design calls; the Practice view stays long because the short game renders in full | this commit |
 
 
 ---

@@ -544,14 +544,20 @@ button:disabled, button[disabled] {
 
 /* ── Empty state ───────────────────────────────────────── */
 .empty-state {
-  text-align: center; padding: 5rem 2rem;
+  text-align: center; padding: 3rem 1.5rem;
   display: flex; flex-direction: column; align-items: center; gap: 1rem;
 }
 .empty-icon { font-size: 2.5rem; color: var(--text-dim); opacity: .55; line-height: 1; }
 .empty-state h2 { font-size: 1.3rem; color: var(--text); }
-.empty-state p { color: var(--text-muted); font-size: .8rem; max-width: 250px; }
+/* V17: body face, no hyphenation, a readable measure. */
+.empty-state p { color: var(--text-muted); font-size: .9rem; line-height: 1.5; max-width: 32ch; hyphens: none; text-wrap: pretty; }
 
 /* ── Session list ──────────────────────────────────────── */
+/* V12: the card's Share / Export pair, on the button system rather than
+   4px-radius inline styles in green and blue text. */
+.session-card-actions { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.session-card-actions .btn-sm { flex: 1; min-height: var(--tap); }
+
 .session-list { list-style: none; display: flex; flex-direction: column; gap: .55rem; }
 
 .session-card {
@@ -1452,6 +1458,10 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 
 /* ── Personal bests ────────────────────────────────────── */
 .records-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .6rem; }
+/* V13: an odd count in a two-column grid left one cell alone with an empty
+   hole beside it. The last item of an odd set takes the whole row instead.
+   (Harmless where these grids collapse to one column.) */
+:is(.records-grid, .dash-grid, .dna-grid, .charts-grid) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 .record-card {
   background: var(--surface); border: 1px solid var(--line);
   border-top: 2px solid var(--accent);
@@ -2043,7 +2053,6 @@ body.modal-open {
   text-transform: uppercase;
   letter-spacing: var(--track-caps-lg);
 }
-.empty-state p { font-family: var(--font-mono); letter-spacing: .03em; }
 
 /* ── Form labels — mono ────────────────────────────────────── */
 .form-group label {

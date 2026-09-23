@@ -7996,9 +7996,9 @@ const UI = (() => {
                 ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
                 ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${icon(f.icon)} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
               </div>
-              <div style="display:flex;gap:.4rem;margin-top:.6rem;font-size:.8rem">
-                <button data-share="${s.id}" style="background:var(--surface2);border:none;color:var(--green);padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('external')} Share</button>
-                <button data-export="${s.id}" style="background:var(--surface2);border:none;color:var(--blue);padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('import')} Export</button>
+              <div class="session-card-actions">
+                <button class="btn-secondary btn-sm" data-share="${s.id}">${icon('external')} Share</button>
+                <button class="btn-secondary btn-sm" data-export="${s.id}">${icon('import')} Export</button>
               </div>
             </div>
             <div class="session-card-score">
@@ -9654,7 +9654,7 @@ const UI = (() => {
           <label class="qe-field"><span>Up and downs</span><input type="number" id="rdUd" min="0" max="18" inputmode="numeric"></label>
           <label class="qe-field"><span>of attempts</span><input type="number" id="rdUdOf" min="0" max="18" inputmode="numeric"></label>
         </div>
-        <div class="probe-btns"><button class="probe-btn" id="rdSave">Save round</button></div>
+        <div class="probe-btns"><button class="btn-primary" id="rdSave">Save round</button></div>
         <div class="tail-note">Only the score is required. Anything you leave blank is simply not placed —
           the app never fills a gap with an assumption.</div>
       </div>`;
