@@ -10767,7 +10767,12 @@ async function init() {
 
   // In-page section nav (session detail)
   const subnavLinks = [...document.querySelectorAll('.subnav-link')];
-  const markSubnav = link => subnavLinks.forEach(l => l.classList.toggle('active', l === link));
+  // Buttons, not <a> without an href — those were never in the tab order, so
+  // the section jumps were pointer-only (R4). aria-current says which is live.
+  const markSubnav = link => subnavLinks.forEach(l => {
+    l.classList.toggle('active', l === link);
+    if (l === link) l.setAttribute('aria-current', 'true'); else l.removeAttribute('aria-current');
+  });
   subnavLinks.forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();

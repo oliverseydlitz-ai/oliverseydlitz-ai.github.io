@@ -379,7 +379,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
    inset ring sits on the control's own fill, and an accent ring on the accent
    primary button or an active tab is the same invisible ring by another route.
    render-scan.js measures every focusable control for both. */
-:is(.settings-section, .drill-tabs, .filter-row, .tbl-wrap, .doc-table-wrap) :focus-visible {
+:is(.settings-section, .drill-tabs, .filter-row, .tbl-wrap, .doc-table-wrap, .subnav) :focus-visible {
   outline-offset: -2px; outline-color: currentColor;
 }
 :is(.btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .btn-icon):focus-visible {
@@ -2115,6 +2115,15 @@ body.modal-open {
   border:none; border-bottom:2px solid transparent; background:none;
   margin-bottom:-1px;
   transition:color var(--dur), border-color var(--dur);
+}
+/* The tab row scrolls sideways at phone width and nothing said so: "FAU…"
+   simply stopped at the edge (V6). A fade in the page ground pinned to the
+   right edge says there is more. Sticky inside the scroller, so it rides the
+   edge while scrolling and comes to rest in its own space after the last tab
+   at the end — no negative margin, or it would sit on "Shots". */
+.subnav::after {
+  content: ""; position: sticky; right: 0; flex: 0 0 1.75rem;
+  background: linear-gradient(to right, transparent, var(--bg)); pointer-events: none;
 }
 .subnav-link:hover { color:var(--text); border-bottom-color:var(--line-strong); }
 .subnav-link.active { color:var(--text); border-bottom-color:var(--accent); }
