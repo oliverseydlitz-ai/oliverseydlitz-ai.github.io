@@ -54,8 +54,9 @@ console.log('— every number has a source —');
 // guide matches "−2,628" or "-2628" in the base.
 const SOURCES = ['docs/research-base-v2.md', 'docs/short-game-evidence.md'].map(read).join('\n');
 const norm = s => s.replace(/[−–]/g, '-');
-const numbersIn = s => [...norm(s).matchAll(/\d[\d,]*(?:\.\d+)?/g)]
-  .map(m => m[0].replace(/,(?=\d{3}\b)/g, '')).filter(n => /\d/.test(n));
+// Thousands groups only: "only 2, because" is the number 2, not "2,".
+const numbersIn = s => [...norm(s).matchAll(/\d+(?:,\d{3}(?!\d))*(?:\.\d+)?/g)]
+  .map(m => m[0].replace(/,/g, ''));
 const KNOWN = new Set(numbersIn(SOURCES));
 // What a guide's prose says, minus the things that are not claims: the tokens
 // (resolved from the modules, checked below), link targets (a URL is an
@@ -75,6 +76,17 @@ for (const g of GUIDES) {
   const miss = unsourced(read(g.source));
   ok(miss.length === 0,
      `${g.slug}: every typed number appears in the research base${miss.length ? ' — no source for: ' + miss.join(', ') : ''}`);
+}
+
+// A citation link is a source too. Every outbound URL must appear verbatim in
+// the research base's bibliography: a URL typed from memory looks exactly as
+// authoritative as a real one, and the first draft of the smash guide had one.
+console.log('— every citation link is one the research base already cites —');
+for (const g of GUIDES) {
+  const urls = [...read(g.source).matchAll(/\]\((https:\/\/[^)\s]+)\)/g)].map(m => m[1]);
+  const stray = urls.filter(u => !SOURCES.includes(u));
+  ok(urls.length > 0 && stray.length === 0,
+     `${g.slug}: ${urls.length} citation link(s), all from the bibliography${stray.length ? ' — not in the research base: ' + stray.join(', ') : ''}`);
 }
 
 console.log('— every token resolves against the real modules —');

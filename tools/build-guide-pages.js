@@ -46,6 +46,14 @@ const GUIDES = [
     title: 'Is launch-monitor spin accurate?',
     description: 'Why spin rate is the least trustworthy number on a consumer launch monitor, what the peer-reviewed agreement data says, and what to do with it instead.',
     source: 'docs/guides/launch-monitor-spin-accuracy.md', published: '2026-09-23', updated: '2026-09-23' },
+  { slug: 'smash-factor-by-club',
+    title: 'Smash factor by club: what good looks like',
+    description: 'Tour smash factor for every club from driver to wedge, why it falls with loft, what moves yours, and how many shots before your average means anything.',
+    source: 'docs/guides/smash-factor-by-club.md', published: '2026-09-23', updated: '2026-09-23' },
+  { slug: 'driver-attack-angle',
+    title: "Driver attack angle: why the tour average isn't your target",
+    description: 'The PGA Tour hits slightly down on the driver. Why that is not what you should copy, why yards-per-degree charts mislead, and how far to trust your launch monitor on it.',
+    source: 'docs/guides/driver-attack-angle.md', published: '2026-09-23', updated: '2026-09-23' },
 ];
 
 // ── Tokens: numbers the app owns ─────────────────────────────────────────
