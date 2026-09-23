@@ -22,7 +22,10 @@ const shot = (o = {}) => ({ clubType: '7i', ballSpeed: 118, clubSpeed: 85, smash
 const sessAt = (ms, club = '7i') => ({ id: 'S' + ms, date: new Date(ms).toISOString(),
   conditions: { ball: 'premium', surface: 'grass', alignment: 'confirmed' },
   shots: Array.from({ length: 12 }, () => shot({ clubType: club })) });
-const openAt = ms => RP.open(sessAt(ms), { id: 'low-point', clubType: '7i', name: 'Low point', metric: 'smashFactor' });
+// Opened AT the session's own time, then aged. A probe cannot be opened on a
+// session whose window has already closed (C6), so an expired probe is made
+// the way it happens: opened back then, never answered.
+const openAt = ms => RP.open(sessAt(ms), { id: 'low-point', clubType: '7i', name: 'Low point', metric: 'smashFactor' }, { now: ms + H });
 
 console.log('— the window is three-valued, and "early" is not a failure —');
 reset();
@@ -89,6 +92,18 @@ const live1 = SR.getNextStep([sessAt(now)]);
 ok(live1.type === 'probe', 'a live one does rank first');
 ok(/days left/i.test(live1.title), 'and the title carries the countdown');
 ok(typeof live1.deadline === 'string' && live1.deadline.length > 5, 'with the deadline on the card');
+
+console.log('— a follow-up that is already imported is answered, not re-hit (C42) —');
+reset();
+openAt(now - 3 * DAY);
+const answer = SR.getNextStep([sessAt(now)]);
+ok(answer.type === 'probe' && /^Answer/.test(answer.title) && answer.action === 'session:' + sessAt(now).id,
+   'with the answering session here, the card says answer it and opens that session');
+reset();
+openAt(now - 3 * DAY);
+const retest = SR.getNextStep([sessAt(now - 3 * DAY)]);
+ok(retest.type === 'probe' && /^Re-test/.test(retest.title) && retest.action === 'import',
+   'with only the baseline here, it asks for the re-test');
 
 console.log('— the soonest deadline wins —');
 reset();

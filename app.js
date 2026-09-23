@@ -644,12 +644,22 @@ const Metrics = (() => {
 
   // Empirical single-shot spread for a metric, from this golfer's own shots.
   // Replaces the old population constant: if we have their data, use it.
+  // One way to read a metric off a shot, derived ones included. Face-to-path,
+  // face angle and spin loft are not fields — they are computed — and a probe
+  // or a noise floor keyed on one read `shot.facePath`, got undefined for every
+  // shot, and reported "not enough history" forever.
+  function read(s, metric) {
+    if (!s) return null;
+    if (metric === 'facePath') return facePath(s);
+    if (metric === 'faceAngle') return faceAngle(s);
+    if (metric === 'spinLoft') return spinLoft(s);
+    return s[metric];
+  }
+
   function shotSpread(shots, metric, clubType) {
     const vals = (shots || [])
       .filter(s => !clubType || s.clubType === clubType)
-      .map(s => metric === 'facePath' ? facePath(s)
-              : metric === 'faceAngle' ? faceAngle(s)
-              : s[metric]);
+      .map(s => read(s, metric));
     const { kept } = trimOutliers(vals);
     return kept.length >= 3 ? stdDev(kept) : null;
   }
@@ -718,7 +728,7 @@ const Metrics = (() => {
   function typicalError(sessions, metric, clubType) {
     const perSession = (sessions || []).map(sn => {
       const shots = (sn.shots || []).filter(s => !clubType || s.clubType === clubType);
-      const { kept } = trimOutliers(shots.map(s => s[metric]));
+      const { kept } = trimOutliers(shots.map(s => read(s, metric)));
       return kept.length >= 3 ? stdDev(kept) : null;
     }).filter(Number.isFinite);
     if (perSession.length < 3) return { value: null, source: 'population', n: perSession.length };
@@ -771,7 +781,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, CEILING, peak,
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval };
 })();
@@ -4043,32 +4053,62 @@ const RetentionProbe = (() => {
     try { localStorage.setItem(KEY, JSON.stringify(list.slice(-100))); } catch (_) {}
   }
 
-  // Open a probe when a session prescribes work: record the baseline so the
+  // Open a probe on a session's top fault: record the baseline so the
   // follow-up has something to be compared against.
-  function open(session, fault) {
-    if (!session || !fault) return null;
+  //
+  // It is opened ONCE, at import, and only from the newest session (C6). It
+  // used to open on every VIEW of a session: re-viewing an older one
+  // re-baselined the live probe, and a backdated import made a probe whose
+  // window had already closed, which then counted as a miss. And it never
+  // REPLACES a live probe (C26): it used to drop any open probe for the same
+  // fault and club, which on the follow-up session — the one where the fault
+  // persisted — deleted the probe it was about to answer. Only faults that
+  // went away ever got a verdict, which is survivorship bias in the app's one
+  // efficacy metric.
+  function open(session, fault, { sessions = null, now = Date.now() } = {}) {
+    // A fault names what it is measured by, or it opens nothing. A caller may
+    // state a bare metric (up is better); what it may not do any more is get
+    // smash factor by default for a fault that is not about smash (C5).
+    const spec = fault && (fault.probe || (fault.metric ? { metric: fault.metric, better: 1 } : null));
+    if (!session || !spec) return null;
     const shots = (session.shots || []).filter(s => s.clubType === fault.clubType);
     if (shots.length < MIN_SHOTS) return null;
+    const openedAt = new Date(session.date || now).getTime();
+    if (!Number.isFinite(openedAt)) return null;
+    // A newer session already exists: this one is backdated, and a probe on it
+    // would be asking about a week that has already been superseded.
+    if ((sessions || []).some(o => o && o.id !== session.id && new Date(o.date).getTime() > openedAt)) return null;
     const probe = {
       id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-      openedAt: new Date(session.date || Date.now()).getTime(),
+      openedAt,
       sessionId: session.id,
       clubType: fault.clubType,
       faultId: fault.id,
       faultName: fault.name,
-      metric: fault.metric || 'smashFactor',
-      baseline: baselineFor(shots, fault.metric || 'smashFactor'),
+      metric: spec.metric,
+      better: spec.better === -1 ? -1 : 1,
+      baseline: baselineFor(shots, spec.metric),
       status: 'open',
     };
     if (!probe.baseline) return null;
-    const list = all().filter(p => !(p.faultId === probe.faultId && p.clubType === probe.clubType && p.status === 'open'));
+    // Never open one whose window has already closed.
+    if (windowState(probe, now) === 'expired') return null;
+    const list = all();
+    if (list.some(p => p.sessionId === probe.sessionId && p.faultId === probe.faultId && p.clubType === probe.clubType)) return null;
     list.push(probe); save(list);
     return probe;
   }
 
+  // The import path: the session's top fault that carries a probe.
+  function openAtImport(session, sessions, now = Date.now()) {
+    const top = FaultEngine.detectFaults(session.shots || [], session).filter(f => f.probe && f.drills && f.drills.length)[0];
+    return top ? open(session, top, { sessions, now }) : null;
+  }
+
   function baselineFor(shots, metric) {
-    const iv = Metrics.interval(shots.map(s => s[metric]), '', 2);
-    return iv ? { mean: iv.mean, ci: iv.ci, n: iv.n, spread: stdDev(shots.map(s => s[metric]).filter(Number.isFinite)) } : null;
+    const vals = shots.map(s => Metrics.read(s, metric));
+    const iv = Metrics.interval(vals, '', 2);
+    return iv ? { mean: iv.mean, ci: iv.ci, n: iv.n, spread: stdDev(vals.filter(Number.isFinite)) } : null;
   }
 
   // Which probes is this new session eligible to answer?
@@ -4076,6 +4116,7 @@ const RetentionProbe = (() => {
     const t = new Date(session?.date || now).getTime();
     return all().filter(p => {
       if (p.status !== 'open') return false;
+      if (p.sessionId === session?.id) return false;   // a session cannot answer its own baseline
       const gapH = (t - p.openedAt) / 36e5;
       if (gapH < MIN_GAP_HOURS || gapH > MAX_GAP_DAYS * 24) return false;
       return (session.shots || []).filter(s => s.clubType === p.clubType).length >= MIN_SHOTS;
@@ -4107,6 +4148,8 @@ const RetentionProbe = (() => {
     if (!after) return null;
     const delta = after.mean - probe.baseline.mean;
     const verdict = Metrics.changeIsReal(probe.metric, delta, after.n, history || [], probe.clubType);
+    // Probes stored before C5 carry no direction; they all measured smash, where up is better.
+    const better = probe.better === -1 ? -1 : 1;
     const gapDays = Math.round((new Date(session.date).getTime() - probe.openedAt) / 864e5);
 
     const settled = {
@@ -4121,11 +4164,38 @@ const RetentionProbe = (() => {
       // Whether the drill may be credited with the change. Not the same
       // question as whether the change is real, and kept apart from it.
       attributable: practised === true,
-      outcome: verdict.real === null ? 'unknown' : verdict.real ? (delta > 0 ? 'retained' : 'regressed') : 'no-change',
+      outcome: outcomeOf(verdict, delta, better),
       threshold: verdict.threshold, source: verdict.source, note: verdict.note,
     };
     save(all().map(p => (p.id === probe.id ? settled : p)));
     return settled;
+  }
+
+  // "Retained" means moved the way that fixes THIS fault: up for a driver
+  // attack angle, down for a slice's face-to-path. It used to mean "went up".
+  //
+  // Too little history is not an answer (C42). The first probe a golfer ever
+  // answers has fewer than three sessions behind it, so it was settled as
+  // "unknown" and burnt — every time, for everyone. The delta is measured and
+  // kept; only the verdict waits for the golfer's own noise floor, and
+  // `rejudge()` gives it one when the history exists.
+  function outcomeOf(verdict, delta, better) {
+    if (verdict.real === null) return verdict.source === 'insufficient-history' ? 'awaiting-history' : 'unknown';
+    if (!verdict.real) return 'no-change';
+    return delta * better > 0 ? 'retained' : 'regressed';
+  }
+  function rejudge(history) {
+    let n = 0;
+    const next = all().map(p => {
+      if (p.status !== 'settled' || p.outcome !== 'awaiting-history') return p;
+      const v = Metrics.changeIsReal(p.metric, p.delta, p.after?.n || 0, history || [], p.clubType);
+      const outcome = outcomeOf(v, p.delta, p.better === -1 ? -1 : 1);
+      if (outcome === 'awaiting-history') return { ...p, note: v.note };
+      n++;
+      return { ...p, outcome, threshold: v.threshold, source: v.source, note: v.note, rejudgedAt: Date.now() };
+    });
+    if (n) save(next);
+    return n;
   }
 
   // Plain-language result. No cheerleading: the honest outcomes here are
@@ -4139,7 +4209,8 @@ const RetentionProbe = (() => {
   const METRIC_LABEL = {
     smashFactor: 'smash factor', ballSpeed: 'ball speed', clubSpeed: 'club speed',
     carryDistance: 'carry', launchAngle: 'launch angle', attackAngle: 'attack angle',
-    clubPath: 'club path', spinRate: 'spin rate',
+    clubPath: 'club path', spinRate: 'spin rate', facePath: 'face-to-path', spinLoft: 'spin loft',
+    launchDirection: 'start direction', spinAxis: 'spin axis',
   };
   const metricLabel = m => METRIC_LABEL[m] || String(m || '').replace(/([A-Z])/g, ' $1').toLowerCase().trim();
 
@@ -4164,6 +4235,10 @@ const RetentionProbe = (() => {
                    `so no detectable change. Not the same as "no improvement": the change, if any, is below ` +
                    `what this data can resolve.`;
         break;
+      case 'awaiting-history':
+        return `${club} ${metric}: ${d} over ${days}. Whether that is bigger than your own ` +
+               `session-to-session variation needs more ${club} sessions first — ${r.note || ''} ` +
+               `The result is kept and judged then, not thrown away.`.replace(/\s+/g, ' ').trim();
       default:
         return `${club}: not enough history yet to say whether this held. ${r.note || ''}`.trim();
     }
@@ -4295,7 +4370,7 @@ const RetentionProbe = (() => {
       : `${d} days left to answer this one.`;
   }
 
-  return { open, due, settle, describe, evidenceFor, openProbes, allOpen, expired, settled, all, clear,
+  return { open, openAtImport, rejudge, due, settle, describe, evidenceFor, openProbes, allOpen, expired, settled, all, clear,
            windowState, daysLeft, hoursUntilOpen, expireStale, deadline,
            MIN_GAP_HOURS, MAX_GAP_DAYS, MIN_SHOTS };
 })();
@@ -4599,7 +4674,7 @@ const FaultEngine = (() => {
 
     // ── CONTACT ───────────────────────────────────────────────
     {
-      id:'poor-contact', name:'Poor Contact / Thin Strike', icon:'target', category:'Contact', severity:'high',
+      id:'poor-contact', probe:{metric:'smashFactor',better:1}, name:'Poor Contact / Thin Strike', icon:'target', category:'Contact', severity:'high',
       test: s => s.smashFactor > 0 && s.smashFactor < smashMin(s.clubType),
       description: shots => {
         const a = avg(shots,'smashFactor');
@@ -4621,7 +4696,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'fat-shot', name:'Fat / Heavy Strike', icon:'target', category:'Contact', severity:'high',
+      id:'fat-shot', probe:{metric:'smashFactor',better:1}, name:'Fat / Heavy Strike', icon:'target', category:'Contact', severity:'high',
       test: s => s.smashFactor > 0 && s.clubSpeed > 0 &&
         (s.ballSpeed / s.clubSpeed) < 1.22 && s.attackAngle < -6 && isIron(s.clubType),
       description: shots => `Ball speed / club speed ratio of ${fmt(avg(shots,'ballSpeed')/avg(shots,'clubSpeed'),2)} with steep attack angle — classic fat/heavy strike. ` +
@@ -4638,7 +4713,7 @@ const FaultEngine = (() => {
 
     // ── PATH & FACE (D-PLANE) ──────────────────────────────────
     {
-      id:'slice', name:'Slice / Open Face to Path', icon:'sync', category:'Path & Face', severity:'high',
+      id:'slice', probe:{metric:'facePath',better:-1}, name:'Slice / Open Face to Path', icon:'sync', category:'Path & Face', severity:'high',
       test: s => facePath(s) > 5,   // side carry is tier 3 (modelled) — not used
       description: shots => {
         const afp = mean(shots.map(facePath).filter(v => Number.isFinite(v) && v > 5));
@@ -4662,7 +4737,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'hook', name:'Hook / Closed Face to Path', icon:'sync', category:'Path & Face', severity:'medium',
+      id:'hook', probe:{metric:'facePath',better:1}, name:'Hook / Closed Face to Path', icon:'sync', category:'Path & Face', severity:'medium',
       test: s => facePath(s) < -5,  // side carry is tier 3 (modelled) — not used
       description: shots => {
         const sc = avg(shots,'sideCarry');
@@ -4680,7 +4755,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'push-right', name:'Consistent Right Miss (Push)', icon:'→', category:'Path & Face', severity:'medium',
+      id:'push-right', probe:{metric:'launchDirection',better:-1}, name:'Consistent Right Miss (Push)', icon:'→', category:'Path & Face', severity:'medium',
       minShotsFor: Conditions.startLineFloor,   // 10 when aligned, 30 when not
       test: s => s.launchDirection > 5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
@@ -4696,7 +4771,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'pull-left', name:'Consistent Left Miss (Pull)', icon:'←', category:'Path & Face', severity:'medium',
+      id:'pull-left', probe:{metric:'launchDirection',better:1}, name:'Consistent Left Miss (Pull)', icon:'←', category:'Path & Face', severity:'medium',
       minShotsFor: Conditions.startLineFloor,   // 10 when aligned, 30 when not
       test: s => s.launchDirection < -5 &&
         Number.isFinite(facePath(s)) && Math.abs(facePath(s)) < 4,
@@ -4715,7 +4790,7 @@ const FaultEngine = (() => {
     // ── ATTACK ANGLE ──────────────────────────────────────────
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'driver-negative-aa', name:'Negative Attack Angle on Driver', icon:'progress', category:'Attack Angle', severity:'high',
+      id:'driver-negative-aa', probe:{metric:'attackAngle',better:1}, name:'Negative Attack Angle on Driver', icon:'progress', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -1,
       description: shots => {
         const aa = avg(shots,'attackAngle');
@@ -4739,7 +4814,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'driver-very-steep', name:'Very Steep Driver Attack', icon:'progress', category:'Attack Angle', severity:'high',
+      id:'driver-very-steep', probe:{metric:'attackAngle',better:1}, name:'Very Steep Driver Attack', icon:'progress', category:'Attack Angle', severity:'high',
       test: s => s.clubType === 'd' && s.attackAngle < -4,
       description: shots => `Severely negative attack angle of ${fmt(avg(shots,'attackAngle'),1)}° on driver. ` +
         `Likely producing very high spin rates, balloon trajectory, and significant distance loss. ` +
@@ -4755,7 +4830,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'iron-shallow-aa', name:'Shallow Attack Angle on Irons', icon:'progress', category:'Attack Angle', severity:'medium',
+      id:'iron-shallow-aa', probe:{metric:'attackAngle',better:-1}, name:'Shallow Attack Angle on Irons', icon:'progress', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && !isShort(s.clubType) &&
         Number.isFinite(s.attackAngle) && s.attackAngle > -0.5,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° — too shallow for irons. ` +
@@ -4775,7 +4850,7 @@ const FaultEngine = (() => {
 
     {
       minShots: Metrics.MIN_SHOTS_DELIVERY,   // club-delivery metric — tier 2
-      id:'iron-very-steep', name:'Very Steep Iron Attack', icon:'progress', category:'Attack Angle', severity:'medium',
+      id:'iron-very-steep', probe:{metric:'attackAngle',better:1}, name:'Very Steep Iron Attack', icon:'progress', category:'Attack Angle', severity:'medium',
       test: s => isIron(s.clubType) && s.attackAngle < -7,
       description: shots => `Attack angle of ${fmt(avg(shots,'attackAngle'),1)}° is too steep for irons. ` +
         `Excessively steep approach increases fat shot risk, reduces sweet spot contact, and loses distance through gear effect. ` +
@@ -4791,7 +4866,7 @@ const FaultEngine = (() => {
 
     // ── LAUNCH CONDITIONS ──────────────────────────────────────
     {
-      id:'driver-low-launch', name:'Low Launch on Driver', icon:'progress', category:'Launch', severity:'medium',
+      id:'driver-low-launch', probe:{metric:'launchAngle',better:1}, name:'Low Launch on Driver', icon:'progress', category:'Launch', severity:'medium',
       test: s => s.clubType === 'd' && Number.isFinite(s.launchAngle) && s.launchAngle < 9,
       description: shots => {
         const la = avg(shots,'launchAngle');
@@ -4819,7 +4894,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'driver-high-launch', name:'Ballooning / Too High Launch', icon:'progress', category:'Launch', severity:'low',
+      id:'driver-high-launch', probe:{metric:'launchAngle',better:-1}, name:'Ballooning / Too High Launch', icon:'progress', category:'Launch', severity:'low',
       test: s => s.clubType === 'd' && s.launchAngle > 18 && s.carryDistance > 0,
       description: shots => `Launch angle of ${fmt(avg(shots,'launchAngle'),1)}° on driver is too high — creating a ballooning trajectory. ` +
         `A steeply ascending strike adds height without adding carry.`,
@@ -4849,7 +4924,7 @@ const FaultEngine = (() => {
     // adding loft through impact. Estimated from launch and attack angle
     // (Rapsodo does not export dynamic loft) — see spinLoft().
     {
-      id:'high-spin-loft', name:'Adding Loft Through Impact', icon:'warn', category:'Spin Loft', severity:'high',
+      id:'high-spin-loft', probe:{metric:'spinLoft',better:-1}, name:'Adding Loft Through Impact', icon:'warn', category:'Spin Loft', severity:'high',
       test: s => {
         const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
         return sl !== null && sl > band.hi + 3;
@@ -4878,7 +4953,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'low-spin-loft-iron', name:'Delofting Too Much (Irons)', icon:'warn', category:'Spin Loft', severity:'medium',
+      id:'low-spin-loft-iron', probe:{metric:'spinLoft',better:1}, name:'Delofting Too Much (Irons)', icon:'warn', category:'Spin Loft', severity:'medium',
       test: s => {
         if (!isIron(s.clubType)) return false;
         const sl = spinLoft(s), band = Benchmarks.spinLoftBand(s.clubType);
@@ -4905,7 +4980,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'high-spin-axis', name:'High Spin Axis (Slice Spin)', icon:'sync', category:'Spin', severity:'high',
+      id:'high-spin-axis', probe:{metric:'spinAxis',better:-1}, name:'High Spin Axis (Slice Spin)', icon:'sync', category:'Spin', severity:'high',
       // Spin axis is only measured with an RPT ball, and is tier 3 even then.
       test: s => Spin.measured(s) && s.spinAxis && s.spinAxis > 15,
       description: shots => {
@@ -4923,7 +4998,7 @@ const FaultEngine = (() => {
     },
 
     {
-      id:'low-spin-axis', name:'High Draw/Hook Spin', icon:'sync', category:'Spin', severity:'medium',
+      id:'low-spin-axis', probe:{metric:'spinAxis',better:1}, name:'High Draw/Hook Spin', icon:'sync', category:'Spin', severity:'medium',
       test: s => Spin.measured(s) && s.spinAxis && s.spinAxis < -15,
       description: shots => `Spin axis tilted ${fmt(avg(shots,'spinAxis'),1)}° counter-clockwise — significant draw/hook spin. ` +
         `A small amount of draw spin is controllable and fine; this much curvature is hard to command under pressure ` +
@@ -4938,7 +5013,7 @@ const FaultEngine = (() => {
 
     // ── EFFICIENCY ────────────────────────────────────────────
     {
-      id:'low-ball-speed', name:'Low Ball Speed / Energy Loss', icon:'progress', category:'Efficiency', severity:'medium',
+      id:'low-ball-speed', probe:{metric:'smashFactor',better:1}, name:'Low Ball Speed / Energy Loss', icon:'progress', category:'Efficiency', severity:'medium',
       test: s => s.clubSpeed > 0 && s.ballSpeed > 0 && (s.ballSpeed/s.clubSpeed) < 1.30 && s.smashFactor > 1.28,
       description: shots => {
         const ratio = avg(shots,'ballSpeed') / avg(shots,'clubSpeed');
@@ -4957,7 +5032,7 @@ const FaultEngine = (() => {
 
     // ── SHORT GAME ────────────────────────────────────────────
     {
-      id:'wedge-thin', name:'Thin Wedge Strikes', icon:'target', category:'Wedge', severity:'medium',
+      id:'wedge-thin', probe:{metric:'smashFactor',better:1}, name:'Thin Wedge Strikes', icon:'target', category:'Wedge', severity:'medium',
       test: s => isShort(s.clubType) && Number.isFinite(s.smashFactor) && s.smashFactor < 1.20 &&
         Number.isFinite(s.launchAngle) && s.launchAngle > 35,
       description: shots => `Smash factor ${fmt(avg(shots,'smashFactor'),2)} on wedges combined with high launch angle — classic thin/bladed wedge. ` +
@@ -5036,9 +5111,13 @@ const FaultEngine = (() => {
           (firm ? '' : ' — borderline, worth another session to confirm'),
         minShots: floor,
         affectedShots: affected.map(s=>s._row),
-        // for RetentionProbe: which club, and which tier-1 metric to re-measure
+        // For RetentionProbe: which club, and the metric that IS this fault,
+        // with the direction that counts as better (C5). Every probe used to
+        // measure smash factor, whatever opened it — "settles whether Negative
+        // Attack Angle on Driver held", then measured smash.
         clubType: [...clubs][0],
-        metric: rule.probeMetric || 'smashFactor',
+        probe: rule.probe || null,
+        metric: rule.probe ? rule.probe.metric : null,
       });
     }
 
@@ -5943,6 +6022,22 @@ const SmartRecommendations = (() => {
       if (due.length) {
         const p = due[0];
         const left = RetentionProbe.daysLeft(p);
+        // The follow-up may already be here, waiting on the question only the
+        // golfer can answer. Asking them to go and re-test a club they have
+        // already re-tested (C42) sends them to the range for nothing.
+        const answering = list.filter(sn => RetentionProbe.due(sn).some(q => q.id === p.id))
+          .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+        if (answering) return {
+          type: 'probe',
+          title: left <= 1
+            ? `Last day: answer your ${clubLabel(p.clubType)} retention check`
+            : `Answer your ${clubLabel(p.clubType)} retention check — ${left} days left`,
+          desc: `Your ${formatDate(answering.date)} session can settle whether ${p.faultName || 'the last drill'} ` +
+                `held. It needs one answer from you: whether you worked on it in between.`,
+          why: 'Ranked first because it expires, and the follow-up is already imported — the only thing ' +
+               'missing is whether the drill was practised, which the app cannot see.',
+          icon: 'sync', action: `session:${answering.id}`, deadline: RetentionProbe.deadline(p),
+        };
         return {
           type: 'probe',
           title: left <= 1
@@ -7803,13 +7898,9 @@ const UI = (() => {
     try { renderConditionCaveats(session); } catch(e){ console.error('caveats',e); }
     renderSince(session).catch(e => console.error('since', e));
     renderRetention(session).catch(e => console.error('retention', e));
-    // Opening a probe on the top fault is what makes the NEXT session able to
-    // answer whether this one changed anything.
-    try {
-      const top = FaultEngine.detectFaults(session.shots, session)
-        .filter(f => f.drills && f.drills.length)[0];
-      if (top) RetentionProbe.open(session, top);
-    } catch(e) { console.error('probe open', e); }
+    // Probes are NOT opened here any more (C6): viewing a session is not an
+    // event, and re-viewing an old one re-baselined the live probe. They open
+    // once, at import — see ImportFlow.save.
     document.getElementById('detailTitle').textContent = formatDate(session.date);
     document.getElementById('detailNotes').textContent = session.notes
       ? session.notes + (session.conditions ? ` · ${[session.conditions.wind,session.conditions.temp].filter(Boolean).join(', ')}` : '')
@@ -7942,6 +8033,8 @@ const UI = (() => {
     if (!el) return;
     let history = [];
     try { history = await Store.getSessions(); } catch (_) {}
+    // A result held for want of history gets its verdict once the history exists (C42).
+    try { RetentionProbe.rejudge(history); } catch (e) { console.error('rejudge', e); }
     // Ask before settling. The probe cannot tell whether the drill was done,
     // and settling silently is what let it credit practice that never happened.
     let pending = RetentionProbe.due(session);
@@ -10343,6 +10436,13 @@ const ImportFlow = (() => {
     Store.saveLocal(session);
     UI.renderDetail(session);
     Router.show('session-detail');
+    // The one place a probe opens (C6): a new session, checked against every
+    // session already here so a backdated import opens nothing. After the
+    // render, because the list may come from the cloud and the import view is
+    // instant by design; the new probe cannot be answered by this session
+    // anyway, so nothing on screen depends on it.
+    Store.getSessions().then(list => RetentionProbe.openAtImport(session, list))
+      .catch(e => console.error('probe open', e));
     // Persist to cloud in background if logged in (auto-sync on import)
     if (Auth.getUser()) {
       CloudDB.saveSession(session).then(() => {
@@ -10645,6 +10745,9 @@ async function init() {
     // Route to a view (same map as the data-view nav delegator)
     if (t.hasAttribute('data-route')) {
       const v = t.getAttribute('data-route');
+      // `session:<id>` opens one session — the retention card routes to the
+      // follow-up that can answer it.
+      if (v.startsWith('session:')) { Router.showDetail(v.slice(8)).catch(err => console.error('route', err)); return; }
       try {
         await Router.go(v);
       } catch (err) {

@@ -72,12 +72,56 @@ const flatUnpractised = RP.settle(RP.due(mk(t0+2*day,1.301))[0], mk(t0+2*day,1.3
 ok(/baseline any future change has to beat/.test(RP.describe(flatUnpractised)),
    'and no change without practice is framed as the baseline, not a failure');
 
-console.log('— with no history it says so rather than guessing —');
+console.log('— with no history it waits for one, rather than guessing or giving up (C42) —');
+// Every golfer's FIRST probe has fewer than three sessions behind it, so it
+// used to be settled "unknown" and burnt, every time. The delta is measured
+// and kept; only the verdict waits for the golfer's own noise floor.
 RP.clear(); RP.open(mk(t0,1.30), fault);
 const p4 = RP.due(mk(t0+2*day,1.45))[0];
-const unknown = RP.settle(p4, mk(t0+2*day,1.45), []);
-ok(unknown.outcome==='unknown', 'no personal error yet -> unknown, not a population fallback');
-ok(/not enough history/.test(RP.describe(unknown)), 'and asks for more sessions');
+const waiting = RP.settle(p4, mk(t0+2*day,1.45), []);
+ok(waiting.outcome==='awaiting-history', 'no personal error yet -> awaiting history, not a population fallback');
+ok(Number.isFinite(waiting.delta) && waiting.delta > 0.1, 'the change itself is measured and kept');
+ok(/judged then, not thrown away/.test(RP.describe(waiting)), 'and the golfer is told it is kept, not burnt');
+ok(RP.rejudge([]) === 0 && RP.settled()[0].outcome === 'awaiting-history', 'rejudging with still no history changes nothing');
+ok(RP.rejudge(hist(6)) === 1 && RP.settled()[0].outcome === 'retained', 'and once the history exists, it gets its verdict');
+
+console.log('— the probe measures the fault, in the fault\'s direction (C5) —');
+// Every probe measured smash factor whatever opened it. And "retained" meant
+// "went up", which for a slice's face-to-path is the fault getting worse.
+const d0 = t0;
+const drv = (ms, aa, extra = {}) => ({ id: 'd' + ms, date: new Date(ms).toISOString(),
+  conditions: { ball: 'premium', surface: 'grass', alignment: 'confirmed' },
+  shots: Array.from({ length: 16 }, (_, i) => ({ clubType: 'd', _row: i, smashFactor: 1.45, ballSpeed: 150, clubSpeed: 103,
+    launchAngle: 12, attackAngle: aa + ((i % 5) - 2) * 0.2, clubPath: 0, launchDirection: 0, ...extra })) });
+RP.clear();
+const aaProbe = RP.openAtImport(drv(d0, -3), [drv(d0, -3)], d0 + 36e5);
+ok(aaProbe && aaProbe.faultId === 'driver-negative-aa' && aaProbe.metric === 'attackAngle',
+   `a negative-attack-angle probe measures attack angle, not smash (${aaProbe && aaProbe.metric})`);
+const aaHist = Array.from({ length: 4 }, (_, i) => drv(d0 - (i + 1) * day, -3));
+const aaDone = RP.settle(RP.due(drv(d0 + 2 * day, 1))[0], drv(d0 + 2 * day, 1), aaHist, true);
+ok(aaDone.outcome === 'retained', 'and hitting UP afterwards is "retained"');
+const sliceSpec = M.FaultEngine.detectFaults(drv(d0, 0, { launchDirection: 4, clubPath: -8 }).shots, drv(d0, 0))
+  .find(f => f.id === 'slice');
+ok(!!sliceSpec && sliceSpec.probe.metric === 'facePath' && sliceSpec.probe.better === -1,
+   'a slice is measured on face-to-path, where DOWN is better');
+
+console.log('— opened once, at import, never replacing a live probe (C6, C26) —');
+RP.clear();
+const s1 = drv(d0, -3), s2 = drv(d0 + 2 * day, -3);
+RP.openAtImport(s1, [s1], d0 + 36e5);
+ok(RP.openProbes(d0 + 2 * day).length === 1, 'the first session opens one');
+RP.openAtImport(s2, [s1, s2], d0 + 2 * day + 36e5);
+const both = RP.allOpen();
+ok(both.length === 2 && both.some(p => p.sessionId === s1.id),
+   'the follow-up where the fault PERSISTED does not delete the probe it is about to answer');
+ok(RP.due(s2, d0 + 2 * day + 36e5).map(p => p.sessionId).join() === s1.id,
+   'the follow-up answers the earlier probe, never its own');
+RP.openAtImport(s1, [s1, s2], d0 + 3 * day);
+ok(RP.allOpen().length === 2, 'importing (or viewing) an older session opens and re-baselines nothing');
+RP.clear();
+const old = drv(d0 - 30 * day, -3);
+ok(RP.openAtImport(old, [old], d0) === null, 'a backdated session whose window has closed opens nothing');
+ok(RP.expired().length === 0, 'so it cannot count as a miss against the golfer');
 RP.clear();
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

@@ -170,8 +170,11 @@ club-path/attack-angle claim, 30 for dispersion tails. Rules may raise their
 own floor via `minShots`.
 
 **`Metrics.typicalError()` is the moat.** After ~5 sessions the golfer's own
-noise floor beats any published default; it falls back to the MDC table until
-then. Always `trimOutliers()` and report `interval()`, never a bare point.
+noise floor beats any published default. It does **not** fall back to the MDC
+table (an earlier version of this file said it did): with fewer than three
+sessions `changeIsReal` returns `real: null` and says how many more it needs,
+because borrowing a population's variability to rule on one golfer's progress
+is a confident wrong answer. Always `trimOutliers()` and report `interval()`, never a bare point.
 
 **`Conditions`** — ball type and surface are recorded per session because they
 change what the numbers *mean*: range balls give 2–4× the dispersion off a
@@ -764,6 +767,19 @@ the method, and 24 hours is the whole point of the retention literature. So
 card. `daysLeft()` rounds **up**: with 30 hours to go the golfer has today and
 tomorrow, and "1 day left" would send them home.
 
+**Probes open once, at import, from the newest session only, and never
+replace a live one** (C6, C26). They used to open on every *view* of a session
+— re-viewing an old one re-baselined the live probe — and to replace any open
+probe for the same fault and club, which on the follow-up where the fault
+persisted deleted the probe it was about to answer: only faults that went away
+ever got a verdict. **Each fault names its own probe metric and direction**
+(`probe: {metric, better}`, C5) — every probe used to measure smash — and
+`Metrics.read` resolves the derived ones (face-to-path, spin loft). **Too little
+history holds the verdict, it does not burn it** (C42): the delta is kept as
+`awaiting-history` and `rejudge()` settles it once the golfer's own noise floor
+exists. When the follow-up is already imported, `getNextStep` routes to it
+(`session:<id>`) instead of asking for a re-test.
+
 **An expired probe is kept and shown, never deleted.** An efficacy metric that
 silently drops its own misses reports a better hit rate than it earned — the
 exact failure this module exists to prevent, one level up. `expireStale()` marks
@@ -1284,7 +1300,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **71 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v172**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v173**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1751,7 +1767,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**71 test suites**, service worker **v172**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v173**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
