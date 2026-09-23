@@ -234,6 +234,7 @@ Three background agents audited the served app, each through one lens: **visual/
 | R4 | Keyboard paths for every clickable surface; `role=button` Enter/Space handler; paywall `inert`; ranked card's dead route fixed; shot-log cell rules; render-scan POINTER | `176fe2b` |
 | C28 | Fault floor, count and rate per club, never pooled across the clubs it appeared on | `e5edb41` |
 | C12 | Junk rows and impossible readings dropped at import with a counted preview note; `Metrics.impossible` screens whole shots from records | `50cf190` |
+| C10 | Drill pick is `kind: 'drill'` and fits the club (`DrillLibrary.fitsClub`, `for` tags), named fits first | `d9d873a` |
 | V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 | C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
 | C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
@@ -458,7 +459,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 2. **C25, C29, C31, C32 — HELD for Phase 9.** Each tightens a rule Oliver's 22 Sep direction loosens (face angle, spin axis, range-ball gating). Resolve them inside Phase 9, not before it.
 3. **C27** — the rest of the probe work; it changes under Phase 9 (range → premium allowed, weighted), so do it there.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
-5. **C4, C8, C10** — route the remaining legacy surfaces through the gated modules.
+5. **C4, C8** — route the remaining legacy surfaces through the gated modules.
 7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.
 
 ### Done log
