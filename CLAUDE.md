@@ -1360,14 +1360,18 @@ future, so product quality comes before growth, and the growth phase is
 deliberately deferred. Phase 0 (defects) is done; Phase 1 (the first 60
 seconds) has the guest-button fix in and the rest queued.
 
-**Phase 7 is the next work.** Three QC agents audited the app on 22 Sep and
-found, among other things, a service worker that caches Supabase auth and
-session responses cache-first (stale identity, and the cloud-status banner can
-never fire), mislabelled score buckets, a retention probe that measures smash
-for every fault, and legacy fault rules that pool the bag and contradict the
-gated modules on the same page. Its "Suggested order" section is the queue.
-To rerun the agents, use `docs/superpowers/plans/qc-agent-briefs.md`, pointed
-at the NOT YET COVERED lists.
+**Phase 7 is in progress; most of its high-severity items shipped on 23 Sep.**
+The plan's **Done log** (under "Suggested order") lists each with its commit:
+the security items (R19 taint, R15 CSP, R23 sign-out, R3 PII), the service
+worker (R1/R6/R7/R26), the probe honesty work (C5/C6/C26/C42), bag pooling
+(C1/C2/C34, C28), per-club thresholds (C7/C35), junk rows (C12), the drill
+picker (C10), and the keyboard and phone-layout work (R2, R4, R5, R20/V26,
+V1, V2, V3, V6, V36, and a batch of 7C items). **C25, C29, C31, C32 and C27
+are held for Phase 9** — each tightens a rule Oliver's direction loosens — and
+item 4 of the queue (the home screen showing one fault, one form, one
+priority) is a design decision, not a defect. To rerun the agents, use
+`docs/superpowers/plans/qc-agent-briefs.md`, pointed at the NOT YET COVERED
+lists.
 
 Two things removed in Phase 0 that must not come back: the **tip of the day**
 (eight hand-typed lines, one pointing at a Learning Library with no lessons)
@@ -1789,7 +1793,7 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
+**Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
 **72 test suites**, service worker **v182**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone

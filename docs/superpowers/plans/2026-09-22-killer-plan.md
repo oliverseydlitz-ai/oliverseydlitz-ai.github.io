@@ -15,7 +15,7 @@ below is measured unless it says otherwise.
 | 4 | Speed | not started |
 | 5 | Growth | **deliberately deferred** — see the decisions |
 | 6 | Supabase dashboard | Oliver only |
-| **7** | **QC audit findings (three agents, 22 Sep)** | **in progress** — see the Done log under Suggested order |
+| **7** | **QC audit findings (three agents, 22 Sep)** | **in progress** — 30+ items shipped 23 Sep (Done log under Suggested order); C25/C27/C29/C31/C32 held for Phase 9 |
 | 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) **live** — function applied and verified 22 Sep |
 | **9** | **Measurement model v2 — Oliver's direction change (22 Sep)** | **specified, not built — supersedes parts of CLAUDE.md's measurement rules** |
 
