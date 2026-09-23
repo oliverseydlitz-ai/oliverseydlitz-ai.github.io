@@ -13,7 +13,7 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 1. ~~Keep-alive~~ **DONE** — Oliver ran it manually 23 Sep 04:21 UTC, run #1 green
    (21 s). The schedule takes over from here; just confirm scheduled runs appear.
 2. Supabase dashboard: redirect allowlist check, leaked-password protection.
-3. Google Search Console + Bing Webmaster Tools accounts (Phase 10.1) — Claude adds the verification tag once Oliver has the code.
+3. ~~Search Console + Bing~~ DONE 23 Sep (Domain property, verified via DNS — no tag needed in the code).
    (CLAUDE.md "Open, and NOT fixable from this repo").
 
 ## What is next, in order
@@ -49,4 +49,18 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 - Quality over count: stop at the 8 unless a real new search question appears.
 - Order vs Phase 9: Oliver's call at the start of the chat; if he doesn't say, do the
   first guide pair first (short, and it starts the SEO clock), then Phase 9.
+
+## Domain + indexing — DONE by Oliver, 23 Sep (~09:15 local)
+- GitHub Pages custom domain `shotlab.oliverseydlitz.com`, **Enforce HTTPS on**.
+- Supabase Site URL = `https://shotlab.oliverseydlitz.com`; redirect list = the new
+  domain with and without `/`, plus `https://oliverseydlitz-ai.github.io` kept
+  temporarily. **Remove the github.io entry** once Oliver confirms the old address
+  redirects with the padlock and Google sign-in works on the new one.
+- `oliverseydlitz.com` verified on Oliver's GitHub account (takeover protection;
+  covers future project subdomains). The root domain is his multi-project hub —
+  never redirect it to ShotLab.
+- Google Search Console: Domain property `oliverseydlitz.com`, sitemap
+  `https://shotlab.oliverseydlitz.com/sitemap.xml` submitted. Bing Webmaster Tools
+  imported from GSC (processing, up to 48 h).
+- Still open on Supabase: leaked-password protection (Auth → Providers → Email).
 
