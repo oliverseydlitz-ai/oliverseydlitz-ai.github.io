@@ -51,3 +51,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 23:10 CEST — queue 2: R21 (runtime Settings modals are real dialogs, guarded) + code-name leak in drill section C copy. SW v197.
 - 23:40 CEST — queue 2: C41 (drill gate on all the club's shots) + C33 (Progress one club, oldest first, floor; trend summary no longer bag-pooled). SW v198.
 - 00:10 CEST — queue 2: C36 (deleted the low-ball-speed rule; 44 fault drills). SW v199.
+- 00:20 CEST — queue 2: C43 (shot pop-up: club mean, session faults; `shot-modal.js`, 76 suites). SW v200.

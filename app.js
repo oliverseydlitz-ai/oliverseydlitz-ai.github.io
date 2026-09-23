@@ -9202,15 +9202,24 @@ const UI = (() => {
     if (!modal || !shot) return;
     const sc = ShotScorer.score(shot);
     const g = sc!==null ? ShotScorer.grade(sc) : null;
-    // One shot, but still with the session's conditions — the gates inside
-    // the engine key off ball and surface, not off how many shots there are.
-    const faults = FaultEngine.detectFaults([shot], _session);
+    // C43: a fault needs at least MIN_AFFECTED shots and a per-club floor, so
+    // running the engine on this one shot could never report anything and the
+    // modal said "No faults flagged" on every shot. What a single shot can
+    // honestly say is which of the SESSION's faults it belongs to.
+    const row = shot._row;
+    const faults = FaultEngine.detectFaults(sessionShots || [], _session)
+      .filter(f => (f.affectedShots || []).includes(row));
 
+    // Against this club's mean in the session, never the whole bag (C43): a
+    // driver read against a bag average is "+40 yds" for being a driver. Below
+    // the per-club floor there is no mean worth comparing to.
+    const sameClub = (sessionShots || []).filter(x => x.clubType === shot.clubType);
     const cmp = (field, dec) => {
-      const v = shot[field], a = avg(sessionShots, field);
+      if (sameClub.length < Metrics.MIN_SHOTS_REPORT) return '';
+      const v = shot[field], a = avg(sameClub, field);
       if (typeof v!=='number' || a===null) return '';
       const d = v - a;
-      return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs avg</span>`;
+      return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs ${clubLabel(shot.clubType)} avg</span>`;
     };
 
     // Face-to-path is DERIVED, not measured, and one shot's noise is often
@@ -9293,9 +9302,9 @@ const UI = (() => {
       <div class="sm-traj">${Trajectory.shot(shot)}</div>
       <table class="sm-table">${rows.map(([k,v,c])=>`<tr><td class="sm-k">${k}</td><td class="sm-v">${v}</td><td class="sm-c">${c}</td></tr>`).join('')}</table>
       ${faults.length ? `
-        <div class="sm-faults-title">Faults on this shot</div>
+        <div class="sm-faults-title">Part of this session's faults</div>
         ${faults.map(f=>`<div class="sm-fault severity-${f.severity}">${icon(f.icon)} ${f.name}</div>`).join('')}
-      ` : `<div class="sm-clean">${icon('check')} No faults flagged on this shot</div>`}`;
+      ` : `<div class="sm-clean">${icon('check')} Not part of any fault reported for this session</div>`}`;
 
     modal.hidden = false;
   }
