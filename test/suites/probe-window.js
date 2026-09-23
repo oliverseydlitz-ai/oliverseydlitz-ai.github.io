@@ -117,5 +117,24 @@ ok(/Driver/i.test(soonest.title),
 ok(/Last day/i.test(soonest.title), 'and it is flagged as the last day');
 
 reset();
-console.log(fail ? `\n${fail} FAILED` : '\nall passed');
-process.exit(fail ? 1 : 0);
+console.log('— two probes on one club are listed once (found on screen 23 Sep) —');
+// Two faults on the driver opened two probes, and the block read "hit 8+
+// Driver and 8+ Driver", with the same deadline sentence printed twice.
+(async () => {
+  const R2 = require('../load.js').load({});
+  const { UI, RetentionProbe: RP2 } = R2.app;
+  const now = Date.now();
+  const mkp = (id, fault) => ({ id, faultId: fault, clubType: 'd', status: 'open', openedAt: now - 3600e3 });
+  RP2.openProbes = () => [mkp('p1', 'slice'), mkp('p2', 'driver-negative-aa')];
+  RP2.due = () => [];
+  const host = R2.window.document.getElementById('retentionHost');
+  await UI.renderRetention({ id: 'x', date: '2026-09-23', shots: [] });
+  const text = host.textContent.replace(/\s+/g, ' ');
+  ok((text.match(/Driver/g) || []).length === 1, `the club is named once ("${text.slice(0, 90)}…")`);
+  const dl = [...host.querySelectorAll('.probe-deadline')].map(e => e.textContent);
+  ok(dl.length === new Set(dl).size && dl.length >= 1, `each deadline sentence appears once (${dl.length})`);
+  console.log(fail ? `\n${fail} FAILED` : '\nall passed');
+  process.exit(fail ? 1 : 0);
+})().catch(e => { console.log('  FAIL  ' + e.message); process.exit(1); });
+
+

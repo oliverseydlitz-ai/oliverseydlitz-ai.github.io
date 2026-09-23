@@ -10382,7 +10382,7 @@ const UI = (() => {
   }
 
   return { renderSessionList, renderHome, heatmapCells, renderDetail, renderProgress, renderYardages, renderPractice,
-           renderQuietEye, renderDrills, renderShortGame, renderRounds, retintCharts };
+           renderQuietEye, renderDrills, renderShortGame, renderRounds, retintCharts, renderRetention };
 })();
 
 // ────────────────────────────────────────────────────────────────

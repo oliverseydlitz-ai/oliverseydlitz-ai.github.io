@@ -28,7 +28,7 @@ make new plans; if a run gets cut off, finish what was started before anything n
 
 ## Queue
 
-1. Regression test: the retention block must not repeat a club or a deadline when two probes
+1. ~~DONE 21:40~~ Regression test: the retention block must not repeat a club or a deadline when two probes
    share a club (fixed in `25050c6`, unpinned).
 2. The 7D / 7E / 7F items in `2026-09-22-killer-plan.md` that are not in its Done log and are not
    Oliver's calls, and are not made moot by Phase 9 (C25, C27, C29, C31, C32, C9 are v2-intended).
@@ -44,3 +44,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 
 ## Log
 - 21:35 CEST — overnight rules written; 16 check-ins scheduled 22:00–05:30.
+- 21:40 CEST — queue 1 done: retention repeat pinned (probe-window.js, mutation-tested), UI.renderRetention exported; 16 check-ins scheduled (trig ids in session). SW v193.
