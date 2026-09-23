@@ -2515,6 +2515,8 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .session-badge.fault { background: var(--red); color: var(--on-fill); }
 .session-badge.improvement { background: var(--green); color: var(--on-fill); }
 
+.session-card-score { text-align: right; }
+.session-score-text { display: block; }
 .session-score-ring { position: relative; width: 70px; height: 70px; }
 /* The score ring had a soft drop-shadow from the skin before this one.
    Chrome here is flat — --shadow-sm is literally `none`, and elevation is a
@@ -3127,6 +3129,7 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
    .band class (that would also add --s5 of block padding to a sticky row). */
 .quick-stats { margin-inline: calc(-1 * var(--s4)); }
 
+
 /* ── iOS: never let a focusable text control fall under 16px ──────────
    Safari on iOS zooms the whole page when a focused field is smaller than
    16px, and it does not zoom back out — so one tap on a dropdown leaves the
@@ -3153,4 +3156,26 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
   input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
     font-size: 16px !important;
   }
+}
+
+/* ── Phones: one sticky bar, and the score stays in the card's header ──
+   V1: below 768px the view header is already sticky at top:0, and so was the
+   quick-stats strip, so the two stacked while scrolling: the header covered
+   the strip's top row and left an orphan label, while the conditions line
+   that qualifies those numbers scrolled away. On a phone the strip scrolls.
+   V2: `.session-card` went to one column under 640px, which dropped the grade
+   ring and score below Share/Export, hanging off the card's left rule. It
+   stays in the header corner instead, compact, and the text leaves it room.
+   After every base rule for these selectors, so none of them can override it. */
+@media (max-width: 767px) {
+  .quick-stats { position: static; }
+}
+@media (max-width: 640px) {
+  .session-card { position: relative; }
+  .session-card-score { position: absolute; top: var(--s3); right: var(--s3); }
+  .session-card-score .session-score-ring { width: auto; height: auto; display: flex; align-items: center; gap: .4rem; }
+  .session-card-score .session-score-ring svg { width: 40px; height: 40px; }
+  .session-card-score .session-score-num { font-size: 1.2rem; text-align: left; }
+  .session-card-score .session-score-label { text-align: left; }
+  .session-card .session-card-date, .session-card .session-card-meta { padding-right: 88px; }
 }

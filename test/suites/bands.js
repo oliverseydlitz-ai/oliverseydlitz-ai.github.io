@@ -161,8 +161,15 @@ ok(qsHost && !/band--/.test(qsHost.className),
    'the anchored quick-stat row takes no mode class — it is already a band (below)');
 
 console.log('— :nth-child, and the reason it is not used —');
-const bandSection = cssCode.slice(cssCode.indexOf('.band {'), cssCode.indexOf('iOS: never let a focusable'));
-ok(bandSection.length > 500, 'the band CSS section is present and locatable');
+// The end marker is a COMMENT heading, so it is found in the raw sheet and the
+// slice is stripped afterwards. Searching the comment-stripped text for it
+// returned -1, and slice(start, -1) quietly ran the "band section" to the end
+// of the file — every later rule was checked as band CSS, and the check only
+// passed because nothing after it happened to set a display.
+const bandEnd = css.indexOf('iOS: never let a focusable');
+const bandSection = strip(css.slice(css.indexOf('.band {'), bandEnd));
+ok(bandEnd > 0 && bandSection.length > 500 && bandSection.length < css.length / 4,
+   'the band CSS section is present, locatable, and ends where the band block ends');
 ok(!/nth-(child|of-type)\s*\(/.test(bandSection),
    'no positional selector in the band block — CSS cannot count visible siblings');
 // The hidden trap: #dashboard and #syncBanner are toggled with the `hidden`

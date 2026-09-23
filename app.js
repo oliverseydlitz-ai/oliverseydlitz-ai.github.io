@@ -7824,7 +7824,7 @@ const UI = (() => {
                 <button data-export="${s.id}" style="background:var(--surface2);border:none;color:var(--blue);padding:.3rem .6rem;border-radius:4px;cursor:pointer;flex:1">${icon('import')} Export</button>
               </div>
             </div>
-            <div style="text-align:right">
+            <div class="session-card-score">
               ${grade ? `
               <div class="session-score-ring">
                 <svg viewBox="0 0 52 52" width="52" height="52" data-offset="${(125.66*(1-avgScore/100)).toFixed(1)}">
@@ -7836,8 +7836,10 @@ const UI = (() => {
                     class="grade-glyph" font-size="17" font-weight="800"
                     fill="${grade.color}">${grade.letter}</text>
                 </svg>
-                <div class="session-score-num">${avgScore}</div>
-                <div class="session-score-label">Score</div>
+                <div class="session-score-text">
+                  <div class="session-score-num">${avgScore}</div>
+                  <div class="session-score-label">Score</div>
+                </div>
               </div>` : ''}
             </div>
           </div>
