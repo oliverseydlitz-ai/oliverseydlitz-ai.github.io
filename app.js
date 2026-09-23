@@ -5214,7 +5214,24 @@ const ShotScorer = (() => {
     return 'var(--red)';
   }
 
-  return { score, grade, scoreColor };
+  // The session-quality breakdown, as ONE table (C3). It used to be a label
+  // list reversed and indexed with `4-i`, which counted 75-100 as "Poor",
+  // counted under-25 twice (as "Missed" and as "Elite"), painted the low end
+  // green and never counted a 100 at all. Each bar is coloured by scoreColor
+  // at its own floor, so a bar and the pips above it cannot disagree.
+  const BUCKETS = [
+    { label: 'Elite', lo: 75, hi: 100 },
+    { label: 'Good',  lo: 50, hi: 75 },
+    { label: 'Fair',  lo: 25, hi: 50 },
+    { label: 'Poor',  lo: 0,  hi: 25 },
+  ];
+  // Upper bound exclusive except the top one, which takes the 100.
+  function buckets(scores) {
+    return BUCKETS.map((b, i) => ({ ...b, color: scoreColor(b.lo),
+      n: (scores || []).filter(s => s >= b.lo && (i === 0 ? s <= b.hi : s < b.hi)).length }));
+  }
+
+  return { score, grade, scoreColor, BUCKETS, buckets };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -7731,7 +7748,7 @@ const UI = (() => {
               ${grade ? `
               <div class="session-score-ring">
                 <svg viewBox="0 0 52 52" width="52" height="52" data-offset="${(125.66*(1-avgScore/100)).toFixed(1)}">
-                  <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}26" stroke-width="3.5"/>
+                  <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}" stroke-opacity=".15" stroke-width="3.5"/>
                   <circle cx="26" cy="26" r="20" fill="none" stroke="${grade.color}" stroke-width="3.5"
                     stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66"
                     transform="rotate(-90 26 26)" class="scard-ring-arc"/>
@@ -8403,7 +8420,6 @@ const UI = (() => {
     if (!scores.length) { document.getElementById('scoreBanner').innerHTML=''; return; }
     const avgScore = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
     const g = ShotScorer.grade(avgScore);
-    const dist = [0,25,50,75,100].map(t => scores.filter(s=>s>=t && s<t+25).length);
     // D3 — the display tier is for a figure the app is willing to stand behind,
     // and the app does not report a mean under Metrics.MIN_SHOTS_REPORT: the
     // floor the fault engine, strike quality, the tail engine and the yardage
@@ -8419,7 +8435,7 @@ const UI = (() => {
       <div class="score-banner-content">
         <div class="score-ring">
           <svg viewBox="0 0 90 90" width="90" height="90" data-offset="${(226.19*(1-avgScore/100)).toFixed(1)}">
-            <circle cx="45" cy="45" r="36" fill="none" stroke="${g.color}1e" stroke-width="5"/>
+            <circle cx="45" cy="45" r="36" fill="none" stroke="${g.color}" stroke-opacity=".12" stroke-width="5"/>
             <circle cx="45" cy="45" r="36" fill="none" stroke="${g.color}" stroke-width="5"
               stroke-linecap="round" stroke-dasharray="226.19" stroke-dashoffset="226.19"
               transform="rotate(-90 45 45)" class="score-ring-arc"/>
@@ -8437,11 +8453,9 @@ const UI = (() => {
           </div>
         </div>
         <div class="score-breakdown">
-          ${['Elite','Good','OK','Poor','Missed'].reverse().map((l,i) => {
-            const idx = 4-i;
-            const n = idx===4 ? scores.filter(s=>s<25).length : scores.filter(s=>s>=idx*25&&s<(idx+1)*25).length;
-            return `<div class="score-bd-row"><span class="score-bd-label">${l}</span><span class="score-bd-bar" style="width:${n>0?Math.max(8,n/scores.length*100):0}%;background:${['var(--red)','var(--yellow)','var(--yellow)','var(--green-light)','var(--green)'][idx]}"></span><span class="score-bd-n">${n}</span></div>`;
-          }).join('')}
+          ${ShotScorer.buckets(scores).map(b =>
+            `<div class="score-bd-row"><span class="score-bd-label">${b.label}</span><span class="score-bd-bar" style="width:${b.n>0?Math.max(8,b.n/scores.length*100):0}%;background:${b.color}"></span><span class="score-bd-n">${b.n}</span></div>`
+          ).join('')}
         </div>
       </div>`;
     const bannerEl = document.getElementById('scoreBanner');
