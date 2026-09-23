@@ -8028,18 +8028,23 @@ const UI = (() => {
               <button type="button" class="session-card-date session-open" data-key-proxy>${Sanitize.escape(sessionLabel(s, sessions))}</button>
               <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
               <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
-                <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(cardShots,'ballSpeed'),0)}</div>
-                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' ball spd' : 'Ball Speed'}</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(cardShots,'carryDistance'),0)}</div>
-                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' carry' : 'Avg Carry'}</div>
-                </div>
-                <div class="stat-card">
-                  <div class="stat-value">${fmt(avg(cardShots,'launchAngle'),1)}</div>
-                  <div class="stat-label">${cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' launch' : 'Launch'}</div>
-                </div>
+                ${(() => {
+                  // C44: no club mean below the floor — 10 shots for speed and
+                  // carry, 15 for launch (a tier-2 angle). Below it the tile
+                  // says how many it has instead of printing a number.
+                  const nm = cardClub ? Sanitize.escape(clubLabel(cardClub)) + ' ' : '';
+                  const tile = (field, dec, label, floor) => {
+                    const n = cardShots.filter(x => Number.isFinite(x[field])).length;
+                    return `<div class="stat-card">
+                      <div class="stat-value">${n >= floor ? fmt(avg(cardShots, field), dec)
+                        : `<span class="stat-short" title="shots of this club so far">${n} of ${floor}</span>`}</div>
+                      <div class="stat-label">${nm}${label}</div>
+                    </div>`;
+                  };
+                  return tile('ballSpeed', 0, 'ball spd', Metrics.MIN_SHOTS_REPORT) +
+                         tile('carryDistance', 0, 'carry', Metrics.MIN_SHOTS_REPORT) +
+                         tile('launchAngle', 1, 'launch', Metrics.MIN_SHOTS_DELIVERY);
+                })()}
               </div>
               ${(() => {
                 const tags = SessionTags.of(s);
@@ -8178,6 +8183,13 @@ const UI = (() => {
     shots.forEach(s => { if (s.clubType && s.launchAngle > 0) c[s.clubType] = (c[s.clubType]||0)+1; });
     const club = Object.keys(c).sort((x,y)=>c[y]-c[x])[0] || null;
     const set = club ? shots.filter(s => s.clubType === club) : shots;
+    // C44: an averaged flight is a club mean, so it waits for the floor.
+    if (set.length < Metrics.MIN_SHOTS_REPORT) {
+      el.innerHTML = `<div class="chart-card traj-card"><div class="traj-note">${club
+        ? `${set.length} of ${Metrics.MIN_SHOTS_REPORT} ${Sanitize.escape(clubLabel(club))} shots so far`
+        : `${set.length} of ${Metrics.MIN_SHOTS_REPORT} shots so far`} — not enough to average a flight yet.</div></div>`;
+      return;
+    }
     el.innerHTML = `<div class="chart-card traj-card">${Trajectory.avgFlight(set)}` +
       (club ? `<div class="traj-note">Your ${Sanitize.escape(clubLabel(club))}, averaged over ${set.length} shots.</div>` : '') +
       `</div>`;
@@ -8993,9 +9005,16 @@ const UI = (() => {
       const cs = shots.filter(s=>s.clubType===c);
       const bench = Benchmarks.get(c);
       if (!bench) return null;
-      const userLA = avg(cs,'launchAngle');
-      const userAA = avg(cs,'attackAngle');
-      const userSpin = avg(cs.filter(Spin.measured), 'spinRate');
+      // C44: launch and attack angle are tier-2 delivery readings, so a club
+      // mean needs Metrics.MIN_SHOTS_DELIVERY; spin needs the usual floor of
+      // RPT shots. Below it the cell says how many there are.
+      const nLA = cs.filter(x => Number.isFinite(x.launchAngle)).length;
+      const nAA = cs.filter(x => Number.isFinite(x.attackAngle)).length;
+      const spinShots = cs.filter(Spin.measured);
+      const userLA = nLA >= Metrics.MIN_SHOTS_DELIVERY ? avg(cs,'launchAngle') : null;
+      const userAA = nAA >= Metrics.MIN_SHOTS_DELIVERY ? avg(cs,'attackAngle') : null;
+      const userSpin = spinShots.length >= Metrics.MIN_SHOTS_REPORT ? avg(spinShots, 'spinRate') : null;
+      const short = n => `<span class="lw-short">${n}/${Metrics.MIN_SHOTS_DELIVERY} shots</span>`;
       // Read from Benchmarks.TARGET rather than repeating it. What to AIM at is
       // deliberately separate from what the tour AVERAGES — the PGA driver
       // attack angle is -1.3°, descending, while +2 to +5 is the target — and
@@ -9011,8 +9030,8 @@ const UI = (() => {
       const aaStatus = band(userAA, tgt.attack);
       return `<tr>
         <td><strong>${bench.label}</strong></td>
-        <td><span class="status-dot ${laStatus}"></span>${fmt(userLA,1)}°</td><td>${optLA}</td>
-        <td><span class="status-dot ${aaStatus}"></span>${fmt(userAA,1)}°</td><td>${optAA}</td>
+        <td>${userLA === null ? short(nLA) : `<span class="status-dot ${laStatus}"></span>${fmt(userLA,1)}°`}</td><td>${optLA}</td>
+        <td>${userAA === null ? short(nAA) : `<span class="status-dot ${aaStatus}"></span>${fmt(userAA,1)}°`}</td><td>${optAA}</td>
         ${userSpin?`<td>${fmt(userSpin,0)} rpm</td><td>${optSpin}</td>`:
                    `<td colspan="2" style="color:var(--text-muted);font-size:.78rem">No spin data</td>`}
       </tr>`;
@@ -9579,7 +9598,7 @@ const UI = (() => {
         if (Object.keys(benches).length) {
           benchHost.innerHTML = `<div class="section-title" style="margin-bottom:.8rem">${icon('progress')} Club Benchmarks</div>` +
             '<table class="benchmark-table"><thead><tr><th>Club</th><th>Avg Carry</th><th>Shots</th></tr></thead><tbody>' +
-            Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.avg} yds</td><td>${b.count}</td></tr>`).join('') +
+            Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.count >= Metrics.MIN_SHOTS_REPORT ? b.avg + ' yds' : '—'}</td><td>${b.count}${b.count >= Metrics.MIN_SHOTS_REPORT ? '' : '/' + Metrics.MIN_SHOTS_REPORT}</td></tr>`).join('') +
             '</tbody></table>';
         } else {
           benchHost.innerHTML = '';

@@ -53,3 +53,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 00:10 CEST — queue 2: C36 (deleted the low-ball-speed rule; 44 fault drills). SW v199.
 - 00:20 CEST — queue 2: C43 (shot pop-up: club mean, session faults; `shot-modal.js`, 76 suites). SW v200.
 - 00:50 CEST — queue 2: C37 (fatigue t-test, false alarms 12.0% → 4.8%). Found: global stdDev() is population form — for the new plan. SW v201.
+- 01:15 CEST — queue 2: C44 (floors on the card, launch windows, ball flight, benchmarks; `floors-on-screen.js`, 77 suites). Found: "Clean" badge below the fault floor. SW v202.

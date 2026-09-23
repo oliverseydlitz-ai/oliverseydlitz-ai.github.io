@@ -1056,6 +1056,10 @@ tr:hover td { background: var(--surface2); }
   font-family: var(--font-display);
   font-weight: 800; font-size: .9rem; font-variant-numeric: tabular-nums;
 }
+/* A launch-window cell below the 15-shot floor says how many it has (C44). */
+/* A session-card tile below its floor shows the count in place of the value. */
+.stat-short { font-size: .9rem; font-weight: 600; color: var(--text-muted); }
+.lw-short { color: var(--text-muted); font-size: .78rem; white-space: nowrap; }
 .status-dot {
   display: inline-block; width: 6px; height: 6px;
   border-radius: 50%; margin-right: 4px; flex-shrink: 0; vertical-align: middle;
