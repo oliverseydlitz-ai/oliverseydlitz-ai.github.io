@@ -12,7 +12,8 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 ## Oliver has to do (only he can)
 1. ~~Keep-alive~~ **DONE** — Oliver ran it manually 23 Sep 04:21 UTC, run #1 green
    (21 s). The schedule takes over from here; just confirm scheduled runs appear.
-2. Supabase dashboard: redirect allowlist check, leaked-password protection
+2. Supabase dashboard: redirect allowlist check, leaked-password protection.
+3. Google Search Console + Bing Webmaster Tools accounts (Phase 10.1) — Claude adds the verification tag once Oliver has the code.
    (CLAUDE.md "Open, and NOT fixable from this repo").
 
 ## What is next, in order
@@ -25,6 +26,8 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
    C13, C14, C21) — a design decision; show Oliver options first.
 3. Remaining 7C polish (V7–V24, R11, R16) and the rest of 7D/7E/7F not in the Done log.
 4. Rerun the QC agents (`qc-agent-briefs.md`) on the NOT YET COVERED lists.
+5. **Phase 10 — discoverability** (plan section "Phase 10"). 10.1 (Search Console
+   tag) and 10.2 (guide pages) can run alongside anything; 10.4 (posting) waits.
 
 ## Habits that paid off overnight (keep them)
 - Prove every guard fails on the old code before trusting it (restore the bug).

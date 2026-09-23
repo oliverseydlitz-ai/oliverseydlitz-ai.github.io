@@ -18,6 +18,7 @@ below is measured unless it says otherwise.
 | **7** | **QC audit findings (three agents, 22 Sep)** | **in progress** — 30+ items shipped 23 Sep (Done log under Suggested order); C25/C27/C29/C31/C32 held for Phase 9 |
 | 8 | External launch checklist, triaged against this codebase | **approved**; 8B.1 (keep-alive) **live** — function applied and verified 22 Sep |
 | **9** | **Measurement model v2 — Oliver's direction change (22 Sep)** | **specified, not built — supersedes parts of CLAUDE.md's measurement rules** |
+| **10** | **Discoverability — Google, Bing and AI assistants (23 Sep)** | **approved; step 10.1 can start any time, 10.4 waits for Phase 9 + the home screen** |
 
 ---
 
@@ -611,3 +612,62 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 7. **TERMS.md:** make sure it states plainly that prescriptions treat device readings as accurate and that the device has measurement error. That is a statement of fact about the system: bump the version, regenerate the legal pages, and update `Agreement.VERSION`.
 
 **Proposed numbers are defaults, not decisions:** the tier rates (0.30/0.35/0.40), the range weight (×0.8) and the +0.05 bump. Oliver can tune them; they live in one place.
+
+---
+
+## Phase 10 — Discoverability: Google, Bing and AI assistants (approved 23 Sep 2026)
+
+**The problem in one line:** the technical SEO layer is done (sitemap,
+robots.txt, JSON-LD, `llms.txt`, og-image — guarded by `seo-and-production.js`),
+but the site is **one indexable URL**. The views are hash routes and crawlers drop
+everything after `#`, so the only thing Google can rank is the homepage, for a
+brand name nobody searches. `robots.txt` already allows every crawler, including
+GPTBot, ClaudeBot and PerplexityBot (`User-agent: * / Allow: /`) — verified 23 Sep.
+
+### 10.1 Get indexed (Oliver + one small commit; do any time)
+- **Google Search Console**: Oliver adds the property; Claude adds the
+  `google-site-verification` meta tag (or HTML file) and pins it in
+  `seo-and-production.js`; Oliver submits `sitemap.xml`.
+- **Bing Webmaster Tools**: import from Search Console. Matters beyond Bing —
+  ChatGPT search and Copilot draw on Bing's index (true as of mid-2026; re-check,
+  this moves fast).
+
+### 10.2 Guide pages — the actual SEO work
+Standalone, pre-rendered pages, built exactly like `/terms/` and `/privacy/`
+(`tools/build-legal-pages.js`): markdown source in the repo, a generator renders
+static HTML with the same CSP, a guard suite fails if HTML and markdown drift,
+each page listed in `sitemap.xml`, each linking into the app.
+
+Each page answers ONE question people actually search, from the research base —
+cited, specific, honest (that is the edge over generic golf blogs). Candidates:
+1. How to export your Rapsodo MLM2PRO session as a CSV (and what the columns mean)
+2. How accurate is the MLM2PRO? What it measures, what it models, what it cannot see
+3. Is launch-monitor spin accurate? (the limits-of-agreement numbers)
+4. How to build a gapping chart / yardage book from launch monitor data
+5. Smash factor by club: what good looks like (Benchmarks.DATA, tour vs amateur)
+6. Driver attack angle: why the tour average is not the target
+7. Range balls vs premium balls: what changes in your numbers
+8. How many shots before a launch-monitor average means anything (the floors)
+
+**Rules:** every number on a guide page comes from a module or a cited source —
+the "where numbers come from" rule applies doubly to public pages. The §9 "never
+claim" wording rules apply. No fabricated reviews, ratings or testimonials.
+
+### 10.3 Custom domain (Oliver's call, optional)
+~$12/yr; better trust and click-through than `github.io`. If taken: CNAME,
+canonical URLs, sitemap, og tags, Supabase redirect allowlist, and the CSP
+`connect-src` all move together — one commit, with the guards updated.
+
+### 10.4 Get talked about — WAITS for Phase 9 and the home-screen work
+AI assistants recommend what the web discusses. `llms.txt` is a minor signal at
+best. What moves them:
+- Genuine posts where the audience already is: r/golf, r/Rapsodo, GolfWRX,
+  MLM2PRO owner groups ("I built a free tool that tells you which of your
+  MLM2PRO numbers to trust"). One honest post, not a campaign.
+- One-off launches that create backlinks: Product Hunt, Hacker News "Show HN".
+- A README on the GitHub repo that explains the app (GitHub pages rank well).
+
+**Timing (Oliver, 23 Sep):** quality before growth still holds — no posting until
+Phase 9 and the home screen land; first impressions happen once. But indexing and
+the guide pages start now, because SEO takes 3–6 months to compound.
+
