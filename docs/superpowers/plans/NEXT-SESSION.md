@@ -10,9 +10,8 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
 - 26 Phase 7 items shipped overnight; each is one row in the plan's Done log with its commit.
 
 ## Oliver has to do (only he can)
-1. **Keep-alive has never run.** `.github/workflows/keepalive.yml` is registered but
-   GitHub skipped its first scheduled run. GitHub → Actions → keepalive → "Run workflow"
-   once, then confirm a green run. (The GitHub integration here gets 403 on dispatch.)
+1. ~~Keep-alive~~ **DONE** — Oliver ran it manually 23 Sep 04:21 UTC, run #1 green
+   (21 s). The schedule takes over from here; just confirm scheduled runs appear.
 2. Supabase dashboard: redirect allowlist check, leaked-password protection
    (CLAUDE.md "Open, and NOT fixable from this repo").
 
