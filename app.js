@@ -5087,35 +5087,49 @@ const FaultEngine = (() => {
       const affected = shots.filter(s => { try { return rule.test(s); } catch { return false; } });
       if (affected.length < MIN_AFFECTED) continue;
 
-      // Judge the fault against the clubs it actually appeared on, not the
-      // whole session — a driver fault should be measured against drivers.
-      const clubs = new Set(affected.map(s => s.clubType));
+      // Judge each club on its own (C28). This used to pool every club the
+      // fault appeared on: four mishit 7-irons, three 9-irons and three PWs
+      // made "10 of 10 shots" and cleared the 10-shot floor that no single
+      // club had reached. The floor, the minimum count and the rate are per
+      // club; only clubs that clear all three are reported, and the counts
+      // below are theirs alone.
+      const byClub = new Map();
+      for (const s of affected) byClub.set(s.clubType, (byClub.get(s.clubType) || 0) + 1);
+      const qualifying = [];
+      let floor = rule.minShots || Metrics.MIN_SHOTS_REPORT;
+      for (const [club, hit] of byClub) {
+        const ofClub = shots.filter(s => s.clubType === club);
+        const f = rule.minShotsFor ? rule.minShotsFor(ofClub.length ? ofClub : session)
+                : (rule.minShots || Metrics.MIN_SHOTS_REPORT);
+        if (ofClub.length < f || hit < MIN_AFFECTED || hit / ofClub.length < MIN_RATE) continue;
+        qualifying.push({ club, hit, n: ofClub.length, floor: f });
+      }
+      if (!qualifying.length) continue;
+      qualifying.sort((a, b) => b.hit - a.hit);
+      floor = Math.max(...qualifying.map(q => q.floor));
+      const clubs = new Set(qualifying.map(q => q.club));
       const relevant = shots.filter(s => clubs.has(s.clubType));
-      const floor = rule.minShotsFor ? rule.minShotsFor(relevant.length ? relevant : session)
-                  : (rule.minShots || Metrics.MIN_SHOTS_REPORT);
-      if (relevant.length < floor) continue;
-
-      const rate = affected.length / relevant.length;
-      if (rate < MIN_RATE) continue;
+      const inClubs = affected.filter(s => clubs.has(s.clubType));
+      const rate = inClubs.length / relevant.length;
 
       const firm = rate >= FIRM_RATE;
       faults.push({
         ...rule,
         severity: firm ? rule.severity : DOWNGRADE[rule.severity] || rule.severity,
-        count: affected.length,
+        count: inClubs.length,
         total: relevant.length,
         rate,
         confidence: firm ? 'confirmed' : 'tentative',
-        description: typeof rule.description === 'function' ? rule.description(affected) : rule.description,
-        evidence: `${affected.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
+        description: typeof rule.description === 'function' ? rule.description(inClubs) : rule.description,
+        evidence: `${inClubs.length} of ${relevant.length} ${[...clubs].map(clubLabel).join('/')} shots` +
           (firm ? '' : ' — borderline, worth another session to confirm'),
         minShots: floor,
-        affectedShots: affected.map(s=>s._row),
+        affectedShots: inClubs.map(s=>s._row),
         // For RetentionProbe: which club, and the metric that IS this fault,
         // with the direction that counts as better (C5). Every probe used to
         // measure smash factor, whatever opened it — "settles whether Negative
         // Attack Angle on Driver held", then measured smash.
-        clubType: [...clubs][0],
+        clubType: qualifying[0].club,           // the club it hit hardest
         probe: rule.probe || null,
         metric: rule.probe ? rule.probe.metric : null,
       });

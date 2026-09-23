@@ -448,8 +448,11 @@ produce. Three gates, and the constants are exactly these — there is no
 - **`MIN_RATE = 0.30`** of that club's shots.
 
 Below `FIRM_RATE = 0.50` it reports as `tentative` with severity downgraded one
-level. The denominator is the *clubs the fault appeared on*, not the whole
-session, so a driver fault is judged against drivers. The suite pins all four
+level. **All three gates are applied per club** (C28): a club is reported only
+if it clears its own floor, count and rate, and the fault's counts are the
+qualifying clubs' alone. They used to be pooled across every club the fault
+appeared on, so four mishit 7-irons, three 9-irons and three PWs made "10 of 10
+shots" off a floor no club had reached. `faults-vs-targets.js` pins it. The suite pins all four
 numbers, so this paragraph cannot drift from the code again.
 
 ### The one recommendation (`SmartRecommendations.getNextStep`)
@@ -1309,7 +1312,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v177**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v178**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1776,7 +1779,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v177**. Deterministic auth, cloud sync
+**72 test suites**, service worker **v178**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

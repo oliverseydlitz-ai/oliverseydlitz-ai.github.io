@@ -122,5 +122,25 @@ console.log('— a bag is not one club (C1, C2, C34) —');
   ok(pooled.length === 0, `no fault is raised on the whole bag at once${pooled.length ? ' — ' + pooled.map(f => f.name).join(', ') : ''}`);
 }
 
+console.log('— the floor and the rate are per club (C28) —');
+// Four mishit 7-irons, three 9-irons and three PWs made "Poor Contact, 10 of
+// 10 shots" — a #1-priority fault off a 10-shot floor no club had reached.
+{
+  const poor = (club, n, from) => Array.from({ length: n }, (_, i) => ({ _row: from + i, clubType: club,
+    ...base({ smashFactor: 1.05, ballSpeed: 90, clubSpeed: 86, carryDistance: 120, launchAngle: 18, attackAngle: -4 }) }));
+  const fine = (club, n, from) => Array.from({ length: n }, (_, i) => ({ _row: from + i, clubType: club,
+    ...base({ smashFactor: B.get(club).pga.sf, ballSpeed: B.get(club).pga.bs, clubSpeed: +(B.get(club).pga.bs / B.get(club).pga.sf).toFixed(1),
+      carryDistance: B.get(club).pga.carry, launchAngle: B.get(club).pga.la, attackAngle: B.get(club).pga.aa }) }));
+  const mixed = session([...poor('7i', 4, 2), ...poor('9i', 3, 6), ...poor('pw', 3, 9)]);
+  const pc = FE.detectFaults(mixed.shots, mixed).find(f => f.id === 'poor-contact');
+  ok(!pc, `three clubs under their floor do not add up to one over it${pc ? ' — got ' + pc.evidence : ''}`);
+
+  const one = session([...poor('7i', 12, 2), ...poor('9i', 3, 14), ...fine('pw', 12, 17)]);
+  const pc1 = FE.detectFaults(one.shots, one).find(f => f.id === 'poor-contact');
+  ok(pc1 && pc1.total === 12 && pc1.count === 12 && pc1.clubType === '7i',
+     `a club over its floor is reported on its own shots only (${pc1 ? pc1.evidence : 'none'})`);
+  ok(pc1 && !pc1.affectedShots.some(r => r >= 14 && r < 17), 'and the under-floor 9-irons are not counted into it');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
