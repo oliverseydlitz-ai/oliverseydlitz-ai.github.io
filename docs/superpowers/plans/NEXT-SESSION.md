@@ -1,4 +1,11 @@
-# Next session — start here (written 23 Sep 2026, end of the overnight run)
+# Next session — start here
+
+> **SCOPE OF THE NEXT SESSION (Oliver, 23 Sep): the guide pages ONLY (Phase 10.2).**
+> Do not start Phase 9 or anything else. Phase 9 is the session after.
+> Oliver calls them "redirect sites" — they are content pages ON the site, never
+> redirects or doorway pages (Google penalises those). See "Guide pages" below
+> and plan Phase 10.2 for the list of eight.
+
 
 Read `CLAUDE.md` (the authority), then the killer plan's STATUS table, Decisions
 block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-plan.md`).
@@ -47,8 +54,7 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
   menus can't be verified from the sandbox. Do the research guides first.
 - Oliver will send range/app photos when he can; leave a clearly marked spot for them.
 - Quality over count: stop at the 8 unless a real new search question appears.
-- Order vs Phase 9: Oliver's call at the start of the chat; if he doesn't say, do the
-  first guide pair first (short, and it starts the SEO clock), then Phase 9.
+- Scope: guides only this session; Phase 9 is the NEXT one.
 
 ## Domain + indexing — DONE by Oliver, 23 Sep (~09:15 local)
 - GitHub Pages custom domain `shotlab.oliverseydlitz.com`, **Enforce HTTPS on**.
