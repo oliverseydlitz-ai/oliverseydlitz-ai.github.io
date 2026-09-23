@@ -26,7 +26,20 @@ const Sanitize = (() => {
     const node = document.createTextNode(str || '');
     return node;
   }
-  return { escape, text };
+  // A club type is the one string field every screen prints, and it arrives
+  // from a file: a CSV's Club Type column, a restored backup, a cloud row.
+  // It went into ~15 innerHTML sinks raw (R19). Rather than escape at every
+  // sink and miss the sixteenth, it is cleaned at the door — CSVParser,
+  // readBackup, and Store.stamp on every read — into a known code, or a short
+  // token that holds no markup character at all.
+  function clubType(v) {
+    if (v == null || v === '') return v;
+    const t = String(v).trim();
+    const code = t.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(CLUB_LABELS, code)) return code;
+    return t.replace(/[^A-Za-z0-9 ._-]/g, '').trim().slice(0, 24);
+  }
+  return { escape, text, clubType };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -249,7 +262,11 @@ const isIron = t => ['1i','2i','3i','4i','5i','6i','7i','8i','9i','pw','aw','sw'
 const isLong = t => isWood(t) || isHybrid(t) || ['1i','2i','3i','4i'].includes(t);
 const isShort = t => ['8i','9i','pw','aw','sw','lw'].includes(t);
 const isMid = t => ['5i','6i','7i'].includes(t);
-const clubLabel = t => CLUB_LABELS[t] || (t || '').toUpperCase();
+// Own properties only — CLUB_LABELS['constructor'] is Object — and escaped,
+// because the door (Sanitize.clubType) is only as good as the next path
+// somebody adds around it.
+const clubLabel = t => (Object.prototype.hasOwnProperty.call(CLUB_LABELS, t) ? CLUB_LABELS[t]
+  : Sanitize.escape(String(t || '').toUpperCase()));
 const clubColor = t => CLUB_COLORS[t] || '#8B93A0';   // --withheld: an unknown club is not a hue
 const clubOrder = t => { const i = CLUB_ORDER.indexOf(t); return i === -1 ? 99 : i; };
 
@@ -1443,7 +1460,10 @@ const Store = (() => {
     const ball = sn.conditions?.ball || 'unknown';
     const surface = sn.conditions?.surface || 'unknown';
     const aligned = sn.conditions?.alignment === 'confirmed';
-    sn.shots.forEach(s => { s._ball = ball; s._surface = surface; s._aligned = aligned; });
+    sn.shots.forEach(s => {
+      if (s && 'clubType' in s) s.clubType = Sanitize.clubType(s.clubType);
+      s._ball = ball; s._surface = surface; s._aligned = aligned;
+    });
     return sn;
   }
 
@@ -4464,6 +4484,7 @@ const CSVParser = (() => {
         if (!(col in row)) continue;
         shot[field] = NUM.has(field) ? num(row[col]) : row[col];
       }
+      if ('clubType' in shot) shot.clubType = Sanitize.clubType(shot.clubType);
       return shot;
     });
 
@@ -4478,7 +4499,7 @@ const CSVParser = (() => {
     return shots;
   }
 
-  return { parse, REQUIRED };
+  return { parse, REQUIRED, NUM };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -10287,7 +10308,7 @@ const ImportFlow = (() => {
     const labs = {clubType:'Club',clubBrand:'Brand',ballSpeed:'Ball Spd',smashFactor:'Smash',carryDistance:'Carry',launchAngle:'Launch°',clubPath:'Path°',attackAngle:'AoA°'};
     document.getElementById('previewTable').innerHTML = `
       <thead><tr>${cols.map(c=>`<th>${labs[c]||c}</th>`).join('')}</tr></thead>
-      <tbody>${shots.slice(0,5).map(s=>`<tr>${cols.map(c=>`<td>${s[c]??'—'}</td>`).join('')}</tr>`).join('')}</tbody>`;
+      <tbody>${shots.slice(0,5).map(s=>`<tr>${cols.map(c=>`<td>${s[c] == null || s[c] === '' ? '—' : Sanitize.escape(String(s[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
     goStep('step-preview');
   }
 
@@ -12057,6 +12078,7 @@ const SessionSharing = (() => {
   //
   // Read at the door, like the CSV parser: a file that is not a ShotLab backup
   // is refused with the reason rather than imported as a session of nothing.
+  const BACKUP_ID = /^[\w-]{1,64}$/;
   const BACKUP_SHAPE =
     'A ShotLab backup is a JSON array of sessions, each with an id, a date and a shots array.';
 
@@ -12073,7 +12095,12 @@ const SessionSharing = (() => {
     data.forEach((s, i) => {
       if (!s || typeof s !== 'object') { bad.push(`entry ${i + 1} is not a session`); return; }
       if (!s.id || typeof s.id !== 'string') { bad.push(`entry ${i + 1} has no id`); return; }
-      if (!s.date) { bad.push(`session ${s.id} has no date`); return; }
+      // An id lands in data-id attributes and a lookup key. Every id this app
+      // writes is a UUID; anything outside a plain token was not written here.
+      if (!BACKUP_ID.test(s.id)) { bad.push(`entry ${i + 1} has an id this app would not have written`); return; }
+      if (!s.date || !Number.isFinite(new Date(s.date).getTime())) {
+        bad.push(`session ${s.id} has no readable date`); return;
+      }
       if (!Array.isArray(s.shots)) { bad.push(`session ${s.id} has no shots array`); return; }
       // A session of nothing is the case the CSV importer refuses at the door,
       // and a backup can carry one just as easily.
@@ -12081,7 +12108,15 @@ const SessionSharing = (() => {
       if (!s.shots.some(x => x && x.clubType)) {
         bad.push(`session ${s.id} has shots with no club on any of them`); return;
       }
-      good.push(s);
+      // Numbers are numbers or nothing, and a club is a club code — the same
+      // shape CSVParser hands on, so a backup cannot carry what a CSV cannot.
+      good.push({ ...s, shots: s.shots.map(x => {
+        if (!x || typeof x !== 'object') return x;
+        const y = { ...x };
+        for (const f of CSVParser.NUM) if (f in y) y[f] = Number.isFinite(y[f]) ? y[f] : null;
+        if ('clubType' in y) y.clubType = Sanitize.clubType(y.clubType);
+        return y;
+      }) });
     });
     if (!good.length) {
       return { ok: false, why: `Nothing in that file is a session. ${BACKUP_SHAPE}`, rejected: bad };

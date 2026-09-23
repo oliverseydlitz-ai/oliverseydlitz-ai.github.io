@@ -877,6 +877,19 @@ page life would otherwise show what the menus held at load).
 - Erasing device storage calls `forget()` — the recall is derived from imported
   sessions, so it goes with them.
 
+### Club types are cleaned at the door (`Sanitize.clubType`, R19)
+
+The club type is the one string field every screen prints, and it arrives from
+a file. It went into ~15 `innerHTML` sinks raw; a crafted CSV fired beacons at
+a third-party host and injected `<style>` nodes. It is now cleaned where data
+enters — `CSVParser.parse`, `readBackup`, and `Store.stamp` on **every** read,
+local or cloud — into a known code or a short token with no markup character.
+`clubLabel` escapes too and reads own properties only. Both layers are needed:
+with the `stamp` line removed, a sink that bypasses `clubLabel` still injects.
+`readBackup` also refuses an id outside `^[\w-]{1,64}$` or an unreadable date,
+and nulls any numeric field that is not a number. `taint.js` renders every view
+from hostile sessions and asserts no marker becomes an element.
+
 ### Backup and restore (`SessionSharing`)
 
 `exportAsJSON` writes `shotlab-backup-<date>.json` and, for as long as it
@@ -906,7 +919,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **67 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **68 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1221,8 +1234,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **67 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v161**, 58 modules.
+State at handover: **68 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v162**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1689,7 +1702,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**67 test suites**, service worker **v161**. Deterministic auth, cloud sync
+**68 test suites**, service worker **v162**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
