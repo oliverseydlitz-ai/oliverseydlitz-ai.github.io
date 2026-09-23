@@ -439,7 +439,6 @@ The main session verified **R19** (`clubLabel` at `app.js:252` returns an unknow
 
 Finished items move to the **Done log** below this list, one line each with the commit.
 
-1. **R1 + R6 + R7** — one `sw.js` pass, with a test that nothing cross-origin is intercepted.
 2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, R3, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
 3. **C5 + C6 + C26 + C27 + C42** — the retention probe (the app's only efficacy metric) made honest, as ONE piece of work.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
@@ -454,6 +453,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | V25 | `[hidden]` means hidden (global rule); guest cannot reach sign-out; render-scan HIDDEN check | `2c4649d` |
 | R23 | Sign-out asks: clear this device or keep; every `sl*` key classified account/device; `signout-clears.js` | `9967816` |
 | R19 | Club types cleaned at the door (CSV, backup, every read); `clubLabel` escapes; backup ids/dates/numbers validated; `taint.js` | `78061db` |
+| R1+R6+R7+R26 | SW: no cross-origin interception, only `res.ok` cached by path, 3 s timeout, offline 404; `service-worker.js`; run.js fails a suite with no result | `dc41852` |
 
 
 ---
