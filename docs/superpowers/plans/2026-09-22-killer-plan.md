@@ -228,6 +228,7 @@ Three background agents audited the served app, each through one lens: **visual/
 | C16+C17 | Drill-library section text: no strokes figures (A, B), no retracted 1.8° (D); guarded | `fdc28fc` |
 | C7+C35 | Smash floor/good/elite and wedge spin-loft bands per club off `Benchmarks.DATA`; every PGA row silent (one named exemption); no amateur-average row flagged | `d3a343b` |
 | C5+C6+C26+C42 | Probe measures its own fault's metric and direction; opens once at import from the newest session; never replaces a live probe; short history held (`awaiting-history` + `rejudge`), not burnt; home card routes to an imported follow-up | `d753d82` |
+| R2+R5 | Removed dialogs leave the focus trap (observer + prune backstop, focus restored); Ctrl/Cmd+P and Ctrl+H freed; shortcuts overlay trapped; `focus-trap.js` | `2d1f711` |
 | C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
 | C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
 | C1 | HIGH | **"Fatigue Pattern Detected — 73 of 73 shots"** fires whenever a golfer hits driver and then an iron: the rule compares first-half and second-half ball speed across the pooled bag. On the same page, Strike says "No measurable fade", and the plan gives the fault a 10-minute block. | `app.js` 4952–4973, 5062–5072 | Delete the rule and route to `Strike.fatigue`, which is per club with a 15-shot floor. | S |
@@ -452,7 +453,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 3. **C27** — the rest of the probe work; it changes under Phase 9 (range → premium allowed, weighted), so do it there.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
 5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
-6. **R2, R4, R5, V1, V2, V6** — keyboard access and the phone layout.
+6. **R4, V1, V2, V6** — keyboard access and the phone layout.
 7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.
 
 ### Done log
