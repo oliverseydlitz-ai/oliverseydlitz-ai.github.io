@@ -82,6 +82,14 @@ console.log('— every view, rendered from hostile sessions —');
   }
   ok(doc.querySelectorAll('img[src*="evil.example"]').length === 0, 'no request to a third party was ever set up');
 
+  // R15: and if something does get in, it cannot phone home. The R19 proof of
+  // concept fired its beacons through `img-src … https:`, which allowed an
+  // image from any host at all. Nothing in the app loads a remote image.
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'index.html'), 'utf8');
+  const imgSrc = ((html.match(/Content-Security-Policy"\s+content="([^"]+)"/) || [])[1] || '').split(';')
+    .map(d => d.trim()).find(d => d.startsWith('img-src')) || '';
+  ok(imgSrc && !/\bhttps?:(?!\/\/)|\*/.test(imgSrc), `the CSP allows no image from an arbitrary host (${imgSrc})`);
+
   // The positive control: the same marker, put into a sink on purpose, is seen.
   const probe = doc.createElement('div'); probe.innerHTML = MARK; doc.body.appendChild(probe);
   ok(tainted() > 0, 'and the check sees a marker that does get in');
