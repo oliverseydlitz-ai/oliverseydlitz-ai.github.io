@@ -11259,6 +11259,10 @@ async function init() {
   // Settings account controls
   document.getElementById('accountSignInBtn').addEventListener('click', () => Auth.showAuth());
   document.getElementById('accountSignOutBtn').addEventListener('click', async () => {
+    // A guest has nothing to sign out of, and logout() hard-reloads the page —
+    // which for a guest is a silent wipe of every in-memory session (QC V25).
+    // The button is hidden for guests; this guard is for the day it is not.
+    if (!Auth.getUser()) return;
     await Auth.logout();
     await Router.showSessions();
   });

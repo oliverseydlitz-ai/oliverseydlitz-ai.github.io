@@ -130,6 +130,15 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
       overflow++; console.log(`  GUTTER    ${label}: the view title starts at x=${inner.title}px — no side margin`);
     }
     if (inner.labels.length) { overflow++; console.log(`  SPILL     ${label}: ${inner.labels.slice(0, 3).join('; ')}`); }
+    // HIDDEN: an element marked `hidden` that still renders. An author
+    // `display` rule beats the browser's [hidden] rule, so this is invisible
+    // to every unit suite — it is how a guest was shown "Sign out" and
+    // "Delete my account" (QC V25). style.css now forces [hidden] to win; this
+    // is the check that it keeps winning.
+    const shownHidden = await p.evaluate(() => [...document.querySelectorAll('[hidden]')]
+      .filter(e => getComputedStyle(e).display !== 'none')
+      .map(e => e.id ? '#' + e.id : e.tagName.toLowerCase() + '.' + (e.className + '').split(' ')[0]));
+    if (shownHidden.length) { overflow++; console.log(`  HIDDEN    ${label}: marked hidden but rendered: ${shownHidden.slice(0, 5).join(', ')}`); }
     return m;
   };
 

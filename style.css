@@ -59,6 +59,15 @@
 
 /* ── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* `hidden` MEANS hidden, whatever display an author rule sets. The browser's
+   own [hidden]{display:none} has the lowest priority there is, so ANY class
+   that sets display — `.settings-row{display:flex}` here — silently beats it.
+   That is how a guest came to see "Sign out" and "Delete my account" (QC V25):
+   the rows were correctly marked hidden and rendered anyway, and a guest who
+   tapped Sign out reloaded the page and lost every unsaved session. A code
+   path that sets `el.hidden = true` has to be able to rely on it.
+   test/browser/render-scan.js fails if any [hidden] element renders. */
+[hidden] { display: none !important; }
 
 /* ── Design tokens — "Range" (modern-athletic instrument) ──────────────
    Near-monochrome chrome. Saturated colour is reserved for DATA: the club
