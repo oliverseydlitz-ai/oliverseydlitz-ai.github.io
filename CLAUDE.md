@@ -954,6 +954,16 @@ and a `*-label` wider than its own box (**SPILL**). Deliberate horizontal
 scrollers declare `data-hscroll` in the markup; the detail tables that still
 clip are a named ratchet, `KNOWN_CLIPPED`, pointing at the killer plan's 2.6.
 
+**And it checks every focus ring (RING, added 23 Sep 2026, R20/V26).** Each
+focusable control in each view is focused from the keyboard and measured: a
+ring its own `clip-path` cuts off (every chamfered button — the stylesheet's
+comment claimed an outline "ignores clip-path", which it does not), a ring an
+`overflow` ancestor cuts off (every Settings row, the drill tabs, the chips),
+or an inset ring the colour of the control's own fill. Transitions are switched
+off while it measures, because buttons transition `outline-color` and a
+mid-flight read made the colour check unable to fail — found by checking the
+check. The fix is an inset `currentColor` ring wherever outside would be cut.
+
 The workflow is: edit → `bash test/browser/sync.sh` → serve
 `test/browser/site/` → run the scan. **Forgetting the sync is the classic
 mistake** — you then measure the previous version and conclude a fix did not
@@ -1266,7 +1276,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **71 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v168**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v169**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1733,7 +1743,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**71 test suites**, service worker **v168**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v169**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

@@ -332,8 +332,9 @@ a  { color: var(--accent); text-decoration: none; }
 /* ── Buttons — chamfered cut-corner geometry ──────────────────────────
    One silhouette: top-left + bottom-right corners sliced by --cut. Three
    weights. clip-path also clips a real border, so .btn-secondary draws its
-   outline as a ::before layer sharing the clip. Focus is an outline (ignores
-   clip-path, so it is always visible). No shadows on buttons — chrome is flat. */
+   outline as a ::before layer sharing the clip. Focus is an outline drawn INSIDE
+   the cut (clip-path clips an outline too — see the focus rules below). No
+   shadows on buttons — chrome is flat. */
 button {
   font-family: var(--font-body);
   cursor: pointer; border: none;
@@ -370,6 +371,20 @@ button {
 .btn-ghost:hover { color: var(--text); }
 
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The ring goes INSIDE wherever outside would be cut off (R20/V26). clip-path
+   clips an outline like everything else, so every chamfered button drew its
+   focus ring into the clipped-away region — invisible. And a control inside a
+   box that clips (overflow hidden or auto) loses whichever edge crosses it:
+   every Settings row, the drill tabs, the club chips. currentColor, because an
+   inset ring sits on the control's own fill, and an accent ring on the accent
+   primary button or an active tab is the same invisible ring by another route.
+   render-scan.js measures every focusable control for both. */
+:is(.settings-section, .drill-tabs, .filter-row, .tbl-wrap, .doc-table-wrap) :focus-visible {
+  outline-offset: -2px; outline-color: currentColor;
+}
+:is(.btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .btn-icon):focus-visible {
+  outline-offset: -5px; outline-color: currentColor;
+}
 :where(.btn-primary, .btn-secondary, .btn-danger, .btn-icon):active { transform: translateY(1px); }
 button:disabled, button[disabled] {
   background: var(--surface2); color: var(--text-dim);

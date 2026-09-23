@@ -158,6 +158,66 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   await imp('session.csv','range');
   await widthCheck('detail (range ball)');
 
+  // RING: every focusable control, focused from the keyboard, must have a
+  // focus ring that is actually drawn (R20/V26). Three ways it was not, all
+  // at once, while the stylesheet's own comment said the outline "ignores
+  // clip-path, so it is always visible":
+  //   OWN CLIP       — the control's clip-path (the chamfer) cuts off an
+  //                    outline drawn outside it: every chamfered button.
+  //   ANCESTOR CLIP  — a box with overflow hidden/auto cuts the edge that
+  //                    crosses it: every Settings row, the drill tabs, chips.
+  //   SAME COLOUR    — an inset ring the colour of the control's own fill.
+  // A control scrolled partly out of its box is legitimately clipped and is
+  // not reported. No exemption list: there is nothing here worth exempting.
+  let rings = 0;
+  const ringCheck = async label => {
+    await p.keyboard.press('Shift');   // a keyboard interaction, so focus() matches :focus-visible
+    const res = await p.evaluate(() => {
+      // Buttons transition outline-color, so a style read straight after
+      // focus() sees the colour mid-flight and SAME COLOUR can never match.
+      // Found by checking the check: an accent ring on the accent button
+      // passed until transitions were switched off for the measurement.
+      const still = document.createElement('style');
+      still.textContent = '*, *::before, *::after { transition: none !important; }';
+      document.head.appendChild(still);
+      const out = [];
+      const sel = 'button, a[href], input:not([type=hidden]), select, textarea, [tabindex]:not([tabindex="-1"])';
+      const inView = el => { const v = el.closest('.view'); return !v || v.classList.contains('active'); };
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height || !inView(el) || el.closest('[hidden]') || getComputedStyle(el).visibility === 'hidden') continue;
+        if (el.closest('.modal-overlay:not(.open), .modal:not(.open)')) continue;
+        el.focus({ preventScroll: true });
+        if (document.activeElement !== el || !el.matches(':focus-visible')) continue;
+        const cs = getComputedStyle(el);
+        const w = parseFloat(cs.outlineWidth) || 0, off = parseFloat(cs.outlineOffset) || 0;
+        const name = el.id ? '#' + el.id : el.tagName.toLowerCase() + '.' + ((el.className + '').trim().split(/\s+/)[0] || '') + (el.textContent ? ' "' + el.textContent.trim().slice(0, 20) + '"' : '');
+        if (cs.outlineStyle === 'none' || w === 0) { if (cs.boxShadow === 'none') out.push(`NO RING ${name}`); continue; }
+        if (cs.clipPath !== 'none' && off > -w) { out.push(`OWN CLIP ${name} (offset ${off}px)`); continue; }
+        if (off <= -w && cs.outlineColor === cs.backgroundColor) { out.push(`SAME COLOUR ${name}`); continue; }
+        const e = off + w;
+        const ring = { l: r.left - e, t: r.top - e, r: r.right + e, b: r.bottom + e };
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+          const ac = getComputedStyle(a);
+          const clips = ac.overflowX !== 'visible' || ac.overflowY !== 'visible' || ac.clipPath !== 'none';
+          if (!clips) continue;
+          const ar = a.getBoundingClientRect();
+          const inside = r.left >= ar.left - .5 && r.right <= ar.right + .5 && r.top >= ar.top - .5 && r.bottom <= ar.bottom + .5;
+          if (!inside) break;        // scrolled partly out of its box: legitimately clipped
+          if (ring.l < ar.left - .5 || ring.r > ar.right + .5 || ring.t < ar.top - .5 || ring.b > ar.bottom + .5) {
+            out.push(`ANCESTOR CLIP ${name} by ${a.tagName.toLowerCase()}.${(a.className + '').split(' ')[0]}`); break;
+          }
+        }
+      }
+      document.activeElement && document.activeElement.blur();
+      still.remove();
+      return out;
+    });
+    const uniq = [...new Set(res.map(x => x.replace(/ ".*?"/, '')))];
+    uniq.slice(0, 12).forEach(x => console.log(`  RING      ${label}: ${x}`));
+    rings += uniq.length;
+  };
+
   const BAD = /\bNaN\b|\bundefined\b|\[object Object\]|\bInfinity\b|\bnull\b/;
   const scan = (where, text) => {
     const lines = (text || '').split('\n').map(l => l.replace(/\s+/g,' ').trim()).filter(Boolean);
@@ -171,6 +231,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     await p.waitForTimeout(1600);
     total += scan(v, await p.evaluate(() => document.body.innerText));
     await widthCheck(v);
+    await ringCheck(v);
   }
   // session detail, every section
   await p.evaluate(async () => { const ss = await Store.getSessions(); Router.showDetail(ss[0].id); });
@@ -179,6 +240,7 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   await p.waitForTimeout(500);
   total += scan('session detail', await p.evaluate(() => document.body.innerText));
   await widthCheck('session detail');
+  await ringCheck('session detail');
   // every drill-library tab
   await p.click('.bottom-nav-item[data-view="drills"]'); await p.waitForTimeout(1200);
   for (const s of ['A','B','C','D','E','F','G','H','I']) {
@@ -190,12 +252,13 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   const staleClipped = Object.keys(KNOWN_CLIPPED).filter(k => !seenClipped.has(k));
   if (staleClipped.length) { overflow++; console.log(`  STALE     these no longer clip — strike them off KNOWN_CLIPPED: ${staleClipped.join(', ')}`); }
   console.log(overflow ? `${overflow} layout finding(s)` : 'no horizontal overflow, clipped box, gutterless title or spilled label at phone width');
+  console.log(rings ? `${rings} focus ring(s) not drawn` : 'every focusable control draws a visible focus ring');
   console.log('page errors:', errs.length?errs:'none');
   await b.close();
   // Exit non-zero on a finding. This used to only print, so its exit status was
   // 0 whatever it found — a check that cannot fail is a check that is not
   // running, and it was being reported as a pass on that basis.
-  const failed = total + overflow + errs.length;
-  if (failed) console.error(`\nrender-scan FAILED: ${total} text, ${overflow} overflow, ${errs.length} page error(s)`);
+  const failed = total + overflow + rings + errs.length;
+  if (failed) console.error(`\nrender-scan FAILED: ${total} text, ${overflow} overflow, ${rings} focus ring, ${errs.length} page error(s)`);
   process.exit(failed ? 1 : 0);
 })();
