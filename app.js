@@ -2853,7 +2853,7 @@ const DrillLibrary = (() => {
          structure: 'Track p90 and p95 absolute offline, never SD alone. Blocked → serial → random.' },
     C: { id: 'C', name: 'Start-line control', count: 10,
          why: 'Face contributes about 84% of start direction with a driver, falling to about 71% for a ' +
-              'wedge (PING 2020 / TrackMan, the anchors R_ANCHORS uses) — path\'s share roughly doubles ' +
+              'wedge (PING 2020 / TrackMan) — path\'s share roughly doubles ' +
               'as loft rises.',
          gate: { shots: 15, metric: 'launchDirection', alignment: true },
          structure: 'Bandwidth feedback at ±2° tolerance.' },
@@ -11282,6 +11282,9 @@ async function init() {
     );
   });
 
+  // These five are built at runtime. They carry .modal-overlay so the dialog
+  // trap in AccessibilityEnhancements sees them: role, a name, focus moved in
+  // and back, Tab kept inside, Escape (R21). Without it they were plain divs.
   document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
     document.getElementById('analyticsModal')?.remove();
     const sessions = await Store.getSessions();
@@ -11290,7 +11293,7 @@ async function init() {
     if (!metrics) { toast('Unable to generate metrics'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal" aria-label="Advanced Analytics">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Advanced Analytics
@@ -11367,7 +11370,7 @@ async function init() {
       </div>`;
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal" aria-label="Where you sit">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('progress')} Where you sit
@@ -11423,7 +11426,7 @@ async function init() {
       </div>`;
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal" aria-label="What you can work on">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('book')} What you can work on
@@ -11457,7 +11460,7 @@ async function init() {
     if (!clubs.length) { toast('No club data'); return; }
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal" aria-label="Club Performance Analysis">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('bag')} Club Performance Analysis
@@ -11504,7 +11507,7 @@ async function init() {
     const vol = PracticeEfficiency.volume(latest);
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal" aria-label="How you practised">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
             ${icon('target')} How you practised
@@ -11735,7 +11738,7 @@ async function init() {
     ];
 
     const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal" aria-label="Keyboard shortcuts">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:400px;width:100%;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             Keyboard Shortcuts

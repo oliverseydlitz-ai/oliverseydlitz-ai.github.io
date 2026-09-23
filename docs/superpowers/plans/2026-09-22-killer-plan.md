@@ -507,6 +507,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | R28 R38 R40 V35 V43 | Count-up and subnav scroll obey reduced motion; data-rights modal is one copy with a labelled close and an escaped email; `mobile-web-app-capable`; scroll padding clears the bottom nav (top nav on desktop); one disabled treatment, hover gated on `:not(:disabled)` | overnight 22:00 |
 | R39 V34 | Sign-in errors read the code only, mapped to fixed copy (no URL text in the app's voice), and a failed token install no longer says "Email verified"; pinned in `taint.js`. Drill tabs keep the chosen tab in view and focused, fade at the edge on phones, wrap at 768px+ | overnight 22:20 |
 | R32 | Sign-in and import errors are `role=alert`; a sign-in error marks its field `aria-invalid` + `aria-describedby` and focuses it; new suite `form-errors.js` | overnight 22:40 |
+| R21 | The five Settings runtime modals (analytics, benchmarks, learning, club, efficiency) carry `.modal-overlay`, so the trap gives them role, name, focus in/out, Tab containment and Escape; the shortcuts overlay got a name; guard in `focus-trap.js` (mutation-checked). Also removed a code name (`R_ANCHORS`) from section C's user-facing text | overnight 23:10 |
 
 
 ---

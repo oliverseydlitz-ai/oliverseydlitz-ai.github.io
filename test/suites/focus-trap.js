@@ -105,6 +105,18 @@ R.window.scrollTo = () => {};   // jsdom does not implement it; the scroll lock 
   R.window.localStorage.removeItem('slDebug');
   ok(!logErr, `and the auth trace does not throw with debugging on (R18)${logErr ? ': ' + logErr.message : ''}`);
 
+  // R21: a modal built at runtime is only trapped if it carries .modal-overlay,
+  // the class the observer watches. Five Settings dialogs were plain divs, so
+  // Tab walked the page behind them and Escape did nothing. Every element in
+  // app.js whose id ends in "Modal" and is written as markup must carry it.
+  const appSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
+  const roots = [...appSrc.matchAll(/<div\b([^>]*\bid="(\w+Modal)"[^>]*)>/g)];
+  ok(roots.length >= 6, `found the runtime modal roots (${roots.length})`);
+  const untrapped = roots.filter(m => !/class="[^"]*\bmodal-overlay\b/.test(m[1])).map(m => m[2]);
+  ok(!untrapped.length, `every runtime modal is a trapped dialog${untrapped.length ? ': ' + untrapped.join(', ') : ''}`);
+  const unnamed = roots.filter(m => !/aria-label(ledby)?="/.test(m[1]) && !/modal-title/.test(appSrc.slice(m.index, m.index + 600))).map(m => m[2]);
+  ok(!unnamed.length, `and each has a name${unnamed.length ? ': ' + unnamed.join(', ') : ''}`);
+
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exitCode = fail ? 1 : 0;
 })();
