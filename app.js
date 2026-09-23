@@ -5877,7 +5877,11 @@ const PracticePlan = (() => {
     if (!section) return {};
     const clubs = faultClubs(fault, shots);
     const club = clubs.length ? mode_(clubs.map(s => s.clubType)) : null;
-    const ctx = { shots: clubs, clubType: club, sessions: 1 };
+    // The club comes from the shots that tripped the fault; the gate is judged
+    // on EVERY shot of that club (C41). Passing only the affected ones told a
+    // golfer with 20 drivers "needs 15 Driver, you have 13".
+    const own = club ? shots.filter(s => s.clubType === club) : clubs;
+    const ctx = { shots: own, clubType: club, sessions: 1 };
     const rows = DrillLibrary.forSection(section, ctx);
     const open = rows.filter(r => r.ok);
     // A prescription is a range DRILL for THIS club (C10). The first open
@@ -9549,18 +9553,24 @@ const UI = (() => {
       }
     } catch(e){ console.error('benchmarks',e); }
 
+    // One club at a time (C33). "All clubs" averaged a driver and a wedge into
+    // one line, so a wedge-heavy session plotted as a collapse in carry: it
+    // measured which clubs were hit, not how. The default is the most-hit club.
     const allClubs = [...new Set(sessions.flatMap(s=>sortedClubs(s.shots)))];
+    const hits = {};
+    sessions.forEach(sn => (sn.shots || []).forEach(x => { if (x.clubType) hits[x.clubType] = (hits[x.clubType] || 0) + 1; }));
+    const firstClub = allClubs.slice().sort((a, b) => (hits[b] || 0) - (hits[a] || 0))[0] || 'all';
     const clubSel = document.getElementById('progressClub');
-    clubSel.innerHTML = ['all',...allClubs].map(c=>
-      `<option value="${c}">${c==='all'?'All clubs':clubLabel(c)}</option>`).join('');
+    clubSel.innerHTML = allClubs.map(c=>
+      `<option value="${c}"${c===firstClub?' selected':''}>${clubLabel(c)}</option>`).join('');
     clubSel.onchange = () => {
       renderProgressCharts(sessions, clubSel.value);
       renderTailTrend(sessions, clubSel.value);
       renderStrikeTrend(sessions, clubSel.value);
     };
-    renderProgressCharts(sessions,'all');
-    try { renderTailTrend(sessions, 'all'); } catch(e){ console.error('tail trend',e); }
-    try { renderStrikeTrend(sessions, 'all'); } catch(e){ console.error('strike trend',e); }
+    renderProgressCharts(sessions, firstClub);
+    try { renderTailTrend(sessions, firstClub); } catch(e){ console.error('tail trend',e); }
+    try { renderStrikeTrend(sessions, firstClub); } catch(e){ console.error('strike trend',e); }
     try { renderRounds(sessions); } catch(e){ console.error('rounds',e); }
     try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
   }
@@ -9873,10 +9883,15 @@ const UI = (() => {
   function renderProgressCharts(sessions, clubFilter) {
     // V8: same-day sessions get a second label line (Chart.js draws an array
     // as stacked lines), so the axis never repeats one date three times.
-    const filtered = sessions.map(s=>({
+    // C33: oldest on the left, like every other trend on this page (sessions
+    // arrive newest-first, so the charts used to run backwards), and a session
+    // with fewer than the floor's worth of this club is left off — a three-shot
+    // point looks exactly like a thirty-shot one on a line.
+    const byDate = sessions.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    const filtered = byDate.map(s=>({
       label: sessionLabel(s, sessions).split(' · '),
       shots: clubFilter==='all'?s.shots:s.shots.filter(sh=>sh.clubType===clubFilter),
-    })).filter(s=>s.shots.length>0);
+    })).filter(s=>s.shots.length >= (clubFilter==='all' ? 1 : Metrics.MIN_SHOTS_REPORT));
 
     const labels = filtered.map(s=>s.label);
     const d = f => filtered.map(s=>avg(s.shots,f));
@@ -9982,7 +9997,9 @@ const UI = (() => {
     }
 
     const compare = (field, label, higherBetter) => {
-      const rShots = recent.flatMap(s=>s.shots), oShots = older.flatMap(s=>s.shots);
+      // The club the page is showing, not the whole bag (C33).
+      const mine = sh => clubFilter==='all' || sh.clubType===clubFilter;
+      const rShots = recent.flatMap(s=>s.shots.filter(mine)), oShots = older.flatMap(s=>s.shots.filter(mine));
       const r = avg(rShots, field), o = avg(oShots, field);
       if (!r || !o) return '';
       const diff = r - o;

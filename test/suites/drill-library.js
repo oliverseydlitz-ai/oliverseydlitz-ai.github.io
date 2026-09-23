@@ -141,6 +141,12 @@ const drvPick = P.libraryDrill(fault('driver-negative-aa', []), mk(20, { clubTyp
 ok(drvPick.section === 'E' && drvPick.libraryDrill && L.fitsClub(drvPick.libraryDrill, 'd'),
    `a driver low-point fault gets a drill a driver can run (${drvPick.libraryDrill && drvPick.libraryDrill.name})`);
 ok(drvPick.libraryDrill && drvPick.libraryDrill.name !== 'Divot-line drill', 'not the divot-line drill');
+// C41: the gate is judged on every shot of the club, not only the ones that
+// tripped the fault. 13 of 20 drivers low used to read "needs 15, you have 13".
+const twenty = mk(20, { clubType: 'd', attackAngle: -3 });
+const c41 = P.libraryDrill(fault('driver-negative-aa', twenty.slice(0, 13).map(s => s._row)), twenty);
+ok(c41.libraryDrill !== null && !/you have 13/.test(c41.lockedNote || ''),
+   `a fault on 13 of 20 drivers is gated on all 20 (${c41.lockedNote || 'open'})`);
 const ironPick = P.libraryDrill(fault('iron-very-steep', []), mk(20, { clubType: '7i', attackAngle: -8 }));
 ok(ironPick.libraryDrill && !/\(driver\)/.test(ironPick.libraryDrill.name) && L.fitsClub(ironPick.libraryDrill, '7i'),
    `and a 7-iron one does not get the tee-height ladder (${ironPick.libraryDrill && ironPick.libraryDrill.name})`);

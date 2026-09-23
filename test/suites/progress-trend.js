@@ -85,5 +85,16 @@ console.log('— the progress charts do not dramatise noise (V9) —');
      'and a minimum y-span read from Metrics.mdc, so a move inside the noise stays visibly small');
 }
 
+console.log('— one club at a time, oldest first, above the floor (C33) —');
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '../../app.js'), 'utf8');
+  const body = src.slice(src.indexOf('function renderProgressCharts'), src.indexOf('function renderPractice('));
+  const sel = src.slice(src.indexOf("const clubSel = document.getElementById('progressClub')"), src.indexOf('function renderRounds'));
+  ok(!/All clubs/.test(sel.replace(/\/\/.*$/gm, '')), 'the club filter no longer offers a pooled "All clubs" line');
+  ok(/sort\(\(a, b\) => new Date\(a\.date\) - new Date\(b\.date\)\)/.test(body), 'the charts run oldest to newest');
+  ok(/Metrics\.MIN_SHOTS_REPORT/.test(body.slice(0, body.indexOf('const labels'))), 'a session below the per-club floor is left off');
+  ok(/rShots = recent\.flatMap\(s=>s\.shots\.filter\(mine\)\)/.test(body), 'and the trend summary reads the chosen club, not the bag');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

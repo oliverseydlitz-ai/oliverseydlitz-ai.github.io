@@ -49,3 +49,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 22:25 CEST — queue 2 batch: R39 (auth error copy, pinned), V34 (drill tabs). SW v195.
 - 22:40 CEST — queue 2: R32 (form errors announced, fields marked; `form-errors.js`, 75 suites). SW v196.
 - 23:10 CEST — queue 2: R21 (runtime Settings modals are real dialogs, guarded) + code-name leak in drill section C copy. SW v197.
+- 23:40 CEST — queue 2: C41 (drill gate on all the club's shots) + C33 (Progress one club, oldest first, floor; trend summary no longer bag-pooled). SW v198.
