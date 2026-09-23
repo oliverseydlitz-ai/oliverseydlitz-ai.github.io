@@ -1322,6 +1322,9 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
+**Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
+(what Oliver has to do, what is next, and the habits worth keeping).
+
 State at handover: **72 suites, all green**, render scan exit 0 both with and
 without `SM_NO_IO=1`, service worker at **v183**, 58 modules.
 
