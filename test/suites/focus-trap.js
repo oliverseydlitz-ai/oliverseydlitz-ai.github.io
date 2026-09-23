@@ -75,6 +75,36 @@ R.window.scrollTo = () => {};   // jsdom does not implement it; the scroll lock 
   await tick();
   ok(A.top() !== sc, 'Escape closes it through the trap');
 
+  console.log('— the small accessibility items (R8, R9, R10, R12, R14, R18) —');
+  R.app.toast('Saved');
+  const t = doc.getElementById('toast');
+  ok(t && t.getAttribute('role') === 'status' && t.getAttribute('aria-live') === 'polite', 'the toast is a live region (R10)');
+  const cv = doc.createElement('canvas'); doc.body.appendChild(cv);
+  R.app.ScrollMotion.chart(cv, { type: 'line', data: { datasets: [{ label: 'Carry' }] }, options: {} });
+  ok(cv.getAttribute('role') === 'img' && /Carry/.test(cv.getAttribute('aria-label') || ''),
+     `every chart canvas is a named image (R8): "${cv.getAttribute('aria-label')}"`);
+  R.app.Router.show('yardages');
+  const cur = [...doc.querySelectorAll('[data-view][aria-current="page"]')].map(e => e.dataset.view);
+  ok(cur.length && cur.every(v => v === 'yardages'), `the nav says which view is showing (R9): ${cur.join()}`);
+  ok(!!doc.getElementById('goalMetric').getAttribute('aria-label'), 'the goal picker has a name (R12)');
+  const first = doc.querySelector('body a[href], body button, body input, body select, body textarea');
+  ok(first && first.classList.contains('skip-link') && first.getAttribute('href') === '#appMain'
+     && doc.getElementById('appMain').getAttribute('tabindex') === '-1', 'the first control on the page skips to content (R14)');
+  // R18: sign-in in a browser that blocks storage.
+  const realLS = Object.getOwnPropertyDescriptor(R.window, 'localStorage');
+  let oauthErr = null;
+  try {
+    Object.defineProperty(R.window, 'localStorage', { configurable: true, get() { throw new Error('blocked'); } });
+    await R.app.Auth.oauth('google');
+  } catch (e) { oauthErr = e; }
+  finally { if (realLS) Object.defineProperty(R.window, 'localStorage', realLS); }
+  ok(!oauthErr, `Google sign-in does not throw when storage is blocked (R18)${oauthErr ? ': ' + oauthErr.message : ''}`);
+  R.window.localStorage.setItem('slDebug', '1');
+  let logErr = null;
+  try { R.app.authLog('token installed', { ok: true }); } catch (e) { logErr = e; }
+  R.window.localStorage.removeItem('slDebug');
+  ok(!logErr, `and the auth trace does not throw with debugging on (R18)${logErr ? ': ' + logErr.message : ''}`);
+
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exitCode = fail ? 1 : 0;
 })();

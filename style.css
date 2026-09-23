@@ -3205,3 +3205,13 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
   .session-card-score .session-score-label { text-align: left; }
   .session-card .session-card-date, .session-card .session-card-meta { padding-right: 88px; }
 }
+
+/* R14: the first Tab stop on every page. Off-screen until focused, then on
+   top of everything, so a keyboard user can pass the header and nav once. */
+.skip-link {
+  position: absolute; left: var(--s3); top: -3rem; z-index: 10000;
+  padding: .6rem 1rem; background: var(--accent); color: var(--on-fill);
+  font-weight: 600; text-decoration: none;
+}
+.skip-link:focus { top: var(--s3); }
+#appMain:focus { outline: none; }

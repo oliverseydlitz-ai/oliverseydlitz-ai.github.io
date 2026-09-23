@@ -1032,7 +1032,10 @@ if (_authError) {
 
 function toast(msg) {
   let t = document.getElementById('toast');
-  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  // A live region, or a screen reader never hears it (R10). role=status is
+  // polite: it waits for the current announcement rather than cutting in.
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast';
+    t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); document.body.appendChild(t); }
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toast._t);
@@ -1127,7 +1130,9 @@ function authLog(...parts) {
   const ts = new Date().toLocaleTimeString();
   let body = d.querySelector('.dbg-body');
   if (!body) { body = document.createElement('div'); body.className = 'dbg-body'; d.appendChild(body); }
-  body.textContent = `[DEBUG ${ts}]\n` + msg;
+  // `msg` was never defined here — the parameter is `parts` — so switching the
+  // debug flag on made every auth trace throw (R18).
+  body.textContent = `[DEBUG ${ts}]\n` + parts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ');
 }
 
 const Auth = (() => {
@@ -1273,13 +1278,18 @@ const Auth = (() => {
   }
 
   function purgeAuthStorage() {
-    // Remove every Supabase auth token so a stale identity can't be re-read
-    [...Object.keys(localStorage)].forEach(k => {
-      if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) {
-        localStorage.removeItem(k);
-      }
-    });
-    sessionStorage.clear();
+    // Remove every Supabase auth token so a stale identity can't be re-read.
+    // Guarded (R18): in a browser that blocks storage, reading localStorage
+    // throws, and this ran on the way INTO Google sign-in — so sign-in threw
+    // before it started, in exactly the browser with nothing to purge.
+    try {
+      [...Object.keys(localStorage)].forEach(k => {
+        if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) {
+          localStorage.removeItem(k);
+        }
+      });
+    } catch (_) {}
+    try { sessionStorage.clear(); } catch (_) {}
   }
 
   async function logout({ clearDevice = false } = {}) {
@@ -7262,6 +7272,18 @@ const ScrollMotion = (() => {
     // The ONE construction site in the file. A `new Chart(` anywhere else is a
     // chart that animates below the fold, unseen — the bug this fixes — and it
     // would look perfectly fine while never drawing on. The suite counts them.
+    // A canvas is a picture to a screen reader, and an unnamed one is nothing
+    // at all (R8). Named from the chart's own title or dataset labels, set
+    // here because this is the one place every chart passes through.
+    try {
+      if (!canvas.getAttribute('role')) canvas.setAttribute('role', 'img');
+      if (!canvas.getAttribute('aria-label')) {
+        const t = cfg.options?.plugins?.title?.text;
+        const sets = (cfg.data?.datasets || []).map(d => d.label).filter(Boolean);
+        canvas.setAttribute('aria-label', (Array.isArray(t) ? t.join(' ') : t) ||
+          (sets.length ? `Chart: ${sets.join(', ')}` : 'Chart'));
+      }
+    } catch (_) {}
     const inst = new Chart(canvas, cfg);
     if (!live) return inst;
     observe(canvas, () => {
@@ -9239,7 +9261,7 @@ const UI = (() => {
       if (drillHost) {
         const widest = book.filter(b => b.enough && b.cv != null).sort((a,b) => b.cv - a.cv)[0];
         if (!widest) {
-          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h3>
+          drillHost.innerHTML = `<h2 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h2>
             <div class="tail-note">No club has reached ${Metrics.MIN_SHOTS_REPORT} shots in these conditions
             yet, so nothing here is your widest. That is the answer rather than a gap in the app.</div>`;
         } else {
@@ -9247,7 +9269,7 @@ const UI = (() => {
           const rows = DrillLibrary.forSection('A',
             { shots: clubShots, clubType: widest.club, sessions: used.length });
           const pick = rows.filter(r => r.ok)[0];
-          drillHost.innerHTML = `<h3 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h3>
+          drillHost.innerHTML = `<h2 class="section-title" style="margin-bottom:.8rem">${icon('target')} Drill focus</h2>
             <div class="drill-card" data-route="practice" role="button" tabindex="0">
               <div class="drill-icon" style="width:14px;height:14px;border-radius:50%;background:${clubColor(widest.club)}"></div>
               <div class="drill-title">${Sanitize.escape(clubLabel(widest.club))} — widest carry spread</div>
@@ -10296,7 +10318,9 @@ const Router = (() => {
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById(`view-${viewId}`)?.classList.add('active');
     document.querySelectorAll('[data-view]').forEach(el=>
-      el.classList.toggle('active', el.dataset.view===viewId));
+      { el.classList.toggle('active', el.dataset.view===viewId);
+        // Say which view is showing, not just paint it (R9).
+        if (el.dataset.view === viewId) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current'); });
   }
 
   // Wrap a render so a single rendering error can never block navigation or

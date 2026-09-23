@@ -40,7 +40,6 @@ console.log('— and every id the markup declares is accounted for —');
 // named here with its reason. A NEW name in this list is the signal — either a
 // host nothing writes to, or a section nothing renders.
 const MARKUP_ONLY = {
-  appMain:        'layout wrapper, styled by id in CSS',
   bottomNav:      'layout wrapper, styled by id in CSS',
   detailSubnav:   'layout wrapper for the session-detail sub-navigation',
   fabImport:      'routes via its data-route attribute, not by id',
