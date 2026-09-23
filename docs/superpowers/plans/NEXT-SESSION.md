@@ -37,3 +37,16 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
   matches the findings table, which is how 21 rows landed in the wrong table once.
 - CLAUDE.md headings: no backticked names in `###` headings (module-map.js).
 - Re-run `npm test` AFTER editing CLAUDE.md, before pushing.
+
+## Guide pages (Phase 10.2) — Oliver's go-ahead, 23 Sep
+- **Build all 8 from the plan's 10.2 list, two per batch.** Push each pair, then
+  give Oliver a short "read these two" note before starting the next pair.
+- First batch also builds the generator (same pattern as `tools/build-legal-pages.js`)
+  under `/guides/<slug>/`, adds each page to `sitemap.xml`, and adds a guard suite.
+- **Guide 1 (Rapsodo CSV export) waits for Oliver's screenshots** — the Rapsodo app's
+  menus can't be verified from the sandbox. Do the research guides first.
+- Oliver will send range/app photos when he can; leave a clearly marked spot for them.
+- Quality over count: stop at the 8 unless a real new search question appears.
+- Order vs Phase 9: Oliver's call at the start of the chat; if he doesn't say, do the
+  first guide pair first (short, and it starts the SEO clock), then Phase 9.
+
