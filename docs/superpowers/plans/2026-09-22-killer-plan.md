@@ -231,6 +231,7 @@ Three background agents audited the served app, each through one lens: **visual/
 | C4 | HIGH | **The session metrics strip defaults to "All", which pools the bag.** It shows "CARRY 201yds" for a driver-plus-7-iron session, which is nobody's club. "Carry Total" is `totalDistance`, which is tier 3. There is no sample floor: a 3-shot file gets headline numbers. | `app.js` 8398–8425 | Default to the most-hit club, as `QuickStats.pick` does. Drop total. Gate each value at `MIN_SHOTS_REPORT`. | M |
 | C12 | HIGH | **Junk rows become shots.** A blank row is counted as a shot; an empty Club Type creates a phantom club ("7i/", and an unlabelled yardage row). A smash of 1.714 is excluded from records, yet the same shot's ball speed is the personal best. | `CSVParser.parse` ~4420; `CEILING` applied to records only | Drop rows with no club or no ball speed at parse time and report the count in the preview. Apply `CEILING` to the whole shot before any mean. | M |
 | R3 | HIGH | **The signed-in email is logged to the console** on every load and on every cloud save. `showDebug` is not gated on `slDebug` (only `authLog` is), which contradicts CLAUDE.md's "No PII in the console". **Verified** at `app.js:10290`. | `app.js` 1163–1167, 10290 | Remove the email interpolation, gate `showDebug` on `slDebug`, and add a source-scan test. | S |
+| C3 | Quality breakdown from one `BUCKETS` table (100 counted, colours match pips); invisible grade-ring tracks fixed (new, found beside it); `score-buckets.js` | `570b531` |
 | C16 | MED | **A second strokes figure.** Drill library section A says "roughly 0.8–1.3 strokes a round available", and section B restates the Dispersion valuation. The app keeps exactly one strokes figure. | `app.js:2676` | Remove A's strokes clause, and point B at the Dispersion tail. | S |
 | C17 | MED | **Section D quotes the retracted "±1.8° of single-shot noise"**, which CLAUDE.md says no one ever measured (`DEVICE_ERROR = 0`). | DrillLibrary section D | Replace with "quoted from your own shot-to-shot spread". | S |
 | C13 | MED | **Grades and praise from 3 shots.** A 3-shot file gets "80 FORM", "Overall grade C", "Very tight distance grouping" and "Excellent, consistent session!", while Swing DNA and Benchmarks correctly refuse. | Home, coach panel | Put the grades and praise behind `MIN_SHOTS_REPORT` per club. | S |
@@ -439,7 +440,7 @@ The main session verified **R19** (`clubLabel` at `app.js:252` returns an unknow
 
 Finished items move to the **Done log** below this list, one line each with the commit.
 
-2. **C25, C3, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
+2. **C25, C1+C2+C34 (delete `SESSION_RULES`), C7+C35, C29, C31, C32, C16, C17, V3** — each is small, each is a wrong number or a broken rule, and each gets a unit test.
 3. **C5 + C6 + C26 + C27 + C42** — the retention probe (the app's only efficacy metric) made honest, as ONE piece of work.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
 5. **C4, C8, C10, C12** — route the remaining legacy surfaces through the gated modules.
