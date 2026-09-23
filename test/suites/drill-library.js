@@ -18,6 +18,16 @@ ok(L.byId('a1').name === 'Smash Baseline Audit', 'lookup by id works');
 ok(L.byId('nope') === null, 'and an unknown id is null rather than a default');
 
 console.log('— every section carries its measurement gate as data —');
+// C16: the app keeps exactly ONE strokes figure, and it lives in Dispersion.
+// Section A's "roughly 0.8–1.3 strokes a round" and B's restated Broadie & Ko
+// valuation were a second and third, rendered as the section's evidence.
+// C17: D quoted "±1.8° of single-shot noise", the figure Metrics.DEVICE_ERROR
+// retracted because nobody ever measured it.
+const whys = Object.values(L.SECTIONS).map(sc => `${sc.id}: ${sc.why}`);
+const strokeClaims = whys.filter(w => /\d[\d.,–-]*\s*strokes?\b/i.test(w));
+ok(strokeClaims.length === 0, `no section states a strokes figure${strokeClaims.length ? ' — ' + strokeClaims.join(' | ') : ''}`);
+ok(!whys.some(w => /1\.8\s*°/.test(w)), 'and none quotes the retracted 1.8° noise constant');
+ok(/\d[\d.,–-]*\s*strokes?\b/i.test('roughly 0.8–1.3 strokes a round'), 'and the pattern finds the shipped claim');
 ok(L.SECTIONS.B.gate.shots === 30 && L.SECTIONS.B.gate.ball === 'premium',
    'dispersion needs 30 shots on a premium ball');
 ok(L.SECTIONS.C.gate.alignment === true, 'start line needs confirmed alignment');

@@ -2733,13 +2733,14 @@ const DrillLibrary = (() => {
   const SECTIONS = {
     A: { id: 'A', name: 'Strike quality', count: 18,
          why: 'The average male amateur has LPGA club speed and 1.430 smash against the tour 1.478. ' +
-              'Tier-1 measurement, weeks not months, roughly 0.8–1.3 strokes a round available.',
+              'Tier-1 measurement, and it moves in weeks rather than months.',
          gate: { shots: 10, metric: 'smashFactor' },
          structure: 'Errorless progression. Bandwidth feedback: silence inside ±0.03 of target.' },
     B: { id: 'B', name: 'Dispersion tails', count: 14,
          why: 'Fairways hit is flat across handicaps, 50% to 46%. Penalties vary eightfold. ' +
-              'Broadie & Ko: −2° of directional spread is −2.6 strokes for a 100-golfer, and the ' +
-              'mechanism is catastrophe avoidance rather than fairways.',
+              'Broadie & Ko: what narrower directional spread saves comes from catastrophe avoidance ' +
+              'rather than fairways. What it is worth for you is the dispersion-tail figure on your ' +
+              'driver, once you have 30 shots on your own ball.',
          gate: { shots: 30, ball: 'premium', metric: 'sideCarry' },
          structure: 'Track p90 and p95 absolute offline, never SD alone. Blocked → serial → random.' },
     C: { id: 'C', name: 'Start-line control', count: 10,
@@ -2749,7 +2750,8 @@ const DrillLibrary = (() => {
          gate: { shots: 15, metric: 'launchDirection', alignment: true },
          structure: 'Bandwidth feedback at ±2° tolerance.' },
     D: { id: 'D', name: 'Face-to-path control', count: 10,
-         why: 'Face-to-path is derived here, not measured, and carries about ±1.8° of single-shot noise.',
+         why: 'Face-to-path is derived here, not measured. How noisy one shot is gets quoted from your ' +
+              'own shot-to-shot spread with that club, not from a published constant.',
          gate: { shots: 15, preferred: 20, metric: 'clubPath' },
          structure: 'Multi-shot mean with an interval, always. Never a single-shot value, never a ' +
                     'diagnosis from one ball. If the interval spans zero the honest output is ' +
@@ -8888,8 +8890,8 @@ const UI = (() => {
       return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs avg</span>`;
     };
 
-    // Face-to-path is DERIVED, not measured, and carries ±1.8° on a single
-    // shot — wider than most real values. A bare per-shot number here would be
+    // Face-to-path is DERIVED, not measured, and one shot's noise is often
+    // wider than the real value. A bare per-shot number here would be
     // exactly the claim the app must never make. Show the noise inline, and
     // put the club mean beside it, which is where it becomes trustworthy.
     const spinOK = Spin.measured(shot) || Spin.measured(_session);
