@@ -2861,15 +2861,28 @@ const DrillLibrary = (() => {
   const kindOf = d => (d && KINDS[d.kind] ? d.kind : 'drill');
 
   // n = the number in the research base, kept so a drill can be traced back.
+  // `for` names the only clubs a drill can be run with (C10): 'driver' off a
+  // tee, 'turf' for anything hit off the ground, 'irons', 'wedges'. Absent
+  // means any club. A driver attack-angle fault was handed the divot-line
+  // drill — a teed driver takes no divot — while the tee-height ladder sat in
+  // the same section.
   const D = (n, section, name, desc, extra = {}) => ({ n, section, name, desc, ...extra,
     kind: extra.kind || 'drill',
     id: section.toLowerCase() + n });
+  function fitsClub(drill, club) {
+    if (!drill || !drill.for || !club) return true;
+    if (drill.for === 'driver') return club === 'd';
+    if (drill.for === 'turf')   return club !== 'd';
+    if (drill.for === 'irons')  return isIron(club);
+    if (drill.for === 'wedges') return ['pw', 'aw', 'sw', 'lw'].includes(club);
+    return true;
+  }
 
   const ALL = [
     // ── A. Strike quality (18) ──
     D(1,'A','Smash Baseline Audit','20 shots, log the mean AND the spread. A measurement session, not a training one — nothing later can claim a change without it.',{kind:'measure'}),
     D(2,'A','Face-tape strike map','Impact tape or foot spray, 10 shots, photograph the pattern. The only direct strike-location data the MLM2PRO cannot give you.',{noDevice:true}),
-    D(3,'A','Centre-strike block, tee height fixed','Remove tee-height variance before blaming the swing for strike scatter.'),
+    D(3,'A','Centre-strike block, tee height fixed','Remove tee-height variance before blaming the swing for strike scatter.',{for:'driver'}),
     D(4,'A','Errorless distance ladder','Start at 40% effort where centre contact is near-guaranteed; add 10% per successful block of five.'),
     D(5,'A','Toe-bias / heel-bias alternation','Deliberately strike toe, then heel, then centre. Builds strike-location control rather than avoidance.'),
     D(6,'A','High-face / low-face alternation','Same on the vertical axis. Vertical gear effect runs about 1.5–2× the horizontal.'),
@@ -2930,15 +2943,15 @@ const DrillLibrary = (() => {
     D(52,'D','Face-to-path trend review','Mean and interval across five or more sessions.',{kind:'review',sessions:5}),
 
     // ── E. Low point and strike height (12) ──
-    D(53,'E','Divot-line drill','A line just ahead of the ball; the divot must start past it. Physical feedback where the metric is unreliable.'),
-    D(54,'E','Towel behind the ball','Penalty feedback for a low point too far back.'),
+    D(53,'E','Divot-line drill','A line just ahead of the ball; the divot must start past it. Physical feedback where the metric is unreliable.',{for:'turf'}),
+    D(54,'E','Towel behind the ball','Penalty feedback for a low point too far back.',{for:'turf'}),
     D(55,'E','Attack-angle baseline by club','15 shots each with driver, 7-iron and wedge. Confirms club-appropriate delivery.',{kind:'measure'}),
-    D(56,'E','Tee-height ladder (driver)','Attack angle logged per height to find your personal window.'),
-    D(57,'E','Ball-position sweep (irons)','Three positions; attack angle and strike quality at each.'),
+    D(56,'E','Tee-height ladder (driver)','Attack angle logged per height to find your personal window.',{for:'driver'}),
+    D(57,'E','Ball-position sweep (irons)','Three positions; attack angle and strike quality at each.',{for:'irons'}),
     D(58,'E','Weight-forward block','75% on the lead side at impact; attack angle and smash read together.'),
     D(59,'E','Errorless low-point ladder','Half swings where the strike is near-guaranteed, lengthening progressively.'),
     D(60,'E','Turf-versus-mat comparison','The same drill on both surfaces on the same day. Quantifies YOUR mat bias — no published number for it exists.'),
-    D(61,'E','Lie-variation block','Fairway, light rough, tight lie, upslope.'),
+    D(61,'E','Lie-variation block','Fairway, light rough, tight lie, upslope.',{for:'turf'}),
     D(62,'E','Speed-ladder low point','50/75/100% effort; low-point consistency at each.'),
     D(63,'E','Kneeling strike drill','Removes leg drive to isolate hand and arm control of the low point.'),
     D(64,'E','Low-point trend review','Attack-angle spread across sessions.',{kind:'review',sessions:5}),
@@ -2948,7 +2961,7 @@ const DrillLibrary = (() => {
     D(66,'F','Overlap detection','Flag clubs whose carry distributions overlap by more than half. That is a gapping problem, not a swing problem.'),
     D(67,'F','Wedge matrix','Three wedges × three swing lengths × eight shots. Your personal wedge chart.',{kind:'measure'}),
     D(68,'F','Three-quarter ladder','Carry per swing length, one club.'),
-    D(69,'F','Clock-face wedge system','9, 10 and 11 o\'clock backswing lengths; carry logged per position.'),
+    D(69,'F','Clock-face wedge system','9, 10 and 11 o\'clock backswing lengths; carry logged per position.',{for:'wedges'}),
     D(70,'F','Landing-window drill','Nominate a carry window and score in or out. Bandwidth feedback.'),
     D(71,'F','Descending-target ladder','60, 70, 80, 90 yards in sequence. The hardest distance-control test in golf.'),
     D(72,'F','Random-distance call','A random carry number called out, which you then have to produce.'),
@@ -3072,7 +3085,7 @@ const DrillLibrary = (() => {
 
   const count = () => ALL.length;
 
-  return { SECTIONS, ALL, KINDS, kindOf, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
+  return { SECTIONS, ALL, KINDS, kindOf, fitsClub, byId, bySection, wrappers, sectionForFault, FAULT_SECTION,
            SAFETY, PAIN, FITNESS_CAVEAT,
            admissible, forSection, count };
 })();
@@ -5724,14 +5737,24 @@ const PracticePlan = (() => {
     const ctx = { shots: clubs, clubType: club, sessions: 1 };
     const rows = DrillLibrary.forSection(section, ctx);
     const open = rows.filter(r => r.ok);
+    // A prescription is a range DRILL for THIS club (C10). The first open
+    // entry used to win whatever it was: fatigue got a measurement session,
+    // wide dispersion got "compute p90 by hand" (which the app already
+    // renders), and a driver got the divot-line drill. Named fits for the club
+    // first, then the rest; checkable before feel within each.
+    const usable = open
+      .filter(r => DrillLibrary.kindOf(r.drill) === 'drill' && DrillLibrary.fitsClub(r.drill, club))
+      .sort((a, b) => (b.drill.for ? 1 : 0) - (a.drill.for ? 1 : 0) || (a.drill.feel ? 1 : 0) - (b.drill.feel ? 1 : 0));
     const sec = DrillLibrary.SECTIONS[section];
     return {
       section, sectionName: sec.name, structure: sec.structure,
-      libraryDrill: open.length ? open[0].drill : null,
-      libraryAlternates: open.slice(1, 3).map(r => r.drill),
+      libraryDrill: usable.length ? usable[0].drill : null,
+      libraryAlternates: usable.slice(1, 3).map(r => r.drill),
       // What is not available, and the one reason that would unlock the most.
       locked: rows.length - open.length,
-      lockedNote: open.length ? null
+      lockedNote: usable.length ? null
+        : open.length ? `Nothing in this section is a range drill for ${club ? 'a ' + clubLabel(club) : 'this club'} — ` +
+                        'what is open here is a measurement or a review, not practice.'
         : (rows.find(r => r.reasons.length)?.reasons[0] ||
            'No drill in this section can be run on what this session measured.'),
     };

@@ -131,6 +131,21 @@ ok(good.lockedNote === null, 'with nothing withheld');
 ok(P.libraryDrill(fault('poor-contact', []), mk(20, { _ball: 'range' })).libraryDrill !== null,
    'range balls do not lock strike quality — smash does not care what ball it was');
 
+console.log('— the pick is a range drill that fits the club (C10) —');
+// A driver attack-angle fault was handed the divot-line drill: a teed driver
+// takes no divot, and the tee-height ladder sat in the same section.
+const drvPick = P.libraryDrill(fault('driver-negative-aa', []), mk(20, { clubType: 'd', attackAngle: -3 }));
+ok(drvPick.section === 'E' && drvPick.libraryDrill && L.fitsClub(drvPick.libraryDrill, 'd'),
+   `a driver low-point fault gets a drill a driver can run (${drvPick.libraryDrill && drvPick.libraryDrill.name})`);
+ok(drvPick.libraryDrill && drvPick.libraryDrill.name !== 'Divot-line drill', 'not the divot-line drill');
+const ironPick = P.libraryDrill(fault('iron-very-steep', []), mk(20, { clubType: '7i', attackAngle: -8 }));
+ok(ironPick.libraryDrill && !/\(driver\)/.test(ironPick.libraryDrill.name) && L.fitsClub(ironPick.libraryDrill, '7i'),
+   `and a 7-iron one does not get the tee-height ladder (${ironPick.libraryDrill && ironPick.libraryDrill.name})`);
+ok([drvPick, ironPick, good].every(x => !x.libraryDrill || L.kindOf(x.libraryDrill) === 'drill'),
+   'every pick is range work — never a measurement session or a review');
+ok(!L.fitsClub(L.ALL.find(d => d.name === 'Divot-line drill'), 'd') && L.fitsClub(L.ALL.find(d => d.name === 'Divot-line drill'), '7i'),
+   'fitsClub: a divot needs turf');
+
 // Section B (dispersion tails) is premium-only. No fault reaches it any more —
 // the pooled 'dispersion-wide' session rule was deleted (C2) and spread is
 // raised per club by Dispersion — so its gate is checked directly.

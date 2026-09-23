@@ -375,7 +375,11 @@ learning, contextual interference (random order), and external focus.
 
 ### Drill library (`DrillLibrary`)
 
-All 104 entries from §8, each carrying its section's gate. `admissible(drill,
+All 104 entries from §8, each carrying its section's gate. **A prescription is
+a range drill that fits the club** (C10): `PracticePlan.libraryDrill` takes
+only `kind: 'drill'` entries that pass `DrillLibrary.fitsClub` (an entry's
+optional `for`: `driver`, `turf`, `irons`, `wedges`), named fits first. It used
+to take the first open entry, so a teed driver was told to take a divot. `admissible(drill,
 ctx)` returns `{ok, reasons}` — **a locked drill is shown with its reason, never
 filtered out.** Section I are wrappers applied *over* a drill, never instead.
 
@@ -1319,7 +1323,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v179**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v180**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1786,7 +1790,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v179**. Deterministic auth, cloud sync
+**72 test suites**, service worker **v180**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
