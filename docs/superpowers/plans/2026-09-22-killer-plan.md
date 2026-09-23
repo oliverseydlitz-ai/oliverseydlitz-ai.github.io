@@ -220,26 +220,6 @@ Three background agents audited the served app, each through one lens: **visual/
 |---|---|---|---|---|---|
 | R1 | HIGH | **The service worker serves every cross-origin GET cache-first until the next version bump.** That includes Supabase `GET /auth/v1/user` and `GET /rest/v1/sessions`, keyed without the Authorization header. Effects: a stale identity after switching accounts; other devices' sessions never appear; a paused project "succeeds" from cache, so the `cloudStatus` banner never fires; logout clears nothing. It is a likely root cause of the old "wrong email after switching accounts" bug. **Verified in code.** | `sw.js` fetch handler, `else` branch | Do not intercept cross-origin requests at all (`if (!sameOrigin) return;`), since everything is self-hosted now. Bump the cache version. On logout, delete non-app cache entries. | S |
 | C3 | HIGH | **The session quality buckets are mislabelled.** `['Elite',…].reverse()` indexed with `4-i` counts shots scored 75–100 as "Poor" and paints them green. A score of exactly 100 is never counted. **Verified.** | `app.js` ~8379 | Build the buckets from one `[{label,lo,hi}]` array, with the top bucket including 100, and add a unit test. | S |
-| V3 | Heatmap anchored on this week; local-day keys (a timezone shift found beside it); `heatmap.js` under 3 TZs | `10f9647` |
-| V36 | One `@keyframes` per name; content slides in visible; banner on `cookieIn`; duplicate-keyframe check in `cascade-overrides.js` | `80f849e` |
-| R22 | Range card leaves Space/arrows to focused controls; dialog role; heading focus per repaint; focus returns on close | `9c3d0f1` |
-| R20/V26 | Inset `currentColor` focus rings on chamfered buttons and inside clipping boxes (Settings rows, drill tabs, chips — wider than reported); render-scan RING check | `4f90d52` |
-| C1+C2+C34 | Deleted the four bag-pooled session fault rules; driver+wedge fixture raises nothing bag-wide; name banned in `rules-are-wired.js` | `f2a2260` |
-| C16+C17 | Drill-library section text: no strokes figures (A, B), no retracted 1.8° (D); guarded | `fdc28fc` |
-| C7+C35 | Smash floor/good/elite and wedge spin-loft bands per club off `Benchmarks.DATA`; every PGA row silent (one named exemption); no amateur-average row flagged | `d3a343b` |
-| C5+C6+C26+C42 | Probe measures its own fault's metric and direction; opens once at import from the newest session; never replaces a live probe; short history held (`awaiting-history` + `rejudge`), not burnt; home card routes to an imported follow-up | `d753d82` |
-| R2+R5 | Removed dialogs leave the focus trap (observer + prune backstop, focus restored); Ctrl/Cmd+P and Ctrl+H freed; shortcuts overlay trapped; `focus-trap.js` | `2d1f711` |
-| V1+V2 | Quick-stats strip not sticky on phones; session score kept top-right in the card on phones; `bands.js` section slice fixed (it ran to EOF) | `2d73032` |
-| V6 | Tab-row edge fade at phone width; section tabs are buttons with `aria-current` (part of R4) | `db519e1` |
-| R4 | Keyboard paths for every clickable surface; `role=button` Enter/Space handler; paywall `inert`; ranked card's dead route fixed; shot-log cell rules; render-scan POINTER | `176fe2b` |
-| C28 | Fault floor, count and rate per club, never pooled across the clubs it appeared on | `e5edb41` |
-| C12 | Junk rows and impossible readings dropped at import with a counted preview note; `Metrics.impossible` screens whole shots from records | `50cf190` |
-| C10 | Drill pick is `kind: 'drill'` and fits the club (`DrillLibrary.fitsClub`, `for` tags), named fits first | `d9d873a` |
-| R8 R9 R10 R12 R13 R14 R18 | Named chart canvases; `aria-current` nav; live toast; goal picker name; heading order; skip link; two auth-path crashes | `8131e3c` |
-| R17 | `sync.sh` copies every SW asset (done before the overnight run) | earlier |
-| R15 | CSP `img-src 'self' data:` (no arbitrary hosts); guarded in `taint.js` | `55b9d6c` |
-| C4 | Metrics strip anchors on the most-hit club (named in a caption), no pooled 'vs all' delta, per-club floor; total kept per Phase 9 | `d987ceb` |
-| V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 | C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
 | C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
 | C1 | HIGH | **"Fatigue Pattern Detected — 73 of 73 shots"** fires whenever a golfer hits driver and then an iron: the rule compares first-half and second-half ball speed across the pooled bag. On the same page, Strike says "No measurable fade", and the plan gives the fault a 10-minute block. | `app.js` 4952–4973, 5062–5072 | Delete the rule and route to `Strike.fatigue`, which is per club with a 15-shot floor. | S |
@@ -251,7 +231,6 @@ Three background agents audited the served app, each through one lens: **visual/
 | C4 | HIGH | **The session metrics strip defaults to "All", which pools the bag.** It shows "CARRY 201yds" for a driver-plus-7-iron session, which is nobody's club. "Carry Total" is `totalDistance`, which is tier 3. There is no sample floor: a 3-shot file gets headline numbers. | `app.js` 8398–8425 | Default to the most-hit club, as `QuickStats.pick` does. Drop total. Gate each value at `MIN_SHOTS_REPORT`. | M |
 | C12 | HIGH | **Junk rows become shots.** A blank row is counted as a shot; an empty Club Type creates a phantom club ("7i/", and an unlabelled yardage row). A smash of 1.714 is excluded from records, yet the same shot's ball speed is the personal best. | `CSVParser.parse` ~4420; `CEILING` applied to records only | Drop rows with no club or no ball speed at parse time and report the count in the preview. Apply `CEILING` to the whole shot before any mean. | M |
 | R3 | HIGH | **The signed-in email is logged to the console** on every load and on every cloud save. `showDebug` is not gated on `slDebug` (only `authLog` is), which contradicts CLAUDE.md's "No PII in the console". **Verified** at `app.js:10290`. | `app.js` 1163–1167, 10290 | Remove the email interpolation, gate `showDebug` on `slDebug`, and add a source-scan test. | S |
-| C3 | Quality breakdown from one `BUCKETS` table (100 counted, colours match pips); invisible grade-ring tracks fixed (new, found beside it); `score-buckets.js` | `570b531` |
 | C16 | MED | **A second strokes figure.** Drill library section A says "roughly 0.8–1.3 strokes a round available", and section B restates the Dispersion valuation. The app keeps exactly one strokes figure. | `app.js:2676` | Remove A's strokes clause, and point B at the Dispersion tail. | S |
 | C17 | MED | **Section D quotes the retracted "±1.8° of single-shot noise"**, which CLAUDE.md says no one ever measured (`DEVICE_ERROR = 0`). | DrillLibrary section D | Replace with "quoted from your own shot-to-shot spread". | S |
 | C13 | MED | **Grades and praise from 3 shots.** A 3-shot file gets "80 FORM", "Overall grade C", "Very tight distance grouping" and "Excellent, consistent session!", while Swing DNA and Benchmarks correctly refuse. | Home, coach panel | Put the grades and praise behind `MIN_SHOTS_REPORT` per club. | S |
@@ -475,6 +454,27 @@ Finished items move to the **Done log** below this list, one line each with the 
 | R19 | Club types cleaned at the door (CSV, backup, every read); `clubLabel` escapes; backup ids/dates/numbers validated; `taint.js` | `78061db` |
 | R1+R6+R7+R26 | SW: no cross-origin interception, only `res.ok` cached by path, 3 s timeout, offline 404; `service-worker.js`; run.js fails a suite with no result | `dc41852` |
 | R3 | No email in any diagnostic call; `showDebug` gated on `slDebug`; paren-scan guard | `c0359a9` |
+| C3 | Quality breakdown from one `BUCKETS` table (100 counted, colours match pips); invisible grade-ring tracks fixed (new, found beside it); `score-buckets.js` | `570b531` |
+| V3 | Heatmap anchored on this week; local-day keys (a timezone shift found beside it); `heatmap.js` under 3 TZs | `10f9647` |
+| V36 | One `@keyframes` per name; content slides in visible; banner on `cookieIn`; duplicate-keyframe check in `cascade-overrides.js` | `80f849e` |
+| R22 | Range card leaves Space/arrows to focused controls; dialog role; heading focus per repaint; focus returns on close | `9c3d0f1` |
+| R20/V26 | Inset `currentColor` focus rings on chamfered buttons and inside clipping boxes (Settings rows, drill tabs, chips — wider than reported); render-scan RING check | `4f90d52` |
+| C1+C2+C34 | Deleted the four bag-pooled session fault rules; driver+wedge fixture raises nothing bag-wide; name banned in `rules-are-wired.js` | `f2a2260` |
+| C16+C17 | Drill-library section text: no strokes figures (A, B), no retracted 1.8° (D); guarded | `fdc28fc` |
+| C7+C35 | Smash floor/good/elite and wedge spin-loft bands per club off `Benchmarks.DATA`; every PGA row silent (one named exemption); no amateur-average row flagged | `d3a343b` |
+| C5+C6+C26+C42 | Probe measures its own fault's metric and direction; opens once at import from the newest session; never replaces a live probe; short history held (`awaiting-history` + `rejudge`), not burnt; home card routes to an imported follow-up | `d753d82` |
+| R2+R5 | Removed dialogs leave the focus trap (observer + prune backstop, focus restored); Ctrl/Cmd+P and Ctrl+H freed; shortcuts overlay trapped; `focus-trap.js` | `2d1f711` |
+| V1+V2 | Quick-stats strip not sticky on phones; session score kept top-right in the card on phones; `bands.js` section slice fixed (it ran to EOF) | `2d73032` |
+| V6 | Tab-row edge fade at phone width; section tabs are buttons with `aria-current` (part of R4) | `db519e1` |
+| R4 | Keyboard paths for every clickable surface; `role=button` Enter/Space handler; paywall `inert`; ranked card's dead route fixed; shot-log cell rules; render-scan POINTER | `176fe2b` |
+| C28 | Fault floor, count and rate per club, never pooled across the clubs it appeared on | `e5edb41` |
+| C12 | Junk rows and impossible readings dropped at import with a counted preview note; `Metrics.impossible` screens whole shots from records | `50cf190` |
+| C10 | Drill pick is `kind: 'drill'` and fits the club (`DrillLibrary.fitsClub`, `for` tags), named fits first | `d9d873a` |
+| R8 R9 R10 R12 R13 R14 R18 | Named chart canvases; `aria-current` nav; live toast; goal picker name; heading order; skip link; two auth-path crashes | `8131e3c` |
+| R17 | `sync.sh` copies every SW asset (done before the overnight run) | earlier |
+| R15 | CSP `img-src 'self' data:` (no arbitrary hosts); guarded in `taint.js` | `55b9d6c` |
+| C4 | Metrics strip anchors on the most-hit club (named in a caption), no pooled 'vs all' delta, per-club floor; total kept per Phase 9 | `d987ceb` |
+| V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 
 
 ---
