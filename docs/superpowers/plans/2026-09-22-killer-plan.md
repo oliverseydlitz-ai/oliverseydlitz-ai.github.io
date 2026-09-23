@@ -653,7 +653,28 @@ cited, specific, honest (that is the edge over generic golf blogs). Candidates:
 the "where numbers come from" rule applies doubly to public pages. The §9 "never
 claim" wording rules apply. No fabricated reviews, ratings or testimonials.
 
-### 10.3 Custom domain (Oliver's call, optional)
+### 10.3 Custom domain — DECIDED 23 Sep: `shotlab.oliverseydlitz.com`
+
+Oliver owns `oliverseydlitz.com` on Cloudflare. **Subdomain, not a path**
+(`/shotlab`): a subdomain is its own origin, so the Supabase token in
+localStorage is walled off from anything else ever put on the root; and every
+path in the app is root-absolute (`/sw.js`, SW scope `/`, manifest, `/terms/`),
+which a path would force us to rewrite. SEO is a wash with an empty root.
+
+**Hosting does not move.** GitHub Pages keeps serving; Cloudflare is DNS only.
+- Oliver: Cloudflare CNAME `shotlab` → `oliverseydlitz-ai.github.io`, **DNS only
+  (grey cloud)** so GitHub can issue the TLS cert. Later: GitHub verified-domain
+  TXT record; Supabase Site URL + redirect list; Search Console as a Domain
+  property (Cloudflare adds the TXT itself — no tag in the code).
+- Claude (one commit): `CNAME` file; move every absolute URL together — canonical,
+  `sitemap.xml`, `robots.txt` Sitemap line, og/twitter tags, JSON-LD, `llms.txt`,
+  404 page, legal generator + pages, keepalive workflow's site check — and update
+  the guards that pin them. Then Oliver ticks "Enforce HTTPS" in Settings → Pages.
+- The old `github.io` URL 301-redirects to the custom domain (GitHub does this).
+- Browser storage is per-origin: device-only data on the old address does not
+  follow. No users yet, so now is the cheapest moment.
+
+#### (original note)
 ~$12/yr; better trust and click-through than `github.io`. If taken: CNAME,
 canonical URLs, sitemap, og tags, Supabase redirect allowlist, and the CSP
 `connect-src` all move together — one commit, with the guards updated.
