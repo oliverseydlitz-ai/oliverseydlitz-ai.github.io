@@ -18,9 +18,16 @@ const glitched = sess('a', '2026-08-01', [
 ]);
 ok(Goals.getProgress('smash', [glitched]) === 1.44,
    `the smash goal reads 1.44, not the impossible 1.71 (ceiling ${Metrics.CEILING.smashFactor})`);
-ok(Goals.getProgress('carry', [glitched]) === 402,
-   'carry still reads 402 — deliberately unscreened, because a long drive is unusual, not impossible');
-ok(Goals.getProgress('ball_speed', [glitched]) === 244, 'and ball speed likewise');
+// The 402 and the 244 are the SAME shot as the 1.71: one misread, of the whole
+// shot (C12). Screening the smash and then crowning that shot's carry and ball
+// speed as personal bests was the defect. A long carry on a plausible shot is
+// still counted — carry has no ceiling of its own, because a long drive is
+// unusual, not impossible.
+ok(Goals.getProgress('carry', [glitched]) !== 402,
+   `carry does not read 402 off the misread shot (${Goals.getProgress('carry', [glitched])})`);
+ok(Goals.getProgress('ball_speed', [glitched]) !== 244, 'and neither does its ball speed');
+const bomb = sess('a2', '2026-08-02', [...many(20), { _row: 98, ...shot({ smashFactor: 1.49, ballSpeed: 190, carryDistance: 330 }) }]);
+ok(Goals.getProgress('carry', [bomb]) === 330, 'while a long drive on a plausible strike still counts');
 ok(Goals.getProgress('sessions', [glitched]) === 1, 'session counts are unaffected');
 ok(Goals.getProgress('carry', []) === 0, 'and no data is not a crash');
 

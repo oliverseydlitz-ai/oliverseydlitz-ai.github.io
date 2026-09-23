@@ -14,6 +14,24 @@ ok(shots.length === 2, 'both rows come through');
 ok(shots[0].clubType === '7i' && shots[0].ballSpeed === 82, 'columns map onto fields');
 ok(shots[0]._row === 2, 'and the row number is kept for tracing a bad cell back');
 
+console.log('— rows that are not shots do not become shots (C12) —');
+// A blank row was counted as a shot, an empty Club Type made a phantom club,
+// and an impossible smash made its own ball speed the personal best.
+const junk = CSVParser.parse(csv([HDR,
+  ['7i','82','150','60','1.36','-1.2','-4.0'],
+  ['',  '81','149','60','1.35','-1.0','-3.9'],          // no club
+  ['7i','',  '',   '',  '',    '',    ''],               // blank readings
+  ['7i','120','260','70','1.714','0','-3'],             // impossible smash — a misread
+  ['7i','80','147','59','1.35','-0.8','-3.6']]));
+ok(junk.length === 2, `only the two real shots survive (${junk.length})`);
+ok(!junk.some(s => !s.clubType), 'no phantom club');
+ok(!junk.some(s => s.smashFactor > 1.55), 'no impossible reading, and none of its other fields either');
+ok(junk.dropped && junk.dropped.noClub === 1 && junk.dropped.noBallSpeed === 1 && junk.dropped.impossible === 1,
+   'and what was dropped is counted by reason');
+const note = CSVParser.droppedNote(junk.dropped);
+ok(/3 rows left out/.test(note) && /no club/.test(note) && /misread/.test(note), `the preview says so: "${note}"`);
+ok(CSVParser.droppedNote(CSVParser.parse(good).dropped) === '', 'and says nothing when nothing was dropped');
+
 console.log('— the wrong CSV is refused at the door, not imported as nothing —');
 // Papa parses any CSV happily. Without a format check, none of the columns
 // matched, every shot came back holding only its row number, and the preview

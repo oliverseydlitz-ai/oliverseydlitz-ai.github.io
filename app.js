@@ -690,9 +690,16 @@ const Metrics = (() => {
   // shape that has caused most of the real bugs in this file.
   //
   // `values` may be shots or bare numbers.
+  // A reading over its ceiling is a MISREAD, and a misread is of the whole
+  // shot, not of one field: a smash of 1.71 means the ball speed or the club
+  // speed beside it is wrong too (C12). The record screen used to drop the
+  // smash and crown the same shot's ball speed as the personal best.
+  const impossible = shot => !!shot && Object.keys(CEILING).some(f => Number.isFinite(shot[f]) && shot[f] > CEILING[f]);
+
   function peak(items, field) {
     const cap = CEILING[field] ?? Infinity;
     const vals = (items || [])
+      .filter(x => !(x && typeof x === 'object' && impossible(x)))
       .map(x => (x && typeof x === 'object') ? x[field] : x)
       .filter(v => Number.isFinite(v) && v > 0 && v <= cap);
     return vals.length ? Math.max(...vals) : null;
@@ -781,7 +788,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak,
+  return { TIER, tier, canPrescribe, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval };
 })();
@@ -4578,10 +4585,39 @@ const CSVParser = (() => {
       throw new Error(`The columns are right but none of the ${shots.length} rows has a ball speed in it, ` +
         `so there is nothing to analyse. Check the session actually recorded shots before exporting.`);
     }
-    return shots;
+    // Rows that are not shots do not become shots (C12). A blank row was
+    // counted as one; an empty Club Type made a phantom club ("7i/" and an
+    // unlabelled yardage row); an impossible reading (Metrics.CEILING) made a
+    // personal best out of a misread. They are dropped here, counted, and the
+    // preview says so — silently dropping rows would be the same failure as
+    // silently keeping them.
+    const dropped = { noClub: 0, noBallSpeed: 0, impossible: 0 };
+    const kept = shots.filter(s => {
+      if (!s.clubType) { dropped.noClub++; return false; }
+      if (!(Number.isFinite(s.ballSpeed) && s.ballSpeed > 0)) { dropped.noBallSpeed++; return false; }
+      if (Metrics.impossible(s)) { dropped.impossible++; return false; }
+      return true;
+    });
+    if (!kept.length) {
+      throw new Error(`None of the ${shots.length} rows is a usable shot: every one is missing its club or ` +
+        `its ball speed, or reads as physically impossible.`);
+    }
+    Object.defineProperty(kept, 'dropped', { value: dropped, enumerable: false });
+    return kept;
   }
 
-  return { parse, REQUIRED, NUM };
+  // One sentence for the preview, or '' when nothing was dropped.
+  function droppedNote(d) {
+    if (!d) return '';
+    const parts = [];
+    if (d.noClub) parts.push(`${d.noClub} with no club`);
+    if (d.noBallSpeed) parts.push(`${d.noBallSpeed} with no ball speed`);
+    if (d.impossible) parts.push(`${d.impossible} with an impossible reading (a misread, not a shot)`);
+    const n = d.noClub + d.noBallSpeed + d.impossible;
+    return n ? `${n} row${n === 1 ? '' : 's'} left out: ${parts.join(', ')}.` : '';
+  }
+
+  return { parse, droppedNote, REQUIRED, NUM };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -10418,9 +10454,11 @@ const ImportFlow = (() => {
   }
 
   function showPreview(shots, filename) {
+    const skipped = CSVParser.droppedNote(shots.dropped);
     document.getElementById('previewCount').textContent =
       `${shots.length} shots · ${[...new Set(shots.map(s=>s.clubType))].length} clubs · `+
-      `${shots.some(s=>s.spinRate)?'Spin data present (only a reading with an RPT ball)':'No spin data'}`;
+      `${shots.some(s=>s.spinRate)?'Spin data present (only a reading with an RPT ball)':'No spin data'}` +
+      (skipped ? ` · ${skipped}` : '');
 
     const match = filename.match(/(\d{6})/);
     if (match) {

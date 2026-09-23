@@ -47,9 +47,13 @@ const a = Features.achievements([glitched]);
 const badge = id => a.defs.find(d => d.id === id);
 ok(badge('smash').got === false,
    `the smash badge stays locked on a real 1.40 (ceiling ${Metrics.CEILING.smashFactor})`);
-ok(badge('bomb').got === true,
-   'the 250-yard badge still unlocks off the 402 — carry is deliberately unscreened');
-ok(badge('speed').got === true, 'and ball speed likewise');
+// The 402 and 244 belong to the misread shot (C12), so they unlock nothing;
+// the real drives here carry 245, just short of the 250 badge.
+ok(badge('bomb').got === false, 'the 250-yard badge does not unlock off the misread shot\'s 402');
+const real = sess('d2', 'premium', [...many(20, { smashFactor: 1.40, ballSpeed: 150, carryDistance: 245 }),
+  { _row: 98, ...shot({ smashFactor: 1.48, ballSpeed: 175, carryDistance: 290 }) }]);
+ok(Features.achievements([real]).defs.find(d => d.id === 'bomb').got === true,
+   'while a real 290 on a plausible strike does — carry has no ceiling of its own');
 ok(badge('first').got === true, 'session-count badges are unaffected');
 ok(a.total === a.defs.length && a.unlocked <= a.total, 'and the counts stay coherent');
 

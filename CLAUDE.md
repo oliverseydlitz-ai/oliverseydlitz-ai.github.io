@@ -683,6 +683,13 @@ deliberately unscreened — a long drive is unusual, not impossible. **Do not ad
 a ceiling without a citable physical bound.** A MAD trim does not work here:
 with one outlier among tied values it becomes its own scale and passes.
 
+**A reading over its ceiling is a misread of the whole shot** (C12,
+`Metrics.impossible`). Carry and ball speed have no ceiling of their own, but a
+shot with an impossible smash is not a source of records for them either — the
+record screen used to screen the smash and crown the same shot's ball speed.
+`CSVParser` drops such shots at import, along with rows that have no club or no
+ball speed, and the preview counts each reason.
+
 ### Where numbers come from (the question that found the most)
 
 Three modules shipped **fabricated content**, each easy to write and
@@ -1312,7 +1319,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v178**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v179**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1779,7 +1786,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v178**. Deterministic auth, cloud sync
+**72 test suites**, service worker **v179**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
