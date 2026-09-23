@@ -47,3 +47,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 21:40 CEST — queue 1 done: retention repeat pinned (probe-window.js, mutation-tested), UI.renderRetention exported; 16 check-ins scheduled (trig ids in session). SW v193.
 - 22:15 CEST — queue 2 batch: R28, R38, R40, V35, V43 (reduced motion, data-rights modal, meta tag, scroll padding, disabled buttons). SW v194.
 - 22:25 CEST — queue 2 batch: R39 (auth error copy, pinned), V34 (drill tabs). SW v195.
+- 22:40 CEST — queue 2: R32 (form errors announced, fields marked; `form-errors.js`, 75 suites). SW v196.

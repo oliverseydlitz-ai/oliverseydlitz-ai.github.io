@@ -207,7 +207,7 @@
         <button class="btn-secondary" id="browseBtn">Browse file</button>
         <input type="file" id="fileInput" accept=".csv" hidden>
       </div>
-      <p class="import-error" id="importError" hidden></p>
+      <p class="import-error" id="importError" role="alert" hidden></p>
       <p class="import-hint">Export from Rapsodo Cloud → Session → Share → CSV</p>
       <p class="import-hint"><button class="link-btn" id="setupGuideLink">First time? How to set up &amp; align your monitor →</button></p>
     </div>
@@ -989,7 +989,7 @@
       <p class="auth-hint">Already have an account? <a href="#" id="authSwitchLogin">Sign in</a></p>
     </form>
 
-    <p id="authError" class="auth-error"></p>
+    <p id="authError" class="auth-error" role="alert"></p>
     <div id="authGuestWrap" class="auth-guest" hidden>
       <button id="authGuestBtn" class="btn-secondary w-full">Continue as guest</button>
       <p class="auth-guest-note" id="authGuestNote">Sessions are held in memory only and are lost when you

@@ -506,6 +506,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | V12 V13 V15 V17 | Share/Export on the button system; odd last grid cell spans the row; round form Save is a primary button; empty states in the body face with a real CTA and honest copy (no "AI-generated"). Open: V14 (heading patterns) and R16 (manifest theme) are Oliver's design calls; the Practice view stays long because the short game renders in full | this commit |
 | R28 R38 R40 V35 V43 | Count-up and subnav scroll obey reduced motion; data-rights modal is one copy with a labelled close and an escaped email; `mobile-web-app-capable`; scroll padding clears the bottom nav (top nav on desktop); one disabled treatment, hover gated on `:not(:disabled)` | overnight 22:00 |
 | R39 V34 | Sign-in errors read the code only, mapped to fixed copy (no URL text in the app's voice), and a failed token install no longer says "Email verified"; pinned in `taint.js`. Drill tabs keep the chosen tab in view and focused, fade at the edge on phones, wrap at 768px+ | overnight 22:20 |
+| R32 | Sign-in and import errors are `role=alert`; a sign-in error marks its field `aria-invalid` + `aria-describedby` and focuses it; new suite `form-errors.js` | overnight 22:40 |
 
 
 ---

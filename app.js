@@ -1110,6 +1110,22 @@ if (_authError) {
   _authErrorMsg = Object.prototype.hasOwnProperty.call(AUTH_ERROR_COPY, code) ? AUTH_ERROR_COPY[code] : '';
 }
 
+// Sign-in form errors (R32). The message sits in a role=alert region so a
+// screen reader hears it; the fields it is about are marked aria-invalid and
+// pointed at it, and the first one takes focus. An empty message clears all.
+const AUTH_FIELDS = ['authEmail', 'authPassword', 'authSignupEmail', 'authSignupPassword', 'authSignupConfirm'];
+function setAuthError(msg, fields = []) {
+  const box = document.getElementById('authError');
+  if (box) box.textContent = msg || '';
+  AUTH_FIELDS.forEach(id => {
+    const f = document.getElementById(id);
+    if (!f) return;
+    if (msg && fields.includes(id)) { f.setAttribute('aria-invalid', 'true'); f.setAttribute('aria-describedby', 'authError'); }
+    else { f.removeAttribute('aria-invalid'); f.removeAttribute('aria-describedby'); }
+  });
+  if (msg && fields.length) document.getElementById(fields[0])?.focus();
+}
+
 function toast(msg) {
   let t = document.getElementById('toast');
   // A live region, or a screen reader never hears it (R10). role=status is
@@ -1462,7 +1478,7 @@ const Auth = (() => {
     document.getElementById('authTabSignup').classList.remove('active');
     document.getElementById('authLoginForm').classList.add('active');
     document.getElementById('authSignupForm').classList.remove('active');
-    document.getElementById('authError').textContent = '';
+    setAuthError('');
   }
 
   function switchToSignup() {
@@ -1470,7 +1486,7 @@ const Auth = (() => {
     document.getElementById('authTabLogin').classList.remove('active');
     document.getElementById('authSignupForm').classList.add('active');
     document.getElementById('authLoginForm').classList.remove('active');
-    document.getElementById('authError').textContent = '';
+    setAuthError('');
   }
 
   return { init, signup, login, oauth, logout, getUser, setGuest, returningGuest, showAuth, hideAuth, switchToLogin, switchToSignup };
@@ -10557,6 +10573,7 @@ const ImportFlow = (() => {
 
   function importError(msg) {
     const el = document.getElementById('importError');
+    // role=alert in the markup, so the reason is announced, not just drawn (R32).
     if (el) { el.textContent = msg; el.hidden = false; }
     toast('Import failed — see the message on the import screen.');
   }
@@ -11597,14 +11614,14 @@ async function init() {
     e.preventDefault();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value.trim();
-    if (!email || !password) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
+    if (!email || !password) { setAuthError('Please fill in all fields.', [!email ? 'authEmail' : 'authPassword']); return; }
     try {
       await Auth.login(email, password);
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
       await afterAuth();
     } catch(err) {
-      document.getElementById('authError').textContent = err.message;
+      setAuthError(err.message, ['authEmail', 'authPassword']);
     }
   });
 
@@ -11613,14 +11630,14 @@ async function init() {
     const email = document.getElementById('authSignupEmail').value.trim();
     const password = document.getElementById('authSignupPassword').value.trim();
     const confirm = document.getElementById('authSignupConfirm').value.trim();
-    if (!email || !password || !confirm) { document.getElementById('authError').textContent = 'Please fill in all fields.'; return; }
-    if (password !== confirm) { document.getElementById('authError').textContent = 'Passwords do not match.'; return; }
+    if (!email || !password || !confirm) { setAuthError('Please fill in all fields.', [!email ? 'authSignupEmail' : !password ? 'authSignupPassword' : 'authSignupConfirm']); return; }
+    if (password !== confirm) { setAuthError('Passwords do not match.', ['authSignupConfirm']); return; }
     // Client-side only, and it is a courtesy rather than a control: the server
     // is the authority on what it accepts (Supabase Auth), and anything here
     // can be bypassed by not using this page at all. It exists to fail fast
     // with a clear message instead of a round trip.
     if (password.length < 8) {
-      document.getElementById('authError').textContent = 'Use at least 8 characters. Length beats symbols — a short password with a "!" on the end is not a strong one.';
+      setAuthError('Use at least 8 characters. Length beats symbols — a short password with a "!" on the end is not a strong one.', ['authSignupPassword']);
       return;
     }
     try {
@@ -11629,16 +11646,16 @@ async function init() {
       document.getElementById('authSignupPassword').value = '';
       document.getElementById('authSignupConfirm').value = '';
       if (Auth.getUser()) await afterAuth();
-      else document.getElementById('authError').textContent = 'Check your email to confirm your account, then sign in.';
+      else setAuthError('Check your email to confirm your account, then sign in.');
     } catch(err) {
-      document.getElementById('authError').textContent = err.message;
+      setAuthError(err.message, ['authSignupEmail', 'authSignupPassword']);
     }
   });
 
   // Social sign-in
   document.getElementById('authGoogleBtn').addEventListener('click', async () => {
     try { await Auth.oauth('google'); }
-    catch(err) { document.getElementById('authError').textContent = err.message; }
+    catch(err) { setAuthError(err.message); }
   });
   // Continue as guest
   document.getElementById('authGuestBtn').addEventListener('click', async () => {
