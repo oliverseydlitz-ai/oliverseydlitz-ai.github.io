@@ -906,7 +906,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **66 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **67 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1195,6 +1195,15 @@ opt-in, **off by default**, in Settings → Data & Export.
 - The guest note renders `LocalDB.describe()`, the same sentence as the
   setting, so the two cannot drift.
 
+**Sign-out asks, and it does not default to leaving data behind (R23).** The
+practice log, probes, rounds, putts, short game and goals are device-only —
+never synced — so wiping them silently loses them, and keeping them silently
+leaves one person's notes on a shared phone for the next. The confirm offers
+both as labelled buttons. `LocalDB.ACCOUNT_KEYS` / `DEVICE_KEYS` classify every
+`sl*` key `app.js` uses; `signout-clears.js` fails on an unclassified one, so a
+new storage key has to pick a side. `wipeAccountData()` runs **before** the
+reload and reports a store that refused rather than swallowing it.
+
 Debugging: `showDebug()` logs to console only; set `localStorage.slDebug='1'`
 to re-enable the on-screen banner.
 
@@ -1212,8 +1221,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **66 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v159**, 58 modules.
+State at handover: **67 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v161**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1680,7 +1689,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**66 test suites**, service worker **v159**. Deterministic auth, cloud sync
+**67 test suites**, service worker **v161**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

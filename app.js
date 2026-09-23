@@ -910,7 +910,36 @@ const LocalDB = (() => {
       : 'Sessions are held in memory only and are lost when you close the tab. Nothing is written to ' +
         'this device. Turn this on to keep them, or sign in to sync them to the cloud.';
 
-  return { hydrate, persist, forget, setEnabled, enabled, unavailable, describe, KEY };
+  // ── Signing out (QC R23) ──────────────────────────────────────────
+  // Every `sl*` storage key is classified here, stated rather than derived —
+  // test/suites/signout-clears.js fails on a key in app.js that is in neither
+  // list, so a new store cannot silently survive a sign-out.
+  //
+  // ACCOUNT data is about the golfer: sessions, what they practised, whether
+  // it held, their rounds and putting. Several of these live ONLY on this
+  // device (they are never synced), which is why sign-out asks rather than
+  // always wiping — wiping a golfer's own practice log on their own phone is
+  // data loss, and leaving it on a shared one shows it to the next person.
+  const ACCOUNT_KEYS = ['slPracticeLog', 'slProbes', 'slRounds', 'slPutts', 'slShortGame',
+                        'slGoals', 'slLastConditions', 'slGuestChosen'];
+  // DEVICE data is about this browser, not the person: theme, layout
+  // preferences, the storage answer, the terms acceptance, the intro seen,
+  // the debug flag, and the device-storage switch itself.
+  const DEVICE_KEYS = ['slTheme', 'slViewPrefs', 'slCookieConsent', 'slTermsAccepted',
+                       'slSeenIntro', 'slDebug', KEY];
+  async function wipeAccountData() {
+    const failed = [];
+    for (const k of ACCOUNT_KEYS) { try { localStorage.removeItem(k); } catch (_) { failed.push(k); } }
+    // Sessions go whether or not the device-storage switch is on: a copy may
+    // be sitting in IndexedDB from when it was, and "clear this device" has
+    // to mean the device, not the current setting.
+    try { await DB.clearAll(); } catch (_) { failed.push('sessions'); }
+    // MemDB needs nothing: logout() reloads the page, and memory goes with it.
+    return { ok: failed.length === 0, failed };
+  }
+
+  return { hydrate, persist, forget, setEnabled, enabled, unavailable, describe, KEY,
+           wipeAccountData, ACCOUNT_KEYS, DEVICE_KEYS };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -1213,7 +1242,7 @@ const Auth = (() => {
     sessionStorage.clear();
   }
 
-  async function logout() {
+  async function logout({ clearDevice = false } = {}) {
     _signingOut = true;        // block onAuthStateChange from re-setting _user
     _user = null;
     updateUI();
@@ -1226,6 +1255,11 @@ const Auth = (() => {
     // global revokes the refresh token server-side (best effort; may be offline)
     await sb.auth.signOut({ scope: 'global' }).catch(() => {});
     purgeAuthStorage();        // clear again in case the client re-persisted
+
+    // Before the reload, or it never happens: the account holder's sessions,
+    // notes and device-only records, if they asked for this device to be
+    // cleared (QC R23). Keeping them is the other, equally explicit, choice.
+    if (clearDevice) await LocalDB.wipeAccountData();
 
     // Hard reload to a clean origin — no #hash/?code leftovers, no JS heap state
     window.location.replace(location.origin + location.pathname);
@@ -10301,14 +10335,26 @@ const ImportFlow = (() => {
 // ────────────────────────────────────────────────────────────────
 // Confirm modal
 // ────────────────────────────────────────────────────────────────
-function showConfirm(title, body, onOk) {
+// opts: { okLabel, altLabel, onAlt } — a button should say what it does, and a
+// choice with two real outcomes (sign out keeping, or clearing, this device's
+// data) cannot be squeezed into Confirm/Cancel. Labels reset on every close so
+// the next caller never inherits them.
+function showConfirm(title, body, onOk, opts = {}) {
   const modal = document.getElementById('confirmModal');
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmBody').textContent  = body;
+  const ok = document.getElementById('confirmOk'), cancel = document.getElementById('confirmCancel');
+  const alt = document.getElementById('confirmAlt');
+  ok.textContent = opts.okLabel || 'Confirm';
+  alt.hidden = !opts.onAlt;
+  alt.textContent = opts.altLabel || '';
   modal.hidden = false;
-  const ok=document.getElementById('confirmOk'), cancel=document.getElementById('confirmCancel');
-  const cleanup = () => { modal.hidden=true; ok.onclick=null; cancel.onclick=null; };
+  const cleanup = () => {
+    modal.hidden = true; ok.onclick = null; cancel.onclick = null; alt.onclick = null;
+    ok.textContent = 'Confirm'; alt.hidden = true; alt.textContent = '';
+  };
   ok.onclick = () => { cleanup(); onOk(); };
+  alt.onclick = () => { cleanup(); opts.onAlt && opts.onAlt(); };
   cancel.onclick = cleanup;
 }
 
@@ -11263,8 +11309,16 @@ async function init() {
     // which for a guest is a silent wipe of every in-memory session (QC V25).
     // The button is hidden for guests; this guard is for the day it is not.
     if (!Auth.getUser()) return;
-    await Auth.logout();
-    await Router.showSessions();
+    showConfirm('Sign out',
+      'Your sessions are saved to your account and come back when you sign in. This device also holds ' +
+      'a copy of them, plus records that exist only here: your practice log, retention checks, rounds, ' +
+      'putting and short-game logs, and goals. Clearing removes all of it from this device, so the next ' +
+      'person to open the app sees none of it — and the device-only records cannot be restored. Keep it ' +
+      'if this is your own device.',
+      async () => { await Auth.logout({ clearDevice: true }); },
+      { okLabel: 'Sign out and clear this device',
+        altLabel: 'Sign out, keep on this device',
+        onAlt: async () => { await Auth.logout({ clearDevice: false }); } });
   });
 
   // Manual cloud sync: push every local session up, then re-render from cloud
