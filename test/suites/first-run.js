@@ -45,36 +45,16 @@ for (const t of [1, 2, 3]) {
 ok(!/spin rate.*tier 1|prescribed freely.*spin/i.test(src.slice(src.indexOf('const FirstRun'), src.indexOf('const FirstRun') + 7000)),
    'no tier assignment is hardcoded in the copy');
 
-console.log('— shown once, on a genuinely new account —');
-store.removeItem('slSeenIntro');
-doc.getElementById('firstRunModal')?.remove();
-ok(FR.seen() === false, 'a new account has not seen it');
-ok(FR.maybeShow([{ id: 'a' }]) === false, 'an account WITH sessions never sees it — it is orientation, not a tour');
-ok(FR.seen() === true, '  …and is marked as done, so it will not ambush them later');
-store.removeItem('slSeenIntro');
-ok(FR.maybeShow([]) === true, 'an empty account gets it');
-ok(doc.getElementById('firstRunModal') !== null, 'and it is on screen');
-ok(FR.maybeShow([]) === false, 'but only once');
-
-console.log('— never stacked on a blocking modal —');
-// The agreement gate and the sign-in modal both open at boot, on the same tick
-// as the first home render. An orientation on top of either swallows the button
-// underneath it, and a new user cannot get past the sign-in screen at all.
-// Found by the browser scan, not by a unit test: every module involved was
-// behaving correctly on its own.
-doc.getElementById('firstRunModal')?.remove();
-store.removeItem('slSeenIntro');
-const blocker = doc.createElement('div');
-blocker.className = 'modal-overlay';
-blocker.id = 'testBlocker';
-blocker.getClientRects = () => [{ width: 10, height: 10 }];
-doc.body.appendChild(blocker);
-ok(FR.maybeShow([]) === false, 'it defers while something blocking is on screen');
-ok(FR.seen() === false,
-   'and does NOT mark itself seen — marking it here is how an orientation silently never appears for anyone whose sign-in modal was up');
-blocker.remove();
-ok(FR.maybeShow([]) === true, 'and shows once the way is clear');
-doc.getElementById('firstRunModal')?.remove();
+console.log('— it never opens by itself —');
+// It used to open over the home view on a new account's first visit. Oliver
+// removed that on 23 Sep: a first visit lands on the app, not on a wall of
+// text. The screen stays, reachable from Settings. These pin that nothing
+// reopens it at boot by the back door.
+ok(!('maybeShow' in FR), 'there is no auto-show entry point left on the module');
+const callers = [...src.matchAll(/FirstRun\.show\(/g)].length;
+ok(callers === 1 && /getElementById\('introBtn'\)[^\n]*FirstRun\.show\(\)/.test(src),
+   `FirstRun.show() has exactly one caller, the Settings row (${callers} found)`);
+ok(doc.getElementById('firstRunModal') === null, 'and a fresh whole-file load boots without it on screen');
 
 console.log('— and re-openable, because a one-shot screen is a worse place to keep the method than the docs —');
 doc.getElementById('firstRunModal')?.remove();

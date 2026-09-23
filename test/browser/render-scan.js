@@ -43,7 +43,9 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   }
   await p.waitForSelector('#authGuestWrap button',{state:'visible',timeout:8000}).catch(()=>{});
   await p.click('#authGuestWrap button').catch(()=>{}); await p.waitForTimeout(600);
-  // A brand-new account gets the FirstRun orientation over the home view. It is
+  // FirstRun no longer opens by itself (23 Sep); this dismissal is a no-op kept
+  // in case an older build is being scanned. Originally: a brand-new account got
+  // the FirstRun orientation over the home view. It is
   // a modal, so it intercepts every click after it — dismiss it the way a real
   // new user would before scanning anything.
   await p.click('#firstRunModal [data-fr="close"]').catch(()=>{}); await p.waitForTimeout(300);

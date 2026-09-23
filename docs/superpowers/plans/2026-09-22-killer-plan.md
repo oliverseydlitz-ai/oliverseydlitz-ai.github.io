@@ -607,6 +607,17 @@ Oliver brought a generic "before you launch" list: security, reliability, UI, SE
 2. **FaultEngine / PracticePlan / getNextStep / RetentionProbe:** drop every tier-2/3 and condition ban; apply the tier rates and the range-ball adjustment.
 3. **Gapping / yardage book / Dispersion:** run on range balls, weighted.
 4. **Caveats:** move to Settings under "How the numbers work". `FirstRun` keeps reading its figures from the modules, so it cannot drift.
+   - **FirstRun tier copy (Oliver, 23 Sep, from his phone):** the orientation screen still says
+     "Shown, never prescribed from" (tier 2) and "Never used for advice ... the app will not build a
+     drill on them" (tier 3). Under v2 every tier prescribes, so both are false the day Phase 9
+     ships. Rewrite them as "prescribed, judged on more shots" (tier 2) and "prescribed, judged
+     hardest" (tier 3), keeping "spin only with an RPT ball". Same pass: the intro line ("the
+     difference is the whole product"), "Numbers arrive late, on purpose", and the conditions
+     paragraph ("break gapping", "never compared"), which says range balls are switched off.
+     `first-run.js` must pin the new wording, not just delete the old. Also plain-English it: Oliver
+     wants the app copy to sound like a golfer, not a textbook.
+   - **FirstRun no longer opens by itself** (done 23 Sep, ahead of Phase 9): it is reachable only
+     from Settings → the intro row. Do not reintroduce an auto-open.
 5. **Tests:** roughly 20 suites encode the old rules. **Rewrite them to pin the NEW rules**, never delete them: the tier rates, the range weight, "spin only with RPT", "floors unchanged", "no caveat text on the main screens". A rule written down with no test pinning it is this repo's oldest defect.
 6. **CLAUDE.md:** rewrite "Measurement honesty", "Claims the app must never make" (keeping the wording rules), the Dispersion and Conditions sections, and the Phase 7 rescope, in the same commit.
 7. **TERMS.md:** make sure it states plainly that prescriptions treat device readings as accurate and that the device has measurement error. That is a statement of fact about the system: bump the version, regenerate the legal pages, and update `Agreement.VERSION`.

@@ -1,50 +1,50 @@
 # Is launch-monitor spin accurate?
 
-Not accurate enough to practise on — not on a consumer unit, and it's shakier than you'd think even on a TrackMan. Spin is the number everyone wants to fix, because it's right there on the screen and it explains so much. It's also the least trustworthy number a home launch monitor gives you.
+Not accurate enough to practise on. Not on a home unit, and not as much as you'd think even on a TrackMan. Spin is the number everyone wants to fix because it's right there on the screen. It's also the least reliable number your launch monitor gives you.
 
 [[photo: a Rapsodo RPT ball next to a normal ball, close enough to see the markings]]
 
-## The number that settles it
+## The study that settles it
 
-The best independent data on consumer-radar spin comes from a peer-reviewed study that put a FlightScope Mevo+ next to a TrackMan 4 and had 29 young golfers hit ten drivers and ten 6-irons each. Speeds lined up well. Spin didn't:
+The best test of home launch monitor spin put a FlightScope Mevo+ next to a TrackMan 4, with 29 young golfers hitting ten drivers and ten 6-irons each. The speeds matched. Spin didn't:
 
 - On average the Mevo+ read up to 1,238 rpm away from TrackMan.
-- For any single shot, the gap could run anywhere from **−2,628 to +5,103 rpm** (the 95% limits of agreement).
+- On a single shot, it could be anywhere from **2,628 rpm too low to 5,103 rpm too high**.
 
-Now compare that with the thing you're trying to fix. The USGA and R&A measured the average male amateur's driver at 3,275 rpm and the PGA Tour average at 2,686 rpm. That's a gap of 589 rpm. **The measurement error is several times bigger than the entire gap between you and a tour player.** A spin reading that says you've "lost 400 rpm" can't tell that apart from nothing happening.
+Now compare that with what you're trying to fix. The USGA and R&A measured the average male amateur's driver at 3,275 rpm and the PGA Tour average at 2,686 rpm. That's a gap of 589 rpm. **The error is several times bigger than the whole gap between an average golfer and a tour player.** If the screen says you've "lost 400 rpm", that could easily be nothing.
 
-That study used a Mevo+, not an MLM2PRO. Nobody has published MLM2PRO spin accuracy, so there's no better number to give you. The MLM2PRO measures spin with a camera, and only with its marked RPT ball — without one, the spin you see isn't a measurement of the ball you hit.
+That was a Mevo+, not an MLM2PRO. Nobody has tested MLM2PRO spin, so there's nothing better to go on. The MLM2PRO only measures spin with its marked RPT ball. Without one, the spin on your screen isn't a real reading.
 
 ## Even a TrackMan struggles with it
 
-This is the part that surprises people. A separate study had good golfers hit ten drivers in each of two sessions on a TrackMan 4. Club speed and ball speed were rock steady between sessions. Spin wasn't: its session-to-session reliability (ICC) ranged from 0.60 down to **0.02**, with a typical wobble of 241 to 455 rpm.
+This surprises people. Another study had good golfers hit ten drivers in each of two sessions on a TrackMan 4. Club speed and ball speed barely moved between sessions. Spin moved by 241 to 455 rpm, and for some players one session's spin said almost nothing about the next.
 
-An ICC of 0.02 means a golfer's spin in one session told you close to nothing about their spin in the next. That's on the best device on the market, so it isn't a hardware problem. **Your spin number moves a lot on its own**, because it depends on things that change from swing to swing and bay to bay.
+That's on the best device there is, so it isn't the hardware. **Your spin just moves a lot on its own**, because it depends on things that change from swing to swing and bay to bay.
 
 ## What moves spin that isn't your swing
 
-Spin reacts to almost everything, which is why it's so noisy:
+Spin reacts to almost everything:
 
 | What changed | What it does to spin |
 |---|---|
 | Hitting off a mat instead of grass (8-iron) | About 1,000 to 1,300 rpm less |
 | Worn wedge grooves (new vs about 500 bunker shots, 50 yards) | 7,021 down to 3,737 rpm |
-| Urethane cover vs Surlyn (a premium ball vs a cheap one) | Roughly 12–15% different on shots where friction is the limit |
+| Premium ball vs a cheap one | Roughly 12–15% different on some shots |
 | Range balls, pitching wedge | About half the spin |
 | Striking it low on the heel vs the centre (driver, robot) | 3,310 rpm vs 2,710 rpm |
 
-That last row is the useful one. A swing robot hitting the same driver at the same speed got about 600 rpm more spin just by missing low on the heel. **A lot of what shows up as "too much spin" is where you hit it on the face.**
+The last row is the useful one. A swing robot got about 600 rpm more spin just by missing low on the heel. **A lot of "too much spin" is really where you hit it on the face.**
 
 ## What to do instead
 
-The amateur spin problem is mostly a strike problem, and strike shows up in a number the device measures well: smash factor. The same USGA and R&A data puts the average male amateur at 93 mph of club speed — about the same as an LPGA player's 94 — but with 7 mph less ball speed and 664 rpm more spin than the LPGA average. Same engine, worse contact.
+For most amateurs, too much spin is a strike problem, and strike shows up in a number the device measures well: smash factor. The same USGA and R&A data has the average male amateur swinging 93 mph, about the same as the LPGA average of 94, but getting 7 mph less ball speed and 664 rpm more spin. Same speed, worse contact.
 
 So:
 
-- **Work on strike and watch smash factor.** It's ball speed over club speed, both measured, and it moves with where you hit the face.
-- **If you look at spin, use the RPT ball and average it.** Between two sessions of ten shots, spin needs to move by roughly {{Metrics.MDC_N10.spinRate}} rpm before the change is likely real — and that figure is on the optimistic side.
-- **Treat the "optimal" charts as a region.** Published launch-and-spin windows cover 350 to 500 rpm inside a single swing-speed group. Two players with the same speed can have different best numbers.
-- **Never compare spin across balls or surfaces.** A mat session against a grass session, or a range ball against your gamer, measures the conditions.
+- **Work on strike and watch smash factor.** It's ball speed divided by club speed, both measured, and it changes with where you hit the face.
+- **If you look at spin, use the RPT ball and average it.** Between two sessions of ten shots, spin has to move about {{Metrics.MDC_N10.spinRate}} rpm before it's likely real, and that's a generous estimate.
+- **Don't chase one "perfect" spin number.** The published charts give a range of 350 to 500 rpm even for one swing speed. Two players with the same speed can have different best numbers.
+- **Don't compare spin across balls or surfaces.** Mat against grass, or range ball against your own ball, just shows you the difference in conditions.
 
 ## Sources
 

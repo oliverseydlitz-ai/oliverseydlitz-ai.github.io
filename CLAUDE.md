@@ -575,13 +575,12 @@ so a wrong figure would never surface anywhere else. The suite asserts every
 metric in `TIER` is placed, so a metric that changes tier moves this screen with
 it.
 
-- **Deferred, never marked seen, when something blocking is already up.** The
-  agreement gate and the sign-in modal open at boot on the same tick as the
-  first home render; an orientation stacked on either swallows the button
-  underneath and a new user cannot get past sign-in. Found by the browser scan —
-  every module involved was correct on its own.
-- **Re-openable from Settings.** A one-shot screen closed on day one and never
-  findable again is a worse place to keep the method than the docs.
+- **It does not open by itself (Oliver, 23 Sep).** It used to open over the
+  home view on a new account's first visit; a first visit now lands on the app.
+  The only way in is the Settings row (`#introBtn`), and `first-run.js` pins that
+  `FirstRun.show()` has exactly that one caller. Do not reintroduce an auto-open.
+- **Its tier copy is wrong under Phase 9** ("never prescribed from", "never used
+  for advice"). The rewrite is queued in the killer plan's Phase 9, step 4.
 - It ends on the day-one answer (the off-device short game), the same branch
   `getNextStep` takes with nothing imported.
 
@@ -1354,7 +1353,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **73 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v188**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v189**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1825,7 +1824,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**73 test suites**, service worker **v188**. Deterministic auth, cloud sync
+**73 test suites**, service worker **v189**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

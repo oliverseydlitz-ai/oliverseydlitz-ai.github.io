@@ -1,18 +1,18 @@
 # Smash factor by club: what good looks like
 
-Smash factor is ball speed divided by club speed, and it's the best single number you've got for how well you're striking it. With a driver the tour average is {{Benchmarks.get('d').pga.sf|2}}. With a 7-iron it's {{Benchmarks.get('7i').pga.sf|2}}, and with a pitching wedge {{Benchmarks.get('pw').pga.sf|2}}. So there's no one "good smash factor". It depends on the club, and comparing your 7-iron to someone's driver number tells you nothing.
+Smash factor is ball speed divided by club speed. It's the best single number you've got for how well you're hitting it. With a driver the tour average is {{Benchmarks.get('d').pga.sf|2}}. With a 7-iron it's {{Benchmarks.get('7i').pga.sf|2}}, and with a pitching wedge {{Benchmarks.get('pw').pga.sf|2}}. So there's no one "good smash factor". It depends on the club, and comparing your 7-iron to someone's driver number tells you nothing.
 
 [[photo: a driver face with strike tape or foot spray showing a centred strike next to a heel strike]]
 
-## Why it's worth your attention
+## Why it's worth watching
 
-Smash factor is built from the two numbers a launch monitor measures best: ball speed and club speed. Both hold up well against a TrackMan on consumer units, and smash factor tracked closely in the same study. Most of what's on your screen is shakier than that.
+It's made from the two numbers a launch monitor measures best, ball speed and club speed. On home units both match a TrackMan well, and so does smash factor. Most of the other numbers on your screen are shakier.
 
-It's also where most amateurs have the easiest yards. The USGA and R&A measured the average male amateur's driver at 93 mph of club speed, basically the same as the LPGA Tour average of 94. But the amateur gets 133 mph of ball speed out of it and the LPGA player gets 140. Their smash factors come out at about 1.430 and 1.489. **Same engine, worse contact.** Most amateurs don't need more speed as much as they need to hit the middle of the face with the speed they've got.
+It's also where most amateurs have the easiest yards to find. The USGA and R&A measured the average male amateur's driver at 93 mph of club speed, basically the same as the LPGA Tour average of 94. But the amateur gets 133 mph of ball speed out of it and the LPGA player gets 140. That's a smash factor of about 1.430 against 1.489. **Same speed, worse contact.** Most of us don't need more speed as much as we need to hit the middle of the face.
 
 ## Tour averages, club by club
 
-These are TrackMan's published PGA Tour averages, as the app holds them. The "good strike" column is where ShotLab calls a strike good: the tour figure minus a small margin. That margin is the app's own line, not a published standard.
+These are TrackMan's PGA Tour averages. The "good strike" column is where ShotLab calls a strike good: a bit under the tour number. That line is ShotLab's own choice, not an official standard.
 
 | Club | Tour | Good strike |
 |---|---|---|
@@ -27,11 +27,11 @@ These are TrackMan's published PGA Tour averages, as the app holds them. The "go
 | 8-iron | {{Benchmarks.get('8i').pga.sf|2}} | {{Benchmarks.smashRef('8i').good|2}} |
 | PW | {{Benchmarks.get('pw').pga.sf|2}} | {{Benchmarks.smashRef('pw').good|2}} |
 
-The number drops as loft goes up because a lofted club hits the ball a more glancing blow. More of the energy goes into spin and height and less into ball speed. That's physics, not bad striking, and it's why you can only compare a club with itself.
+The number drops as loft goes up because a lofted club hits the ball more of a glancing blow. More of the energy goes into spin and height and less into ball speed. That's just physics, and it's why you can only compare a club with itself.
 
 ## What moves it
 
-Where you hit the face is the big one. In robot testing of 25 drivers at 95 mph, the centre of the face carried 224.5 yards on average. Low on the face averaged 210.5, and the low heel was the worst spot at 204.3. That's over 20 yards lost with the same swing speed, and most of it came from the launch and spin changing, not just from ball speed.
+Where you hit the face is the big one. In robot testing of 25 drivers at 95 mph, the centre of the face carried 224.5 yards on average. Low on the face averaged 210.5, and the low heel was the worst spot at 204.3. That's over 20 yards lost at the same swing speed, mostly because the launch and spin changed.
 
 Two more things from the same kind of testing are worth knowing:
 
@@ -41,11 +41,11 @@ Two more things from the same kind of testing are worth knowing:
 ## Reading your own number
 
 - **Give it {{Metrics.MIN_SHOTS_REPORT}} shots per club** before trusting an average. One flushed drive is not your smash factor.
-- **A change needs to be real.** Between two ten-shot sessions, smash has to move by about {{Metrics.MDC_N10.smashFactor|2}} before it's likely more than noise. Watch the trend over a few sessions, not one good day.
-- **Throw out impossible readings.** The rules of golf cap how springy a driver face can be, which puts a hard ceiling on smash factor. ShotLab treats anything above {{Metrics.CEILING.smashFactor|2}} as a misread of the whole shot, not a record.
+- **Make sure a change is real.** Between two ten-shot sessions, smash has to move by about {{Metrics.MDC_N10.smashFactor|2}} before it's likely more than luck. Watch it over a few sessions, not one good day.
+- **Ignore impossible readings.** The rules limit how springy a driver face can be, so smash factor has a ceiling. ShotLab treats anything above {{Metrics.CEILING.smashFactor|2}} as a misread, not a record.
 - **Compare like with like.** Same club, same ball, same surface. Range balls and mats change the numbers.
 
-If you want to put a distance on it: closing the average amateur's driver gap, from 1.430 to the tour's 1.478 at 93 mph, would add about 4.5 mph of ball speed. That's worth roughly 7–8 yards of carry. It's a chained estimate, not a measurement, but it gives you the scale.
+To put a distance on it: if the average amateur went from 1.430 to the tour's 1.478 at 93 mph, that's about 4.5 mph more ball speed, or roughly 7–8 yards of carry. That's an estimate, not a measurement, but it gives you an idea.
 
 ## Sources
 

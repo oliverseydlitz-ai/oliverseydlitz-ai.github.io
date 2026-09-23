@@ -6894,31 +6894,7 @@ const FirstRun = (() => {
     return m;
   }
 
-  // Is something blocking already on screen? The agreement gate and the sign-in
-  // modal both open at boot, on the same tick as the first home render, and an
-  // orientation stacked on top of either swallows the button underneath it —
-  // which is how a new user ends up unable to get past the sign-in screen at
-  // all. Found by the browser scan, not by any unit test: every module involved
-  // was behaving correctly on its own.
-  function blocked() {
-    return [...document.querySelectorAll('.modal-overlay, .agreement-gate')]
-      .some(el => el.id !== 'firstRunModal' && !el.hidden &&
-                  (el.offsetParent !== null || el.getClientRects().length > 0));
-  }
-
-  // Only on a genuinely new account, and never on top of something blocking.
-  // NOT marked as seen when it is deferred — the golfer has not seen it, and
-  // marking it here is how an orientation silently never appears for anyone
-  // whose sign-in modal happened to still be up.
-  function maybeShow(sessions) {
-    if (seen()) return false;
-    if ((sessions || []).length) { markSeen(); return false; }
-    if (blocked()) return false;
-    show();
-    return true;
-  }
-
-  return { show, maybeShow, seen, reset, content };
+  return { show, seen, reset, content };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -10368,11 +10344,8 @@ const Router = (() => {
   async function showSessions() {
     const sessions = await Store.getSessions();
     safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
-    // Only on a genuinely new account, and only after the home view has
-    // rendered — an orientation over a blank page is a wall of text with no
-    // context, and over the agreement gate it would be a second modal on top
-    // of a blocking one.
-    try { FirstRun.maybeShow(sessions); } catch (e) { console.error('intro', e); }
+    // FirstRun no longer opens by itself (Oliver, 23 Sep): a first visit lands
+    // on the home view, not on a wall of text. It opens from Settings only.
   }
 
   async function showPractice() {

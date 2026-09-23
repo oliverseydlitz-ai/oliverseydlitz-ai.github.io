@@ -1,44 +1,44 @@
 # Driver attack angle: why the tour average isn't your target
 
-The PGA Tour's average driver attack angle is {{Benchmarks.get('d').pga.aa}}°. That's slightly *down* on the ball. It gets quoted as if it's what you should copy, and for most amateurs it isn't. The target worth aiming at with a driver is hitting up, somewhere around {{Benchmarks.TARGET.driverAttackAngle.lo}}° to {{Benchmarks.TARGET.driverAttackAngle.hi}}°. A tour average tells you what tour players do on average. It doesn't tell you what's best.
+The PGA Tour's average driver attack angle is {{Benchmarks.get('d').pga.aa}}°, which is slightly *down* on the ball. People quote it like it's what you should copy. For most amateurs it isn't. With a driver you want to be hitting up, somewhere around {{Benchmarks.TARGET.driverAttackAngle.lo}}° to {{Benchmarks.TARGET.driverAttackAngle.hi}}°. The tour average tells you what tour players do. It doesn't tell you what's best.
 
 [[photo: a teed-up driver from face-on, ball forward in the stance, with the low point of the swing behind the ball]]
 
-## Average and optimal are different questions
+## Average isn't the same as best
 
-Tour players are some of the fastest, most consistent strikers alive, and their swings differ a lot. An average across all of them blends very different ways of getting the ball out there. It describes the tour. It isn't a recipe for you.
+Tour players are fast, great strikers, and their swings are all different. Average them all together and you get a number that describes the tour, not a recipe for you.
 
-What matters for distance is the launch and spin you end up with, and attack angle is one of the levers on both. Hitting up lets you launch the ball higher with less spin for the same loft. Hitting down does the opposite: less launch, more spin, a ball that climbs and falls short. For most amateurs, whose driver problem is already too much spin, hitting down makes it worse.
+What gets you distance is launch and spin, and attack angle changes both. Hitting up gets the ball higher with less spin for the same loft. Hitting down does the opposite: lower launch, more spin, a ball that balloons and falls short. Most amateurs already spin the driver too much, so hitting down makes it worse.
 
-## How much is it worth? Careful here
+## How many yards is it worth? Careful
 
-You'll see charts claiming a fixed number of extra yards for every degree you hit up. They come from TrackMan's driver optimisation tables, and those tables have a condition that almost nobody repeats: **at every attack angle, the loft and spin were re-optimised too.** Going from 5° down to 5° up in those tables also needed about 5.3° more dynamic loft and roughly 1,184 rpm less spin.
+You'll see charts saying you gain so many yards for every degree you hit up. They come from TrackMan's driver tables, and there's a catch almost nobody mentions: **at every attack angle, the loft and spin were changed to suit it.** Going from 5° down to 5° up in those tables also meant about 5.3° more loft at impact and roughly 1,184 rpm less spin.
 
-So the gain is real, but it's the gain for a driver set up to match the new attack angle. If you change your attack angle and keep your current driver exactly as it is, you won't get the chart number. You'll get something smaller, and nobody has published how much smaller. That's why this guide won't give you a yards-per-degree figure: there isn't an honest one for an unchanged club.
+So the gain is real, but only with a driver set up for the new attack angle. Change your attack angle with the same driver and you'll get less than the chart says. Nobody has published how much less. That's why this guide won't give you a yards-per-degree number: there isn't an honest one for your current club.
 
-What you can say is that hitting up, with a driver fitted for it, carries further for the same ball speed. The direction is clear. The size of the gain for your driver, as it is today, isn't known.
+What we do know: hitting up, with a driver fitted for it, carries further at the same ball speed. How much further with your driver as it is today, nobody knows.
 
 ## Can your launch monitor tell you your attack angle?
 
 Roughly, over a bucket, and not shot by shot.
 
-- The MLM2PRO measures attack angle, but only with the ball placed where it expects it. Rapsodo's own test against a GCQuad put its average error at 1.05°.
-- On other consumer units it can be much worse. In one peer-reviewed study, the Mevo+'s attack angle with a 7-iron agreed with TrackMan's at an ICC of 0.02, which means almost no relationship at all.
+- The MLM2PRO measures attack angle, but only if the ball is exactly where it expects. Rapsodo's own test against a GCQuad had it off by 1.05° on average.
+- On other home units it can be much worse. In one study, the Mevo+'s attack angle with a 7-iron had almost nothing to do with what TrackMan read.
 - Your own swing moves too. Between two ten-shot sessions, attack angle needs to shift by about {{Metrics.MDC_N10.attackAngle}}° before it's likely a real change.
 
-So average it. ShotLab waits for {{Metrics.MIN_SHOTS_DELIVERY}} shots with a club before it reads anything into your attack angle, and it shows a range rather than a single number. A single drive reading +4° is one number from a noisy measurement.
+So average it. ShotLab waits for {{Metrics.MIN_SHOTS_DELIVERY}} shots with a club before it reads anything into your attack angle, and shows a range, not one number. One drive reading +4° doesn't mean much on its own.
 
 ## Irons are the other way round
 
-None of this carries over to irons. With an iron you want to hit down, somewhere around {{Benchmarks.TARGET.ironAttackAngle.hi}}° to {{Benchmarks.TARGET.ironAttackAngle.lo}}°, so the club reaches the bottom of its arc after the ball. The tour averages agree: every iron in the table is hitting down, from {{Benchmarks.get('3i').pga.aa}}° with a 3-iron to {{Benchmarks.get('pw').pga.aa}}° with a pitching wedge. An upward attack angle with a 7-iron usually means a thin strike.
+None of this applies to irons. With an iron you want to hit down, somewhere around {{Benchmarks.TARGET.ironAttackAngle.hi}}° to {{Benchmarks.TARGET.ironAttackAngle.lo}}°, so the club bottoms out after the ball. The tour averages agree: every iron in the table is hitting down, from {{Benchmarks.get('3i').pga.aa}}° with a 3-iron to {{Benchmarks.get('pw').pga.aa}}° with a pitching wedge. An upward attack angle with a 7-iron usually means a thin strike.
 
 One warning if you practise off mats: a mat is hard, so the club bounces off it instead of digging. A strike well behind the ball can still come off looking fine. Mats hide fat shots, which is exactly the fault low-point work is meant to catch.
 
 ## What to do with it
 
 - **Driver:** tee it high enough and far enough forward to catch it on the way up. Watch whether your average moves toward hitting up across a session, not whether one drive did.
-- **Check the rest of the picture.** A better attack angle should show up as higher launch and, on good balls, a longer carry. If the attack angle changes and nothing else does, question the reading.
-- **Consider the driver, not just the swing.** Because the big gains assume loft is re-optimised, a fitting can be part of the answer.
+- **Check the other numbers.** A better attack angle should show up as higher launch and, on good balls, more carry. If attack angle changes and nothing else does, don't trust the reading.
+- **Think about the driver, not just the swing.** The big gains assume the loft is set up for it, so a fitting might be part of the answer.
 - **Irons:** hit down, and be suspicious of good-looking numbers off a mat.
 
 ## Sources

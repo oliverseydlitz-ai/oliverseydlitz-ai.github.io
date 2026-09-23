@@ -70,7 +70,6 @@ const WIRED = [
   ['NOT_A_VARIABLE',  'SessionTags',    'tags look like a dimension the app analyses, which is an uncontrolled comparison it refuses everywhere else'],
   ['of',              'SessionTags',    'tags are parsed and nothing reads them, so no card and no search ever sees one'],
   ['setAlignment',    'Store',          'the alignment caveat names what it withholds and offers no way to answer it'],
-  ['maybeShow',       'FirstRun',       'a new account never sees what the app will and will not tell it'],
   ['cloudStatus',     'Store',          'a signed-in user sees a partial account as if it were the whole one'],
   ['kindOf',          'DrillLibrary',   'the drill list goes back to one flat pile with gym sessions and screen-reads in it'],
   ['KINDS',           'DrillLibrary',   'the groups lose the sentence saying what each one actually is'],
