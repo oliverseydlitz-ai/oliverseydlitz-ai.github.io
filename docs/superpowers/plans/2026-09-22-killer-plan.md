@@ -235,6 +235,8 @@ Three background agents audited the served app, each through one lens: **visual/
 | C28 | Fault floor, count and rate per club, never pooled across the clubs it appeared on | `e5edb41` |
 | C12 | Junk rows and impossible readings dropped at import with a counted preview note; `Metrics.impossible` screens whole shots from records | `50cf190` |
 | C10 | Drill pick is `kind: 'drill'` and fits the club (`DrillLibrary.fitsClub`, `for` tags), named fits first | `d9d873a` |
+| R8 R9 R10 R12 R13 R14 R18 | Named chart canvases; `aria-current` nav; live toast; goal picker name; heading order; skip link; two auth-path crashes | `8131e3c` |
+| R17 | `sync.sh` copies every SW asset (done before the overnight run) | earlier |
 | V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 | C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
 | C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
