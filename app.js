@@ -7661,24 +7661,43 @@ const UI = (() => {
     if(lastTile) lastTile.addEventListener('click',()=>Router.showDetail(lastTile.dataset.gotoLast));
   }
 
+  // The grid ends on the Sunday of THIS week, so today is always on it (V3).
+  // It used to step back 125 days and then back again to a Monday, which left
+  // the last column up to six days before today — the week you are in, the
+  // one a streak is about, was never shown.
+  //
+  // Days are keyed in LOCAL time. The old key was toISOString() of a local
+  // midnight, which is the previous day anywhere east of UTC; and a stored
+  // '2026-07-01' parsed as UTC midnight, which is 30 June anywhere west of it.
+  // A date-only string is a calendar day, so it is read as one.
+  const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const localDay = v => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ''));
+    const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(v);
+    if (isNaN(d)) return null;
+    d.setHours(0, 0, 0, 0); return d;
+  };
+  function heatmapCells(sessions, now = new Date()) {
+    const WEEKS = 18;
+    const today = new Date(now); today.setHours(0, 0, 0, 0);
+    const perDay = {};
+    (sessions || []).forEach(s => { const d = localDay(s.date); if (!d) return;
+      const k = dayKey(d); perDay[k] = (perDay[k] || 0) + (s.shots || []).length; });
+    const start = new Date(today);
+    start.setDate(start.getDate() - (today.getDay() + 6) % 7 - (WEEKS - 1) * 7);   // Monday, 17 weeks back
+    const cells = [];
+    for (let i = 0; i < WEEKS * 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      if (d > today) { cells.push({ future: true }); continue; }
+      const k = dayKey(d), n = perDay[k] || 0;
+      cells.push({ key: k, n, level: n === 0 ? 0 : n < 15 ? 1 : n < 35 ? 2 : n < 60 ? 3 : 4 });
+    }
+    return cells;
+  }
   function renderHeatmap(sessions) {
     const el=document.getElementById('heatmap'); if(!el) return;
-    const WEEKS=18, days=WEEKS*7;
-    const today=new Date(); today.setHours(0,0,0,0);
-    const perDay={};
-    sessions.forEach(s=>{ const d=new Date(s.date); if(isNaN(d))return; d.setHours(0,0,0,0); const k=d.toISOString().slice(0,10); perDay[k]=(perDay[k]||0)+s.shots.length; });
-    const start=new Date(today); start.setDate(start.getDate()-(days-1));
-    const dow=(start.getDay()+6)%7; start.setDate(start.getDate()-dow); // align to Monday
-    const cells=[];
-    for(let i=0;i<WEEKS*7;i++){
-      const d=new Date(start); d.setDate(start.getDate()+i);
-      if(d>today){ cells.push(`<div class="hm-cell hm-empty"></div>`); continue; }
-      const k=d.toISOString().slice(0,10);
-      const n=perDay[k]||0;
-      const lvl=n===0?0:n<15?1:n<35?2:n<60?3:4;
-      cells.push(`<div class="hm-cell hm-l${lvl}" title="${k}: ${n} shot${n!==1?'s':''}"></div>`);
-    }
-    el.innerHTML=cells.join('');
+    el.innerHTML = heatmapCells(sessions).map(c => c.future ? `<div class="hm-cell hm-empty"></div>`
+      : `<div class="hm-cell hm-l${c.level}" title="${c.key}: ${c.n} shot${c.n!==1?'s':''}"></div>`).join('');
   }
 
   // ── Sessions list ─────────────────────────────────────────────
@@ -10119,7 +10138,7 @@ const UI = (() => {
     });
   }
 
-  return { renderSessionList, renderHome, renderDetail, renderProgress, renderYardages, renderPractice,
+  return { renderSessionList, renderHome, heatmapCells, renderDetail, renderProgress, renderYardages, renderPractice,
            renderQuietEye, renderDrills, renderShortGame, renderRounds, retintCharts };
 })();
 

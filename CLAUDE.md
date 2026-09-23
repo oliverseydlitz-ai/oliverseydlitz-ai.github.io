@@ -919,7 +919,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **70 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **71 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1260,8 +1260,8 @@ to re-enable the on-screen banner.
 
 ## Where things stand (read this first in a new session)
 
-State at handover: **70 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v165**, 58 modules.
+State at handover: **71 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v166**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1728,7 +1728,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**70 test suites**, service worker **v165**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v166**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
