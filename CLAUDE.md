@@ -806,6 +806,11 @@ the app refuses everywhere else, printed larger.
   reads as a reproach.
 - The scroll lock is a class on `<html>` (`range-open`), for the same reason
   `ViewPrefs` is: a class survives a re-render, `hidden` does not.
+- **Space and the arrows mean next/previous only when nothing that takes them
+  has focus** (R22). On a focused "Done ✓" the card's Space handler used to
+  run first, advance the block, and swallow the activation — so the keyboard
+  path logged nothing. It is a labelled `role="dialog"`; each repaint focuses
+  the block heading, and closing returns focus to the opener.
 - `wakeLock` is best-effort and silent on failure — absent on most desktop
   browsers, and it rejects outright when the page is not visible.
 
@@ -1261,7 +1266,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **71 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v167**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v168**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1728,7 +1733,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**71 test suites**, service worker **v167**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v168**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

@@ -96,6 +96,36 @@ ok(doc.getElementById('rangeCard') === null, 'the card is removed');
 ok(!doc.documentElement.classList.contains('range-open'), 'and the scroll lock with it');
 ok(RC.isOpen() === false, 'isOpen agrees');
 
+console.log('— the keyboard: Space on Done logs it (R22) —');
+// The page-level Space-means-next handler ran before the focused button's own
+// activation, called preventDefault, advanced the block — and nothing was
+// logged. The card's one job, lost on the keyboard path only.
+reset();
+const opener = doc.createElement('button'); opener.textContent = 'Open card'; doc.body.appendChild(opener); opener.focus();
+RC.open([block(), block({ name: 'Path', faultId: 'over-the-top' })]);
+const kcard = doc.getElementById('rangeCard');
+ok(kcard.getAttribute('role') === 'dialog' && kcard.getAttribute('aria-modal') === 'true' && kcard.getAttribute('aria-label'),
+   'the card is a labelled modal dialog');
+ok(doc.activeElement && doc.activeElement.classList.contains('rc-name'), 'focus lands on the block heading, not <body>');
+const step = () => doc.querySelector('.rc-step').textContent;
+const key = (el, k) => { const e = new R.window.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e; };
+const done = doc.querySelector('[data-rc="done"]');
+done.focus();
+const sp = key(done, ' ');
+ok(!sp.defaultPrevented && step() === 'Block 1 of 2', 'Space on a focused Done is left to the button — the card does not advance under it');
+done.click();     // what the browser does next with that Space
+ok(PL.all().length === 1 && step() === 'Block 2 of 2', 'and the button logs the block, then advances');
+ok(doc.activeElement && doc.activeElement.classList.contains('rc-name'), 'focus is back on the new heading after the repaint');
+key(doc.activeElement, ' ');
+ok(/Session logged/.test(kcard.textContent), 'Space with nothing that takes it still means next');
+const arrow = doc.querySelector('[data-rc="prev"]'); arrow.focus();
+key(arrow, 'ArrowLeft');
+ok(/Session logged/.test(kcard.textContent), 'and an arrow on a focused button is left to the button');
+RC.close();
+ok(doc.activeElement === opener, 'closing returns focus to what opened it');
+opener.remove();
+reset();
+
 console.log('— it is the same plan, not a second one —');
 const shot = (o = {}) => ({ clubType: '7i', ballSpeed: 96, clubSpeed: 85, smashFactor: 1.18,
   launchAngle: 17, attackAngle: -3, carryDistance: 158, ...o });

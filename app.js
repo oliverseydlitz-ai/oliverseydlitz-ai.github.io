@@ -6891,7 +6891,7 @@ const SessionTags = (() => {
 // the part that says what the number cannot support. Ticking a block writes to
 // PracticeLog, which is what lets a retention check credit the drill later.
 const RangeCard = (() => {
-  let _blocks = null, _session = null, _i = 0, _wake = null, _logged = null;
+  let _blocks = null, _session = null, _i = 0, _wake = null, _logged = null, _opener = null;
 
   // A screen that sleeps between shots is a card nobody reads. Best-effort
   // only: the API is absent on most desktop browsers and rejects outright when
@@ -6933,6 +6933,12 @@ const RangeCard = (() => {
     const m = document.createElement('div');
     m.className = 'range-card';
     m.id = 'rangeCard';
+    // A full-screen layer is a dialog, and says so (R22). Focus goes back to
+    // whatever opened it, or a keyboard user lands on <body> at the top.
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-modal', 'true');
+    m.setAttribute('aria-label', 'Range card');
+    _opener = document.activeElement;
     document.body.appendChild(m);
     document.documentElement.classList.add('range-open');
     m.addEventListener('click', onClick);
@@ -6948,6 +6954,8 @@ const RangeCard = (() => {
     document.removeEventListener('keydown', onKey);
     releaseWake();
     _blocks = null; _session = null; _logged = null;
+    try { if (_opener && _opener.isConnected) _opener.focus(); } catch (_) {}
+    _opener = null;
   }
 
   const isOpen = () => !!document.getElementById('rangeCard');
@@ -6971,9 +6979,18 @@ const RangeCard = (() => {
     return true;
   }
 
+  // Space and the arrows mean next/previous only when nothing that takes them
+  // itself has focus (R22). On a focused "Done ✓" the page-level Space
+  // handler used to run first: it called preventDefault, advanced the block,
+  // and the button's own activation never fired — so the block moved on and
+  // NOTHING was logged to PracticeLog, which is the whole point of the card.
+  const ownsKeys = el => !!(el && el.closest &&
+    el.closest('button, a[href], input, select, textarea, [contenteditable=""], [contenteditable="true"]'));
+
   function onKey(e) {
     if (!isOpen()) return;
     if (e.key === 'Escape') { close(); return; }
+    if (ownsKeys(e.target)) return;
     if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(_i + 1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); go(_i - 1); }
   }
@@ -7006,7 +7023,7 @@ const RangeCard = (() => {
         <div class="rc-shell">
           <button class="rc-x" data-rc="close" aria-label="Close">✕</button>
           <div class="rc-body rc-end">
-            <div class="rc-end-h">Session logged</div>
+            <div class="rc-end-h" tabindex="-1">Session logged</div>
             <div class="rc-end-n">${done} of ${n} block${n === 1 ? '' : 's'}${balls ? ` · ${balls} balls` : ''}</div>
             ${done < n ? `<p class="rc-end-note">${esc(PracticeLog.EMPTY_NOTE)}</p>` : ''}
             <p class="rc-end-note">Import the session when you get home. A retention check needs a
@@ -7018,6 +7035,7 @@ const RangeCard = (() => {
             <button class="rc-btn" data-rc="close">Close</button>
           </div>
         </div>`;
+      focusHead(m);
       return;
     }
 
@@ -7033,7 +7051,7 @@ const RangeCard = (() => {
              data-rc="jump" data-i="${i}" aria-label="Block ${i + 1}"></button>`).join('')}</div>
         <div class="rc-body">
           <div class="rc-step">Block ${_i + 1} of ${n}</div>
-          <div class="rc-name">${b.icon ? icon(b.icon) + ' ' : ''}${esc(b.name)}</div>
+          <div class="rc-name" tabindex="-1">${b.icon ? icon(b.icon) + ' ' : ''}${esc(b.name)}</div>
           <div class="rc-count">${b.balls ? `${b.balls} balls` : ''}${b.balls && b.minutes ? ' · ' : ''}${b.minutes ? `${b.minutes} min` : ''}</div>
           <div class="rc-cue">
             <div class="rc-cue-name">${esc(cue.name)}</div>
@@ -7051,6 +7069,15 @@ const RangeCard = (() => {
           <button class="rc-btn ghost" data-rc="next">→</button>
         </div>
       </div>`;
+    focusHead(m);
+  }
+
+  // Every repaint replaces the card's innerHTML, which drops focus to <body>.
+  // The heading takes it instead, so a screen reader announces the new block
+  // and Tab starts from inside the card.
+  function focusHead(m) {
+    const h = m.querySelector('.rc-name, .rc-end-h');
+    try { if (h) h.focus({ preventScroll: true }); } catch (_) {}
   }
 
   return { open, close, isOpen, paint, cueFor, notesFor };

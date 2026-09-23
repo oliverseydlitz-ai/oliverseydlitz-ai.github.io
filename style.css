@@ -2725,6 +2725,9 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 .rc-btn[disabled]{opacity:.35;cursor:default}
 .rc-end{text-align:center}
 .rc-end-h{font-size:1.6rem;font-weight:800}
+/* Focused by script after each repaint so the new block is announced; they
+   are headings, not controls, so they draw no ring (R22). */
+.rc-name:focus, .rc-end-h:focus { outline: none; }
 .rc-end-n{font-size:1.05rem;font-weight:700;color:var(--accent);margin-top:.3rem}
 .rc-end-note{font-size:.85rem;line-height:1.5;color:var(--text-muted);margin:1rem 0 0}
 
