@@ -11,7 +11,7 @@ const REPO = path.resolve(__dirname, '..');
 
 function load({ html = 'index.html', app = 'app.js' } = {}) {
   const dom = new JSDOM(fs.readFileSync(path.join(REPO, html), 'utf8'), {
-    url: 'https://oliverseydlitz-ai.github.io/',
+    url: 'https://shotlab.oliverseydlitz.com/',
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });

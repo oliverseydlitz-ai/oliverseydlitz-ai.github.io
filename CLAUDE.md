@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ShotLab TOUR** is a golf swing analysis web app that imports Rapsodo launch monitor CSV exports and provides visualization & insights into swing metrics, club gapping, consistency, and performance trends.
 
-- **Live at:** `oliverseydlitz-ai.github.io`
+- **Live at:** `shotlab.oliverseydlitz.com` (custom domain on Cloudflare DNS, hosted by GitHub Pages; the old `oliverseydlitz-ai.github.io` 301-redirects here)
 - **PWA:** Installable on mobile; works offline via service worker
 - **Storage:** IndexedDB (local) + Supabase (cloud for authenticated users)
 
@@ -1326,7 +1326,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **72 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v183**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v184**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1716,7 +1716,7 @@ cannot fail at all.
    It matters because OAuth uses the **implicit flow**, which returns the access
    token in the URL *fragment* — a wildcard in the allowlist means a crafted
    Google login link can deliver a live token to somebody else's domain. Site
-   URL should be `https://oliverseydlitz-ai.github.io` and the redirect list
+   URL should be `https://shotlab.oliverseydlitz.com` and the redirect list
    should contain that (plus `http://localhost:*` for local dev) and nothing
    loose.
 2. **Leaked-password protection is off** — Auth → Providers → Email. It is the
@@ -1797,7 +1797,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**72 test suites**, service worker **v183**. Deterministic auth, cloud sync
+**72 test suites**, service worker **v184**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

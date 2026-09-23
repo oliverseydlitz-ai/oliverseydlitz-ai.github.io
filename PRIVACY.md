@@ -8,7 +8,7 @@
 
 ## 1. Controller and scope
 
-ShotLab TOUR (the "Service") is a golf swing analysis web application operated by Oliver Seydlitz (the "Operator", "we", "us", "our") and published at https://oliverseydlitz-ai.github.io. The Operator is the data controller for the personal data described in this policy.
+ShotLab TOUR (the "Service") is a golf swing analysis web application operated by Oliver Seydlitz (the "Operator", "we", "us", "our") and published at https://shotlab.oliverseydlitz.com. The Operator is the data controller for the personal data described in this policy.
 
 The Operator is established in the Czech Republic. Processing is therefore governed by Regulation (EU) 2016/679 (the General Data Protection Regulation) and by Czech Act No. 110/2019 Coll., on the processing of personal data. The competent supervisory authority is the Office for Personal Data Protection (Úřad pro ochranu osobních údajů), Pplk. Sochora 27, 170 00 Prague 7, Czech Republic, https://uoou.gov.cz.
 

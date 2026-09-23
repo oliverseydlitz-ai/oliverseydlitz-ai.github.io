@@ -47,11 +47,11 @@ Shot Scope's 90M-shot sample.
 
 ## Pages
 
-- [App](https://oliverseydlitz-ai.github.io/): the whole application — import,
+- [App](https://shotlab.oliverseydlitz.com/): the whole application — import,
   yardage book, progress, practice, settings.
-- [Privacy policy](https://oliverseydlitz-ai.github.io/PRIVACY.md)
-- [Terms](https://oliverseydlitz-ai.github.io/TERMS.md)
-- [Security policy](https://oliverseydlitz-ai.github.io/SECURITY.md)
+- [Privacy policy](https://shotlab.oliverseydlitz.com/PRIVACY.md)
+- [Terms](https://shotlab.oliverseydlitz.com/TERMS.md)
+- [Security policy](https://shotlab.oliverseydlitz.com/SECURITY.md)
 
 ## Technical
 

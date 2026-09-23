@@ -5,7 +5,7 @@ let fail = 0; const ok = (c, m) => { console.log((c?'  PASS  ':'  FAIL  ')+m); i
 const root = path.join(__dirname, '..', '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const has = f => fs.existsSync(path.join(root, f));
-const DOMAIN = 'https://oliverseydlitz-ai.github.io';
+const DOMAIN = 'https://shotlab.oliverseydlitz.com';
 
 // SEO and production metadata rot silently: nothing renders it, no user reports
 // it, and it is only ever noticed by a crawler that has already moved on. These
@@ -148,6 +148,20 @@ const sw = read('sw.js');
 ok(/req\.mode [!=]== 'navigate'/.test(sw),   // behaviour is exercised in service-worker.js
    'only a navigation falls back to the app shell — every failed GET used to receive index.html, so an offline asset came back as a page of HTML');
 ok(/'\/404\.html'/.test(sw), 'and 404.html is precached so it works offline');
+
+console.log('— one domain, everywhere —');
+// The site moved to a custom domain on 23 Sep 2026. GitHub Pages serves
+// whatever the CNAME file names, and every canonical, sitemap and og URL has to
+// agree with it: a canonical pointing at the old address tells a crawler the
+// real page is somewhere that now only redirects.
+{
+  const cname = read('CNAME').trim();
+  ok(`https://${cname}` === DOMAIN, `the CNAME file (${cname}) is the canonical domain`);
+  const PUBLIC = ['index.html', '404.html', 'sitemap.xml', 'robots.txt', 'llms.txt', '.well-known/security.txt',
+                  'terms/index.html', 'privacy/index.html', 'contact/index.html', 'PRIVACY.md', 'TERMS.md'];
+  const stale = PUBLIC.filter(f => /https:\/\/oliverseydlitz-ai\.github\.io/.test(read(f)));
+  ok(stale.length === 0, `no public file still points at the old github.io address${stale.length ? ' — ' + stale.join(', ') : ''}`);
+}
 
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exit(fail ? 1 : 0);

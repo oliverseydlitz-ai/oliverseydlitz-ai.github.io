@@ -79,7 +79,7 @@ function page({ slug, title, description, source }) {
 <title>${esc(title)} — ShotLab TOUR</title>
 <meta name="description" content="${esc(description)}">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://oliverseydlitz-ai.github.io/${slug}/">
+<link rel="canonical" href="https://shotlab.oliverseydlitz.com/${slug}/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 </head>

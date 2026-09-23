@@ -53,7 +53,7 @@ console.log('— nothing on them can reach a third party —');
 for (const p of PAGES.concat([{ slug: 'contact' }])) {
   const html = fs.readFileSync(path.join(root, p.slug, 'index.html'), 'utf8');
   const ext = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map(m => m[1])
-    .filter(u => !/^https:\/\/oliverseydlitz-ai\.github\.io/.test(u));
+    .filter(u => !/^https:\/\/shotlab\.oliverseydlitz\.com/.test(u));
   const nonLink = ext.filter(u => !html.includes(`href="${u}" rel="noopener noreferrer"`));
   ok(nonLink.length === 0,
      `/${p.slug}/ loads no third-party asset${nonLink.length ? ` — ${nonLink.join(', ')}` : ''}`);

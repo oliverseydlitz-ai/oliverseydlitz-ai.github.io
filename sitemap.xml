@@ -12,22 +12,22 @@
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://oliverseydlitz-ai.github.io/</loc>
+    <loc>https://shotlab.oliverseydlitz.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://oliverseydlitz-ai.github.io/terms/</loc>
+    <loc>https://shotlab.oliverseydlitz.com/terms/</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://oliverseydlitz-ai.github.io/privacy/</loc>
+    <loc>https://shotlab.oliverseydlitz.com/privacy/</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://oliverseydlitz-ai.github.io/contact/</loc>
+    <loc>https://shotlab.oliverseydlitz.com/contact/</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

@@ -1,4 +1,4 @@
-# ShotLab TOUR — https://oliverseydlitz-ai.github.io/
+# ShotLab TOUR — https://shotlab.oliverseydlitz.com/
 #
 # This is a single-page app. Everything a crawler can usefully index lives at
 # the root URL; the in-app views are hash routes (#/yardages, #/practice …) and
@@ -18,4 +18,4 @@ Disallow: /test/
 Disallow: /node_modules/
 Disallow: /supabase/
 
-Sitemap: https://oliverseydlitz-ai.github.io/sitemap.xml
+Sitemap: https://shotlab.oliverseydlitz.com/sitemap.xml

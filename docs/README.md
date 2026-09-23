@@ -10,7 +10,7 @@ service — GitHub Pages serves them, but they read fine from the filesystem too
 | --- | --- |
 | [`coaching-calibration-audit.html`](coaching-calibration-audit.html) | Every swing-mechanics claim in ShotLab checked against Trackman tour data, published D-plane physics, Rapsodo's own accuracy testing, and the motor-learning literature. Includes the derivation for the face-to-path correction and the spin-loft estimator, plus evidence grades for each practice-science claim. |
 
-Live at `https://oliverseydlitz-ai.github.io/docs/coaching-calibration-audit.html`
+Live at `https://shotlab.oliverseydlitz.com/docs/coaching-calibration-audit.html`
 once deployed.
 
 ## Why these matter to the code

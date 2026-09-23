@@ -15,7 +15,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 let fail = 0; const ok = (c, m) => { console.log((c ? '  PASS  ' : '  FAIL  ') + m); if (!c) fail++; };
 const src = fs.readFileSync(path.join(__dirname, '..', '..', 'sw.js'), 'utf8');
-const ORIGIN = 'https://oliverseydlitz-ai.github.io';
+const ORIGIN = 'https://shotlab.oliverseydlitz.com';
 
 function worker({ net, cached = {} }) {
   const store = new Map(Object.entries(cached).map(([k, v]) => [ORIGIN + k, v]));

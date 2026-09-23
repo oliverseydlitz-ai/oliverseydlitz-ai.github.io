@@ -8,7 +8,7 @@
 
 ## 1. Agreement
 
-These Terms of Service (the "Terms") form a binding agreement between the user ("you") and Oliver Seydlitz, operator of ShotLab TOUR (the "Operator", "we", "us"), established in the Czech Republic, governing use of the ShotLab TOUR web application at https://oliverseydlitz-ai.github.io (the "Service").
+These Terms of Service (the "Terms") form a binding agreement between the user ("you") and Oliver Seydlitz, operator of ShotLab TOUR (the "Operator", "we", "us"), established in the Czech Republic, governing use of the ShotLab TOUR web application at https://shotlab.oliverseydlitz.com (the "Service").
 
 The Service is provided free of charge. No payment is taken, no subscription exists, and no feature is sold.
 
