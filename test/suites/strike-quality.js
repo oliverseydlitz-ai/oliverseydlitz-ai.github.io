@@ -91,6 +91,36 @@ const warming = [...shots(9, 1.40, 0.002), ...shots(9, 1.44, 0.002), ...shots(9,
 ok(/warming up/.test(S.fatigue(warming, 'd').note), 'and a rise is named as a warm-up, not ignored');
 ok(S.fatigue(shots(12, 1.46), 'd').ok === false, 'under 15 shots it will not split the block');
 
+// C37: on trend-free data the old z = 1.96 band on five-shot thirds called a
+// fade about one time in ten. The test is Welch's t now, so the false-alarm
+// rate has to sit near the 5% it claims. Seeded, so it cannot flake.
+if (typeof S.zQuantile !== 'function') ok(false, 'Strike exports its quantile helpers');
+else {
+ok(Math.abs(S.zQuantile(0.975) - 1.959964) < 1e-4, `the normal quantile is right (${S.zQuantile(0.975).toFixed(5)})`);
+ok(Math.abs(S.tQuantile(0.975, 8) - 2.306) < 0.02 && Math.abs(S.tQuantile(0.975, 30) - 2.042) < 0.005,
+   `and the t quantile matches the table at 8 and 30 df (${S.tQuantile(0.975, 8).toFixed(3)}, ${S.tQuantile(0.975, 30).toFixed(3)})`);
+}
+{
+  // mulberry32: seeded and well mixed. A plain LCG's consecutive pairs are
+  // correlated, which Box-Muller turns into a biased rate of its own.
+  let seed = 12345;
+  const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-12)) * Math.cos(2 * Math.PI * rnd());
+  let alarms = 0; const RUNS = 4000;
+  for (let r = 0; r < RUNS; r++) {
+    const block = Array.from({ length: 15 }, (_, i) => ({ _row: i + 2, clubType: 'd', smashFactor: 1.46 + 0.02 * gauss(),
+      ballSpeed: 150, clubSpeed: 102 }));
+    if (S.fatigue(block, 'd').real) alarms++;
+  }
+  const rate = alarms / RUNS;
+  ok(rate < 0.065, `trend-free 15-shot blocks are called a fade ${(rate * 100).toFixed(1)}% of the time (the test claims 5%)`);
+  // Across two testable clubs the alpha halves, so each club's rate drops too.
+  const two = Array.from({ length: 15 }, (_, i) => ({ clubType: '7i', smashFactor: 1.33 }));
+  const one = Array.from({ length: 15 }, (_, i) => ({ clubType: 'd', smashFactor: 1.46 + (i % 3) * 0.01 }));
+  ok(S.fatigue([...one, ...two], 'd').tested === 2, 'and the alpha is split across every club long enough to test');
+}
+
 console.log('— trends need three sessions, never a paired comparison —');
 const sess = (i, m) => ({ id: 's'+i, date: new Date(2026, 0, i+1).toISOString(), shots: shots(12, m, 0.004) });
 ok(S.trend([sess(1, 1.42), sess(2, 1.47)], 'd').ok === false, 'two sessions is refused');

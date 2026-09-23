@@ -2505,6 +2505,27 @@ const Strike = (() => {
     };
   }
 
+  // Quantiles for the fatigue test. The normal one is Acklam's rational
+  // approximation (relative error ~1e-9); the t one adds the Cornish-Fisher
+  // terms to it, good to about 1% at 4 degrees of freedom and better above.
+  function zQuantile(p) {
+    const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
+    const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
+    const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
+    const d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+    const lo = 0.02425;
+    if (p < lo) { const q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1); }
+    if (p > 1 - lo) return -zQuantile(1 - p);
+    const q = p - 0.5, r = q * q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  }
+  function tQuantile(p, df) {
+    const z = zQuantile(p), v = Math.max(1, df);
+    return z + (z**3 + z) / (4*v) + (5*z**5 + 16*z**3 + 3*z) / (96*v**2)
+             + (3*z**7 + 19*z**5 + 17*z**3 - 15*z) / (384*v**3);
+  }
+
   // ── Does it hold up over a long session? (drill A15) ──────────
   // Fatigue is a within-session physical effect, so unlike a learning claim it
   // is legitimately measured within the session. Judged against this golfer's
@@ -2520,10 +2541,26 @@ const Strike = (() => {
     const first = set.slice(0, third).map(s => s.smashFactor);
     const last = set.slice(-third).map(s => s.smashFactor);
     const drop = mean(first) - mean(last);
-    // The spread of a difference of two means, from this golfer's own shots.
-    const band = 1.96 * Math.sqrt((stdDev(first) ** 2 + stdDev(last) ** 2) / third);
+    // C37: a t-test, not z = 1.96. With five shots a third the standard
+    // deviations are themselves noisy, and the normal cut-off called trend-free
+    // blocks "fade" about one time in ten per club. The two thirds are always
+    // the same size, so the standard error is the same whether pooled or
+    // Welch; the degrees of freedom are the pooled 2n - 2, because Welch's
+    // estimated df is itself noisy at n = 5 and ran at ~6.7% in simulation.
+    // The alpha is also split across every club in these shots long enough to
+    // test (Bonferroni), because the page asks the question once per club.
+    // stdDev() is the population form (÷ n); a t-test needs the sample
+    // variance (÷ n - 1), which at n = 5 is 25% larger.
+    const bessel = third / (third - 1);
+    const v1 = stdDev(first) ** 2 * bessel / third, v2 = stdDev(last) ** 2 * bessel / third;
+    const se = Math.sqrt(v1 + v2);
+    const df = 2 * third - 2;
+    const counts = {};
+    (shots || []).forEach(x => { if (x.clubType) counts[x.clubType] = (counts[x.clubType] || 0) + 1; });
+    const tested = Math.max(1, Object.values(counts).filter(c => Math.floor(c / 3) >= 5).length);
+    const band = tQuantile(1 - 0.05 / (2 * tested), df) * se;
     return {
-      ok: true, club, n: set.length, per: third, first: mean(first), last: mean(last), drop, band,
+      ok: true, club, n: set.length, per: third, first: mean(first), last: mean(last), drop, band, df, tested,
       real: Math.abs(drop) > band,
       note: Math.abs(drop) <= band
         ? `Your strike at the end of the block matched the start to within your own variation. No measurable ` +
@@ -2572,7 +2609,7 @@ const Strike = (() => {
   }
 
   return { YD_PER_BALL_MPH, MIN_SPEED_RANGE, MIN_SPEED_SHOTS,
-           reference, baseline, headroom, weakLink, speedCost, fatigue, trend, report };
+           reference, baseline, headroom, weakLink, speedCost, fatigue, trend, report, zQuantile, tQuantile };
 })();
 
 // ────────────────────────────────────────────────────────────────
