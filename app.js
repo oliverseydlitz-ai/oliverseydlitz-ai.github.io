@@ -11478,13 +11478,14 @@ async function init() {
 
   // Keyboard shortcuts for power users
   document.addEventListener('keydown', e => {
-    if (e.target.matches('input,textarea,select')) return; // don't interfere with form inputs
+    if (e.target?.matches?.('input,textarea,select')) return; // don't interfere with form inputs (a document target has no matches)
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'i' || e.key === 'I') { e.preventDefault(); Router.showImport(); }
-      if (e.key === 'h' || e.key === 'H') { e.preventDefault(); Router.showSessions(); }
-      if (e.key === 'p' || e.key === 'P') { e.preventDefault(); Router.showProgress(); }
       if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); Router.showYardages(); }
       if (e.key === '/' || e.key === '?') { e.preventDefault(); showKeyboardShortcuts(); }
+      // Ctrl/Cmd+P opened Progress, which took the browser's PRINT shortcut
+      // away from the one screen built to be printed — the yardage card (R5).
+      // Ctrl+H took History. Both gone; the nav reaches both views.
       // Ctrl+S used to be a second binding for Yardages — it hijacked the
       // browser's Save shortcut for a duplicate of Ctrl+Y. Ctrl+G toasted
       // "Quick actions coming soon", which is the empty promise this codebase
@@ -11496,14 +11497,12 @@ async function init() {
     document.getElementById('shortcutsModal')?.remove();
     const shortcuts = [
       { key: 'Ctrl+I', action: 'Import CSV' },
-      { key: 'Ctrl+H', action: 'Home / Sessions' },
-      { key: 'Ctrl+P', action: 'Progress' },
       { key: 'Ctrl+Y', action: 'Yardages' },
       { key: 'Ctrl+?', action: 'Show this help' },
     ];
 
     const html = `
-      <div style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
+      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal">
         <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:400px;width:100%;padding:1.5rem;box-shadow:var(--shadow-md)">
           <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
             Keyboard Shortcuts
@@ -11522,21 +11521,12 @@ async function init() {
           </div>
         </div>
       </div>`;
+    // A `modal-overlay`, so the focus trap owns it: a dialog role, focus in
+    // and back out, and Escape. It used to have none of that, and its own
+    // Escape listener was only removed on Escape — closing with ✕ leaked one
+    // listener per opening (R5).
     document.body.insertAdjacentHTML('beforeend', html);
-
-    // Close on Escape
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        document.getElementById('shortcutsModal')?.remove();
-        document.removeEventListener('keydown', handleEsc);
-      }
-    };
-    document.addEventListener('keydown', handleEsc);
   }
-
-  // Show keyboard tips in console
-  console.log('%cShotLab Keyboard Shortcuts', 'font-weight:bold;font-size:14px;color:#0070f3');
-  console.log('Ctrl+I: Import | Ctrl+H: Home | Ctrl+P: Progress | Ctrl+Y: Yardages | Ctrl+?: Help');
 
   // View preferences toggles
   // Element id -> pref key, stated rather than derived. The old version built
@@ -13036,7 +13026,25 @@ const AccessibilityEnhancements = (() => {
     const z = parseInt(getComputedStyle(el).zIndex, 10);
     return Number.isFinite(z) ? z : 0;
   };
+  // A dialog closed by REMOVING it (FirstRun's ✕, several injected modals)
+  // never sets `hidden`, so the observer above never saw it close: it stayed
+  // on this stack for the life of the page, `top()` kept returning a detached
+  // node, and Tab was trapped inside something that no longer existed (R2).
+  // The body observer in init() closes them properly; this is the backstop,
+  // so a detached entry can never be "on top".
+  const prune = () => {
+    let gone = null;
+    for (let i = _open.length - 1; i >= 0; i--) if (!_open[i].el.isConnected) { gone = gone || _open[i]; _open.splice(i, 1); }
+    if (_open.length || !gone) return;
+    document.body.classList.remove('modal-open');
+    // Whichever runs first, this or the observer, focus goes back where it came from.
+    const a = document.activeElement;
+    if (!a || a === document.body || !a.isConnected) {
+      try { if (gone.restore && document.contains(gone.restore)) gone.restore.focus({ preventScroll: true }); } catch (_) {}
+    }
+  };
   const top = () => {
+    prune();
     if (!_open.length) return null;
     let best = _open[0];
     for (const s of _open) if (zOf(s.el) >= zOf(best.el)) best = s;
@@ -13089,11 +13097,18 @@ const AccessibilityEnhancements = (() => {
     document.querySelectorAll('.modal-overlay').forEach(watch);
     // Modals injected at runtime — the analytics, benchmark, club, efficiency,
     // learning and shortcut dialogs are all built with innerHTML on demand.
-    new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
-      if (n.nodeType !== 1) return;
-      if (n.classList?.contains('modal-overlay')) watch(n);
-      n.querySelectorAll?.('.modal-overlay').forEach(watch);
-    }))).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(muts => muts.forEach(m => {
+      m.addedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.classList?.contains('modal-overlay')) watch(n);
+        n.querySelectorAll?.('.modal-overlay').forEach(watch);
+      });
+      // Removed rather than hidden: close it, which also hands focus back.
+      m.removedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        _open.filter(s => s.el === n || n.contains(s.el)).forEach(s => closed(s.el));
+      });
+    })).observe(document.body, { childList: true, subtree: true });
     document.addEventListener('keydown', onKey, true);
   }
 
