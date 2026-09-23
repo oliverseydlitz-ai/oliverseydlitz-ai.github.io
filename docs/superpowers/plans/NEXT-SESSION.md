@@ -24,6 +24,8 @@ block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-p
    (CLAUDE.md "Open, and NOT fixable from this repo").
 
 ## What is next, in order
+0. **Rename: drop "TOUR" ("ShotLab TOUR" → "ShotLab").** Decided by Oliver 23 Sep; the scope
+   checklist is in the killer plan under "Decided, queued". Small, own commit, legal version bump.
 1. **Phase 9 — measurement model v2** (plan section "Phase 9"). Oliver's direction:
    every tier prescribes (lower tiers judged harder), range balls near-normal (x0.8,
    never spin), floors unchanged, "never claim" wording unchanged, caveats off the

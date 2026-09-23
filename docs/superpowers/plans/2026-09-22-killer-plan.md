@@ -44,6 +44,31 @@ below is measured unless it says otherwise.
    open until he answers them one by one. First item built: 8B.1, the Supabase
    keep-alive.
 
+## Decided, queued — do in its own commit
+
+- **Drop "TOUR" from the name: "ShotLab TOUR" becomes "ShotLab" (Oliver, 23 Sep:
+  "it sounds goofy").** It also argues against the app's own message: the guides and
+  `Benchmarks.TARGET` exist because the tour average is *not* your target. Scope, all in
+  one commit (82 occurrences across ~35 files on 23 Sep; `grep -rI "ShotLab TOUR"` and
+  the `brand-tag` spans):
+  - `index.html` (title, meta, og/twitter tags, JSON-LD `name`, header `.brand-tag`
+    spans), `manifest.json` (`name` / `short_name`: this is the installed app's name on
+    a phone), `404.html`, `llms.txt`, `robots.txt`, `.well-known/security.txt`,
+    `contact/index.html`.
+  - `app.js` strings and the header brand mark; `style.css` `.brand-tag`. Decide whether
+    the mono tag goes entirely or carries something else. Do not leave an empty chip.
+  - Both generators (`tools/build-legal-pages.js`, `tools/build-guide-pages.js`: page
+    titles, nav brand, JSON-LD publisher, CTA), then regenerate the legal and guide pages.
+  - `TERMS.md` / `PRIVACY.md` name the service: edit, **bump the version**, update
+    `Agreement.VERSION`, regenerate `/terms/` and `/privacy/` (`legal-docs.js` pins it).
+  - `tools/build-og-image.js`: re-render `og-image.png` if the card shows the name.
+  - `DESIGN.md` (regenerate) and `CLAUDE.md` / `SECURITY.md` / `LICENSE` wording.
+  - Leave historical plans/specs alone; they are records.
+  - Before committing: check that "ShotLab" alone doesn't clash with an existing golf
+    product or trademark. Unverified as of 23 Sep.
+  - Bump the service worker; run `npm test` + the render scan both ways (the header
+    brand is on every view, and the nav width is tight at 393px).
+
 ## Still open — Oliver's calls, not taken
 
 - **Default theme.** Recommendation: follow the phone's system setting rather
