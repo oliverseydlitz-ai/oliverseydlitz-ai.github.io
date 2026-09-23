@@ -90,6 +90,13 @@ console.log('— every view, rendered from hostile sessions —');
     .map(d => d.trim()).find(d => d.startsWith('img-src')) || '';
   ok(imgSrc && !/\bhttps?:(?!\/\/)|\*/.test(imgSrc), `the CSP allows no image from an arbitrary host (${imgSrc})`);
 
+  // R39: a sign-in redirect's error text is free text in a URL. Only its code
+  // is read, mapped to fixed copy, so a crafted link cannot speak for the app.
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8')
+    .replace(/\/\/.*$/gm, '');
+  ok(!/get\(\s*['"]error_description['"]/.test(src), "app.js never reads error_description out of the URL");
+  ok(/AUTH_ERROR_COPY\s*=/.test(src) && /hasOwnProperty\.call\(AUTH_ERROR_COPY/.test(src), 'sign-in errors come from a fixed table, own keys only');
+
   // The positive control: the same marker, put into a sink on purpose, is seen.
   const probe = doc.createElement('div'); probe.innerHTML = MARK; doc.body.appendChild(probe);
   ok(tainted() > 0, 'and the check sees a marker that does get in');

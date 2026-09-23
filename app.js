@@ -1092,11 +1092,22 @@ const _oauthTokens = (() => {
   return null;
 })();
 
-// Pull the human-readable error reason out of the redirect (hash or query)
+// Which sign-in error the redirect names. Only the CODE is read and mapped to
+// fixed copy (R39): error_description is free text in a URL, so anyone who
+// can send a link could put any sentence in the app's voice.
+const AUTH_ERROR_COPY = {
+  otp_expired: 'That link has expired. Please sign in or request a new one.',
+  access_denied: 'Sign-in was cancelled or refused. Please try again.',
+  bad_oauth_state: 'Sign-in could not be completed. Please try again.',
+  bad_oauth_callback: 'Sign-in could not be completed. Please try again.',
+  email_not_confirmed: 'Confirm your email first, then sign in.',
+  user_banned: 'This account cannot sign in.',
+};
 let _authErrorMsg = '';
 if (_authError) {
   const p = new URLSearchParams(location.hash.replace(/^#/, '') + '&' + location.search.replace(/^\?/, ''));
-  _authErrorMsg = (p.get('error_description') || p.get('error') || '').replace(/\+/g, ' ');
+  const code = p.get('error_code') || p.get('error') || '';
+  _authErrorMsg = Object.prototype.hasOwnProperty.call(AUTH_ERROR_COPY, code) ? AUTH_ERROR_COPY[code] : '';
 }
 
 function toast(msg) {
@@ -10087,7 +10098,7 @@ const UI = (() => {
 
     const secs = Object.values(DrillLibrary.SECTIONS);
     const tabs = secs.map(sc => `<button class="drill-tab${sc.id === _drillSection ? ' on' : ''}"
-        data-drill-sec="${sc.id}">${sc.id} · ${esc(sc.name)}</button>`).join('');
+        data-drill-sec="${sc.id}"${sc.id === _drillSection ? ' aria-current="true"' : ''}>${sc.id} · ${esc(sc.name)}</button>`).join('');
     // Rendered above the catalogue, not below it: this is the one page in the
     // app that lists 79 physical activities, and a safety line under 79
     // entries is a safety line nobody reaches.
@@ -10148,7 +10159,17 @@ const UI = (() => {
     el.querySelectorAll('[data-drill-sec]').forEach(b => b.addEventListener('click', () => {
       _drillSection = b.dataset.drillSec;
       renderDrills(sessions);
+      // The re-render built a new row; the tapped tab keeps the focus.
+      el.querySelector('.drill-tab.on')?.focus({ preventScroll: true });
     }));
+    // V34: the re-render reset the row to its start, so on a phone the tab
+    // just chosen slid off-screen. Bring it back into the row's own view
+    // (scrollLeft, not scrollIntoView, which would move the page as well).
+    const row = el.querySelector('.drill-tabs'), on = row && row.querySelector('.drill-tab.on');
+    if (on && row.scrollWidth > row.clientWidth) {
+      const off = on.getBoundingClientRect().left - row.getBoundingClientRect().left + row.scrollLeft;
+      row.scrollLeft = Math.max(0, off - 24);
+    }
   }
 
   // ── Short game ────────────────────────────────────────────────
@@ -11884,13 +11905,15 @@ async function init() {
     if (_authError) {
       const expired = /expired|otp_expired|invalid|access_denied/.test(_redirectStr);
       toast(_authErrorMsg
-        ? `Sign-in failed: ${_authErrorMsg}`
+        ? _authErrorMsg
         : (expired ? 'That link has expired. Please sign in or request a new one.' : 'Sign-in failed. Please try again.'));
     } else {
       Auth.hideAuth();
       const fromEmail = /type=(signup|magiclink|recovery|email_change|invite)/.test(_redirectStr);
+      // Without a user the token did not install: "verified" would be a claim
+      // about something that did not happen (R39).
       if (Auth.getUser()) toast(fromEmail ? 'Email verified — you’re signed in!' : 'Signed in!');
-      else toast('Email verified — please sign in.');
+      else toast('Sign-in didn’t complete. Please sign in again.');
     }
   }
 

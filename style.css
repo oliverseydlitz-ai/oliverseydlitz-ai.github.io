@@ -1359,6 +1359,15 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
   transition:color var(--dur),border-color var(--dur)}
 .drill-tab:hover{color:var(--text);border-bottom-color:var(--line-strong)}
 .drill-tab.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
+/* Same edge fade as the section subnav (V6): the row scrolls on a phone and
+   the fade says there is more. At tablet width and up there is room, so it
+   wraps and every section is visible (V34). */
+.drill-tabs::after{content:"";position:sticky;right:0;flex:0 0 1.75rem;
+  background:linear-gradient(to right,transparent,var(--bg));pointer-events:none}
+@media (min-width:768px){
+  .drill-tabs{flex-wrap:wrap;overflow-x:visible}
+  .drill-tabs::after{display:none}
+}
 .drill-row{padding:.7rem .85rem;margin-bottom:.4rem;background:var(--surface2);
   border-left:3px solid var(--accent);border-radius:var(--radius)}
 .drill-row.locked{border-left-color:var(--withheld);opacity:.72}
