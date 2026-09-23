@@ -1141,7 +1141,7 @@ that reads it has already moved on.
 - `.nojekyll` makes serving deterministic — Jekyll would otherwise decide which
   files to process.
 
-### The service worker (`sw.js`) — pinned by `service-worker.js`
+### The service worker — pinned by service-worker.js
 
 It used to answer **every cross-origin GET cache-first** until the next version
 bump — Supabase's `/auth/v1/user` and `/rest/v1/sessions` included, keyed
@@ -1178,8 +1178,10 @@ loudly — it fails as a parse error somewhere unrelated. Only a request whose
 The auth path logged the signed-in **email address** on every `getUser()` and
 every auth event. That is PII on a surface the privacy policy does not mention,
 which persists in devtools history and rides along in any screen-share or bug
-report. The `authLog()` helper is gated on the same `slDebug` flag as `showDebug`, and it
-never takes an email or a token: a log line that must be redacted before it can
+report. `authLog()` and `showDebug()` are both gated on the `slDebug` flag
+(`showDebug` was not until R3, and two of its call sites carried the email —
+the old scan looked only at `console.log` lines and missed them, so it now
+paren-scans every diagnostic call). Neither takes an email or a token: a log line that must be redacted before it can
 be pasted anywhere should not exist.
 
 ### The auth forms are real `<form>` elements
@@ -1259,7 +1261,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **69 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v163**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v164**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1726,7 +1728,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**69 test suites**, service worker **v163**. Deterministic auth, cloud sync
+**69 test suites**, service worker **v164**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

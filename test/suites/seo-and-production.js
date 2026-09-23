@@ -124,6 +124,22 @@ const logLines = app.split('\n').filter(l => /console\.(log|warn|info)\(/.test(l
 ok(!logLines.some(l => /\.email/.test(l)),
    'no console line logs an email — PII in devtools history rides along in every screen-share and bug report');
 ok(/function authLog/.test(app), 'auth tracing goes through authLog');
+// R3: showDebug printed on every load for every user, and two of its call
+// sites carried the signed-in email. The scan above only looked at
+// console.log lines, and the email never appeared on one — it was built in a
+// showDebug argument three lines up. So: no diagnostic call names an email,
+// and showDebug itself is gated.
+const diagCalls = [];
+for (const m of app.matchAll(/\b(showDebug|authLog|console\.(?:log|warn|info|error))\(/g)) {
+  let j = m.index + m[0].length, depth = 1;
+  while (j < app.length && depth > 0) { if (app[j] === '(') depth++; else if (app[j] === ')') depth--; j++; }
+  diagCalls.push(app.slice(m.index, j));
+}
+const leaky = diagCalls.filter(c => /\.email\b/.test(c));
+ok(diagCalls.length > 20 && leaky.length === 0,
+   `no diagnostic call (of ${diagCalls.length}) carries an email${leaky.length ? ' — ' + leaky.map(c => c.slice(0, 60)).join(' | ') : ''}`);
+const sdBody = (app.match(/function showDebug\(msg\) \{[^]*?\n\}/) || [''])[0];
+ok(/getItem\('slDebug'\) !== '1'\) return/.test(sdBody), 'and showDebug prints nothing unless the debug flag is set');
 ok(/slDebug.*!== '1'.*return|getItem\('slDebug'\) !== '1'/.test(app),
    'which is off unless the debug flag is set');
 

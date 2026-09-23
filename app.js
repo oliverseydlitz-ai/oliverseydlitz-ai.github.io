@@ -1074,7 +1074,13 @@ function applyTheme(dark) {
 // (the banner was a temporary debugging aid while fixing OAuth — login works
 // now, so we keep the call sites but stop covering the UI). Toggle the on-screen
 // version any time from the console with: localStorage.setItem('slDebug','1')
+//
+// Gated on the same flag as authLog (R3). It printed on every load for every
+// user, and two of its call sites carried the signed-in email — PII in devtools
+// history that rides along in every screen-share and bug report. The call
+// sites no longer pass an email either; the gate is the second layer.
 function showDebug(msg) {
+  try { if (localStorage.getItem('slDebug') !== '1') return; } catch (_) { return; }
   console.log('[ShotLab]', msg);
 }
 
@@ -1208,7 +1214,7 @@ const Auth = (() => {
     // Diagnostic banner so the state is visible on mobile (no dev console).
     showDebug(
       `had #token   : ${!!_oauthTokens}\n` +
-      `signed in as : ${_user?.email || '(none)'}\n` +
+      `signed in    : ${_user ? 'yes' : 'no'}\n` +
       `status       : ${_user ? '✓ logged in' : 'not logged in'}`
     );
     return _user;
@@ -10342,7 +10348,7 @@ const ImportFlow = (() => {
     if (Auth.getUser()) {
       CloudDB.saveSession(session).then(() => {
         toast('Saved to cloud ✓');
-        showDebug('CLOUD SYNC: ✓ saved session to cloud as ' + Auth.getUser().email);
+        showDebug('CLOUD SYNC: ✓ saved session to cloud');
       }).catch(e => {
         toast('Cloud sync failed: ' + (e?.message || 'unknown error'));
         showDebug('CLOUD SYNC FAILED:\n' + (e?.message || JSON.stringify(e)));
