@@ -314,5 +314,23 @@ console.log('— the ranked card is not restated by an alert under it —');
      'and renderHome filters the alerts on it');
 }
 
+console.log('— the session metrics strip is one club, never the bag (C4) —');
+{
+  const mixed = sess('m', '2026-07-09', prem, [
+    ...many(20, { clubType: 'd', carryDistance: 250, ballSpeed: 150, clubSpeed: 105, smashFactor: 1.43 }),
+    ...many(12, { clubType: '7i', carryDistance: 160 })]);
+  UI.renderDetail(mixed);
+  const strip = doc.getElementById('metricsStrip');
+  const carryCell = [...strip.querySelectorAll('.metric-card')].find(c => /^Carry$/.test(c.querySelector('.metric-label').textContent.trim()));
+  const cap = doc.getElementById('metricsStripClub');
+  ok(cap && /^Driver · 20 shots/.test(cap.textContent), `under "All" it names the club it is reading ("${cap && cap.textContent}")`);
+  ok(carryCell && carryCell.querySelector('.mval').dataset.v === '250',
+     `and carry is the driver's 250, not the pooled ${Math.round((20 * 250 + 12 * 160) / 32)} (${carryCell && carryCell.querySelector('.mval').dataset.v})`);
+  ok(!/vs all/.test(strip.textContent), 'no delta against the pooled bag');
+  UI.renderDetail(sess('t', '2026-07-10', prem, many(3, { clubType: '7i' })));
+  ok(/7 more shots to report/.test(strip.textContent) && !strip.querySelector('.mval[data-v]:not([data-v=""])'),
+     'and a 3-shot club gets no headline numbers, just what it needs');
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exit(fail ? 1 : 0);

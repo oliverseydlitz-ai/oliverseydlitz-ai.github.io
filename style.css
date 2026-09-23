@@ -734,8 +734,7 @@ textarea { resize: vertical; }
 }
 .metric-unit { font-size: .4em; font-weight: 600; opacity: .5; margin-left: 1px; }
 .metric-delta { font-size: .68rem; color: var(--text-muted); margin-top: .15rem; }
-.metric-delta.up   { color: var(--green); }
-.metric-delta.down { color: var(--red); }
+.metrics-strip-club { font-size: .75rem; color: var(--text-muted); margin: 0 0 var(--s2); }
 
 /* ── Club filter ───────────────────────────────────────── */
 .filter-row {

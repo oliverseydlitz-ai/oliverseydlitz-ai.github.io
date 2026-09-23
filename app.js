@@ -8664,14 +8664,29 @@ const UI = (() => {
       {label:'Carry Total', field:'totalDistance',    dec:0, unit:'yds', col:'var(--line-strong)'},
     ];
     const el = document.getElementById('metricsStrip');
+    // One club, never the bag (C4). Under "All" this averaged every shot, so a
+    // driver-plus-7-iron session read "CARRY 201", which is nobody's club; and
+    // with a club picked, its "vs all" delta compared that club with the pooled
+    // bag, which measures the gap between clubs. Under "All" the strip anchors
+    // on the most-hit club and names it, the way QuickStats.pick does; the delta
+    // is gone; and below the per-club floor a value is withheld with what it
+    // needs, like every other club mean in the app.
+    const clubsHere = [...new Set((shots || []).map(s => s.clubType))];
+    const count = c => shots.filter(s => s.clubType === c).length;
+    const anchor = clubsHere.length > 1 ? clubsHere.sort((a, b) => count(b) - count(a))[0] : clubsHere[0];
+    const own = clubsHere.length > 1 ? shots.filter(s => s.clubType === anchor) : shots;
+    const short = Metrics.MIN_SHOTS_REPORT - own.length;
+    // The club is named once, above the strip — prefixed onto six labels it
+    // wrapped half of them onto two lines and threw the values out of line.
+    let cap = document.getElementById('metricsStripClub');
+    if (!cap) { cap = document.createElement('div'); cap.id = 'metricsStripClub'; cap.className = 'metrics-strip-club'; el.before(cap); }
+    cap.textContent = anchor
+      ? `${clubLabel(anchor)} · ${own.length} shot${own.length === 1 ? '' : 's'}${clubsHere.length > 1 ? ' · your most-hit club this session' : ''}`
+      : '';
     el.innerHTML = M.map(m => {
-      const val = avg(shots,m.field);
-      const allVal = avg(allShots,m.field);
-      let delta='';
-      if (val!==null && allVal!==null && shots!==allShots) {
-        const d = val-allVal; const cls=d>=0?'up':'down'; const sign=d>=0?'+':'';
-        delta = `<div class="metric-delta ${cls}">${sign}${fmt(d,m.dec)} vs all</div>`;
-      }
+      const val = short > 0 ? null : avg(own, m.field);
+      const delta = short > 0
+        ? `<div class="metric-delta">${short} more shot${short === 1 ? '' : 's'} to report</div>` : '';
       return `<div class="metric-card" style="--mc:${m.col}">
         <div class="metric-label">${m.label}</div>
         <div class="metric-value"><span class="mval" data-v="${val!==null?val:''}" data-d="${m.dec}">${fmt(val,m.dec)}</span><small class="metric-unit">${m.unit}</small></div>
