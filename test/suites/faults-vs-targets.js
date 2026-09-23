@@ -74,5 +74,20 @@ const steep = run('d', 'attackAngle', -6,
   .filter(f => f.category === 'Attack Angle');
 ok(steep.length > 0, `a driver chopping down at -6° does raise one (${steep.map(f=>f.id).join(', ')})`);
 
+console.log('— a bag is not one club (C1, C2, C34) —');
+// Twenty identical drivers, then twenty identical wedges. Per club there is
+// nothing to say. Pooled, the old session rules saw a 55 mph "fatigue" drop,
+// a smash spread, a launch spread and a side-carry spread — the driver-to-
+// wedge gap, reported as four faults on the session.
+{
+  const drv = Array.from({ length: 20 }, (_, i) => ({ _row: i + 2, clubType: 'd', ...base({ launchAngle: 12, attackAngle: 3, sideCarry: 18 }) }));
+  const sw = Array.from({ length: 20 }, (_, i) => ({ _row: i + 22, clubType: 'sw', ...base({ smashFactor: 1.20, ballSpeed: 95,
+    clubSpeed: 79, carryDistance: 95, totalDistance: 98, launchAngle: 31, attackAngle: -5, spinRate: 9000, sideCarry: -18 }) }));
+  const s = session([...drv, ...sw]);
+  const pooled = FE.detectFaults(s.shots, s).filter(f => f.total === s.shots.length && new Set(s.shots.map(x => x.clubType)).size > 1
+    && /Consistency/.test(f.category));
+  ok(pooled.length === 0, `no fault is raised on the whole bag at once${pooled.length ? ' — ' + pooled.map(f => f.name).join(', ') : ''}`);
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

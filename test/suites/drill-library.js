@@ -121,11 +121,12 @@ ok(good.lockedNote === null, 'with nothing withheld');
 ok(P.libraryDrill(fault('poor-contact', []), mk(20, { _ball: 'range' })).libraryDrill !== null,
    'range balls do not lock strike quality — smash does not care what ball it was');
 
-// A dispersion fault on range balls: section B is premium-only, so it locks.
-const locked = P.libraryDrill(fault('dispersion-wide', []), mk(40, { _ball: 'range' }));
-ok(locked.section === 'B', 'a dispersion fault resolves to the tail section');
-ok(locked.libraryDrill === null, 'which is entirely locked on range balls');
-ok(/2–4× wider/.test(locked.lockedNote), 'and says what would unlock it rather than substituting a drill');
+// Section B (dispersion tails) is premium-only. No fault reaches it any more —
+// the pooled 'dispersion-wide' session rule was deleted (C2) and spread is
+// raised per club by Dispersion — so its gate is checked directly.
+const bGates = L.forSection('B', { shots: mk(40, { _ball: 'range' }), sessions: 1 }).filter(x => !x.offDevice);
+ok(bGates.length > 0 && bGates.every(x => !x.ok), 'the tail section is entirely locked on range balls');
+ok(bGates.every(x => x.reasons.some(r => /2–4× wider/.test(r))), 'and says what would unlock it rather than substituting a drill');
 
 // A start-line fault from an unaligned unit.
 const unaligned2 = P.libraryDrill(fault('pull-left', []), mk(20, { _aligned: false }));

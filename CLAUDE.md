@@ -417,7 +417,7 @@ the cautious side, never the flattering one.
 two of those a checkable drill was sitting second in the same list. A block
 where *every* drill is a feel sets `drillIsFeel` and says so.
 
-Three surfaces, one rule, all guarded by `test/suites/drill-focus.js`: **53**
+Three surfaces, one rule, all guarded by `test/suites/drill-focus.js`: **46**
 fault drills (each labelled), **104** library drills (external by default, the
 one exception declares `feel:true`), **24** coaching tips. Two library drills
 trip the word list innocently — a junior's "growing spine", a putting "lag
@@ -1276,7 +1276,7 @@ to re-enable the on-screen banner.
 ## Where things stand (read this first in a new session)
 
 State at handover: **71 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v169**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v170**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1743,7 +1743,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 22 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**71 test suites**, service worker **v169**. Deterministic auth, cloud sync
+**71 test suites**, service worker **v170**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

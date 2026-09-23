@@ -205,6 +205,10 @@ console.log('— and no replaced formula is still in use anywhere —');
     ['avg(allShots, \'carryDistance\')', 'one named club — a bag mean moves with which clubs you hit'],
     ['avg(s.shots,\'carryDistance\')',   'the same'],
     ['avg(sessions.flatMap', 'the same — flattening sessions pools ball types as well as clubs'],
+    // Four fault rules that ran over every shot in the session at once (C1,
+    // C2, C34): "Fatigue Pattern Detected — 73 of 73" for driver-then-iron.
+    // Each has a per-club, gated owner; a pooled rule list must not return.
+    ['SESSION_RULES', 'Strike (contact, fatigue) and Dispersion (spread), per club and gated'],
   ];
   for (const [dead, instead] of ZOMBIES) {
     const n = code.split(dead).length - 1;

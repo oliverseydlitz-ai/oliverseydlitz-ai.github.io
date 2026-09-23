@@ -2988,10 +2988,9 @@ const DrillLibrary = (() => {
   // join that looks complete and joins nothing.
   const FAULT_SECTION = {
     // Strike quality — smash factor and energy transfer
-    'poor-contact': 'A', 'inconsistent-contact': 'A', 'low-ball-speed': 'A',
-    'session-fatigue': 'A',                 // A15 is the fatigue probe
-    // Dispersion tails
-    'dispersion-wide': 'B',
+    'poor-contact': 'A', 'low-ball-speed': 'A',
+    // Dispersion tails (B) have no fault: spread is raised per club by the
+    // Dispersion module, never by a pooled session rule (C2).
     // Start line — where the ball set off, before any curve
     'pull-left': 'C', 'push-right': 'C',
     // Face-to-path — curvature and the spin axis it produces
@@ -3001,7 +3000,7 @@ const DrillLibrary = (() => {
     'fat-shot': 'E', 'wedge-thin': 'E',
     'driver-negative-aa': 'E', 'driver-very-steep': 'E',
     'iron-shallow-aa': 'E', 'iron-very-steep': 'E',
-    'driver-high-launch': 'E', 'driver-low-launch': 'E', 'variable-launch': 'E',
+    'driver-high-launch': 'E', 'driver-low-launch': 'E',
     'high-spin-loft': 'E', 'low-spin-loft-iron': 'E',
   };
   const sectionForFault = fid => FAULT_SECTION[fid] || null;
@@ -4967,99 +4966,16 @@ const FaultEngine = (() => {
     },
   ];
 
-  // Session-wide consistency rules (operate on all shots together)
-  const SESSION_RULES = [
-    {
-      id:'inconsistent-contact', name:'Inconsistent Contact Quality', icon:'progress', category:'Consistency', severity:'medium',
-      test: shots => {
-        const vals = shots.map(s=>s.smashFactor).filter(v=>v>0);
-        return stdDev(vals) > 0.08;
-      },
-      description: shots => {
-        const vals = shots.map(s=>s.smashFactor).filter(v=>v>0);
-        const sd = stdDev(vals);
-        const best = Math.max(...vals);
-        const worst = Math.min(...vals);
-        return `Smash factor standard deviation of ${fmt(sd,3)} is above the 0.08 threshold (Tour: ~0.02). ` +
-          `Range from ${fmt(worst,2)} to ${fmt(best,2)} within the session. ` +
-          `Ball speed tracks smash almost linearly, so that spread is roughly a ${fmt((best-worst)/1.4*100,0)}% ` +
-          `ball-speed swing between your best and worst strike — the carry cost of that depends on the club and is not quoted here.`;
-      },
-      causes:['No consistent pre-shot routine','Ball position varying shot-to-shot','Setup changes (grip, stance width)',
-        'Fatigue or mental drift during session'],
-      drills:[
-        {name:'Rigid pre-shot routine',desc:'Develop and stick to a 3-step routine before every shot: (1) approach from behind and visualise the shot, (2) walk in and take your grip + stance, (3) one waggle + go. Consistency starts before the swing.',focus:'external'},
-        {name:'Ball position gate',desc:'Use an alignment stick to set ball position before every shot in practice. Vary the club but always double-check position relative to the alignment stick.',focus:'setup'},
-      ],
-    },
-    {
-      id:'variable-launch', name:'Variable Launch Angle', icon:'progress', category:'Consistency', severity:'low',
-      test: shots => {
-        const vals = shots.map(s=>s.launchAngle).filter(v=>v>0);
-        return vals.length >= 5 && stdDev(vals) > 5;
-      },
-      description: shots => {
-        const vals = shots.map(s=>s.launchAngle).filter(v=>v>0);
-        return `Launch angle standard deviation of ${fmt(stdDev(vals),1)}°. ` +
-          `Variable launch angle = inconsistent ball striking. Distance will vary significantly even with the same club speed.`;
-      },
-      causes:['Inconsistent ball position','Varying spine angle / posture at address',
-        'Dynamic loft changing due to wrist action variability'],
-      drills:[
-        {name:'Check address position',desc:'Photograph your address position from face-on and down-the-line. Compare to Tour reference photos for your club type. Small setup changes cause large launch angle variations.',focus:'setup'},
-      ],
-    },
-    {
-      id:'session-fatigue', name:'Fatigue Pattern Detected', icon:'warn', category:'Consistency', severity:'low',
-      test: shots => {
-        if (shots.length < 10) return false;
-        const firstHalf = shots.slice(0, Math.floor(shots.length/2));
-        const secondHalf = shots.slice(Math.floor(shots.length/2));
-        const f = avg(firstHalf,'ballSpeed');
-        const s = avg(secondHalf,'ballSpeed');
-        return f !== null && s !== null && (f - s) > 5;
-      },
-      description: shots => {
-        const firstHalf = shots.slice(0,Math.floor(shots.length/2));
-        const secondHalf = shots.slice(Math.floor(shots.length/2));
-        const drop = avg(firstHalf,'ballSpeed') - avg(secondHalf,'ballSpeed');
-        return `Ball speed dropped by ${fmt(drop,1)} mph from the first half to the second half of this session. ` +
-          `Fatigue causes muscles to tighten, reducing clubhead speed and quality of contact. ` +
-          `Consider shorter, more focused practice sessions with breaks.`;
-      },
-      causes:['Muscle fatigue','Loss of concentration','Dehydration','Hitting too many balls without recovery'],
-      drills:[
-        {name:'Structured practice blocks',desc:'Practice in 15-minute focused blocks with 5-minute rest. Quality > quantity. 50 deliberate balls beats 200 tired balls every time.',focus:'external'},
-        {name:'Speed training last',desc:'If doing speed work (fast swings), do it in the first 20 minutes when you are freshest. Technique work later when pace doesn\'t matter as much.',focus:'external'},
-      ],
-    },
-    {
-      id:'dispersion-wide', name:'Wide Shot Dispersion', icon:'target', category:'Consistency', severity:'medium',
-      test: shots => {
-        const vals = shots.map(s=>s.sideCarry);
-        return stdDev(vals) > 20;
-      },
-      description: shots => {
-        // Unfiltered, this took Math.min of an array containing undefined —
-        // NaN — for any shot the parser had no side carry for. The rule's own
-        // test gates on it, so in practice it held; one missing field would
-        // have broken the sentence.
-        const vals = shots.map(s=>s.sideCarry).filter(Number.isFinite);
-        const sd = stdDev(vals);
-        const leftMost = vals.length ? Math.min(...vals) : null;
-        const rightMost = vals.length ? Math.max(...vals) : null;
-        return `Side carry standard deviation of ${fmt(sd,1)} yards (side carry is a modelled figure, not measured). ` +
-          `Left-right spread: ${fmt(leftMost,1)} to +${fmt(rightMost,1)} yards, a total width of ${fmt(rightMost-leftMost,0)} yards. ` +
-          `What actually costs strokes is the tail of that spread — the occasional big miss — more than the average width, ` +
-          `so treat the widest one or two shots as the thing to work on.`;
-      },
-      causes:['Face angle variability','Path inconsistency','Contact quality variation'],
-      drills:[
-        {name:'Target narrow gate',desc:'Set up two headcovers 20 yards wide 150 yards away (or use flags). Practice until 80% of balls land between them. Narrow target = narrow mind = better shots.',focus:'external'},
-        {name:'Intentional shape drill',desc:'Deliberately hit 5 draws then 5 fades. Controlling shot shape intentionally improves overall path and face consistency.',focus:'external'},
-      ],
-    },
-  ];
+  // There were four "session-wide" rules here — contact consistency, launch
+  // variability, a first-half/second-half fatigue check and side-carry spread —
+  // and every one computed over ALL shots together (C1, C2, C34). Pooled across
+  // a bag, each measures the driver-to-wedge gap: identical drivers plus
+  // identical wedges tripped two of them, and a golfer who hit driver then an
+  // iron was told "Fatigue Pattern Detected — 73 of 73 shots" on the same page
+  // Strike said "No measurable fade". They are deleted, not fixed, because each
+  // already has a per-club, gated owner: Strike (contact and fatigue, 15-shot
+  // floor per club) and Dispersion (spread, per club, 30 shots, ball-gated).
+  // rules-are-wired.js fails if the name comes back.
 
   // ── Reporting gates ───────────────────────────────────────────
   // The launch monitor's own error (MAE 1.05 deg attack angle, 1.19 deg club
@@ -5117,19 +5033,6 @@ const FaultEngine = (() => {
         // for RetentionProbe: which club, and which tier-1 metric to re-measure
         clubType: [...clubs][0],
         metric: rule.probeMetric || 'smashFactor',
-      });
-    }
-
-    for (const rule of SESSION_RULES) {
-      if (shots.length < Metrics.MIN_SHOTS_REPORT) break;  // too small a session to judge
-      let passes = false;
-      try { passes = rule.test(shots); } catch {}
-      if (!passes) continue;
-      faults.push({
-        ...rule,
-        count: shots.length,
-        total: shots.length,
-        description: typeof rule.description === 'function' ? rule.description(shots) : rule.description,
       });
     }
 

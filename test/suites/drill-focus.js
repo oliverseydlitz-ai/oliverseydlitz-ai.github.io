@@ -24,8 +24,9 @@ const drills = parsed.filter(d => d.focus);
 const unlabelled = parsed.filter(d => !d.focus).map(d => d.name);
 
 console.log('— every drill declares where the golfer\'s attention goes —');
-ok(parsed.length === 53, `read every drill out of the source (found ${parsed.length})`);
-ok(drills.length === 53, `all 53 carry a focus (found ${drills.length})`);
+// 46 since C1/C2/C34 deleted the four pooled session rules and their 7 drills.
+ok(parsed.length === 46, `read every drill out of the source (found ${parsed.length})`);
+ok(drills.length === 46, `all 46 carry a focus (found ${drills.length})`);
 ok(unlabelled.length === 0,
    `no drill is missing one${unlabelled.length ? ': ' + unlabelled.join(', ') : ''}`);
 ok(drills.every(d => FE.DRILL_FOCUS.includes(d.focus)), 'and every value is one of the three');
