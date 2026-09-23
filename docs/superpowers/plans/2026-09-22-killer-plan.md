@@ -238,6 +238,7 @@ Three background agents audited the served app, each through one lens: **visual/
 | R8 R9 R10 R12 R13 R14 R18 | Named chart canvases; `aria-current` nav; live toast; goal picker name; heading order; skip link; two auth-path crashes | `8131e3c` |
 | R17 | `sync.sh` copies every SW asset (done before the overnight run) | earlier |
 | R15 | CSP `img-src 'self' data:` (no arbitrary hosts); guarded in `taint.js` | `55b9d6c` |
+| C4 | Metrics strip anchors on the most-hit club (named in a caption), no pooled 'vs all' delta, per-club floor; total kept per Phase 9 | `d987ceb` |
 | V20 | Shot-log score rule on the first cell only (done inside R4) | see R4 |
 | C5 | HIGH | **Every retention probe measures smash factor, whatever fault opened it.** No rule defines `probeMetric`, so the fallback is `smashFactor`. The card promises it "settles whether Negative Attack Angle on Driver held" and then measures smash. This is the app's *only* efficacy metric. **Verified.** | `app.js:5058` | Give each rule a tier-1 `probeMetric` that is relevant to it, or no probe at all. Name the measured metric on the card. | M |
 | C6 | HIGH | **Probes are opened by *viewing* a session.** Re-viewing an older session re-baselines the live probe, and a backdated import creates an already-expired probe that counts against the hit rate. Partly inferred from code; the expired case was reproduced. | `renderDetail` → `RetentionProbe.open` ~7743; `open()` ~3987 | Open a probe once, at import, for the newest session only. Never open one whose window has already closed. Expire relative to the sessions that exist, not only `Date.now()`. | M |
@@ -462,7 +463,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 2. **C25, C29, C31, C32 — HELD for Phase 9.** Each tightens a rule Oliver's 22 Sep direction loosens (face angle, spin axis, range-ball gating). Resolve them inside Phase 9, not before it.
 3. **C27** — the rest of the probe work; it changes under Phase 9 (range → premium allowed, weighted), so do it there.
 4. **V5/C11 + V4 + C13 + C14 + C21** — home shows one fault, one form and one priority (this merges with plan 2.5).
-5. **C4, C8** — route the remaining legacy surfaces through the gated modules.
+5. **C8** (changes under Phase 9: absolute bias becomes tier 3) — route the remaining legacy surfaces through the gated modules.
 7. Everything in 7C; then rerun the agents on the NOT YET COVERED list.
 
 ### Done log
