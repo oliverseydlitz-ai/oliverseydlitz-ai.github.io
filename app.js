@@ -3111,7 +3111,7 @@ const DrillLibrary = (() => {
   // join that looks complete and joins nothing.
   const FAULT_SECTION = {
     // Strike quality — smash factor and energy transfer
-    'poor-contact': 'A', 'low-ball-speed': 'A',
+    'poor-contact': 'A',
     // Dispersion tails (B) have no fault: spread is raised per club by the
     // Dispersion module, never by a pooled session rule (C2).
     // Start line — where the ball set off, before any curve
@@ -5183,23 +5183,11 @@ const FaultEngine = (() => {
     },
 
     // ── EFFICIENCY ────────────────────────────────────────────
-    {
-      id:'low-ball-speed', probe:{metric:'smashFactor',better:1}, name:'Low Ball Speed / Energy Loss', icon:'progress', category:'Efficiency', severity:'medium',
-      test: s => s.clubSpeed > 0 && s.ballSpeed > 0 && (s.ballSpeed/s.clubSpeed) < 1.30 && s.smashFactor > 1.28,
-      description: shots => {
-        const ratio = avg(shots,'ballSpeed') / avg(shots,'clubSpeed');
-        return `Ball speed / club speed ratio of ${fmt(ratio,2)}. ` +
-          `Even with decent contact (smash factor OK), overall energy transfer is below optimal. ` +
-          `This often indicates a loss of lag or "casting" before impact.`;
-      },
-      causes:['Early release / casting (losing lag before impact)','Deceleration in the downswing',
-        'Tension stopping natural wrist release at impact','Passive lower body — arms doing all the work'],
-      drills:[
-        {name:'Lag preservation',desc:'Hold your wrist angle (lag) as long as possible in the downswing. Imagine holding a tray of drinks — release only when the hands reach hip height on the downswing.',focus:'feel'},
-        {name:'Towel swings',desc:'Swing a damp towel or a training aid that "whooshes" at the bottom. Listen for where the whoosh peaks: if it comes before the ball, the speed is arriving too early. Move it until it is loudest level with the ball.',focus:'external'},
-      ],
-      optimalRange: () => 'Ball/club speed ratio > 1.42 (driver), > 1.36 (irons)',
-    },
+    // 'low-ball-speed' was deleted (C36). It read ball speed / club speed —
+    // which IS smash factor — a second time, against a third copy of the
+    // threshold, and on a shot whose reported smash was fine it inferred
+    // "casting": a body cause from launch data. Poor contact already owns
+    // strike efficiency, per club, off Benchmarks.smashRef.
 
     // ── SHORT GAME ────────────────────────────────────────────
     {

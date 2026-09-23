@@ -24,9 +24,10 @@ const drills = parsed.filter(d => d.focus);
 const unlabelled = parsed.filter(d => !d.focus).map(d => d.name);
 
 console.log('— every drill declares where the golfer\'s attention goes —');
-// 46 since C1/C2/C34 deleted the four pooled session rules and their 7 drills.
-ok(parsed.length === 46, `read every drill out of the source (found ${parsed.length})`);
-ok(drills.length === 46, `all 46 carry a focus (found ${drills.length})`);
+// 46 since C1/C2/C34 deleted the four pooled session rules and their 7 drills;
+// 44 since C36 deleted low-ball-speed and its 2.
+ok(parsed.length === 44, `read every drill out of the source (found ${parsed.length})`);
+ok(drills.length === 44, `all 44 carry a focus (found ${drills.length})`);
 ok(unlabelled.length === 0,
    `no drill is missing one${unlabelled.length ? ': ' + unlabelled.join(', ') : ''}`);
 ok(drills.every(d => FE.DRILL_FOCUS.includes(d.focus)), 'and every value is one of the three');
@@ -62,9 +63,10 @@ const mk = (id, shots) => Store.stamp({ id, date: '2026-07-01',
   conditions: { ball: 'premium', surface: 'grass', alignment: 'confirmed' }, shots });
 const sess = mk('p', [
   ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 2, ...shot() })),
-  // low-ball-speed: ratio under 1.30 with the smash still over 1.28
-  ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 20,
-    ...shot({ clubType: '9i', ballSpeed: 80, clubSpeed: 62, smashFactor: 1.33 }) })),
+  // a second club group (low-ball-speed used to fire here until C36 deleted it)
+  // steep 9-iron attack: tier 2, so it needs 15 shots of the club
+  ...Array.from({ length: 16 }, (_, i) => ({ _row: i + 20,
+    ...shot({ clubType: '9i', ballSpeed: 88, clubSpeed: 66, smashFactor: 1.33, attackAngle: -8.5 }) })),
   // shallow iron attack angle
   ...Array.from({ length: 12 }, (_, i) => ({ _row: i + 40,
     ...shot({ clubType: '6i', attackAngle: 2.5, smashFactor: 1.35, ballSpeed: 88, clubSpeed: 65 }) })),
@@ -92,17 +94,11 @@ ok(withDrill.every(b => Number.isFinite(b.balls) && b.balls > 0),
 ok(withDrill.reduce((a2, b) => a2 + b.minutes, 0) <= 60,
    'and the whole plan fits in the time it was asked for');
 
-// low-ball-speed is the one that made this concrete: "Lag preservation — hold
-// your wrist angle" was drills[0], with "Towel swings" (an audible whoosh, and
-// entirely external) sitting right behind it.
+// low-ball-speed made this concrete ("Lag preservation" as drills[0] with an
+// external towel drill behind it). The rule itself is gone (C36): it scored
+// smash a second time and inferred "casting" from launch data.
 console.log('— the case that started it —');
-const lbs = [...block.matchAll(/id:'low-ball-speed'[\s\S]*?optimalRange/g)][0][0];
-const lbsDrills = [...lbs.matchAll(/\{name:'([^']*)',desc:'(?:[^'\\]|\\.)*',focus:'(\w+)'\}/g)]
-  .map(m => ({ name: m[1], focus: m[2] }));
-ok(lbsDrills.some(d => d.focus !== 'feel'),
-   'low-ball-speed has a checkable drill available');
-ok(FE.splitDrills(lbsDrills).checkable[0].name === 'Towel swings',
-   'and the split surfaces it ahead of "Lag preservation"');
+ok(!/id:'low-ball-speed'/.test(block), 'low-ball-speed no longer exists — poor contact owns strike efficiency');
 
 console.log('— the 104-drill library is held to it too —');
 // The library was written from the research base and is almost entirely

@@ -509,6 +509,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | R32 | Sign-in and import errors are `role=alert`; a sign-in error marks its field `aria-invalid` + `aria-describedby` and focuses it; new suite `form-errors.js` | overnight 22:40 |
 | R21 | The five Settings runtime modals (analytics, benchmarks, learning, club, efficiency) carry `.modal-overlay`, so the trap gives them role, name, focus in/out, Tab containment and Escape; the shortcuts overlay got a name; guard in `focus-trap.js` (mutation-checked). Also removed a code name (`R_ANCHORS`) from section C's user-facing text | overnight 23:10 |
 | C41 C33 | Drill gate judged on every shot of the fault's club, not only the affected ones (`drill-library.js`). Progress: no pooled "All clubs" line — defaults to the most-hit club, charts run oldest to newest, sessions below the per-club floor are left off, and the trend summary reads the chosen club instead of the whole bag (`progress-trend.js`). Both mutation-checked. Conditions are NOT filtered on the charts: v2 treats range balls as near-normal data | overnight 23:40 |
+| C36 | Deleted `low-ball-speed`: it read ball/club speed (smash) a second time against a third threshold copy and inferred "casting" from launch data. Its section mapping went with it; `drill-focus.js` now pins 44 fault drills and the rule's absence, with its fixture reworked onto a steep 9-iron | overnight 00:10 |
 
 
 ---
