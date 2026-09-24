@@ -4841,11 +4841,25 @@ const FaultEngine = (() => {
   //
   // The framing rule from §3.6, verbatim: say "your face was 3° open to your
   // path"; never say "your lead wrist was cupped."
-  const BODY_CONSTRUCT = /\b(hip|hips|pelvis|torso|shoulder turn|wrist|wrists|lag|cast|casting|early exten|weight shift|ground|x-factor|spine|arm-dominant|over the top|release|posture|sway|slide|sliding|separation|knee|elbow|forearm|grip pressure|stance)\b/i;
+  const BODY_CONSTRUCT = /\b(hip|hips|pelvis|torso|shoulders?|shoulder turn|wrist|wrists|lag|cast|casting|early exten|weight|ground|x-factor|spine|arm-dominant|arms?|over[- ]the[- ]top|release|releasing|posture|sway|slide|sliding|separation|knee|elbow|forearms?|hands?|grip|stance|scoop\w*|flip\w*|trail (?:foot|side)|body|rotation|upper body|tension|address|alignment|aimed|ball position|ball too far|tee too|toe|heel|shaft lean|dynamic loft|coaching)\b/i;
 
-  // Can the launch monitor actually see this, or is it a body position someone
-  // would need video to check?
-  const causeIsObservable = text => !BODY_CONSTRUCT.test(String(text || ''));
+  // What the monitor reads off the club and the ball: club path, attack angle,
+  // and the face-to-path relation derived from them (C30). A cause is measured
+  // only if it names one of these AND no body position. It used to be the
+  // other way round — anything the body list missed counted as measured — and
+  // forty of sixty-two causes rendered under "What the numbers show", among
+  // them grip, alignment, weight on the trail foot, dynamic loft (not
+  // exported), toe strikes (impact location is not measured) and
+  // "Over-the-top", whose hyphens slipped past "over the top". Unknown now
+  // means not measured, the cautious side, as with an unlabelled drill.
+  const MEASURED_CAUSE = /\b(path|attack angle|face (?:open|closed) to (?:the )?path|downswing too steep)\b/i;
+
+  // Can the launch monitor actually see this, or is it a body position (or a
+  // setup detail) someone would need video or a mirror to check?
+  const causeIsObservable = text => {
+    const t = String(text || '');
+    return MEASURED_CAUSE.test(t) && !BODY_CONSTRUCT.test(t);
+  };
   function splitCauses(causes) {
     const list = (causes || []).filter(Boolean);
     return {

@@ -442,8 +442,15 @@ causes are split: `causeIsObservable()` is false for anything naming a hip,
 wrist, spine, posture, lag, casting or early extension, and those render under
 "Often behind it — but not measured here" with `BODY_CAVEAT`. Dynamic loft is
 a many-to-one outcome and cannot be inverted to a wrist angle — there is no
-published regression for it. A bulk test asserts no body-position string is
-ever classified as measured, so a new cause cannot land on the wrong side.
+published regression for it.
+
+**Measured is opt-in, not the default (C30).** A cause is observable only if it
+names a club/ball reading (`MEASURED_CAUSE`: path, attack angle, face-to-path)
+**and** no body or setup word. It used to be "anything the body list missed",
+and 40 of 62 causes rendered as findings — grip, alignment, weight, dynamic
+loft, toe strikes, and "Over-the-top" (hyphens beat the regex). The bulk test
+in `core-geometry-and-faults.js` names the seven measured causes; a new one on
+that side must be added there by name.
 
 ### Prescribing across the boundary (`FaultEngine.splitDrills`)
 
@@ -1390,7 +1397,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **81 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v211**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v212**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1861,7 +1868,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**81 test suites**, service worker **v211**. Deterministic auth, cloud sync
+**81 test suites**, service worker **v212**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

@@ -151,6 +151,31 @@ ok(leaked.length === 0,
 const bodyCount = all.filter(c => !FE.causeIsObservable(c)).length;
 ok(bodyCount >= 15, `${bodyCount} of them are correctly held behind the caveat`);
 
+// C30: every shipped cause is placed explicitly. The narrow word list above let
+// forty of sixty-two render as measured — grip, alignment, weight on the trail
+// foot, dynamic loft, a toe strike, "Over-the-top" with hyphens. These seven
+// name a club or ball reading and nothing else; any other string is held
+// behind the caveat. A new cause that lands on the measured side must be added
+// here BY NAME, which is the point: it is a claim about what the device sees.
+const MEASURED = [
+  'Inside-out path combined with closed face',
+  'Downswing too steep — treating the driver like an iron',
+  'Negative attack angle (see above)',
+  'Attack angle too steeply upward (> +6°)',
+  'Face open to path at impact (main cause)',
+  'Outside-in swing path',
+  'Face closed to path',
+];
+const measuredNow = all.filter(FE.causeIsObservable);
+const extra = measuredNow.filter(c => !MEASURED.includes(c));
+const lost = MEASURED.filter(c => all.includes(c) && !FE.causeIsObservable(c));
+ok(extra.length === 0, `only the named causes render as measured${extra.length ? ' — also: ' + extra.join(' | ') : ''}`);
+ok(lost.length === 0, `and each named one still does${lost.length ? ' — lost: ' + lost.join(' | ') : ''}`);
+for (const bad of ['Over-the-top swing path creating a glancing blow', 'Weak grip', 'Tee too low',
+  'Dynamic loft too high', 'Hitting too far out on toe (reduces effective loft)',
+  'Alignment problem — shoulders aimed right of target', 'Hanging back on the trail foot through impact'])
+  ok(!FE.causeIsObservable(bad), `not measured: "${bad.slice(0, 44)}"`);
+
 console.log('— the fault gates, pinned so the docs cannot drift from them —');
 // CLAUDE.md described a `MIN_CLUB_SHOTS = 4` that does not exist and never
 // did, and put the per-club floor at 4 when it is 10. A wrong constant in the
