@@ -1743,6 +1743,11 @@ body.modal-open {
 .agreement-gate .modal { box-shadow: var(--shadow-lg); }
 .modal-title { margin-bottom: .5rem; }
 .modal-body { color: var(--text-muted); font-size: .875rem; margin-bottom: 1.25rem; line-height: 1.6; }
+/* The confirm and info bodies are plain text set with textContent, so a
+   paragraph break in the string has to survive rendering (V37). Only here:
+   the other modal bodies hold markup, where pre-line would print the
+   template's own newlines. */
+#confirmBody { white-space: pre-line; }
 /* ── Legal documents ───────────────────────────────────────────────────
    Set as a document, not as app UI: a measured column, dense leading, a
    clear heading hierarchy and real tables. Both documents are mostly tables

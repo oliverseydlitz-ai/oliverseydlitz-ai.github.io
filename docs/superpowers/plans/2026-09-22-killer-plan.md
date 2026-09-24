@@ -516,6 +516,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | V29 | Shot pop-up rows are two-column grids with the comparison on its own line, so nothing clips (295/295px at 393, 330/330 at 1440); the shot-log # is the shot's place in the session (stable under sorting) and the pop-up title uses the same number; pinned in `shot-modal.js`. **Found, not fixed:** "+0.0 vs Driver avg" is coloured green | overnight 01:40 |
 | V32 | Reference tables wrap and drop their 420px min-width: 260/260px at 393, 295/295 at 1440. `render-scan.js` now opens "How the numbers work" and fails on any table wider than its box (verified: old CSS reports 590px and 420px in 260px and exits 1) | overnight 02:10 |
 | V33 | Import preview: five columns (club name, ball mph, smash, carry, launch) rounded like every other screen, no 500px min-width (359/359px at 393); `accent-color` on `<html>` so native checkboxes take the accent. `render-scan.js` now measures the preview step (old code: 560px in 359px, exit 1). The truncated "Premium (own l…" option label is left for the new plan | overnight 02:40 |
+| V37 | `showInfo()` for information (no red, dismiss says Close, the onward action names where it goes — the range-wrapper note now opens the drill library, where section I lives, instead of Practice); every `showConfirm` passes a verb ("Delete session", "Upload them", "Yes, it was aligned"…); red only for destructive actions; `#confirmBody` keeps paragraph breaks. `confirm-verbs.js` pins it | overnight 03:10 |
 
 
 ---

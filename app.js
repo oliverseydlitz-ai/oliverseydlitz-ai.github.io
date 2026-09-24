@@ -8429,7 +8429,8 @@ const UI = (() => {
               renderDetail(updated);
             })
             .catch(err => { console.error('alignment', err); toast('Could not update that session.'); });
-        });
+        },
+        { okLabel: turningOn ? 'Yes, it was aligned' : 'Withdraw it', danger: !turningOn });
     });
   }
 
@@ -10768,10 +10769,14 @@ const ImportFlow = (() => {
 // ────────────────────────────────────────────────────────────────
 // Confirm modal
 // ────────────────────────────────────────────────────────────────
-// opts: { okLabel, altLabel, onAlt } — a button should say what it does, and a
-// choice with two real outcomes (sign out keeping, or clearing, this device's
-// data) cannot be squeezed into Confirm/Cancel. Labels reset on every close so
-// the next caller never inherits them.
+// opts: { okLabel, altLabel, onAlt, danger } — a button should say what it
+// does, and a choice with two real outcomes (sign out keeping, or clearing,
+// this device's data) cannot be squeezed into Confirm/Cancel. Every caller
+// passes a verb for okLabel (V37); 'Confirm' is only the fallback. The OK
+// button is red only when the action destroys something (danger, the
+// default) — backing up or confirming alignment is not a deletion, and a red
+// button says it is. Labels and the colour reset on every close so the next
+// caller never inherits them.
 function showConfirm(title, body, onOk, opts = {}) {
   const modal = document.getElementById('confirmModal');
   document.getElementById('confirmTitle').textContent = title;
@@ -10779,16 +10784,30 @@ function showConfirm(title, body, onOk, opts = {}) {
   const ok = document.getElementById('confirmOk'), cancel = document.getElementById('confirmCancel');
   const alt = document.getElementById('confirmAlt');
   ok.textContent = opts.okLabel || 'Confirm';
+  ok.className = opts.danger === false ? 'btn-primary' : 'btn-danger';
+  cancel.textContent = opts.cancelLabel || 'Cancel';
+  cancel.hidden = !!opts.noCancel;
   alt.hidden = !opts.onAlt;
   alt.textContent = opts.altLabel || '';
   modal.hidden = false;
   const cleanup = () => {
     modal.hidden = true; ok.onclick = null; cancel.onclick = null; alt.onclick = null;
-    ok.textContent = 'Confirm'; alt.hidden = true; alt.textContent = '';
+    ok.textContent = 'Confirm'; ok.className = 'btn-danger'; cancel.textContent = 'Cancel';
+    alt.hidden = true; alt.textContent = '';
   };
   ok.onclick = () => { cleanup(); onOk(); };
   alt.onclick = () => { cleanup(); opts.onAlt && opts.onAlt(); };
   cancel.onclick = cleanup;
+}
+
+// Information, not a decision (V37). It used to borrow the destructive
+// confirm, so reading about a drill ended on a red "Confirm" that went
+// somewhere the text never mentioned. Same dialog, no red, the dismiss button
+// says Close, and the optional onward action names where it goes.
+function showInfo(title, body, opts = {}) {
+  showConfirm(title, body, opts.onOk || (() => {}),
+    { okLabel: opts.onOk ? (opts.okLabel || 'OK') : 'Close', cancelLabel: 'Close',
+      noCancel: !opts.onOk, danger: false });
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -11135,7 +11154,7 @@ async function init() {
     showConfirm('Delete session?','This cannot be undone.', async ()=>{
       await Store.deleteSession(this.dataset.id);
       await Router.showSessions();
-    });
+    }, { okLabel: 'Delete session' });
   });
 
   // Settings
@@ -11256,7 +11275,8 @@ async function init() {
           // 3. Sign out & purge tokens regardless (hard reload to a clean origin).
           await Auth.logout();
         } catch(err) { toast('Delete failed: ' + (err.message || 'unknown error')); }
-      }
+      },
+      { okLabel: 'Delete my account' }
     );
   });
 
@@ -11361,7 +11381,8 @@ async function init() {
           await Router.showSessions();
           toast(`Cleared ${sessions.length} session${sessions.length===1?'':'s'}.`);
         } catch(err) { toast('Clear failed: ' + (err.message || 'could not reach the cloud')); }
-      }
+      },
+      { okLabel: 'Clear this device' }
     );
   });
 
@@ -11682,7 +11703,7 @@ async function init() {
             toast(`Backed up ${n} session${n === 1 ? '' : 's'}.`);
             await Router.showSessions();
           } catch (e) { toast('Backup failed: ' + (e?.message || 'could not reach the cloud')); }
-        });
+        }, { okLabel: 'Upload them', cancelLabel: 'Not now', danger: false });
     } catch (e) { console.error('local-only check', e); }
   }
 
@@ -11948,11 +11969,11 @@ async function init() {
   document.getElementById('rangeWrapperBtn')?.addEventListener('click', () => {
     const w = DrillLibrary.byId(FeedbackEngine.DEFAULT_WRAPPER);
     if (!w) { Router.show('practice'); return; }
-    showConfirm(`${w.name}`,
+    showInfo(`${w.name}`,
       `${w.desc}\n\nThis and the other session wrappers are in the drill library, section I. ` +
       `They are the highest-evidence items in the research base and they apply over whatever drill ` +
       `you are running.`,
-      () => Router.show('practice'));
+      { okLabel: 'Open the drill library', onOk: () => Router.show('drills') });
   });
 
   // Goals management
