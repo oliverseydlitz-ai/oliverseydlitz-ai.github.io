@@ -1243,11 +1243,14 @@ a.settings-row { text-decoration: none; }
 .check-row input{flex:0 0 auto;width:20px;height:20px}
 
 .tbl-wrap{overflow-x:auto;margin:.6rem 0 1rem}
-.ref-tbl{width:100%;border-collapse:collapse;font-size:.8rem;min-width:420px}
+/* V32: no min-width, and cells wrap. The global td rule is nowrap, so each
+   metric's source line held the table at ~590px and pushed MAE/RMSE/Bias off
+   a 260px phone modal. */
+.ref-tbl{width:100%;border-collapse:collapse;font-size:.8rem}
 .ref-tbl th{text-align:left;font-size:.68rem;letter-spacing: var(--track-caps-xs);text-transform:uppercase;
   color:var(--text-dim);font-weight:700;padding:.4rem .6rem .4rem 0;border-bottom:1px solid var(--border)}
 .ref-tbl td{padding:.5rem .6rem .5rem 0;border-bottom:1px solid var(--border);
-  color:var(--text);vertical-align:top;font-variant-numeric:tabular-nums}
+  color:var(--text);vertical-align:top;font-variant-numeric:tabular-nums;white-space:normal}
 .ref-tbl tr.unmeasured td{color:var(--text-muted)}
 .ref-src{font-size:.68rem;color:var(--text-muted);margin-top:.15rem;font-variant-numeric:normal}
 .ref-note{font-size:.78rem;line-height:1.5;color:var(--text-dim);margin:.3rem 0 .6rem}

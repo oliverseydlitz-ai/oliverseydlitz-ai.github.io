@@ -248,6 +248,21 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     rings += uniq.length;
   };
 
+  // MODAL: the reference pop-up is a table in a ~260px box on a phone, and it
+  // held its columns at ~590px (V32) while every view check passed, because
+  // no check opened it. Open it, measure every table's scroll box, close it.
+  {
+    const bad = await p.evaluate(async () => {
+      const btn = document.getElementById('measRefBtn'); if (!btn) return ['measRefBtn missing'];
+      btn.click(); await new Promise(r => setTimeout(r, 300));
+      const out = [...document.querySelectorAll('.modal-overlay:not([hidden]) .tbl-wrap')]
+        .filter(w => w.scrollWidth > w.clientWidth + 1).map(w => `${w.scrollWidth}px in ${w.clientWidth}px`);
+      document.querySelectorAll('.modal-overlay:not([hidden])').forEach(m => m.hidden = true);
+      return out;
+    });
+    if (bad.length) { overflow++; console.log(`  CLIPPED   "How the numbers work": ${bad.join(', ')}`); }
+  }
+
   const BAD = /\bNaN\b|\bundefined\b|\[object Object\]|\bInfinity\b|\bnull\b/;
   const scan = (where, text) => {
     const lines = (text || '').split('\n').map(l => l.replace(/\s+/g,' ').trim()).filter(Boolean);
