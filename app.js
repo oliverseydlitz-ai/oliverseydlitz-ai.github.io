@@ -306,11 +306,16 @@ function cleanBadge(shots, faults) {
     : '<span class="session-badge">Too few shots to judge</span>';
 }
 
+// The SAMPLE standard deviation (÷ n − 1). Every caller estimates a golfer's
+// spread from a handful of shots, and the population form (÷ n) understates
+// it — by 5% at ten shots, 11% at five — which made every interval, noise
+// floor and "is this change real" test slightly too confident. The fatigue
+// t-test found it: false alarms ran at 12% until it corrected locally (C37).
 function stdDev(values) {
   const v = values.filter(x => typeof x === 'number' && !isNaN(x));
   if (v.length < 2) return 0;
   const mean = v.reduce((a,b) => a+b,0) / v.length;
-  return Math.sqrt(v.map(x => (x-mean)**2).reduce((a,b) => a+b,0) / v.length);
+  return Math.sqrt(v.map(x => (x-mean)**2).reduce((a,b) => a+b,0) / (v.length - 1));
 }
 
 // A 0-100 consistency score. The old form was `100 - stdDev(carries)`, which
@@ -2569,10 +2574,8 @@ const Strike = (() => {
     // estimated df is itself noisy at n = 5 and ran at ~6.7% in simulation.
     // The alpha is also split across every club in these shots long enough to
     // test (Bonferroni), because the page asks the question once per club.
-    // stdDev() is the population form (÷ n); a t-test needs the sample
-    // variance (÷ n - 1), which at n = 5 is 25% larger.
-    const bessel = third / (third - 1);
-    const v1 = stdDev(first) ** 2 * bessel / third, v2 = stdDev(last) ** 2 * bessel / third;
+    // stdDev() is the sample form (÷ n − 1), which is what a t-test needs.
+    const v1 = stdDev(first) ** 2 / third, v2 = stdDev(last) ** 2 / third;
     const se = Math.sqrt(v1 + v2);
     const df = 2 * third - 2;
     const counts = {};

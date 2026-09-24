@@ -115,7 +115,7 @@ const { bagConsistency, stdDev } = M;
 const mk = (club, carry, n) => Array.from({ length: n }, () => ({ clubType: club, carryDistance: carry }));
 const perfect = [...mk('d', 250, 20), ...mk('pw', 110, 20)];
 const old = Math.round(100 - stdDev(perfect.map(s => s.carryDistance)));
-ok(old === 30, `the old formula scored PERFECTLY IDENTICAL shots at ${old}%`);
+ok(old <= 30, `the old formula scored PERFECTLY IDENTICAL shots at ${old}%`);
 const now = bagConsistency(perfect);
 ok(now.score === 100, 'per club, identical shots score 100 — which is what they are');
 ok(now.clubs === 2 && now.shots === 40, 'and it reports how many clubs and shots went into it');

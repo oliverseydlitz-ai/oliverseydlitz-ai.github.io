@@ -64,5 +64,14 @@ for (const sel of ['.caveat-block', '.probe-block']) {
 ok(/\.probe-item\.dotted\s*\{[^}]*padding-left/.test(css) && !/\.probe-item\{[^}]*padding-left/.test(css),
   'only a dotted probe item reserves room for the dot');
 
+// A5: stdDev is the SAMPLE form. The population form understated every spread
+// estimated from a few shots (11% at n = 5), and the fatigue test ran at 12%
+// false alarms on it.
+{
+  const sd = R.app.stdDev([1, 2, 3, 4]);
+  ok(Math.abs(sd - Math.sqrt(5 / 3)) < 1e-12, `stdDev divides by n − 1 (${sd.toFixed(4)} for 1,2,3,4)`);
+  ok(R.app.stdDev([7]) === 0, 'and one value has no spread');
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exitCode = fail ? 1 : 0;
