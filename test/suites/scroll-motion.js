@@ -98,10 +98,10 @@ ok(/reduced\(\)/.test(chartFn), 'the chart path consults reduced() — wired, no
 console.log('— IntersectionObserver is feature-detected before use —');
 ok(/typeof IntersectionObserver === 'function'/.test(mod),
    'support is tested, not assumed');
-// Every construction goes through observe(), which returns false rather than
+// Every construction goes through observe(), which returns null (no stop handle) rather than
 // throwing when support is absent.
 const news = [...mod.matchAll(/new IntersectionObserver/g)].length;
-ok(news >= 1 && /if \(!SUPPORTED \|\| !el\) return false;/.test(mod),
+ok(news >= 1 && /if \(!SUPPORTED \|\| !el\) return null;/.test(mod),
    `observe() refuses without support (${news} IntersectionObserver sites)`);
 
 console.log('— and every chart is built through ScrollMotion —');

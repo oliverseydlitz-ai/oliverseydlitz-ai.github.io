@@ -9,7 +9,7 @@ const { JSDOM } = require('jsdom');
 
 const REPO = path.resolve(__dirname, '..');
 
-function load({ html = 'index.html', app = 'app.js' } = {}) {
+function load({ html = 'index.html', app = 'app.js', before = null } = {}) {
   const dom = new JSDOM(fs.readFileSync(path.join(REPO, html), 'utf8'), {
     url: 'https://shotlab.oliverseydlitz.com/',
     runScripts: 'outside-only',
@@ -52,6 +52,9 @@ function load({ html = 'index.html', app = 'app.js' } = {}) {
   w.Chart = function Chart(){ return { destroy(){}, update(){} }; };
   w.crypto = w.crypto || { randomUUID: () => 'test-' + Math.random().toString(36).slice(2) };
   if (!w.matchMedia) w.matchMedia = () => ({ matches: false, addEventListener(){}, addListener(){} });
+  // A suite that needs a browser API jsdom lacks installs it here, before
+  // app.js runs — modules read feature support once, at construction.
+  if (before) before(w);
 
   const errors = [];
   const src = fs.readFileSync(path.join(REPO, app), 'utf8');

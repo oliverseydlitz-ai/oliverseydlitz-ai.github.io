@@ -517,6 +517,7 @@ Finished items move to the **Done log** below this list, one line each with the 
 | V32 | Reference tables wrap and drop their 420px min-width: 260/260px at 393, 295/295 at 1440. `render-scan.js` now opens "How the numbers work" and fails on any table wider than its box (verified: old CSS reports 590px and 420px in 260px and exits 1) | overnight 02:10 |
 | V33 | Import preview: five columns (club name, ball mph, smash, carry, launch) rounded like every other screen, no 500px min-width (359/359px at 393); `accent-color` on `<html>` so native checkboxes take the accent. `render-scan.js` now measures the preview step (old code: 560px in 359px, exit 1). The truncated "Premium (own l…" option label is left for the new plan | overnight 02:40 |
 | V37 | `showInfo()` for information (no red, dismiss says Close, the onward action names where it goes — the range-wrapper note now opens the drill library, where section I lives, instead of Practice); every `showConfirm` passes a verb ("Delete session", "Upload them", "Yes, it was aligned"…); red only for destructive actions; `#confirmBody` keeps paragraph breaks. `confirm-verbs.js` pins it | overnight 03:10 |
+| R29 | ScrollMotion tracks every pending IntersectionObserver; `prune()` (run by the same MutationObserver that finds new blocks) disconnects any whose element left the page, and `chart().destroy()` ends its chart's watch. `observer-leak.js` counts live observers through a fake IntersectionObserver (`load({before})` hook added); old code fails it | overnight 03:40 |
 
 
 ---

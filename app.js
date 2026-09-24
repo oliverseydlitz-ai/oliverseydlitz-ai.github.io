@@ -7368,15 +7368,28 @@ const ScrollMotion = (() => {
 
   // Fires ONCE and stops watching. A chart that re-animates every time it
   // scrolls past is the thing that reads as decoration rather than as feedback.
+  //
+  // An observer whose element is never scrolled to never fires, so it never
+  // disconnects — and it holds the element, and through the callback the
+  // chart, after a re-render has thrown both away (R29: ~190 KB per session
+  // detail opened, linear). So every live observer is tracked and prune()
+  // drops the ones whose element has left the document. It runs from the
+  // same MutationObserver that finds new blocks, i.e. on every re-render.
+  const pending = new Set();
+  function prune() {
+    for (const w of pending) if (!w.el.isConnected) { try { w.io.disconnect(); } catch (_) {} pending.delete(w); }
+  }
   function observe(el, fn) {
-    if (!SUPPORTED || !el) return false;
+    if (!SUPPORTED || !el) return null;
     try {
-      const io = new IntersectionObserver(es => {
-        for (const e of es) if (e.isIntersecting) { io.disconnect(); fn(); return; }
+      const w = { el, io: null };
+      w.io = new IntersectionObserver(es => {
+        for (const e of es) if (e.isIntersecting) { w.io.disconnect(); pending.delete(w); fn(); return; }
       }, { rootMargin: '0px 0px -8% 0px' });
-      io.observe(el);
-      return true;
-    } catch (_) { return false; }
+      w.io.observe(el);
+      pending.add(w);
+      return () => { try { w.io.disconnect(); } catch (_) {} pending.delete(w); };
+    } catch (_) { return null; }
   }
 
   // Effect 1 — the chart draws on when it is actually looked at.
@@ -7418,12 +7431,18 @@ const ScrollMotion = (() => {
     } catch (_) {}
     const inst = new Chart(canvas, cfg);
     if (!live) return inst;
-    observe(canvas, () => {
+    const stop = observe(canvas, () => {
       // reset() returns it to the pre-animation state; update() then animates
       // to the finished one. Without the reset there is nothing to animate —
       // the chart is already where update() would take it.
       try { inst.options.animation = wanted; inst.reset(); inst.update(); } catch (_) {}
     });
+    // Destroying the chart ends its watch too: most charts are destroyed by
+    // the render that replaces them, before prune() would see the canvas go.
+    if (stop) {
+      const destroy = inst.destroy.bind(inst);
+      inst.destroy = (...a) => { stop(); return destroy(...a); };
+    }
     return inst;
   }
 
@@ -7451,6 +7470,7 @@ const ScrollMotion = (() => {
   // never observed twice; the class only ever ADDS an animation to a rule that
   // is already drawn.
   function scan() {
+    prune();
     if (!SUPPORTED || reduced()) return;
     document.querySelectorAll('.section-block:not([data-sm])').forEach(b => {
       b.setAttribute('data-sm', '1');
@@ -7474,7 +7494,7 @@ const ScrollMotion = (() => {
 
   function init() { header(); scan(); watch(); }
 
-  return { init, scan, observe, chart, reduced, SUPPORTED };
+  return { init, scan, observe, chart, reduced, SUPPORTED, watching: () => pending.size };
 })();
 
 const UI = (() => {

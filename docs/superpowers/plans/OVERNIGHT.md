@@ -58,3 +58,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 02:10 CEST — queue 2: V32 (reference tables fit; render-scan opens the modal and checks). SW v204.
 - 02:40 CEST — queue 2: V33 (import preview readable and fits; scan measures it). SW v205.
 - 03:10 CEST — queue 2: V37 (showInfo; every confirm button is a verb; red only when destructive). SW v206.
+- 03:40 CEST — queue 2: R29 (unseen charts no longer leak their observer + chart). SW v207.
