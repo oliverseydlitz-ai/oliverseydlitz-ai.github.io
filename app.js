@@ -10700,11 +10700,20 @@ const ImportFlow = (() => {
       document.getElementById('metaDate').value = new Date().toISOString().slice(0,10);
     }
 
-    const cols = ['clubType','clubBrand','ballSpeed','smashFactor','carryDistance','launchAngle','clubPath','attackAngle'];
-    const labs = {clubType:'Club',clubBrand:'Brand',ballSpeed:'Ball Spd',smashFactor:'Smash',carryDistance:'Carry',launchAngle:'Launch°',clubPath:'Path°',attackAngle:'AoA°'};
+    // V33: a check that the right file was read, not a data dump. It showed
+    // the raw club code ("d"), unrounded floats and eight columns clipped in a
+    // phone-width box. Five columns, the club's name, and the same rounding
+    // every other screen uses.
+    const cols = [
+      { h: 'Club',      v: s => clubLabel(s.clubType) },
+      { h: 'Ball mph',  v: s => fmt(s.ballSpeed, 1) },
+      { h: 'Smash',     v: s => fmt(s.smashFactor, 2) },
+      { h: 'Carry yds', v: s => fmt(s.carryDistance, 0) },
+      { h: 'Launch°',   v: s => fmt(s.launchAngle, 1) },
+    ];
     document.getElementById('previewTable').innerHTML = `
-      <thead><tr>${cols.map(c=>`<th>${labs[c]||c}</th>`).join('')}</tr></thead>
-      <tbody>${shots.slice(0,5).map(s=>`<tr>${cols.map(c=>`<td>${s[c] == null || s[c] === '' ? '—' : Sanitize.escape(String(s[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+      <thead><tr>${cols.map(c=>`<th>${c.h}</th>`).join('')}</tr></thead>
+      <tbody>${shots.slice(0,5).map(s=>`<tr>${cols.map(c=>`<td>${c.v(s)}</td>`).join('')}</tr>`).join('')}</tbody>`;
     goStep('step-preview');
   }
 

@@ -183,7 +183,7 @@
 /* ── Base ──────────────────────────────────────────────── */
 /* V35: a control focused from the keyboard scrolls clear of the fixed
    bottom nav (phones) rather than landing underneath it. */
-html { height: 100%; scroll-padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
+html { height: 100%; accent-color: var(--accent); scroll-padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
 body {
   background: var(--bg);
   color: var(--text);
@@ -1821,8 +1821,10 @@ body.modal-open {
 }
 
 /* ── Preview table ─────────────────────────────────────── */
-.preview-table th, .preview-table td { font-size: .74rem; padding: .4rem .65rem; }
-.preview-table { min-width: 500px; }
+.preview-table th, .preview-table td { font-size: .74rem; padding: .4rem .45rem; }
+.preview-table th { white-space: normal; vertical-align: bottom; }
+/* Five columns fit a phone (V33); the 500px minimum was for the old eight. */
+.preview-table { width: 100%; }
 
 /* ── Custom scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

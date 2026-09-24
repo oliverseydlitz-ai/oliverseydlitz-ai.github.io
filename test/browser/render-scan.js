@@ -147,6 +147,11 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   const imp = async (file, ball) => {
     await p.click('.bottom-nav-item[data-view="import"]'); await p.waitForTimeout(250);
     await p.setInputFiles('#fileInput', path.join(__dirname, 'fixtures', file)); await p.waitForTimeout(800);
+    // The import preview is its own step and was never measured: it held
+    // eight raw columns at 500px in a 359px box (V33).
+    const pv = await p.evaluate(() => { const t = document.getElementById('previewTable');
+      return t ? [t.scrollWidth, t.parentElement.clientWidth] : null; });
+    if (pv && pv[0] > pv[1] + 1) { overflow++; console.log(`  CLIPPED   import preview: ${pv[0]}px of table in a ${pv[1]}px box`); }
     await p.click('#previewNext'); await p.waitForTimeout(250);
     await p.selectOption('#metaBall', ball); await p.click('#saveSession'); await p.waitForTimeout(1300);
   };
