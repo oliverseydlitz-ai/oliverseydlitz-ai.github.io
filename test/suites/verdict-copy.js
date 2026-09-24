@@ -28,5 +28,21 @@ ok(/Number\(fmt\(v - a, dec\)\)/.test(cmpSrc) && /'flat'/.test(cmpSrc), 'a delta
 const css = fs.readFileSync(path.join(__dirname, '../../style.css'), 'utf8');
 ok(/\.sm-cmp\.flat\s*\{/.test(css), 'and the neutral state has a style');
 
+// A4 (C49): ranked claims with no source. Neither "#1 cause" nor "single most
+// common reason" is in the research base, and the face-share rule was quoted
+// as one percentage when it moves with loft. Comments stripped: the reasons
+// quote the phrases.
+const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+for (const bad of [/#1 cause/i, /single most common reason/i, /"75% face" rule/i])
+  ok(!bad.test(code), `no unsourced claim on screen: ${bad}`);
+
+// A6: the import menu cut "Premium (own ball)" to "Premium (own l…" at 393px
+// (142px of text in 115px, measured). The menu reads a short label; every
+// sentence that names the ball keeps the full one.
+const opt = R.window.document.querySelector('#metaBall option[value="premium"]');
+ok(opt && opt.textContent === R.app.Conditions.BALLS.premium.short && opt.textContent.length <= 12,
+  `the import menu uses the short ball label (${opt && opt.textContent})`);
+ok(R.app.Conditions.BALLS.premium.label === 'Premium (own ball)', 'the full label is unchanged for prose');
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exitCode = fail ? 1 : 0;

@@ -1794,7 +1794,9 @@ const Conditions = (() => {
     // v2: every ball feeds dispersion and gapping. What differs is the weight
     // in a cross-session pool and the fault bar (Metrics.conditionWeight /
     // rateBump), and whether spin is a reading at all (RPT only).
-    premium:  { id:'premium',  label:'Premium (own ball)' },
+    // short: the import menu's wording. The full label cut to "Premium (own l…"
+    // in a half-width menu at 393px; every sentence that names the ball keeps it.
+    premium:  { id:'premium',  label:'Premium (own ball)', short:'Premium ball' },
     rpt:      { id:'rpt',      label:'Rapsodo RPT',        spinMeasured:true },
     range:    { id:'range',    label:'Range balls' },
     unknown:  { id:'unknown',  label:'Not recorded' },
@@ -4948,7 +4950,7 @@ const FaultEngine = (() => {
         return `Face is open to path by ~${fmt(afp,1)}° (D-Plane). Ball is starting toward the open face ` +
           `then curving further right due to clockwise spin axis. Average side carry: +${fmt(sc,1)} yds right. ` +
           `Start direction is mostly face — about 84% for a driver, 78% for a mid-iron, 71% for a wedge — ` +
-          `and the rest is path. The "75% face" rule taught everywhere is loft-dependent, not universal.`;
+          `and the rest is path. The share moves with loft, so no single percentage fits every club.`;
       },
       causes:['Weak/neutral grip causing face to open at impact','Over-the-top swing path (outside-in)',
         'Early forearm rotation causing "chicken wing" through impact',
@@ -5069,7 +5071,7 @@ const FaultEngine = (() => {
       drills:[
         {name:'Forward shaft lean drill',desc:'At impact, your hands should be ahead of the ball (shaft leaning toward target). Practice "pressing" the shaft forward at impact with slow-motion swings. Check in a mirror.',focus:'feel'},
         {name:'Divot after the ball',desc:'Place a £1 coin on the grass 3 inches in front of the ball. Try to hit the coin with your divot after striking the ball. Proves ball-first, then turf contact.',focus:'external'},
-        {name:'Lead wrist flat',desc:'At impact, your lead wrist should be flat or slightly bowed — not cupped (bent back). A cupped lead wrist is the #1 cause of scooping. Use an impact bag to practice.',focus:'feel'},
+        {name:'Lead wrist flat',desc:'At impact, your lead wrist should be flat or slightly bowed — not cupped (bent back). A cupped lead wrist is a common cause of scooping. Use an impact bag to practice.',focus:'feel'},
       ],
       optimalRange: t => `Attack angle ${Benchmarks.targetsFor(t).attack.label}`,
     },
@@ -5162,7 +5164,7 @@ const FaultEngine = (() => {
           `(PGA Tour reference ${fmt(band.tour,1)}°). You are presenting more loft at impact than the club is ` +
           `travelling to deliver — the face is pointing well above the path. This costs ball speed and adds spin ` +
           `at the same time, which is why it feels like "good contact that goes nowhere". ` +
-          `It is the single most common reason smash factor stays low even after strike location improves.`;
+          `It is a common reason smash factor stays low even after strike location improves.`;
       },
       causes:['Casting / early release — the wrist angle unwinds before impact',
         'Scooping: trying to lift the ball rather than compressing it',
@@ -11987,7 +11989,7 @@ async function init() {
       if (!sel) return;
       const keep = sel.value;
       sel.innerHTML = Object.values(table).map(o =>
-        `<option value="${Sanitize.escape(o.id)}"${o.id === 'unknown' ? ' selected' : ''}>${Sanitize.escape(o.label)}</option>`
+        `<option value="${Sanitize.escape(o.id)}"${o.id === 'unknown' ? ' selected' : ''}>${Sanitize.escape(o.short || o.label)}</option>`
       ).join('');
       if (keep && table[keep]) sel.value = keep;
     };
