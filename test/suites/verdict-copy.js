@@ -83,5 +83,15 @@ ok(/\.probe-item\.dotted\s*\{[^}]*padding-left/.test(css) && !/\.probe-item\{[^}
   ok(doc.getElementById('rdSave') && doc.getElementById('rdDate'), 'with no sessions the round form renders, with a date');
 }
 
+// R33: at 320px five nav labels overlapped. Below 380px the nav is icon-only,
+// and the label must stay in the accessibility tree — clipped, never
+// display:none, or every nav button loses its name.
+{
+  const m = css.match(/@media \(max-width: 379px\)\s*\{([\s\S]*?)\n\}/);
+  ok(m && /\.bnav-label\s*\{[^}]*clip-path:\s*inset\(50%\)/.test(m[1]) && !/\.bnav-label[^{]*\{[^}]*display:\s*none/.test(m[1]),
+     'narrow nav hides labels visually but keeps them as the buttons\' names');
+  ok(/\.charts-grid\s*\{[^}]*minmax\(min\(280px, 100%\), 1fr\)/.test(css), 'the chart grid can shrink below 280px');
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exitCode = fail ? 1 : 0;

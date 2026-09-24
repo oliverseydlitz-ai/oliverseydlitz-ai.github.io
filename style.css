@@ -1082,7 +1082,7 @@ tr:hover td { background: var(--surface2); }
 
 /* ── Progress ──────────────────────────────────────────── */
 .progress-filter { max-width: 220px; margin-bottom: 1.25rem; }
-.charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s3); }
+.charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: var(--s3); }
 
 /* ── Trend box ─────────────────────────────────────────── */
 .trend-box {
@@ -3288,3 +3288,25 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 }
 .skip-link:focus { top: var(--s3); }
 #appMain:focus { outline: none; }
+
+/* R33: narrow screens. At 320px (small Android, an SE zoomed) five of the
+   seven nav labels were 52px in a 46px slot and overlapped. Below 380px the
+   nav is icon-only; the label stays in the accessibility tree (clipped, not
+   display:none), so every button keeps its name. */
+@media (max-width: 379px) {
+  .bnav-label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  .bottom-nav-item { gap: 0; }
+}
+/* Past WCAG's 320px reflow bar (200% zoom on a phone is ~197px): two-column
+   grids stack, the hero ring sits above its text, and chips may wrap, so the
+   page does not scroll sideways. */
+@media (max-width: 299px) {
+  .dash-grid, .records-grid { grid-template-columns: 1fr; }
+  .dash-hero, .dash-tile.wide { grid-column: auto; }
+  .dash-hero { flex-direction: column; align-items: flex-start; }
+  .sg-tier { white-space: normal; }
+  .cmp-row { grid-template-columns: 1fr auto; }
+}
