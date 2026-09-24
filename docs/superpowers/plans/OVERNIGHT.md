@@ -3,6 +3,28 @@
 Every check-in reads this file first. Oliver's words: keep working; if everything is done,
 make new plans; if a run gets cut off, finish what was started before anything new.
 
+## Morning summary (written 05:20 CEST, Oliver up early)
+
+**Shipped: 19 fixes in 18 commits, SW v193 → v210, 74 → 81 suites, every push green and render-scan clean both ways.**
+
+- Honesty of the numbers: C33 (Progress reads one club, oldest first, above the floor) `6ceee33` ·
+  C36 (low-ball-speed rule deleted) `bd34e69` · C37 (fatigue test: false alarms 12% → 4.8%) `647c0cd` ·
+  C41 (drill gate counts the whole club) `6ceee33` · C43 (shot pop-up vs its own club) `1130b1f` ·
+  C44 (no club average below its floor) `5adb2c6` · "Clean" badge / +0.0 / "1 more shots" `3e94cde` ·
+  unsourced "#1" claims removed `0d06a32`.
+- Phone and layout: V29 shot pop-up `7ec66fe` · V32 reference tables `e978b6f` · V33 import preview `a4efa5f` ·
+  ball menu no longer truncates `0d06a32` · V31 chart axes `6c1956d`.
+- Accessibility: R21 Settings pop-ups are real dialogs `934d07f` · R32 errors announced `26c320a` ·
+  R39/V34 `636b099` · R28/R38/R40/V35/V43 `6272435` · V37 confirm buttons are verbs `e21079b`.
+- Memory: R29 unseen charts no longer leak `2087621`.
+- **New plan:** `docs/superpowers/plans/2026-09-24-next-plan.md` (A = small fixes, B = bigger leftovers, C = your questions).
+
+**Half-done:** nothing. Plan items A5 (sample-SD formula app-wide) and A7 (left-edge alignment) are open, not started.
+
+**Waiting on Oliver:** see the plan's section C — the Data & Rights "48 hours / 30 days" promises, and the
+standing list (V14 headings, R16 default theme, logo, TOUR chip/rename, Practice collapse, home layout,
+affiliate link, tuning numbers), plus the Supabase allowlist + leaked-password setting and the guide photos.
+
 ## Each check-in, in this order
 
 1. **Recover first.** `git status` and `git log origin/main..HEAD`. Uncommitted or unpushed work
@@ -62,3 +84,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 04:15 CEST — queue 4: new plan written (`2026-09-24-next-plan.md`); A1–A3 shipped (Clean badge needs a club at the floor; +0.0 is neutral; plural counts; `verdict-copy.js`). SW v208.
 - 04:45 CEST — next-plan A4 (unsourced "#1"/"most common" claims and the "75% face" line rewritten) + A6 (short ball label in the import menu, measured 96/115px). SW v209.
 - 05:10 CEST — next-plan A8 / V31: Progress y-axes print at each metric's precision (smash 2 dp, carry/speed 0, angles 1, score 0); fill was already off; `progress-ticks.js` (81 suites). SW v210.
+- 05:20 CEST — Oliver awake; morning summary written at the top. Overnight run closed.
