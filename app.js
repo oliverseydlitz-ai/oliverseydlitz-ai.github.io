@@ -10630,7 +10630,38 @@ const UI = (() => {
 // Router
 // ────────────────────────────────────────────────────────────────
 const Router = (() => {
+  // R30: in-app navigation wrote no history, so Back left the app from any
+  // view, and a reload landed wherever an old deep link said. Every view
+  // change now writes its address — #progress, #session/<id> — and Back and
+  // Forward come in through the existing hashchange listener (applyHash).
+  // Writing starts only after boot has read the deep link it was opened with;
+  // before that a first render would overwrite #practice with #sessions.
+  let writing = false, detailId = null;
+  function addressFor(viewId) {
+    // The rendered session's id is read off the page: renderDetail stamps it
+    // on the delete button before the view switches, and the import flow
+    // renders the detail without going through showDetail.
+    if (viewId === 'session-detail') {
+      const id = document.getElementById('deleteSessionBtn')?.dataset.id || detailId;
+      return id && /^[\w-]{1,64}$/.test(id) ? `#session/${id}` : null;
+    }
+    return HASH_VIEWS[viewId] ? `#${viewId}` : null;
+  }
+  function writeAddress(viewId) {
+    if (!writing) return;
+    const want = addressFor(viewId);
+    if (!want || location.hash === want) return;
+    try {
+      // The first entry replaces a bare URL instead of stacking on it, so one
+      // Back from the first view does not land on an empty step.
+      if (!location.hash) history.replaceState(null, '', want);
+      else history.pushState(null, '', want);
+    } catch (_) {}
+  }
+  function startHistory() { writing = true; }
+
   function show(viewId) {
+    writeAddress(viewId);
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     document.getElementById(`view-${viewId}`)?.classList.add('active');
     document.querySelectorAll('[data-view]').forEach(el=>
@@ -10653,6 +10684,7 @@ const Router = (() => {
   async function showDetail(id) {
     const session = await Store.getSession(id);
     if (!session) { toast('Session not found.'); return; }
+    detailId = session.id;
     safeRender('session', () => UI.renderDetail(session), 'session-detail');
   }
 
@@ -10716,18 +10748,25 @@ const Router = (() => {
   // (#/yardages) because the docs write them that way. Anything not on this
   // list — including an OAuth #access_token — is left for the code that owns it.
   const HASH_VIEWS = { sessions:1, import:1, yardages:1, practice:1, drills:1, progress:1, settings:1 };
+  // `#session/<id>` opens a session's detail — the address the detail view
+  // writes, so Back from a shot-level screen returns to the right session.
+  // The id is held to the same shape readBackup accepts.
   function hashView() {
-    const h = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0].toLowerCase();
+    const raw = (location.hash || '').replace(/^#\/?/, '').split(/[?&]/)[0];
+    const m = raw.match(/^session\/([\w-]{1,64})$/);
+    if (m) return { view: 'session-detail', id: m[1] };
+    const h = raw.toLowerCase();
     return HASH_VIEWS[h] ? h : null;
   }
   function applyHash() {
     const v = hashView();
-    if (v) go(v).catch(err => console.error('hash route:', err));
+    if (v && typeof v === 'object') showDetail(v.id).catch(err => console.error('hash route:', err));
+    else if (v) go(v).catch(err => console.error('hash route:', err));
     return !!v;
   }
 
   return { show, go, showDetail, showProgress, showYardages, showSessions, showPractice, showDrills, showImport,
-           hashView, applyHash };
+           hashView, applyHash, startHistory };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -12186,6 +12225,9 @@ async function init() {
   // owns it. A later shortcut while the app is open comes in via hashchange.
   if (!_authRedirect && !_oauthTokens) { try { Router.applyHash(); } catch (_) {} }
   window.addEventListener('hashchange', () => { try { Router.applyHash(); } catch (_) {} });
+  // From here every view change writes its address (R30). Not earlier: the
+  // renders above would otherwise overwrite the deep link before it was read.
+  Router.startHistory();
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 

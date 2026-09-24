@@ -65,7 +65,10 @@ to hand someone starting cold.
      non-Rapsodo CSV at the door rather than importing it as nothing.
    - `Router` — views `sessions` (home), `yardages`, `progress`, `practice`,
      `drills` (the drill library, its own view — Practice is the plan, this is
-     the catalogue), `settings`; hash routing.
+     the catalogue), `settings`; hash routing. Every view change writes its
+     address (`#progress`, `#session/<id>`) so Back/Forward stay in the app
+     (R30); writing starts only after boot reads the deep link
+     (`Router.startHistory`).
 
 4. **Scoring / analysis engines** — `FaultEngine` (gates, `splitCauses`,
    `splitDrills`), `ShotScorer`, `SwingDNA`, `Benchmarks` (the only copy of the
@@ -1397,7 +1400,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **81 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v214**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v215**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1868,7 +1871,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**81 test suites**, service worker **v214**. Deterministic auth, cloud sync
+**81 test suites**, service worker **v215**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

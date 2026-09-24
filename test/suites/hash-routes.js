@@ -70,6 +70,47 @@ console.log('— applyHash actually switches the view —');
   ok(doc.getElementById('view-settings').classList.contains('active'),
      'and an unmapped name falls through to show()');
 
+  console.log('— every view writes its address, so Back stays in the app (R30) —');
+  const hv = at('#session/abc-123');
+  ok(hv && hv.view === 'session-detail' && hv.id === 'abc-123', '#session/<id> names a session');
+  ok(at('#session/<img>') === null, 'an id outside the backup id shape routes nothing');
+
+  // In the test harness init() may or may not have reached startHistory, so
+  // call it explicitly: from here on, navigating writes history.
+  Router.startHistory();
+  w.history.replaceState(null, '', '#sessions');
+  const histBefore = w.history.length;
+  await Router.go('progress');
+  await new Promise(r => setTimeout(r, 20));
+  ok(w.location.hash === '#progress', `a tab change writes its address (${w.location.hash})`);
+  ok(w.history.length === histBefore + 1, 'as a new history entry, so Back returns to the previous view');
+  await Router.go('progress');
+  ok(w.history.length === histBefore + 1, 'showing the same view again adds nothing');
+
+  const { MemDB, Store } = R.app;
+  MemDB.saveSession(Store.stamp({ id: 'rt-1', date: '2026-09-20T10:00:00Z',
+    conditions: { ball: 'premium', surface: 'grass' },
+    shots: Array.from({ length: 12 }, () => ({ clubType: '7i', ballSpeed: 120, clubSpeed: 86, smashFactor: 1.39, carryDistance: 165 })) }));
+  await Router.showDetail('rt-1');
+  await new Promise(r => setTimeout(r, 20));
+  ok(w.location.hash === '#session/rt-1', `the session detail is addressable (${w.location.hash})`);
+
+  // Back: the browser restores the previous URL and fires hashchange, which
+  // the app answers with applyHash — simulated here in the same order.
+  w.history.replaceState(null, '', '#progress');
+  Router.applyHash();
+  await new Promise(r => setTimeout(r, 30));
+  ok(doc.getElementById('view-progress').classList.contains('active'), 'Back to #progress shows Progress again');
+  w.history.replaceState(null, '', '#session/rt-1');
+  Router.applyHash();
+  await new Promise(r => setTimeout(r, 30));
+  ok(doc.getElementById('view-session-detail').classList.contains('active'), 'and Forward to #session/<id> reopens it');
+
+  const src = require('fs').readFileSync(require('path').join(__dirname, '../../app.js'), 'utf8');
+  const boot = src.slice(src.indexOf("window.addEventListener('hashchange'"));
+  ok(/Router\.startHistory\(\)/.test(boot.slice(0, 600)),
+     'history writing starts only after boot has read the deep link');
+
   w.location.hash = '';
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exit(fail ? 1 : 0);
