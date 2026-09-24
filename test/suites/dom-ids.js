@@ -24,11 +24,14 @@ const inHtml = new Set([...html.matchAll(/id="([\w-]+)"/g)].map(m => m[1]));
 // both were invisible to the first version of this check.
 const madeInMarkup = new Set([...app.matchAll(/id="([\w-]+)"/g)].map(m => m[1]));
 const madeByAssign = new Set([...app.matchAll(/\.id\s*=\s*['"]([\w-]+)['"]/g)].map(m => m[1]));
+// And a third, since V38: the Settings dialogs pass their id to runtimeModal(),
+// which writes it into the shell's template.
+const madeByShell = new Set([...app.matchAll(/runtimeModal\(\s*'([\w-]+)'/g)].map(m => m[1]));
 
 console.log('— every id the JS reaches for exists somewhere —');
 ok(referenced.size > 150, `${referenced.size} ids referenced from app.js`);
 const missing = [...referenced].filter(id =>
-  !inHtml.has(id) && !madeInMarkup.has(id) && !madeByAssign.has(id)).sort();
+  !inHtml.has(id) && !madeInMarkup.has(id) && !madeByAssign.has(id) && !madeByShell.has(id)).sort();
 ok(missing.length === 0,
    `all of them resolve${missing.length ? ` — these do not: ${missing.join(', ')}` : ''}`);
 

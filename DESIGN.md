@@ -270,7 +270,7 @@ claims:
     rule: a display tier with no referent is a rule that does nothing. 0 is a defect.
   tabular-numerals:
     carried-by: "td, th"   # element selectors: app-wide
-    also-declared-on: 26 class rules
+    also-declared-on: 29 class rules
     declared-but-applied-nowhere: ".tnum"
     rule: "td, th" is what holds the declaration on every table in the
       app; `.tnum` is an available utility that nothing applies. Listing it first

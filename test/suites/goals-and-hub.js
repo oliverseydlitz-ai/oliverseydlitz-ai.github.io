@@ -51,17 +51,46 @@ ok(/sessions\/week/.test(month.sessionFrequency),
    `over a real span it does give a rate (${month.sessionFrequency})`);
 
 console.log('— a missing launch angle is missing, not zero —');
-// `s.launchAngle || 0` turned every absent reading into a 0° launch, so the
-// range always started at 0 — a launch nobody has ever produced.
+// `s.launchAngle || 0` turned every absent reading into a 0° launch. The
+// figure is now one club's interval, so a gap must not drag its mean.
 const noLaunch = AH.generateMetricsDashboard([sess('h','2026-08-01',
-  many(10).map(s => { const { launchAngle, ...rest } = s; return rest; }))]);
-ok(noLaunch.launchAngleRange === null, 'with no launch data there is no range at all');
-const partial = AH.generateMetricsDashboard([sess('i','2026-08-01', [
-  { _row: 2, ...shot({ launchAngle: 12 }) },
-  (() => { const { launchAngle, ...rest } = shot(); return { _row: 3, ...rest }; })(),
-])]);
-ok(partial.launchAngleRange[0] === 12,
-   `one reading of 12° gives a range starting at 12, not 0 (${JSON.stringify(partial.launchAngleRange)})`);
+  many(12).map(s => { const { launchAngle, ...rest } = s; return rest; }))]);
+ok(noLaunch.launch === null, 'with no launch data there is no launch figure at all');
+const partial = AH.generateMetricsDashboard([sess('i','2026-08-01',
+  many(12).map((s, i) => { if (i % 2) return s; const { launchAngle, ...rest } = s; return rest; }))]);
+ok(partial.launch && partial.launch.mean === 12,
+   `six readings of 12° and six gaps read 12°, not 6° (${partial.launch && partial.launch.mean})`);
+
+console.log('— V39: one club, one ball, the same figure as "Where you sit" —');
+// It pooled every session on every ball, so the carry beside the benchmark
+// disagreed with it by a yard and the consistency with the home row.
+const jit = [-9, -4, 0, 3, 8, -6, 5, -2, 7, -8, 2, 6];
+const mix = (id, date, ball, club, base) => Store.stamp({ id, date,
+  conditions: { ball, surface: 'grass' },
+  shots: jit.map((j, i) => ({ _row: i + 2, ...shot({ clubType: club, carryDistance: base + j,
+    ballSpeed: (club === 'd' ? 150 : 120) + j / 2, launchAngle: 12 + j / 10 }) })) });
+const hist = [mix('p','2026-08-10','premium','d',250), mix('q','2026-08-05','range','d',220),
+              mix('r','2026-08-01','premium','7i',160)];
+const hub = AH.generateMetricsDashboard(hist);
+const pub = M.CommunityInsights.published(hist);
+ok(hub.clubType === 'd' && pub.club === 'd', 'both read the driver');
+ok(Math.round(hub.carry.mean) === Math.round(pub.rows[0].you.mean),
+   `the carry is the benchmark's carry (${Math.round(hub.carry.mean)} vs ${Math.round(pub.rows[0].you.mean)})`);
+ok(hub.group.sessions === 2 && hub.group.shots === 24,
+   `the range-ball session is not pooled in (${hub.group.sessions} sessions, ${hub.group.shots} shots)`);
+ok(hub.ballSpeed && Math.abs(hub.ballSpeed.mean - 150) < 1,
+   'ball speed is the driver\'s, not averaged with a 7-iron');
+ok(!('improvementTrend' in hub) && hub.trend && typeof hub.trend.real === 'boolean',
+   `the trend is ClubAnalyzer's verdict, not "any positive delta is an improvement" (${hub.trend.label})`);
+const thin = AH.generateMetricsDashboard([sess('t','2026-08-01', many(4))]);
+ok(thin.carry === null && thin.need === 6, 'below the floor there is no club figure, and it says how many more');
+ok(thin.clubs[0].carry === null && thin.clubs[0].need === 6, 'nor a per-club carry in the list');
+const CA = M.ClubAnalyzer.compareClubs(hist);
+const drv = CA.find(c => c.club === M.clubLabel('d'));
+ok(drv && drv.shotCount === 12 && Math.abs(drv.avgCarry - pub.rows[0].you.mean) <= 1,
+   `club by club reads the same group (${drv && drv.shotCount} driver shots, ${drv && drv.avgCarry} yds)`);
+ok(!CA.some(c => c.club === M.clubLabel('7i') && c.avgCarry !== null && c.shotCount < 10),
+   'and a club under the floor prints no carry');
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

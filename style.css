@@ -1754,6 +1754,35 @@ body.modal-open {
    the other modal bodies hold markup, where pre-line would print the
    template's own newlines. */
 #confirmBody { white-space: pre-line; }
+/* ── Runtime dialogs (V38) ─────────────────────────────────
+   The six Settings dialogs built by runtimeModal() in app.js. They used to
+   carry the whole .modal rule inline, so the redesign never reached them:
+   a rounded panel, blue figures, a z-index of their own. Now they are a
+   .modal with a list of tiles in it, and every value here is a token. */
+.rt-modal { max-width: 520px; }
+.rt-sub { color: var(--text-muted); font-size: .85rem; line-height: 1.5; margin: 0 0 var(--s4); }
+.rt-list { display: grid; gap: .75rem; }
+.rt-tile { background: var(--surface2); border: 1px solid var(--line); padding: .85rem 1rem; display: grid; gap: .3rem; min-width: 0; }
+.rt-k { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-caps); color: var(--text-muted); }
+.rt-v { font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
+.rt-unit { font-family: var(--font-body); font-size: .8rem; font-weight: 500; color: var(--text-muted); margin-left: .2rem; white-space: nowrap; }
+/* A sentence in the value slot (a trend verdict, a frequency) is read, not
+   scanned, so it is set as body text rather than at figure size. */
+.rt-verdict { display: block; font-family: var(--font-body); font-size: .95rem; font-weight: 600; line-height: 1.4; }
+.rt-meta { font-size: .8rem; line-height: 1.45; color: var(--text-muted); }
+.rt-text { font-size: .85rem; line-height: 1.5; color: var(--text); }
+.rt-cap { text-transform: capitalize; }
+.rt-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.rt-row { display: flex; justify-content: space-between; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+.rt-row + .rt-row { border-top: 1px solid var(--line); padding-top: .35rem; }
+.rt-row-v { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rt-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; font-variant-numeric: tabular-nums; }
+.rt-cols strong { font-size: 1.05rem; }
+.rt-mark { border-left: 3px solid var(--line); }
+.rt-mark.is-open { border-left-color: var(--green); }
+.rt-mark.is-locked { border-left-color: var(--yellow); }
+.rt-mark.is-wrap { border-left-color: var(--accent); }
+.rt-kbd { font-family: var(--font-mono); font-size: .8rem; font-weight: 600; background: var(--surface3); border: 1px solid var(--line); padding: .15rem .4rem; }
 /* ── Legal documents ───────────────────────────────────────────────────
    Set as a document, not as app UI: a measured column, dense leading, a
    clear heading hierarchy and real tables. Both documents are mostly tables

@@ -110,12 +110,20 @@ R.window.scrollTo = () => {};   // jsdom does not implement it; the scroll lock 
   // Tab walked the page behind them and Escape did nothing. Every element in
   // app.js whose id ends in "Modal" and is written as markup must carry it.
   const appSrc = require('fs').readFileSync(require('path').join(__dirname, '..', '..', 'app.js'), 'utf8');
+  // V38 moved the six Settings dialogs onto one shell, runtimeModal(), so the
+  // check reads the shell's template once and then every call to it; a modal
+  // still written out as markup must carry the class itself.
+  const shellAt = appSrc.indexOf('function runtimeModal(');
+  const shell = appSrc.slice(shellAt, appSrc.indexOf('\n}\n', shellAt));
+  ok(shellAt > 0 && /class="modal-overlay" id="\$\{id\}" aria-label=/.test(shell),
+     'the runtime shell is a trapped, named dialog');
+  const calls = [...appSrc.matchAll(/runtimeModal\(\s*'(\w+Modal)',\s*\{([\s\S]{0,400}?)\}\);/g)];
+  ok(calls.length >= 6, `found the runtime modals built through it (${calls.length})`);
+  const untitled = calls.filter(m => !/\btitle:\s*'[^']+'/.test(m[2])).map(m => m[1]);
+  ok(!untitled.length, `and each passes a title, which names it${untitled.length ? ': ' + untitled.join(', ') : ''}`);
   const roots = [...appSrc.matchAll(/<div\b([^>]*\bid="(\w+Modal)"[^>]*)>/g)];
-  ok(roots.length >= 6, `found the runtime modal roots (${roots.length})`);
   const untrapped = roots.filter(m => !/class="[^"]*\bmodal-overlay\b/.test(m[1])).map(m => m[2]);
-  ok(!untrapped.length, `every runtime modal is a trapped dialog${untrapped.length ? ': ' + untrapped.join(', ') : ''}`);
-  const unnamed = roots.filter(m => !/aria-label(ledby)?="/.test(m[1]) && !/modal-title/.test(appSrc.slice(m.index, m.index + 600))).map(m => m[2]);
-  ok(!unnamed.length, `and each has a name${unnamed.length ? ': ' + unnamed.join(', ') : ''}`);
+  ok(!untrapped.length, `no runtime modal is written outside it untrapped${untrapped.length ? ': ' + untrapped.join(', ') : ''}`);
 
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exitCode = fail ? 1 : 0;

@@ -11038,6 +11038,28 @@ function showInfo(title, body, opts = {}) {
       noCancel: !opts.onOk, danger: false });
 }
 
+// The one shell for a dialog built at runtime (V38). Six Settings dialogs each
+// typed their own copy of the .modal rules inline — a different radius, a
+// different backdrop, a z-index of 9999 — so they drifted from the system the
+// day it moved, and no stylesheet change could reach them. Everything here is
+// a class; the body is the caller's, the frame is not.
+function runtimeModal(id, { title, iconName, sub, body, wide = true }) {
+  document.getElementById(id)?.remove();
+  const html = `
+    <div class="modal-overlay" id="${id}" aria-label="${Sanitize.escape(title)}">
+      <div class="modal${wide ? ' modal-wide' : ''} rt-modal">
+        <div class="modal-head">
+          <h2 class="modal-title">${iconName ? icon(iconName) + ' ' : ''}${Sanitize.escape(title)}</h2>
+          <button class="btn-icon" data-close="${id}" aria-label="Close">✕</button>
+        </div>
+        ${sub ? `<p class="rt-sub">${sub}</p>` : ''}
+        <div class="rt-list">${body}</div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  return document.getElementById(id);
+}
+
 // ────────────────────────────────────────────────────────────────
 // Main
 // ────────────────────────────────────────────────────────────────
@@ -11614,265 +11636,193 @@ async function init() {
     );
   });
 
-  // These five are built at runtime. They carry .modal-overlay so the dialog
-  // trap in AccessibilityEnhancements sees them: role, a name, focus moved in
-  // and back, Tab kept inside, Escape (R21). Without it they were plain divs.
-  document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
-    document.getElementById('analyticsModal')?.remove();
-    const sessions = await Store.getSessions();
-    if (!sessions.length) { toast('No sessions to analyze'); return; }
-    const metrics = AnalyticsHub.generateMetricsDashboard(sessions);
-    if (!metrics) { toast('Unable to generate metrics'); return; }
+  // These five are built at runtime, all through runtimeModal (V38). They
+  // carry .modal-overlay so the dialog trap in AccessibilityEnhancements sees
+  // them: role, a name, focus moved in and back, Tab kept inside, Escape (R21).
+  const rtEsc = t => Sanitize.escape(String(t));
+  const tile = (k, v, meta = '') => `
+    <div class="rt-tile">
+      <div class="rt-k">${k}</div>
+      ${v === '' ? '' : `<div class="rt-v">${v}</div>`}
+      ${meta ? `<div class="rt-meta">${meta}</div>` : ''}
+    </div>`;
+  // "premium (own ball) · surface not recorded" rather than a bare
+  // "· not recorded", which reads as if the ball were the thing missing.
+  const condsLine = (ball, surface) => [[ball, 'ball'], [surface, 'surface']]
+    .filter(([v]) => v).map(([v, what]) => /not recorded/i.test(v) ? `${what} not recorded` : v)
+    .map(x => rtEsc(x.toLowerCase())).join(' · ');
+  const ivText = (iv, unit, dec = 0) => iv
+    ? `${fmt(iv.mean, dec)}<small class="rt-unit">${unit} ± ${fmt(iv.ci, dec)}</small>` : '—';
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="analyticsModal" aria-label="Advanced Analytics">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            ${icon('progress')} Advanced Analytics
-            <button class="btn-icon" data-close="analyticsModal" aria-label="Close">✕</button>
-          </div>
-          <div style="display:grid;gap:1rem">
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Sessions</div>
-              <div style="font-size:2rem;font-weight:800">${metrics.totalSessions}</div>
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Total Shots</div>
-              <div style="font-size:2rem;font-weight:800">${metrics.totalShots}</div>
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Avg Carry Distance</div>
-              <div style="font-size:2rem;font-weight:800">${metrics.avgCarry === null ? '—' : metrics.avgCarry + ' yds'}</div>
-              ${metrics.carryClub ? `<div style="font-size:.8rem;color:var(--text-dim);margin-top:.2rem">${Sanitize.escape(metrics.carryClub)}</div>` : ''}
-              ${metrics.carryConsistency === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Consistency: ${metrics.carryConsistency}%</div>`}
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Ball Speed</div>
-              <div style="font-size:1.5rem;font-weight:800">${metrics.ballSpeedAvg} mph avg</div>
-              ${metrics.ballSpeedMax === null ? '' : `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Max: ${metrics.ballSpeedMax} mph</div>`}
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Launch Angle</div>
-              <div style="font-size:1.5rem;font-weight:800">${metrics.launchAngleAvg}°</div>
-              ${metrics.launchAngleRange ? `<div style="font-size:.9rem;color:var(--text-dim);margin-top:.5rem">Range: ${metrics.launchAngleRange[0].toFixed(1)}° - ${metrics.launchAngleRange[1].toFixed(1)}°</div>` : ''}
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Practice Frequency</div>
-              <div style="font-size:1.5rem;font-weight:800">${metrics.sessionFrequency}</div>
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Trend</div>
-              <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${metrics.improvementTrend}</div>
-            </div>
-            <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-              <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Top Clubs</div>
-              <div style="display:flex;flex-direction:column;gap:.4rem">
-                ${metrics.topPerformers.map(c => `
-                  <div style="display:flex;justify-content:space-between;padding:.4rem .6rem;background:var(--surface3);border-radius:4px">
-                    <span>${c.club}</span>
-                    <span style="color:var(--blue);font-weight:600">${c.avgCarry === null ? 'no carry data' : c.avgCarry + ' yds'} (${c.shots} shots)</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          </div>
-        </div>
+  document.getElementById('showAnalyticsBtn')?.addEventListener('click', async () => {
+    const sessions = await Store.getSessions();
+    if (!sessions.length) { toast('No sessions to analyse'); return; }
+    const m = AnalyticsHub.generateMetricsDashboard(sessions);
+    if (!m) { toast('Unable to generate metrics'); return; }
+    const g = m.group;
+    const conds = condsLine(g.ball, g.surface);
+
+    const clubBlock = m.enough ? `
+      ${tile(`${rtEsc(m.club)} carry`, ivText(m.carry, ' yds'), `${m.n} shots`)}
+      <div class="rt-grid2">
+        ${tile('Ball speed', ivText(m.ballSpeed, ' mph'))}
+        ${tile('Launch', ivText(m.launch, '°', 1))}
+      </div>
+      ${tile('Trend', `<span class="rt-verdict">${rtEsc(m.trend ? m.trend.label : '—')}</span>`,
+             'Session against session, on this ball, against your own spread.')}`
+      : `<div class="tail-note">${m.club
+          ? `${plural(m.need, 'more shot')} of your ${rtEsc(m.club)} on this ball before a club figure means anything.`
+          : 'No club with a carry reading yet.'} A number pooled across the bag measures which clubs you hit, not how you hit them.</div>`;
+
+    const body = `
+      <div class="rt-grid2">
+        ${tile('Sessions', m.totalSessions)}
+        ${tile('Shots', m.totalShots)}
+      </div>
+      ${clubBlock}
+      ${tile('Carry consistency', m.consistency === null ? '—' : m.consistency + '%',
+             m.consistency === null
+               ? `No club has ${Metrics.MIN_SHOTS_REPORT} shots in this group yet.`
+               : `Each club scored on its own spread, weighted by shots (${plural(m.consistencyClubs, 'club')}).`)}
+      ${tile('Practice frequency', `<span class="rt-verdict">${rtEsc(m.sessionFrequency)}</span>`)}
+      <div class="rt-tile">
+        <div class="rt-k">Most-hit clubs</div>
+        ${m.clubs.map(c => `
+          <div class="rt-row">
+            <span>${rtEsc(c.club)}</span>
+            <span class="rt-row-v">${c.carry ? `${fmt(c.carry.mean, 0)} yds` : `needs ${plural(c.need, 'more shot')}`}
+              <small class="rt-unit">${plural(c.shots, 'shot')}</small></span>
+          </div>`).join('')}
       </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+    runtimeModal('analyticsModal', {
+      title: 'Your numbers', iconName: 'progress', body,
+      sub: `Your last ${plural(g.sessions, 'session')} on ${conds || 'these conditions'} — ${plural(g.shots, 'shot')}. The same group the home row and "Where you sit" read.`,
+    });
   });
 
   document.getElementById('showBenchmarksBtn')?.addEventListener('click', async () => {
-    document.getElementById('benchmarkModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions to compare'); return; }
-    const esc = t => Sanitize.escape(String(t));
     const pub = CommunityInsights.published(sessions);
     const course = CommunityInsights.onCourse();
 
     const rowHtml = r => `
-      <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-        <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">${esc(r.label)}</div>
-        <div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
-          <div><span style="color:var(--text-dim)">You:</span>
+      <div class="rt-tile">
+        <div class="rt-k">${rtEsc(r.label)}</div>
+        <div class="rt-cols">
+          <div><div class="rt-meta">You</div>
             <strong>${fmt(r.you.mean, r.dec)}</strong>
-            <small>± ${fmt(r.you.ci, r.dec === 2 ? 3 : r.dec)}${esc(r.unit)}</small></div>
-          <div><span style="color:var(--text-dim)">Amateur:</span> <strong>${fmt(r.am, r.dec)}${esc(r.unit)}</strong></div>
-          <div><span style="color:var(--text-dim)">Tour:</span> <strong>${fmt(r.pga, r.dec)}${esc(r.unit)}</strong></div>
+            <small class="rt-unit">± ${fmt(r.you.ci, r.dec === 2 ? 3 : r.dec)}${rtEsc(r.unit)}</small></div>
+          <div><div class="rt-meta">Amateur</div> <strong>${fmt(r.am, r.dec)}</strong><small class="rt-unit">${rtEsc(r.unit)}</small></div>
+          <div><div class="rt-meta">Tour</div> <strong>${fmt(r.pga, r.dec)}</strong><small class="rt-unit">${rtEsc(r.unit)}</small></div>
         </div>
       </div>`;
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="benchmarkModal" aria-label="Where you sit">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem;display:flex;justify-content:space-between;align-items:center">
-            ${icon('progress')} Where you sit
-            <button class="btn-icon" data-close="benchmarkModal" aria-label="Close">✕</button>
-          </div>
-          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
-            ${pub.ok ? `Your ${esc(clubLabel(pub.club))} over ${pub.n} shots, against TrackMan's published rows`
-                     : 'Against published data — no invented averages'}
-          </div>
-          <div style="display:grid;gap:1rem">
-            ${pub.ok
-              ? pub.rows.map(rowHtml).join('')
-              : `<div class="tail-note">${pub.noBenchmark
-                  ? `No published row exists for your ${esc(clubLabel(pub.club))}.`
-                  : `${pub.need} more shot${pub.need === 1 ? '' : 's'} of your most-hit club before a
-                     comparison means anything — a mean off a handful is not a number to measure yourself by.`}</div>`}
-            ${course ? `
-              <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">On the course</div>
-                <div style="font-size:.9rem;line-height:1.5">${esc(course.note || '')}</div>
-              </div>` : ''}
-            <div class="tail-note">
-              <strong>These are published figures, not other users.</strong> The amateur and tour rows are
-              TrackMan's; the on-course comparison, when there is one, is Shot Scope's normative table off
-              90 million shots. This app stores every session privately and aggregates nobody — so it will
-              never show you a "community average", because it does not have one.
-            </div>
-          </div>
-        </div>
+    const body = `
+      ${pub.ok
+        ? pub.rows.map(rowHtml).join('')
+        : `<div class="tail-note">${pub.noBenchmark
+            ? `No published row exists for your ${rtEsc(clubLabel(pub.club))}.`
+            : `${plural(pub.need, 'more shot')} of your most-hit club before a
+               comparison means anything — a mean off a handful is not a number to measure yourself by.`}</div>`}
+      ${course ? tile('On the course', '', rtEsc(course.note || '')) : ''}
+      <div class="tail-note">
+        <strong>These are published figures, not other users.</strong> The amateur and tour rows are
+        TrackMan's; the on-course comparison, when there is one, is Shot Scope's normative table off
+        90 million shots. This app stores every session privately and aggregates nobody — so it will
+        never show you a "community average", because it does not have one.
       </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+    runtimeModal('benchmarkModal', {
+      title: 'Where you sit', iconName: 'progress', body,
+      sub: pub.ok ? `Your ${rtEsc(clubLabel(pub.club))} over ${pub.n} shots, against TrackMan's published rows`
+                  : 'Against published data — no invented averages',
+    });
   });
 
   document.getElementById('showLearningBtn')?.addEventListener('click', async () => {
-    document.getElementById('learningModal')?.remove();
     const sessions = await Store.getSessions();
-    const esc = t => Sanitize.escape(String(t));
     const path = LearningPath.generatePath(sessions);
 
     const module = m => `
-      <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);
-                  border-left:3px solid ${m.status === 'open' ? 'var(--green)' : 'var(--yellow)'}">
-        <div style="display:flex;justify-content:space-between;align-items:start;gap:.6rem;margin-bottom:.4rem">
-          <div style="font-weight:600">${esc(m.id)} · ${esc(m.title)}</div>
-          <div style="font-size:.72rem;white-space:nowrap;color:var(--text-dim)">
-            ${m.status === 'open' ? `${m.open} of ${m.total} open` : 'locked'}</div>
+      <div class="rt-tile rt-mark ${m.status === 'open' ? 'is-open' : 'is-locked'}">
+        <div class="rt-row">
+          <strong>${rtEsc(m.id)} · ${rtEsc(m.title)}</strong>
+          <span class="rt-meta">${m.status === 'open' ? `${m.open} of ${m.total} open` : 'locked'}</span>
         </div>
-        <div style="font-size:.82rem;line-height:1.5;color:var(--text-dim)">${esc(m.why)}</div>
-        <div style="font-size:.78rem;line-height:1.45;color:var(--text-muted);margin-top:.4rem">
-          <strong>How it is run.</strong> ${esc(m.structure)}</div>
-        ${m.lockedNote ? `<div style="font-size:.78rem;line-height:1.45;color:var(--text-muted);margin-top:.4rem">
-          ${esc(m.lockedNote)}</div>` : ''}
+        <div class="rt-text">${rtEsc(m.why)}</div>
+        <div class="rt-meta"><strong>How it is run.</strong> ${rtEsc(m.structure)}</div>
+        ${m.lockedNote ? `<div class="rt-meta">${rtEsc(m.lockedNote)}</div>` : ''}
       </div>`;
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="learningModal" aria-label="What you can work on">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
-            ${icon('book')} What you can work on
-            <button class="btn-icon" data-close="learningModal" aria-label="Close">✕</button>
-          </div>
-          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">
-            ${path.club ? `Gated against your ${esc(clubLabel(path.club))}` : 'Nothing imported yet, so every gate reads as closed'}
-          </div>
-          <div style="display:grid;gap:.8rem">
-            ${path.modules.map(module).join('')}
-            ${path.wrappers ? `
-              <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid var(--blue)">
-                <div style="font-weight:600;margin-bottom:.4rem">${esc(path.wrappers.id)} · ${esc(path.wrappers.title)}</div>
-                <div style="font-size:.82rem;line-height:1.5;color:var(--text-dim)">${esc(path.wrappers.why)}</div>
-                <div style="font-size:.78rem;color:var(--text-muted);margin-top:.4rem">
-                  These are applied <strong>over</strong> a drill, never instead of one — and on the evidence
-                  they matter more than which drill you picked.</div>
-              </div>` : ''}
-            <div class="tail-note">${esc(path.note)}</div>
-          </div>
-        </div>
-      </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+    const body = `
+      ${path.modules.map(module).join('')}
+      ${path.wrappers ? `
+        <div class="rt-tile rt-mark is-wrap">
+          <strong>${rtEsc(path.wrappers.id)} · ${rtEsc(path.wrappers.title)}</strong>
+          <div class="rt-text">${rtEsc(path.wrappers.why)}</div>
+          <div class="rt-meta">These are applied <strong>over</strong> a drill, never instead of one — and on the evidence
+            they matter more than which drill you picked.</div>
+        </div>` : ''}
+      <div class="tail-note">${rtEsc(path.note)}</div>`;
+    runtimeModal('learningModal', {
+      title: 'What you can work on', iconName: 'book', body,
+      sub: path.club ? `Gated against your ${rtEsc(clubLabel(path.club))}` : 'Nothing imported yet, so every gate reads as closed',
+    });
   });
 
   document.getElementById('showClubAnalysisBtn')?.addEventListener('click', async () => {
-    document.getElementById('clubModal')?.remove();
     const sessions = await Store.getSessions();
-    if (!sessions.length) { toast('No data to analyze'); return; }
+    if (!sessions.length) { toast('No data to analyse'); return; }
     const clubs = ClubAnalyzer.compareClubs(sessions);
     if (!clubs.length) { toast('No club data'); return; }
+    const { used, ball } = QuickStats.pick(sessions);
+    const conds = condsLine(ball && ball.label, used[0] && Conditions.surface(used[0]).label);
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="clubModal" aria-label="Club Performance Analysis">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:550px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            ${icon('bag')} Club Performance Analysis
-            <button class="btn-icon" data-close="clubModal" aria-label="Close">✕</button>
-          </div>
-          <div style="display:grid;gap:.8rem">
-            ${clubs.map(c => `
-              <div style="padding:1rem;background:var(--surface2);border-radius:var(--radius-sm);border-left:4px solid ${clubColor(c.club === clubLabel(c.club) ? Object.keys(CLUB_LABELS).find(k => CLUB_LABELS[k] === c.club) : c.club)}">
-                <div style="font-weight:600;margin-bottom:.6rem">${c.club}</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.6rem">
-                  <div>
-                    <div style="font-size:.8rem;color:var(--text-dim)">Avg Carry</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.avgCarry === null ? '—' : c.avgCarry + ' yds'}</div>
-                  </div>
-                  <div>
-                    <div style="font-size:.8rem;color:var(--text-dim)">Shots</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.shotCount}</div>
-                  </div>
-                  <div>
-                    <div style="font-size:.8rem;color:var(--text-dim)">Consistency</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.consistency === null ? '—' : c.consistency + '%'}</div>
-                  </div>
-                  <div>
-                    <div style="font-size:.8rem;color:var(--text-dim)">Ball Speed</div>
-                    <div style="font-size:1.3rem;font-weight:800">${c.avgBallSpeed} mph</div>
-                  </div>
-                </div>
-                <div style="font-size:.9rem;color:${!c.trend ? 'var(--text-dim)' : c.trend.label.startsWith('↑') ? 'var(--green)' : c.trend.label.startsWith('↓') ? 'var(--red)' : 'var(--text-dim)'};font-weight:600">${Sanitize.escape(c.trend ? c.trend.label : '—')}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+    const body = clubs.map(c => `
+      <div class="rt-tile">
+        <div class="rt-row"><strong>${rtEsc(c.club)}</strong><span class="rt-meta">${plural(c.shotCount, 'shot')}</span></div>
+        ${c.enough ? `
+          <div class="rt-grid2">
+            <div><div class="rt-k">Carry</div><div class="rt-v">${c.avgCarry === null ? '—' : c.avgCarry + '<small class="rt-unit"> yds</small>'}</div></div>
+            <div><div class="rt-k">Consistency</div><div class="rt-v">${c.consistency === null ? '—' : c.consistency + '%'}</div></div>
+            <div><div class="rt-k">Ball speed</div><div class="rt-v">${rtEsc(c.avgBallSpeed)}<small class="rt-unit"> mph</small></div></div>
+            <div><div class="rt-k">Trend</div><div class="rt-text">${rtEsc(c.trend ? c.trend.label : '—')}</div></div>
+          </div>`
+        : `<div class="rt-meta">Needs ${plural(c.need, 'more shot')} before a club figure means anything.</div>`}
+      </div>`).join('');
+    runtimeModal('clubModal', {
+      title: 'Club by club', iconName: 'bag', body,
+      sub: `Your last ${plural(used.length, 'session')} on ${conds || 'these conditions'}, one club at a time.`,
+    });
   });
 
   document.getElementById('showEfficiencyBtn')?.addEventListener('click', async () => {
-    document.getElementById('efficiencyModal')?.remove();
     const sessions = await Store.getSessions();
     if (!sessions.length) { toast('No sessions yet'); return; }
-    const esc = t => Sanitize.escape(String(t));
     const latest = sessions[0];
     const st = PracticeEfficiency.structure(latest);
     const vol = PracticeEfficiency.volume(latest);
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="efficiencyModal" aria-label="How you practised">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:450px;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">
-            ${icon('target')} How you practised
-            <button class="btn-icon" data-close="efficiencyModal" aria-label="Close">✕</button>
-          </div>
-          <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:1.2rem">Your last session, read off the order you hit in</div>
-          <div style="display:grid;gap:1rem">
-            ${st.ok ? `
-              <div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Order</div>
-                <div style="font-size:1.8rem;font-weight:800;text-transform:capitalize">${esc(st.mode)}</div>
-                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">
-                  The club changed on ${Math.round(st.rate * 100)}% of shots — ${st.switches}
-                  change${st.switches === 1 ? '' : 's'} across ${st.shots} shots of ${st.clubs} clubs.</div>
-              </div>
-              <div class="tail-note">${esc(st.note)}</div>
-              <div class="tail-note">${esc(st.caveat)}</div>`
-            : `<div class="tail-note">${esc(st.why)}</div>`}
-            ${vol ? `<div style="background:var(--surface2);padding:1rem;border-radius:var(--radius-sm)">
-                <div style="font-size:.85rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.6rem">Volume</div>
-                <div style="font-size:1.6rem;font-weight:800">${vol.shots}${vol.prescribed ? ` <small style="font-weight:400;color:var(--text-dim)">vs ${vol.prescribed} prescribed</small>` : ''}</div>
-                <div style="font-size:.85rem;color:var(--text-dim);margin-top:.3rem">${esc(vol.note)}</div>
-              </div>` : ''}
-            <div class="tail-note">
-              <strong>There is no efficiency score here, because there is no clock.</strong> This app has never
-              recorded how long a session took, and the figure that used to sit at the top of this modal
-              divided by an assumed hour per session — which made every golfer "Low", including one striking
-              it at 96 out of 100.
-            </div>
-          </div>
-        </div>
+    const body = `
+      ${st.ok ? `
+        ${tile('Order', `<span class="rt-cap">${rtEsc(st.mode)}</span>`,
+               `The club changed on ${Math.round(st.rate * 100)}% of shots — ${plural(st.switches, 'change')}
+                across ${st.shots} shots of ${st.clubs} clubs.`)}
+        <div class="tail-note">${rtEsc(st.note)}</div>
+        <div class="tail-note">${rtEsc(st.caveat)}</div>`
+      : `<div class="tail-note">${rtEsc(st.why)}</div>`}
+      ${vol ? tile('Volume', `${vol.shots}${vol.prescribed ? `<small class="rt-unit"> vs ${vol.prescribed} prescribed</small>` : ''}`,
+                   rtEsc(vol.note)) : ''}
+      <div class="tail-note">
+        <strong>There is no efficiency score here, because there is no clock.</strong> This app has never
+        recorded how long a session took, and the figure that used to sit at the top of this modal
+        divided by an assumed hour per session — which made every golfer "Low", including one striking
+        it at 96 out of 100.
       </div>`;
-    document.body.insertAdjacentHTML('beforeend', html);
+    runtimeModal('efficiencyModal', {
+      title: 'How you practised', iconName: 'target', body,
+      sub: 'Your last session, read off the order you hit in',
+    });
   });
 
   // Click-outside-to-close for all dynamically inserted modals
@@ -12069,31 +12019,18 @@ async function init() {
       { key: 'Ctrl+?', action: 'Show this help' },
     ];
 
-    const html = `
-      <div class="modal-overlay" style="position:fixed;inset:0;background:var(--overlay);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem" id="shortcutsModal" aria-label="Keyboard shortcuts">
-        <div style="background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);border-radius:var(--radius);max-width:400px;width:100%;padding:1.5rem;box-shadow:var(--shadow-md)">
-          <div style="font-size:1.3rem;font-weight:800;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center">
-            Keyboard Shortcuts
-            <button class="btn-icon" data-close="shortcutsModal" aria-label="Close">✕</button>
-          </div>
-          <div style="display:grid;gap:.8rem">
-            ${shortcuts.map(s => `
-              <div style="display:flex;justify-content:space-between;padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm)">
-                <span style="font-family:monospace;font-weight:600;color:var(--blue)">${s.key}</span>
-                <span style="color:var(--text-dim)">${s.action}</span>
-              </div>
-            `).join('')}
-          </div>
-          <div style="margin-top:1.2rem;padding:.8rem;background:var(--accent-weak);border-radius:var(--radius-sm);font-size:.85rem;color:var(--text-dim)">
-            Press <kbd style="background:var(--surface3);padding:.2rem .4rem;border-radius:3px;font-size:.8rem">Escape</kbd> to close this dialog
-          </div>
-        </div>
-      </div>`;
+    const body = `
+      ${shortcuts.map(s => `
+        <div class="rt-tile rt-row">
+          <kbd class="rt-kbd">${s.key}</kbd>
+          <span class="rt-meta">${s.action}</span>
+        </div>`).join('')}
+      <div class="tail-note">Press <kbd class="rt-kbd">Escape</kbd> to close this dialog.</div>`;
     // A `modal-overlay`, so the focus trap owns it: a dialog role, focus in
     // and back out, and Escape. It used to have none of that, and its own
     // Escape listener was only removed on Escape — closing with ✕ leaked one
     // listener per opening (R5).
-    document.body.insertAdjacentHTML('beforeend', html);
+    runtimeModal('shortcutsModal', { title: 'Keyboard shortcuts', body, wide: false });
   }
 
   // View preferences toggles
@@ -12961,38 +12898,46 @@ const PersonalCoach = (() => {
 // AnalyticsHub — Advanced metrics dashboard
 // ════════════════════════════════════════════════════════════════
 const AnalyticsHub = (() => {
+  // V39: this pooled every session on every ball, so its carry disagreed with
+  // "Where you sit" beside it (236 vs 237) and its consistency with the home
+  // row (87% vs 89%) — two screens, one golfer, two answers. It also averaged
+  // ball speed and launch across the whole bag, which measures which clubs were
+  // hit, and called any positive move in a pooled form score an "improvement".
+  //
+  // Now it reads exactly what QuickStats and the benchmark read: the recent
+  // sessions on the latest session's ball and surface, one club, above the
+  // floor, as intervals. Counts stay whole-account — a count is not a pooled
+  // statistic. The trend is ClubAnalyzer's, the one verdict every surface uses.
   function generateMetricsDashboard(sessions) {
     if (!sessions.length) return null;
 
     const allShots = sessions.flatMap(s => s.shots);
-    const carries = allShots.map(s => s.carryDistance || 0).filter(c => c > 0);
-    const ballSpeeds = allShots.map(s => s.ballSpeed || 0).filter(b => b > 0);
-    // `|| 0` turned every missing launch angle into a 0° reading, so the
-    // range always started at 0 — a launch nobody has ever produced.
-    const launchAngles = allShots.map(s => s.launchAngle).filter(Number.isFinite);
+    const { used, shots, club, n, ball } = QuickStats.pick(sessions);
+    const enough = !!club && n >= Metrics.MIN_SHOTS_REPORT;
+    const cs = club ? shots.filter(s => s.clubType === club) : [];
+    const iv = (field, dec, keep = v => v > 0) => enough
+      ? Metrics.interval(cs.map(s => s[field]).filter(v => Number.isFinite(v) && keep(v)), '', dec) : null;
+    const bag = bagConsistency(shots);
 
     return {
       totalSessions: sessions.length,
       totalShots: allShots.length,
-      // Per club, named. A bag-pooled carry rendered at 2rem is a number for
-      // a bag nobody owns.
-      ...(() => {
-        const c = {};
-        allShots.forEach(s => { if (s.clubType && s.carryDistance > 0) c[s.clubType] = (c[s.clubType]||0)+1; });
-        const club = Object.keys(c).sort((x,y)=>c[y]-c[x])[0] || null;
-        const cs = club ? allShots.filter(s => s.clubType === club) : [];
-        return { carryClub: club ? clubLabel(club) : null,
-                 avgCarry: club ? fmt(avg(cs, 'carryDistance'), 0) : null };
-      })(),
-      carryConsistency: (bagConsistency(allShots) || {}).score ?? null,
-      ballSpeedAvg: fmt(avg(allShots, 'ballSpeed'), 1),
-      // Math.max() of nothing is -Infinity, which rendered as "-Infinity mph".
-      ballSpeedMax: ballSpeeds.length ? Math.max(...ballSpeeds) : null,
-      launchAngleAvg: fmt(avg(allShots, 'launchAngle'), 1),
-      launchAngleRange: launchAngles.length ? [Math.min(...launchAngles), Math.max(...launchAngles)] : null,
+      group: { sessions: used.length, shots: shots.length,
+               ball: ball ? ball.label : null,
+               surface: used[0] ? Conditions.surface(used[0]).label : null },
+      club: club ? clubLabel(club) : null,
+      clubType: club, n, enough,
+      need: Math.max(0, Metrics.MIN_SHOTS_REPORT - n),
+      carry: iv('carryDistance', 0),
+      ballSpeed: iv('ballSpeed', 0),
+      // A launch angle can be read as 0 and still be a reading, so only a
+      // missing one is dropped: `|| 0` used to turn every gap into a 0° launch.
+      launch: iv('launchAngle', 1, () => true),
+      consistency: bag ? bag.score : null,
+      consistencyClubs: bag ? bag.clubs : 0,
       sessionFrequency: calculateFrequency(sessions),
-      improvementTrend: calculateTrend(sessions),
-      topPerformers: getTopClubs(allShots),
+      trend: club ? ClubAnalyzer.calculateClubTrend(sessions, club) : null,
+      clubs: getClubs(shots),
     };
   }
 
@@ -13011,46 +12956,22 @@ const AnalyticsHub = (() => {
     return `${(sessions.length / days * 7).toFixed(1)} sessions/week`;
   }
 
-  function calculateTrend(sessions) {
-    if (sessions.length < 3) return 'Insufficient data';
-    const first3 = sessions.slice(-3).flatMap(s => s.shots).map(ShotScorer.score).filter(x=>x!==null);
-    const last3 = sessions.slice(0, 3).flatMap(s => s.shots).map(ShotScorer.score).filter(x=>x!==null);
-
-    if (!first3.length || !last3.length) return 'Insufficient data';
-
-    const firstAvg = first3.reduce((a,b)=>a+b,0) / first3.length;
-    const lastAvg = last3.reduce((a,b)=>a+b,0) / last3.length;
-    const change = lastAvg - firstAvg;
-
-    if (change > 5) return '↑ Strong improvement';
-    if (change > 0) return '→ Slight improvement';
-    if (change < -5) return '↓ Needs attention';
-    return '→ Staying consistent';
-  }
-
-  function getTopClubs(shots) {
-    const clubStats = {};
-    shots.forEach(s => {
-      if (!clubStats[s.clubType]) {
-        clubStats[s.clubType] = { shots: 0, totalCarry: 0 };
-      }
-      // Same phantom zero: a missing carry added 0 to the total and 1 to the
-      // divisor. Count only the shots that actually carried a reading.
-      clubStats[s.clubType].shots++;
-      if (s.carryDistance > 0) {
-        clubStats[s.clubType].withCarry = (clubStats[s.clubType].withCarry || 0) + 1;
-        clubStats[s.clubType].totalCarry += s.carryDistance;
-      }
-    });
-
-    return Object.entries(clubStats)
-      .map(([club, stats]) => ({
-        club: clubLabel(club),
-        shots: stats.shots,
-        avgCarry: stats.withCarry ? Math.round(stats.totalCarry / stats.withCarry) : null,
-      }))
-      .sort((a, b) => b.shots - a.shots)
-      .slice(0, 5);
+  // Per club, within the same group, with the floor applied: a club under it
+  // keeps its row and says what it needs rather than printing a mean off two.
+  function getClubs(shots) {
+    const counts = {};
+    shots.forEach(s => { if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    return Object.keys(counts)
+      .sort((a, b) => counts[b] - counts[a])
+      .slice(0, 5)
+      .map(c => {
+        const n = counts[c];
+        const carry = n >= Metrics.MIN_SHOTS_REPORT
+          ? Metrics.interval(shots.filter(s => s.clubType === c && s.carryDistance > 0)
+              .map(s => s.carryDistance), '', 0) : null;
+        return { club: clubLabel(c), clubType: c, shots: n, carry,
+                 need: Math.max(0, Metrics.MIN_SHOTS_REPORT - n) };
+      });
   }
 
   return { generateMetricsDashboard };
@@ -13339,14 +13260,21 @@ const ClubAnalyzer = (() => {
     const analysis = {
       club: clubLabel(clubType),
       shotCount: clubShots.length,
-      avgCarry: carries.length ? Math.round(carries.reduce((a,b)=>a+b,0)/carries.length) : 0,
+      // Below the floor there is no mean worth printing, and no carry at all
+      // is no carry — it used to read 0 yds.
+      enough: clubShots.length >= Metrics.MIN_SHOTS_REPORT,
+      need: Math.max(0, Metrics.MIN_SHOTS_REPORT - clubShots.length),
+      // Through Metrics.interval, the same trimmed mean "Where you sit" prints:
+      // a plain mean kept one misread in and read a yard off it (V39).
+      avgCarry: clubShots.length >= Metrics.MIN_SHOTS_REPORT && carries.length
+        ? (iv => iv ? Math.round(iv.mean) : null)(Metrics.interval(carries, '', 0)) : null,
       // The sentinels were the bug: with no carries `Math.min(..., 1000)` is
       // 1000, so `worstCarry` read 1000 yards and `carryRange` read -1000.
       bestCarry: carries.length ? Math.max(...carries) : null,
       worstCarry: carries.length ? Math.min(...carries) : null,
       carryRange: carries.length ? Math.max(...carries) - Math.min(...carries) : null,
-      consistency: consistencyScore(carries),
-      avgBallSpeed: ballSpeeds.length ? fmt(ballSpeeds.reduce((a,b)=>a+b,0)/ballSpeeds.length, 1) : '—',
+      consistency: clubShots.length >= Metrics.MIN_SHOTS_REPORT ? consistencyScore(carries) : null,
+      avgBallSpeed: (iv => iv ? fmt(iv.mean, 0) : '—')(Metrics.interval(ballSpeeds, '', 0)),
       maxBallSpeed: ballSpeeds.length ? Math.max(...ballSpeeds) : null,
       gapToNext: null, // filled in by Gap Engine
       gapToPrev: null,
@@ -13392,9 +13320,13 @@ const ClubAnalyzer = (() => {
 
   // Sessions are kept, not flattened, because the trend is a session-to-session
   // question and flattening threw the only structure that could answer it away.
+  //
+  // V39: the per-club figures read the same group QuickStats and the benchmark
+  // read — the recent sessions on the latest ball and surface — so the carry
+  // here is the carry there. Pooled across balls, the two disagreed by a yard.
   function compareClubs(sessions) {
     const list = sessions || [];
-    const allShots = list.flatMap(s => s.shots || []);
+    const allShots = QuickStats.pick(list).shots;
     return sortedClubs(allShots)
       .map(c => {
         const a = analyzeClub(allShots, c);
