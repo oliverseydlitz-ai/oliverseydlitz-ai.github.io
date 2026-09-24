@@ -5,7 +5,7 @@ make new plans; if a run gets cut off, finish what was started before anything n
 
 ## Morning summary (written 05:20 CEST, Oliver up early)
 
-**Shipped: 19 fixes in 18 commits, SW v193 → v210, 74 → 81 suites, every push green and render-scan clean both ways.**
+**Shipped: 18 commits (17 fix commits covering ~30 plan items, plus 1 test), SW v193 → v210, 74 → 81 suites, every push green and render-scan clean both ways.**
 
 - Honesty of the numbers: C33 (Progress reads one club, oldest first, above the floor) `6ceee33` ·
   C36 (low-ball-speed rule deleted) `bd34e69` · C37 (fatigue test: false alarms 12% → 4.8%) `647c0cd` ·
