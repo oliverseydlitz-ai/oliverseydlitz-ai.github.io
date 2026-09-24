@@ -7260,10 +7260,13 @@ const RangeCard = (() => {
     return out;
   }
 
-  function open(blocks, session) {
+  // `at` opens on a given block (V40): a tapped plan card lands on its own
+  // block, not on block 1.
+  function open(blocks, session, at = 0) {
     const list = (blocks || []).filter(Boolean);
     if (!list.length) return false;
-    _blocks = list; _session = session || null; _i = 0; _logged = new Set();
+    _blocks = list; _session = session || null; _logged = new Set();
+    _i = Number.isInteger(at) ? Math.max(0, Math.min(list.length - 1, at)) : 0;
     document.getElementById('rangeCard')?.remove();
     const m = document.createElement('div');
     m.className = 'range-card';
@@ -10271,12 +10274,19 @@ const UI = (() => {
 
     // Weighted minutes and ball counts, and the drill from the gated library —
     // the same plan the session detail shows, because there is only one.
+    // V40: the grid lists exactly the blocks the range card walks — the
+    // transfer block included, which the card counted and the grid did not
+    // ("Block 1 of 4" under three cards) — and each card opens the card on
+    // its own block. They looked tappable (.drill-card is the tappable
+    // variant) and did nothing.
+    const forCard = [...plan, PracticePlan.transferBlock()];
     grid.innerHTML = `<div class="tail-note" style="grid-column:1/-1;margin-bottom:.2rem">Built from your last
         session on ${esc(Conditions.ball(latest).label.toLowerCase())}. Time is weighted by how much each fault
         is likely costing you, and each block counts balls as well as minutes — volume past attention is
         exercise rather than practice.</div>` +
-      plan.map(p => `
-      <div class="drill-card" style="padding:1rem">
+      forCard.map((p, i) => `
+      <div class="drill-card" style="padding:1rem" role="button" tabindex="0" data-block="${i}"
+           aria-label="Open block ${i + 1} of ${forCard.length} on the range card: ${esc(p.name)}">
         <div style="font-size:1.6rem;margin-bottom:.3rem">${icon(p.icon || 'flag')}</div>
         <div class="drill-title" style="font-size:.9rem">${esc(p.name)}</div>
         <div class="drill-time" style="margin-top:.4rem">${p.minutes} min &middot; ${p.balls} balls</div>
@@ -10289,10 +10299,11 @@ const UI = (() => {
       `<button class="btn-primary practice-range" style="grid-column:1/-1">Take this to the range →</button>`;
 
     // The same plan, one block at a time, sized to be read from a metre away
-    // with a club in the other hand. The transfer block is appended here for
-    // the same reason PracticePlan appends it to every plan.
-    const forCard = [...plan, PracticePlan.transferBlock()];
+    // with a club in the other hand. The transfer block is appended for the
+    // same reason PracticePlan appends it to every plan.
     grid.querySelector('.practice-range')?.addEventListener('click', () => RangeCard.open(forCard, latest));
+    grid.querySelectorAll('[data-block]').forEach(card => card.addEventListener('click', () =>
+      RangeCard.open(forCard, latest, parseInt(card.dataset.block, 10))));
   }
 
   // ── Drill library ─────────────────────────────────────────────

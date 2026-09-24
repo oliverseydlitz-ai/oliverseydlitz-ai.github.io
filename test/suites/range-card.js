@@ -137,5 +137,26 @@ ok(RC.open([...plan, PP.transferBlock()], sess) === true, 'and the card opens st
 RC.close();
 reset();
 
+console.log('— the Practice grid shows the blocks the card walks, and each opens its own (V40) —');
+{
+  const { MemDB, Store, UI } = R.app;
+  MemDB.saveSession(Store.stamp({ ...sess, id: 'V40', date: '2026-09-02T10:00:00Z' }));
+  UI.renderPractice([Store.stamp({ ...sess, id: 'V40', date: '2026-09-02T10:00:00Z' })]);
+  const cards = [...doc.querySelectorAll('#practiceGrid [data-block]')];
+  const n = plan.length + 1;
+  ok(cards.length === n, `the grid lists all ${n} blocks, the transfer block included (${cards.length})`);
+  ok(cards.every(c => c.getAttribute('role') === 'button' && c.tabIndex === 0),
+     'each card is a keyboard-reachable button, not a dead tappable-looking box');
+  cards[n - 1].click();
+  const rc = doc.getElementById('rangeCard');
+  ok(rc && new RegExp(`Block ${n} of ${n}`).test(rc.textContent), 'tapping the last card opens the card on that block');
+  ok(/Play the course/.test(rc.querySelector('.rc-body, .rc-name')?.textContent || rc.textContent), 'which is the transfer block');
+  RC.close();
+  ok(RC.open([block(), block()], null, 9) === true && /Block 2 of 2/.test(doc.getElementById('rangeCard').textContent),
+     'an out-of-range start is clamped to the last block');
+  RC.close();
+}
+reset();
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exit(fail ? 1 : 0);
