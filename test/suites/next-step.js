@@ -14,7 +14,7 @@ const shot = (o = {}) => ({ clubType: '7i', ballSpeed: 80, clubSpeed: 62, smashF
 const sess = (id, n = 14, o = {}) => Store.stamp({ id, date: '2026-07-01',
   conditions: { ball: 'premium', surface: 'grass', alignment: 'confirmed' },
   shots: Array.from({ length: n }, (_, i) => ({ _row: i + 2, ...shot(o) })) });
-const rd = (o = {}) => ({ holes: 18, par: 72, score: 90, putts: 31, threePutts: 2, penalties: 4.6,
+const rd = (o = {}) => ({ holes: 18, par: 72, score: 90, putts: 31, threePutts: 2, penalties: 5,  // a whole count: the log refuses a fraction (C45)
   fairwaysHit: 7, fairwaysPossible: 14, girHit: 8, upDowns: 6, upDownAttempts: 14, ...o });
 
 console.log('— with nothing at all, the answer is the work that needs no device —');
@@ -47,7 +47,12 @@ ok(/A range fault is a hypothesis about your scoring; a category gap is your sco
 
 console.log('— a level profile does not outrank anything —');
 R.clear();
-for (let i = 0; i < 4; i++) R.record(rd({ penalties: 1.62, girHit: 6, putts: 31.2, upDowns: 5, upDownAttempts: 16 }));
+// Whole-number rounds that average to a level profile (1.6 penalties, 31.2
+// putts): the log refuses fractional counts, so recording 1.62 penalties per
+// round now saves nothing and the test below would pass on an empty log.
+[[2, 31], [2, 31], [2, 31], [1, 31], [1, 32]].forEach(([pen, putts]) =>
+  R.record(rd({ penalties: pen, girHit: 6, putts, upDowns: 5, upDownAttempts: 16 })));
+ok(R.all().length === 5 && R.profile().ok, 'the level rounds are actually logged');
 ok(SR.getNextStep([s1]).type === 'drill', 'with no outlier it falls through to the session fault');
 R.clear();
 

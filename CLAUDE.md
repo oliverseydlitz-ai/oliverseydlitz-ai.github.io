@@ -1397,7 +1397,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **81 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v213**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v214**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1868,7 +1868,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**81 test suites**, service worker **v213**. Deterministic auth, cloud sync
+**81 test suites**, service worker **v214**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

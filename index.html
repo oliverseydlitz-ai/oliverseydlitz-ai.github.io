@@ -459,12 +459,6 @@
       <!-- Smash trend across sessions (drill A18) -->
       <div id="strikeTrendHost"></div>
 
-      <!-- On the course — the only on-course data the app has -->
-      <div class="section-block" id="secRounds">
-        <h2 class="section-title">On the Course <span class="section-sub">where your strokes actually go</span></h2>
-        <div id="roundsHost"></div>
-      </div>
-
       <!-- Trend summary -->
       <div id="progressTrend"></div>
 
@@ -477,6 +471,15 @@
         <div class="chart-card"><h3>Club Path (°)</h3><canvas id="chartPath"></canvas></div>
         <div class="chart-card"><h3>Attack Angle (°)</h3><canvas id="chartAA"></canvas></div>
       </div>
+    </div>
+
+    <!-- On the course. Outside #progress-content on purpose (C45): rounds need
+         no launch monitor, and inside it the log stayed hidden until two
+         sessions had been imported, so a golfer with no device data could not
+         record a round at all. -->
+    <div class="section-block" id="secRounds">
+      <h2 class="section-title">On the Course <span class="section-sub">where your strokes actually go</span></h2>
+      <div id="roundsHost"></div>
     </div>
   </section>
 

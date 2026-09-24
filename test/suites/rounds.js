@@ -165,5 +165,25 @@ ok(better.first.hcp > better.last.hcp, 'and the implied handicap moved the right
 const worse = R.trend('putts', series([30,30,30,30,30,38]).map((r,i) => ({ ...r, putts: [30,30,30,30,30,38][i] })));
 ok(worse.real === true && worse.improved === false, 'more putts reads as worse, since lower is better there');
 
+console.log('— the log refuses rounds that cannot have happened (C45) —');
+R.clear();
+const bad = (o, field, why) => {
+  const p = R.validate(rd(o));
+  ok(p.some(x => x.field === field) && R.record(rd(o)) === null, why);
+};
+bad({ holes: 9, score: 45, par: 36, putts: 16, threePutts: 1, girHit: 12, fairwaysPossible: 7, upDownAttempts: 6 },
+  'girHit', 'twelve greens on nine holes (133% GIR) is refused');
+bad({ fairwaysHit: 15, fairwaysPossible: 14 }, 'fairwaysHit', 'more fairways hit than possible is refused');
+bad({ upDowns: 5, upDownAttempts: 4 }, 'upDowns', 'more up-and-downs than attempts is refused');
+bad({ threePutts: 12, putts: 30 }, 'threePutts', 'twelve three-putts in thirty putts is refused');
+bad({ score: 17 }, 'score', 'fewer strokes than holes is refused');
+bad({ putts: 95 }, 'putts', 'more putts than strokes is refused');
+bad({ penalties: -1 }, 'penalties', 'a negative count is refused');
+bad({ putts: 31.5 }, 'putts', 'a fractional count is refused');
+bad({ date: new Date(Date.now() + 5 * 864e5).toISOString() }, 'date', 'a round in the future is refused');
+ok(R.validate(rd()).length === 0 && R.record(rd()) !== null, 'a plausible round passes and saves');
+ok(R.validate({ score: 88 }).length === 0, 'blank fields are not problems — only the score is required');
+R.clear();
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);

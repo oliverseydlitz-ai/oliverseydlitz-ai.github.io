@@ -8,6 +8,7 @@ const R = require('../load.js').load({});
 let fail = 0; const ok = (c, m) => { console.log((c ? '  PASS  ' : '  FAIL  ') + m); if (!c) fail++; };
 if (!R.ok) { console.log('  FAIL  app.js did not load: ' + R.errors.join('; ')); process.exit(1); }
 const { cleanBadge, plural, Metrics } = R.app;
+const doc = R.window.document;
 const F = Metrics.MIN_SHOTS_REPORT;
 const shots = (club, n) => Array.from({ length: n }, () => ({ clubType: club }));
 
@@ -71,6 +72,15 @@ ok(/\.probe-item\.dotted\s*\{[^}]*padding-left/.test(css) && !/\.probe-item\{[^}
   const sd = R.app.stdDev([1, 2, 3, 4]);
   ok(Math.abs(sd - Math.sqrt(5 / 3)) < 1e-12, `stdDev divides by n − 1 (${sd.toFixed(4)} for 1,2,3,4)`);
   ok(R.app.stdDev([7]) === 0, 'and one value has no spread');
+}
+
+// C45: rounds need no launch monitor, so the log shows with zero sessions. It
+// sat inside #progress-content, hidden until two imports.
+{
+  const host = doc.getElementById('roundsHost');
+  ok(host && !host.closest('#progress-content'), 'the rounds log is not inside the two-session gate');
+  R.app.UI.renderProgress([]);
+  ok(doc.getElementById('rdSave') && doc.getElementById('rdDate'), 'with no sessions the round form renders, with a date');
 }
 
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');

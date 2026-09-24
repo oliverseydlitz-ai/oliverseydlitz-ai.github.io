@@ -3711,7 +3711,46 @@ const Rounds = (() => {
   function save(list) {
     try { localStorage.setItem(KEY, JSON.stringify(list.slice(-300))); } catch (_) {}
   }
+  // C45: the log accepted 12 greens on a nine-hole round — 133% GIR — and
+  // built its diagnosis on it. Only hard logic is checked, no invented limits:
+  // counts are whole and not negative, per-hole counts cannot exceed the holes
+  // played, "hit" cannot exceed "possible", a three-putt is at least three
+  // putts, and every hole takes a stroke and every putt is one. Each problem
+  // is named so the form can say which field is wrong.
+  function validate(r) {
+    const holes = r?.holes === 9 ? 9 : 18;
+    const has = v => v !== null && v !== undefined && v !== '';
+    const problems = [];
+    const nums = { score: 'Score', putts: 'Putts', threePutts: 'Three-putts', penalties: 'Penalties',
+      girHit: 'Greens in regulation', fairwaysHit: 'Fairways hit', fairwaysPossible: 'Fairways possible',
+      upDowns: 'Up and downs', upDownAttempts: 'Up-and-down attempts' };
+    for (const [k, label] of Object.entries(nums)) {
+      if (!has(r?.[k])) continue;
+      const v = +r[k];
+      if (!Number.isInteger(v) || v < 0) problems.push({ field: k, msg: `${label} has to be a whole number, 0 or more.` });
+    }
+    if (problems.length) return problems;
+    const v = k => (has(r?.[k]) ? +r[k] : null);
+    const perHole = [['girHit', 'Greens in regulation'], ['threePutts', 'Three-putts'],
+                     ['fairwaysPossible', 'Fairways possible'], ['upDownAttempts', 'Up-and-down attempts']];
+    for (const [k, label] of perHole)
+      if (v(k) !== null && v(k) > holes) problems.push({ field: k, msg: `${label} can't be more than ${holes} on a ${holes}-hole round.` });
+    if (v('fairwaysHit') !== null && v('fairwaysPossible') !== null && v('fairwaysHit') > v('fairwaysPossible'))
+      problems.push({ field: 'fairwaysHit', msg: 'Fairways hit can\'t be more than the fairways possible.' });
+    if (v('upDowns') !== null && v('upDownAttempts') !== null && v('upDowns') > v('upDownAttempts'))
+      problems.push({ field: 'upDowns', msg: 'Up and downs can\'t be more than the attempts.' });
+    if (v('threePutts') !== null && v('putts') !== null && v('threePutts') * 3 > v('putts'))
+      problems.push({ field: 'threePutts', msg: 'Each three-putt is at least three putts, so that many three-putts needs more putts.' });
+    if (v('score') !== null && v('score') < holes)
+      problems.push({ field: 'score', msg: `A ${holes}-hole round is at least ${holes} strokes.` });
+    if (v('score') !== null && v('putts') !== null && v('putts') > v('score'))
+      problems.push({ field: 'putts', msg: 'Putts are strokes, so they can\'t be more than the score.' });
+    if (r?.date && !(new Date(r.date) <= new Date(Date.now() + 864e5)))
+      problems.push({ field: 'date', msg: 'The date can\'t be in the future.' });
+    return problems;
+  }
   function record(r) {
+    if (validate(r).length) return null;
     const holes = r?.holes === 9 ? 9 : 18;
     const num = v => (Number.isFinite(+v) && v !== '' && v !== null ? +v : null);
     const row = {
@@ -3985,7 +4024,7 @@ const Rounds = (() => {
     };
   }
 
-  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS, MIN_TREND_ROUNDS, CATEGORY_WORK,
+  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS, MIN_TREND_ROUNDS, CATEGORY_WORK, validate,
            all, record, remove, clear, per18, place, profile, rangeLink, workFor, prescribe, trend };
 })();
 
@@ -9619,6 +9658,9 @@ const UI = (() => {
   function renderProgress(sessions) {
     const empty = document.getElementById('progress-empty');
     const content = document.getElementById('progress-content');
+    // Rounds first: they need no launch-monitor data, so they render whatever
+    // the session count (C45).
+    try { renderRounds(sessions); } catch(e){ console.error('rounds',e); }
     if (sessions.length<2) { empty.style.display=''; content.hidden=true; return; }
     empty.style.display='none'; content.hidden=false;
 
@@ -9693,7 +9735,6 @@ const UI = (() => {
     renderProgressCharts(sessions, firstClub);
     try { renderTailTrend(sessions, firstClub); } catch(e){ console.error('tail trend',e); }
     try { renderStrikeTrend(sessions, firstClub); } catch(e){ console.error('strike trend',e); }
-    try { renderRounds(sessions); } catch(e){ console.error('rounds',e); }
     try { renderCompare(sessions); } catch(e){ console.error('compare',e); }
   }
 
@@ -9801,6 +9842,7 @@ const UI = (() => {
       <div class="tail-block">
         <div class="tail-head">Log a round <span class="tail-n">six numbers you already know</span></div>
         <div class="rd-form">
+          <label class="qe-field"><span>Date played</span><input type="date" id="rdDate"></label>
           <label class="qe-field"><span>Holes</span>
             <select id="rdHoles"><option value="18">18</option><option value="9">9</option></select></label>
           <label class="qe-field"><span>Score</span><input type="number" id="rdScore" min="18" max="200" inputmode="numeric"></label>
@@ -9819,6 +9861,11 @@ const UI = (() => {
           the app never fills a gap with an assumption.</div>
       </div>`;
 
+    const dayEl = document.getElementById('rdDate');
+    if (dayEl) {
+      const t = new Date(), today = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+      dayEl.value = today; dayEl.max = today;
+    }
     document.getElementById('rdHoles')?.addEventListener('change', e => {
       const par = document.getElementById('rdPar'), firOf = document.getElementById('rdFirOf');
       if (par) par.value = e.target.value === '9' ? 36 : 72;
@@ -9826,13 +9873,21 @@ const UI = (() => {
     });
     document.getElementById('rdSave')?.addEventListener('click', () => {
       const v = id => { const el2 = document.getElementById(id); const n = parseFloat(el2?.value); return Number.isFinite(n) ? n : null; };
-      const saved = Rounds.record({
+      // The round is logged on the day it was PLAYED, not the day it was typed
+      // in; a trend across rounds is read in that order (C45).
+      const day = document.getElementById('rdDate')?.value;
+      const input = {
+        date: day ? new Date(day + 'T12:00:00').toISOString() : undefined,
         holes: parseInt(document.getElementById('rdHoles').value, 10),
         score: v('rdScore'), par: v('rdPar'), putts: v('rdPutts'), threePutts: v('rdThree'),
         penalties: v('rdPen'), girHit: v('rdGir'), fairwaysHit: v('rdFir'),
         fairwaysPossible: v('rdFirOf'), upDowns: v('rdUd'), upDownAttempts: v('rdUdOf'),
-      });
-      if (!saved) { toast('A round needs at least a score.'); return; }
+      };
+      if (input.score === null) { toast('A round needs at least a score.'); return; }
+      const problems = Rounds.validate(input);
+      if (problems.length) { toast(problems[0].msg); return; }
+      const saved = Rounds.record(input);
+      if (!saved) { toast('That round could not be saved.'); return; }
       toast('Round saved.');
       renderRounds(sessions);
     });
