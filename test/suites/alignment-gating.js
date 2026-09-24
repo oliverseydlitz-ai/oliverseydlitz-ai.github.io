@@ -43,7 +43,7 @@ const sess = (id, ball, surface, carry, smash) => Store.stamp({
     launchAngle: 18, apex: 30, spinRate: 6000 })),
 });
 const premium = sess(1, 'premium', 'grass', 150, 1.33);
-const range   = sess(2, 'range',   'grass', 170, 1.33);
+const range   = sess(2, 'range',   'grass', 170, 1.35);  // smash differs: a 0 change has no verdict to keep
 const premium2= sess(3, 'premium', 'grass', 160, 1.36);
 
 const across = Features.compare(premium, range);

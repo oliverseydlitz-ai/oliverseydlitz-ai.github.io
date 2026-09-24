@@ -1214,8 +1214,10 @@ a.settings-row { text-decoration: none; }
 
 /* Measurement caveats — deliberately shown ABOVE prescriptions, because they
    decide whether the prescription is admissible at all. */
+/* V42: no side margin. The detail view already supplies the gutter, and the
+   extra 1rem put this block 16px in from the since-block above it. */
 .caveat-block{
-  margin:0 1rem 1rem; padding:.85rem 1rem;
+  margin:0 0 1rem; padding:.85rem 1rem;
   background:var(--surface2); border-left:3px solid var(--yellow);
   border-radius:var(--radius-sm);
 }
@@ -1255,13 +1257,16 @@ a.settings-row { text-decoration: none; }
 .ref-src{font-size:.68rem;color:var(--text-muted);margin-top:.15rem;font-variant-numeric:normal}
 .ref-note{font-size:.78rem;line-height:1.5;color:var(--text-dim);margin:.3rem 0 .6rem}
 
-.probe-block{margin:0 1rem 1rem;padding:.85rem 1rem;background:var(--surface2);
+.probe-block{margin:0 0 1rem;padding:.85rem 1rem;background:var(--surface2);
   border-left:3px solid var(--pine);border-radius:var(--radius-sm)}
 .probe-block.pending{border-left-color:var(--text-muted)}
 .probe-head{font-size:.7rem;letter-spacing: var(--track-caps);text-transform:uppercase;font-weight:700;
   color:var(--text-dim);margin-bottom:.5rem}
-.probe-item{position:relative;padding-left:1rem;font-size:.83rem;line-height:1.55;
+.probe-item{position:relative;font-size:.83rem;line-height:1.55;
   color:var(--text);margin-bottom:.45rem}
+/* Room for the outcome dot only where a dot is drawn; the pending asks have
+   none, and the empty 1rem read as a stray indent under the heading. */
+.probe-item.dotted{padding-left:1rem}
 .probe-item:last-child{margin-bottom:0}
 .probe-dot{position:absolute;left:0;top:.5rem;width:7px;height:7px;border-radius:50%;
   background:var(--text-muted)}

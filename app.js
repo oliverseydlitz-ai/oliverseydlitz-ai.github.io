@@ -6700,16 +6700,20 @@ const Features = (() => {
             real = v ? v.real : null;
           } catch (_) { real = null; }
         }
+        // A move that prints as 0 at this precision is no move: it used to get
+        // `good: false` (0 is not > 0) and render "· 0yds" in the regression
+        // colour.
+        const zero = delta != null && Number(fmt(Math.abs(delta), dec)) === 0;
         return {
           label, unit, sensitive, real,
           a: metric(a, f, dec), b: metric(b, f, dec),
           delta: delta!=null ? fmt(Math.abs(delta), dec) : null,
-          dir: delta==null||Math.abs(delta)<1e-9 ? 'flat' : delta>0 ? 'up' : 'down',
+          dir: delta==null||zero ? 'flat' : delta>0 ? 'up' : 'down',
           // A verdict is withheld when the conditions differ AND when the move
           // is smaller than the golfer's own noise. `real === false` is a
           // finding, not an absence: it says the change is below what this data
           // can resolve, which is worth showing without a colour on it.
-          good: (delta==null || !verdictOk || real === false) ? null : (higherBetter ? delta>0 : delta<0),
+          good: (delta==null || zero || !verdictOk || real === false) ? null : (higherBetter ? delta>0 : delta<0),
         };
       });
       out.comparable = sameConditions;
@@ -8411,7 +8415,7 @@ const UI = (() => {
     el.hidden = false;
     el.innerHTML = `<div class="probe-block">
         <div class="probe-head">Did it hold?</div>
-        ${results.map(r => `<div class="probe-item outcome-${r.outcome}">
+        ${results.map(r => `<div class="probe-item dotted outcome-${r.outcome}">
             <span class="probe-dot"></span>${Sanitize.escape(RetentionProbe.describe(r))}</div>`).join('')}
       </div>` + lapsedNote;
   }

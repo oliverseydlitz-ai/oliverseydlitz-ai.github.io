@@ -44,5 +44,25 @@ ok(opt && opt.textContent === R.app.Conditions.BALLS.premium.short && opt.textCo
   `the import menu uses the short ball label (${opt && opt.textContent})`);
 ok(R.app.Conditions.BALLS.premium.label === 'Premium (own ball)', 'the full label is unchanged for prose');
 
+// A7 / V42 and the zero delta found with it. Two identical sessions compared:
+// every row moved by 0, and each used to come back good:false — painted in the
+// regression colour as "· 0yds".
+{
+  const { Features, Store: St } = R.app;
+  const shotsZ = Array.from({ length: 12 }, () => ({ clubType: 'd', ballSpeed: 150, clubSpeed: 104,
+    smashFactor: 1.44, launchAngle: 12, attackAngle: 1, carryDistance: 235, totalDistance: 255, apex: 31 }));
+  const mk = (id, d) => St.stamp({ id, date: d, conditions: { ball: 'premium', surface: 'grass' }, shots: shotsZ.map(x => ({ ...x })) });
+  const rows = Features.compare(mk('z1', '2026-09-20T10:00:00Z'), mk('z2', '2026-09-21T10:00:00Z')) || [];
+  const zeros = rows.filter(r => r.delta !== null && Number(r.delta) === 0);
+  ok(zeros.length > 0 && zeros.every(r => r.good === null && r.dir === 'flat'),
+    `a change that prints as 0 is neither good nor bad (${zeros.length} rows checked)`);
+}
+for (const sel of ['.caveat-block', '.probe-block']) {
+  const m = css.match(new RegExp(sel.replace('.', '\\.') + '\\s*\\{[^}]*margin:\\s*([^;]+);'));
+  ok(m && /^0 0 1rem$/.test(m[1].trim()), `${sel} has no side margin of its own (${m && m[1]})`);
+}
+ok(/\.probe-item\.dotted\s*\{[^}]*padding-left/.test(css) && !/\.probe-item\{[^}]*padding-left/.test(css),
+  'only a dotted probe item reserves room for the dot');
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exitCode = fail ? 1 : 0;
