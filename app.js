@@ -682,6 +682,10 @@ const Metrics = (() => {
     if (!base || !n) return null;
     return base * Math.sqrt(10 / n);
   };
+  // The per-SHOT spread the same table implies (SD_total = MDC10 x sqrt(10) /
+  // 2.77). It does not shrink with n, so it can stand beside a golfer's own
+  // shot-to-shot sigma; mdc() is for a change in a mean and cannot (C46).
+  const perShotSD = metric => (MDC_N10[metric] ? MDC_N10[metric] * Math.sqrt(10) / 2.77 : null);
 
   // DEVICE ERROR IS TREATED AS ZERO, deliberately.
   //
@@ -880,7 +884,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
+  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, perShotSD, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval, weightedInterval };
 })();
@@ -2243,10 +2247,22 @@ const Dispersion = (() => {
              'A two-way miss is a different problem from a one-way one: there is no side of the target ' +
              'you can safely aim away from, so the same corridor costs you twice as much.';
     } else {
-      verdict = 'one-way';
-      const side = left > right ? 'left' : 'right';
-      note = `Your tail is one-way — ${Math.max(left, right)} of ${total} bad shots go ${side}. ` +
-             'That is the more manageable pattern: a one-way miss can be aimed around while you work on it.';
+      // C46: "3 of 3 go right" was called a pattern. Three coin flips land on
+      // one side a quarter of the time, so a one-way verdict needs an exact
+      // sign test to rule out a 50/50 split (two-sided p <= 0.05): six of six,
+      // or eight of nine. Below that the lean is named and not called.
+      const k = Math.max(left, right), side = left > right ? 'left' : 'right';
+      let tail = 0, c = 1;
+      for (let i = 0; i <= total; i++) { if (i >= k) tail += c; c = c * (total - i) / (i + 1); }
+      const p = Math.min(1, 2 * tail / 2 ** total);
+      if (p <= 0.05) {
+        verdict = 'one-way';
+        note = `Your tail is one-way — ${k} of ${total} bad shots go ${side}. ` +
+               'That is the more manageable pattern: a one-way miss can be aimed around while you work on it.';
+      } else {
+        note = `${k} of ${total} bad shots went ${side}. That leans one way, but a split that uneven turns up ` +
+               'by chance too often to call it a pattern yet — more bad shots on the same side would settle it.';
+      }
     }
     return { ok: true, left, right, total, verdict, note, cut, centre: t.centre };
   }
@@ -5587,11 +5603,15 @@ const SwingDNA = (() => {
     const sd = stdDev(smashVals);
     const avgSmash = avg(cs, 'smashFactor');
     if (smashVals.length >= Metrics.MIN_SHOTS_REPORT && Number.isFinite(sd)) {
-      // Judged against what the DEVICE can resolve over this many shots rather
-      // than against invented 0.04 / 0.07 / 0.10 bands.
-      const floor = Metrics.mdc('smashFactor', smashVals.length);
-      const q = floor && sd <= floor ? { val: 'Repeating below what the device resolves', tone: 'good' }
-              : floor && sd <= floor * 2 ? { val: 'Repeating well', tone: 'good' }
+      // C46: this compared a per-shot spread with Metrics.mdc(n), a threshold
+      // for a change in the MEAN that shrinks as 1/sqrt(n) — so one swing read
+      // "below what the device resolves" at 10 shots and "Spread wide" at 40.
+      // And no one has published MLM2PRO smash error, so the device claim was
+      // unsourced. It is now read against the per-shot spread behind the same
+      // reference table, which does not move with the number of shots.
+      const ref = Metrics.perShotSD('smashFactor');
+      const q = ref && sd <= ref ? { val: 'Tighter than the reference spread', tone: 'good' }
+              : ref && sd <= ref * 2 ? { val: 'Repeating well', tone: 'good' }
               : { val: 'Spread wide', tone: 'bad' };
       pills.push({ category: 'Strike repeatability', icon: 'target', tone: q.tone,
         value: `${q.val} (σ ${fmt(sd, 3)})` });

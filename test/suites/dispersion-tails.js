@@ -108,13 +108,21 @@ ok(Number.isFinite(D.tail(off).bias) && D.tail(off).aligned === false,
 ok(Number.isFinite(D.tail(on).bias) && D.tail(on).aligned === true, 'and flagged aligned once confirmed');
 
 console.log('— the two-sided miss census —');
-const oneWay = [...spread(34, 2), shot(9), shot(10), shot(11)];
+// A clear one-way tail (ten right, one core shot tipping left once the tail
+// moves the centre): a split a 50/50 miss produces well under 5% of the time.
+// Three of three used to be enough (C46).
+const oneWay = [...spread(34, 2), ...[9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5].map(d => shot(d))];
 const twoWay = [...spread(34, 2), shot(9), shot(10), shot(-9), shot(-11)];
 ok(D.census(oneWay).verdict === 'one-way', 'a tail that only goes right reads as one-way');
 ok(/aimed around/.test(D.census(oneWay).note), 'and says it can be aimed around');
 ok(D.census(twoWay).verdict === 'two-way', 'a tail that goes both ways reads as two-way');
 ok(/no side of the target/.test(D.census(twoWay).note), 'and says why that costs more');
 ok(D.census(spread(34, 2)).verdict === 'indeterminate', 'a thin tail is not classified either way');
+// C46: "3 of 3 go right" was called a pattern. Three coin flips land on one
+// side a quarter of the time.
+const three = D.census([...spread(34, 2), shot(9), shot(10), shot(11)]);
+ok(three.verdict === 'indeterminate' && /leans one way/.test(three.note),
+   `three of three is a lean, not a pattern (${three.verdict})`);
 
 console.log('— the strokes valuation, and where it refuses —');
 const v = D.value(7.9, 2);

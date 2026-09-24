@@ -84,5 +84,23 @@ console.log('— and face-to-path has no pill at all —');
 ok(!/[Ff]ace.?to.?[Pp]ath|faceP/.test(code),
    'a five-shot mean with "Open (fading) ✗" was the worst claim in the module');
 
+console.log('— the repeatability verdict does not flip with the number of shots (C46) —');
+{
+  // The same swing — an alternating smash of 1.40 / 1.43, sigma ~0.015 — at 10
+  // shots and at 40. The old verdict compared sigma with the MDC of a MEAN,
+  // which shrinks as 1/sqrt(n): "below what the device resolves" at 10, a
+  // different word at 40, from an identical swing.
+  const mk = n => Array.from({ length: n }, (_, i) => ({ clubType: '7i', smashFactor: i % 2 ? 1.43 : 1.40,
+    ballSpeed: 120, clubSpeed: 85, carryDistance: 165, launchAngle: 17, attackAngle: -3.5 }));
+  const pill = shots => (DNA.analyze(shots) || []).find(p => p.category === 'Strike repeatability');
+  const a = pill(mk(10)), b = pill(mk(40));
+  ok(a && b && a.value.split(' (')[0] === b.value.split(' (')[0] && a.tone === b.tone,
+     `same verdict at 10 and 40 shots ("${a && a.value}" / "${b && b.value}")`);
+  ok(!/device resolves/.test(src.replace(/\/\/.*$/gm, '')),
+     'no claim about what the device resolves — no MLM2PRO smash error has been published');
+  ok(Math.abs(Metrics.perShotSD('smashFactor') - 0.03 * Math.sqrt(10) / 2.77) < 1e-12,
+     'the reference is the per-shot spread behind the MDC table, not the MDC itself');
+}
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
