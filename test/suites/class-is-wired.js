@@ -416,7 +416,6 @@ console.log('— and the names a traced producer builds that no rule covers —'
 const GAP_EXEMPT = {
   'drill-group-drill':   'the drills need no heading, so the group class has nothing to add',
   'drill-group-measure': 'the same — .drill-group carries the layout for every kind',
-  'flat':                'a withheld or unproven row takes the base .since-row / .yard-trend treatment',
   'outcome-unknown':     'a probe with too little history to call it; deliberate default, not a colour',
   'sev-medium':          'a medium severity is the base focus card — only high and low are marked',
   'severity-medium':     'the same, on fault cards, plan blocks, bench rows and shot-log rows',

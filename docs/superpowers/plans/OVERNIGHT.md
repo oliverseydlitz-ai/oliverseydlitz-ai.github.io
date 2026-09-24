@@ -59,3 +59,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 02:40 CEST — queue 2: V33 (import preview readable and fits; scan measures it). SW v205.
 - 03:10 CEST — queue 2: V37 (showInfo; every confirm button is a verb; red only when destructive). SW v206.
 - 03:40 CEST — queue 2: R29 (unseen charts no longer leak their observer + chart). SW v207.
+- 04:15 CEST — queue 4: new plan written (`2026-09-24-next-plan.md`); A1–A3 shipped (Clean badge needs a club at the floor; +0.0 is neutral; plural counts; `verdict-copy.js`). SW v208.

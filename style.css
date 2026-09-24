@@ -1518,6 +1518,7 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .sm-table td.sm-c:empty { display: none; }
 .sm-cmp.up   { color: var(--green); }
 .sm-cmp.down { color: var(--red); }
+.sm-cmp.flat { color: var(--text-muted); }
 .sm-faults-title { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: var(--track-caps-xs); color: var(--text-muted); margin: 1rem 0 .5rem; }
 .sm-fault {
   font-size: .84rem; padding: .4rem .7rem; border-radius: var(--radius);

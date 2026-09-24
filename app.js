@@ -288,6 +288,24 @@ function avg(arr, field) {
   return vals.reduce((a,b) => a+b, 0) / vals.length;
 }
 
+// "1 more shots" read as a typo on three screens. The count is computed, so
+// the noun has to follow it.
+function plural(n, word) { return `${n} ${word}${n === 1 ? '' : 's'}`; }
+
+// "Clean" is a verdict, so it needs data that could have produced the other
+// one. It used to show whenever no HIGH fault reported: on a six-shot session
+// where no club reached the floor and nothing could report, and beside
+// medium faults the card simply did not list.
+function cleanBadge(shots, faults) {
+  if ((faults || []).length) return '';
+  const per = {};
+  for (const x of shots || []) per[x.clubType] = (per[x.clubType] || 0) + 1;
+  const judged = Object.values(per).some(n => n >= Metrics.MIN_SHOTS_REPORT);
+  return judged
+    ? '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'
+    : '<span class="session-badge">Too few shots to judge</span>';
+}
+
 function stdDev(values) {
   const v = values.filter(x => typeof x === 'number' && !isNaN(x));
   if (v.length < 2) return 0;
@@ -4028,7 +4046,7 @@ const MeasurementReference = (() => {
         `Spin, start direction, face angle and anything the monitor calculates need ${pct(r(3).min)}.`)}
       ${para(`No club gets an average until it has ${Metrics.MIN_SHOTS_REPORT} shots. Club path and attack angle wait for ` +
         `${Metrics.MIN_SHOTS_DELIVERY}, and your bad misses wait for ${Metrics.MIN_SHOTS_TAIL}.`)}
-      ${para(Conditions.NOTES.range + ` On range balls a fault has to show up on ${Math.round(bump * 100)} more shots in 100 before it reports.`)}
+      ${para(Conditions.NOTES.range + ` On range balls a fault has to show up on ${plural(Math.round(bump * 100), 'more shot')} in 100 before it reports.`)}
       ${para(Conditions.NOTES.unknown)}
       ${para(Conditions.NOTES.mat)}
       ${para(Conditions.NOTES.alignment)}
@@ -5496,7 +5514,7 @@ const SwingDNA = (() => {
     const n = cs.length;
     if (!club || n < Metrics.MIN_SHOTS_REPORT) {
       return [{ category: 'Not yet', icon: 'search', tone: NEUTRAL,
-        value: `${Metrics.MIN_SHOTS_REPORT - n} more shots of one club` }];
+        value: `${plural(Metrics.MIN_SHOTS_REPORT - n, 'more shot')} of one club` }];
     }
     pills.push({ category: 'Read on', icon: 'bag', tone: NEUTRAL, value: `${clubLabel(club)} · ${n} shots` });
 
@@ -8075,7 +8093,7 @@ const UI = (() => {
               })()}
               <div class="session-card-badges">
                 ${improved ? '<span class="session-badge improvement">↑ Improving</span>' : ''}
-                ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${icon(f.icon)} ${f.name}</span>`).join('') : '<span class="session-badge" style="background:var(--green)">✓ Clean</span>'}
+                ${highFaults.length ? highFaults.map(f => `<span class="session-badge fault">${icon(f.icon)} ${f.name}</span>`).join('') : cleanBadge(s.shots, faults)}
               </div>
               <div class="session-card-actions">
                 <button class="btn-secondary btn-sm" data-share="${s.id}">${icon('external')} Share</button>
@@ -9299,8 +9317,11 @@ const UI = (() => {
       if (sameClub.length < Metrics.MIN_SHOTS_REPORT) return '';
       const v = shot[field], a = avg(sameClub, field);
       if (typeof v!=='number' || a===null) return '';
-      const d = v - a;
-      return `<span class="sm-cmp ${d>=0?'up':'down'}">${d>=0?'+':''}${fmt(d,dec)} vs ${clubLabel(shot.clubType)} avg</span>`;
+      // Rounded first: a delta that prints as 0.0 is not a gain, and was
+      // painted as one.
+      const d = Number(fmt(v - a, dec));
+      const cls = d > 0 ? 'up' : d < 0 ? 'down' : 'flat';
+      return `<span class="sm-cmp ${cls}">${d>0?'+':d===0?'±':''}${fmt(d,dec)} vs ${clubLabel(shot.clubType)} avg</span>`;
     };
 
     // Face-to-path is DERIVED, not measured, and one shot's noise is often
@@ -12720,7 +12741,7 @@ const PersonalCoach = (() => {
     if (best < Metrics.MIN_SHOTS_REPORT) return {
       milestone: Metrics.MIN_SHOTS_REPORT, current: best,
       progress: Math.round((best / Metrics.MIN_SHOTS_REPORT) * 100),
-      message: `${Metrics.MIN_SHOTS_REPORT - best} more shots of one club and it gets a mean with an interval.` };
+      message: `${plural(Metrics.MIN_SHOTS_REPORT - best, 'more shot')} of one club and it gets a mean with an interval.` };
 
     // 2. Three sessions — `Metrics.typicalError` stops using the published
     //    table and starts using this golfer's own noise floor, which is the
@@ -13239,7 +13260,7 @@ const PracticeEfficiency = (() => {
       why: `Every shot was a ${clubLabel(ordered[0].clubType)}. Ordering only means something once there is ` +
            `more than one club to order.` };
     if (ordered.length < Metrics.MIN_SHOTS_REPORT) return { ok: false,
-      why: `${Metrics.MIN_SHOTS_REPORT - ordered.length} more shots before the shape of a session is worth reading.` };
+      why: `${plural(Metrics.MIN_SHOTS_REPORT - ordered.length, 'more shot')} before the shape of a session is worth reading.` };
 
     let switches = 0;
     for (let i = 1; i < ordered.length; i++) if (ordered[i].clubType !== ordered[i - 1].clubType) switches++;

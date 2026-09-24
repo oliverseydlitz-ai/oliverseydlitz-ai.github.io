@@ -69,7 +69,7 @@ function load({ html = 'index.html', app = 'app.js', before = null } = {}) {
     'SwingDNA','Benchmarks','Insights','InsightEngine','PerformanceAlerts','PerformanceGrade','SessionSnapshot','PersonalCoach','PracticeEfficiency','LearningPath','AnalyticsHub','ClubAnalyzer','ContentLibrary','CommunityInsights','QuickStats','PracticePlan','CoachingMode','Analytics','Trajectory','UI','Router',
     'ImportFlow','Features','CloudDB','AccessibilityEnhancements','ScrollMotion','toast','authLog','SmartRecommendations','Goals','SessionSharing','RetentionProbe','PracticeLog','RangeCard','SessionTags','FirstRun','consistencyScore','bagConsistency','sessionLabel','facePath','faceAngle','faceRatio','spinLoft','spinAxisFrom',
     'curveYards','gearEffectSuspected','gearResidual','gearThreshold','mean','avg','stdDev','fmt','clubLabel','isWood','isIron','isHybrid',
-    'isShort','isMid','CLUB_ORDER','showConfirm','showInfo'];
+    'isShort','isMid','CLUB_ORDER','showConfirm','showInfo','plural','cleanBadge'];
   try {
     w.eval(src + '\n;window.__app = {' + EXPORTS.map(n => `${n}: typeof ${n} !== 'undefined' ? ${n} : undefined`).join(',') + '};');
   } catch (e) {
