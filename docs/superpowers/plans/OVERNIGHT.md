@@ -61,3 +61,4 @@ make new plans; if a run gets cut off, finish what was started before anything n
 - 03:40 CEST — queue 2: R29 (unseen charts no longer leak their observer + chart). SW v207.
 - 04:15 CEST — queue 4: new plan written (`2026-09-24-next-plan.md`); A1–A3 shipped (Clean badge needs a club at the floor; +0.0 is neutral; plural counts; `verdict-copy.js`). SW v208.
 - 04:45 CEST — next-plan A4 (unsourced "#1"/"most common" claims and the "75% face" line rewritten) + A6 (short ball label in the import menu, measured 96/115px). SW v209.
+- 05:10 CEST — next-plan A8 / V31: Progress y-axes print at each metric's precision (smash 2 dp, carry/speed 0, angles 1, score 0); fill was already off; `progress-ticks.js` (81 suites). SW v210.

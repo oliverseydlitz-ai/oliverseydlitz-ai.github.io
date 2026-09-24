@@ -10018,6 +10018,15 @@ const UI = (() => {
       const mid = (lo + hi) / 2;
       return { suggestedMin: mid - span / 2, suggestedMax: mid + span / 2 };
     };
+    // V31: Chart.js picks tick steps like 0.00625 and prints them in full, so
+    // the smash axis read "1.43125". Each metric gets the precision it is
+    // shown with everywhere else; the session score is a whole number.
+    const TICK_DP = { smashFactor: 2, carryDistance: 0, ballSpeed: 0,
+                      launchAngle: 1, clubPath: 1, attackAngle: 1 };
+    const tickFmt = metric => {
+      const dp = TICK_DP[metric] ?? 0;
+      return v => Number(v).toFixed(dp);
+    };
     const mkCfg = (data,color,yLabel,metric) => ({
       type:'line', data:{labels,datasets:[{
         data, borderColor:color, backgroundColor:color,
@@ -10033,7 +10042,7 @@ const UI = (() => {
         plugins:{legend:{display:false}},
         scales:{
           x:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid}},
-          y:{ticks:{color:_t.tick,font:{size:10,family:_t.font}},grid:{color:_t.grid}, ...yRange(data, metric),
+          y:{ticks:{color:_t.tick,font:{size:10,family:_t.font},callback:tickFmt(metric)},grid:{color:_t.grid}, ...yRange(data, metric),
             title:{display:!!yLabel,text:yLabel||'',color:_t.tick,font:{size:10,family:_t.font}}},
         },
       },
