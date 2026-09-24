@@ -1006,6 +1006,12 @@ const LocalDB = (() => {
       // gave no reason. Flag first means every reader agrees at every await.
       _broken = null; writeFlag(true); _on = true;
       const rollback = reason => { writeFlag(false); _on = false; return { on: false, reason }; };
+      // R25: the flag is what tells the NEXT visit to read the device store.
+      // writeFlag swallows a refused write, so the switch used to read "on",
+      // sessions went into IndexedDB, and the next boot never looked for them
+      // — orphaned, with no screen that could reach them. Read it back; if it
+      // did not stick, nothing is written and the reason is said.
+      if (!readFlag()) return rollback('this browser would not save the setting, so anything stored now could not be found next time');
       // Probe before promising. A first-time guest has nothing saved yet, so
       // writing "everything already in memory" writes nothing, and the switch
       // would flip on cleanly in a browser that is going to refuse the very

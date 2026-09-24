@@ -155,6 +155,22 @@ await quiet(async () => {
   ok(a.LocalDB.enabled() === false, 'device storage marks itself unavailable rather than silently dropping writes');
 });
 
+console.log('— the switch cannot say "on" when the setting did not stick (R25) —');
+await quiet(async () => {
+  const a = boot();
+  await a.LocalDB.hydrate();
+  a.MemDB.saveSession(mk('orphan-candidate'));
+  // localStorage refuses the flag (a locked-down browser, a full quota), and
+  // writeFlag swallows the refusal. IndexedDB itself works fine.
+  const orig = a.w.Storage.prototype.setItem;
+  a.w.Storage.prototype.setItem = function (k, v) { if (k === 'slKeepLocal') throw new Error('QuotaExceededError'); return orig.call(this, k, v); };
+  const res = await a.LocalDB.setEnabled(true);
+  a.w.Storage.prototype.setItem = orig;
+  ok(res.on === false && /would not save the setting/.test(res.reason || ''), `it reports off, with the reason (${res.reason})`);
+  ok(a.LocalDB.enabled() === false, 'and it is off');
+  ok(!a.idb.has('orphan-candidate'), 'nothing was written to IndexedDB that the next visit could not find');
+});
+
 console.log(fail?`\n${fail} FAILED`:'\nall passed');
 process.exit(fail?1:0);
 })();
