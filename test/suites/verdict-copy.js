@@ -93,5 +93,19 @@ ok(/\.probe-item\.dotted\s*\{[^}]*padding-left/.test(css) && !/\.probe-item\{[^}
   ok(/\.charts-grid\s*\{[^}]*minmax\(min\(280px, 100%\), 1fr\)/.test(css), 'the chart grid can shrink below 280px');
 }
 
+// R27: the dark class was set only by app.js, which loads last, so a
+// dark-scheme phone painted the light theme first (~1.8 s on a slow link).
+// theme.js runs in <head>, before the stylesheet, and is precached offline.
+{
+  const html = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
+  const head = html.slice(0, html.indexOf('</head>'));
+  const ti = head.indexOf('<script src="theme.js">'), ci = head.indexOf('href="style.css"');
+  ok(ti > 0 && ci > ti, 'theme.js loads in <head>, before the stylesheet');
+  const sw = fs.readFileSync(path.join(__dirname, '../../sw.js'), 'utf8');
+  ok(/'\/theme\.js'/.test(sw), 'and the service worker precaches it, so offline starts dark too');
+  const tj = fs.readFileSync(path.join(__dirname, '../../theme.js'), 'utf8');
+  ok(/prefers-color-scheme: dark/.test(tj) && /slTheme/.test(tj), 'it honours the saved choice and the system setting');
+}
+
 console.log(fail ? `\n${fail} FAILED` : '\nall passed');
 process.exitCode = fail ? 1 : 0;

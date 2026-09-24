@@ -1182,6 +1182,8 @@ function applyTheme(dark) {
               || (dark ? '#0B0D10' : '#FBFBFC');
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bar));
 }
+// theme.js does this in <head> before first paint (R27); this stays as the
+// fallback for anything that loads app.js alone, such as the test harness.
 (function initThemeEarly(){
   try {
     const saved = localStorage.getItem('slTheme');

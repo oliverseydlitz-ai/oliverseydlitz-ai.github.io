@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v220';
+const CACHE = 'shotlab-v221';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
@@ -8,7 +8,7 @@ const CACHE = 'shotlab-v220';
 // system-ui, which is the one thing self-hosting was meant to stop. The
 // legal documents are precached because they are fetched at runtime and an
 // offline user is still entitled to read the terms they agreed to.
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/favicon.svg',
+const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/theme.js', '/favicon.svg',
                 '/404.html', '/manifest.json',
                 '/fonts/archivo-latin.woff2', '/fonts/archivo-latin-ext.woff2',
                 '/vendor/papaparse.min.js', '/vendor/chart.umd.js',
