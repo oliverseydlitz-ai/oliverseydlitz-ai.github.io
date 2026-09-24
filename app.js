@@ -10697,6 +10697,15 @@ const Router = (() => {
   }
   function startHistory() { writing = true; }
 
+  // R31: every loader awaits Store.getSessions(), which for a signed-in user
+  // is a cloud read, and the replies can arrive out of order — tap Progress
+  // then Yardages and a slow Progress reply painted over Yardages (3 of 8
+  // rapid sequences in the QC run). Each navigation takes a ticket; a render
+  // whose ticket is no longer the latest is dropped.
+  let navSeq = 0;
+  const ticket = () => ++navSeq;
+  const stale = t => t !== navSeq;
+
   function show(viewId) {
     writeAddress(viewId);
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -10719,31 +10728,41 @@ const Router = (() => {
   }
 
   async function showDetail(id) {
+    const t = ticket();
     const session = await Store.getSession(id);
+    if (stale(t)) return;
     if (!session) { toast('Session not found.'); return; }
     detailId = session.id;
     safeRender('session', () => UI.renderDetail(session), 'session-detail');
   }
 
   async function showProgress() {
+    const t = ticket();
     const sessions = await Store.getSessions();
+    if (stale(t)) return;
     safeRender('progress', () => UI.renderProgress(sessions), 'progress');
   }
 
   async function showYardages() {
+    const t = ticket();
     const sessions = await Store.getSessions();
+    if (stale(t)) return;
     safeRender('yardages', () => UI.renderYardages(sessions), 'yardages');
   }
 
   async function showSessions() {
+    const t = ticket();
     const sessions = await Store.getSessions();
+    if (stale(t)) return;
     safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
     // FirstRun no longer opens by itself (Oliver, 23 Sep): a first visit lands
     // on the home view, not on a wall of text. It opens from Settings only.
   }
 
   async function showPractice() {
+    const t = ticket();
     const sessions = await Store.getSessions();
+    if (stale(t)) return;
     safeRender('practice', () => UI.renderPractice(sessions), 'practice');
   }
 
@@ -10752,11 +10771,14 @@ const Router = (() => {
   // Renders on a brand-new account — `renderDrills` gates each entry and shows
   // the locked ones with their reason.
   async function showDrills() {
+    const t = ticket();
     const sessions = await Store.getSessions();
+    if (stale(t)) return;
     safeRender('drills', () => UI.renderDrills(sessions), 'drills');
   }
 
   function showImport() {
+    ticket();   // a synchronous view still supersedes any render in flight
     document.querySelectorAll('.import-step').forEach(s=>s.classList.remove('active'));
     document.getElementById('step-pick').classList.add('active');
     document.getElementById('fileInput').value='';
@@ -10775,7 +10797,7 @@ const Router = (() => {
       case 'drills':   await showDrills(); return;
       case 'sessions':
       case 'drill':    await showSessions(); return;
-      default:         show(name);
+      default:         ticket(); show(name);
     }
   }
 

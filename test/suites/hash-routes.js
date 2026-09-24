@@ -111,6 +111,28 @@ console.log('— applyHash actually switches the view —');
   ok(/Router\.startHistory\(\)/.test(boot.slice(0, 600)),
      'history writing starts only after boot has read the deep link');
 
+  console.log('— a slow reply for an earlier tab never paints over a later one (R31) —');
+  {
+    const real = R.app.Store.getSessions;
+    let call = 0;
+    // The first read is slow (a cloud round trip), the second is fast.
+    R.app.Store.getSessions = () => new Promise(res => setTimeout(() => res([]), ++call === 1 ? 80 : 5));
+    const first = Router.go('progress');      // tapped first, answered last
+    const second = Router.go('yardages');     // tapped second, answered first
+    await Promise.all([first, second]);
+    await new Promise(r => setTimeout(r, 20));
+    ok(doc.getElementById('view-yardages').classList.contains('active') &&
+       !doc.getElementById('view-progress').classList.contains('active'),
+       'the view tapped last is the one on screen');
+    call = 0;
+    const slow = Router.go('practice');
+    await Router.go('settings');              // a synchronous view supersedes too
+    await slow; await new Promise(r => setTimeout(r, 20));
+    ok(doc.getElementById('view-settings').classList.contains('active'),
+       'and a synchronous view is not painted over by a load still in flight');
+    R.app.Store.getSessions = real;
+  }
+
   w.location.hash = '';
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exit(fail ? 1 : 0);
