@@ -1652,20 +1652,82 @@ const Store = (() => {
   // read has been attempted, so "not known yet" never renders as "fine".
   let _cloud = null;
   const cloudStatus = () => (cloud() ? _cloud : null);
+  // Signed in and no read has come back yet this page life: whatever is on
+  // screen is this device's copy alone, and the home view says so (R31).
+  const syncing = () => cloud() && _cloud === null;
+
+  // ── Merging the cloud copy behind the local one (R31) ─────────
+  // Views paint local first and merge the cloud read behind it, so a read can
+  // be in flight while the golfer edits, deletes or imports. Three rules keep
+  // the older copy from winning:
+  //
+  //   1. A local write wins over the cloud row for the same id unless that
+  //      write was CONFIRMED saved to the cloud before the read started. The
+  //      cloud copy used to win unconditionally, so a note saved while a read
+  //      was in flight came back as the old note (and a failed cloud save was
+  //      silently reverted on screen by the next read).
+  //   2. A session deleted this page life stays deleted, even when a read that
+  //      started before the delete returns it.
+  //   3. Only the NEWEST read updates the cached cloud rows; an older read
+  //      that lands late is still returned to its caller (the views drop it by
+  //      their own navigation ticket) but cannot overwrite the cache.
+  let _clock = 0;
+  const tick = () => ++_clock;
+  const _wrote = new Map();          // id -> { v, synced }  (clock values)
+  const _deleted = new Set();
+  function noteWrite(id) { const v = tick(); _wrote.set(id, { v, synced: null }); return v; }
+  function noteSynced(id, v) { const w = _wrote.get(id); if (w && w.v === v) w.synced = tick(); }
+  const localWins = (id, readAt) => {
+    const w = _wrote.get(id);
+    return !!w && !(w.synced !== null && w.synced < readAt);
+  };
+  const localNow = () => MemDB.getSessions().map(stamp).filter(sn => !_deleted.has(sn.id));
+  function merge(local, rows, readAt) {
+    const byId = new Map();
+    rows.forEach(r => { if (!_deleted.has(r.id)) byId.set(r.id, stamp(fromRow(r))); });
+    local.forEach(sn => { if (!byId.has(sn.id) || localWins(sn.id, readAt)) byId.set(sn.id, sn); });
+    return [...byId.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+  let _readSeq = 0, _statusSeq = 0, _cache = null;   // _cache: { rows, readAt, seq }
+
+  // What a view can paint BEFORE the cloud answers. A guest's device copy is
+  // the whole account. Signed in, it is the last cloud read merged with every
+  // local change since — or, before any read has come back, the device's own
+  // sessions. With nothing on the device and no read yet it is null: the view
+  // waits, because painting "no sessions yet" to an account that has twenty
+  // would be the worst flicker available.
+  function snapshot() {
+    const local = localNow();
+    if (!cloud()) return local;
+    // Keyed to the account, so a sign-in as someone else in the same page
+    // life can never paint the previous account's rows.
+    if (_cache && _cache.user === Auth.getUser().id) return merge(local, _cache.rows, _cache.readAt);
+    return local.length ? local : null;
+  }
+  // A cheap fingerprint of what a render would show, including the sync
+  // state the banner prints, so a merge that changes nothing is not painted twice.
+  function signature(list) {
+    const st = cloud() ? (_cloud ? (_cloud.ok ? 'ok' : 'err:' + _cloud.error) : 'pending') : 'guest';
+    return st + '#' + (list || []).map(sn => [sn.id, sn.date, sn.notes || '',
+      JSON.stringify(sn.conditions || {}), (sn.shots || []).length].join('|')).join('\n');
+  }
 
   async function getSessions() {
     // Local-first so the app NEVER breaks if the cloud is unreachable. Merge
     // cloud rows on top when signed in; on cloud error fall back to local and
     // surface the reason instead of throwing (a throw here used to bubble up
     // through the tab click handlers and silently kill navigation).
-    const local = MemDB.getSessions().map(stamp);
-    if (!cloud()) return local;
+    if (!cloud()) return localNow();
+    const readAt = tick(), seq = ++_readSeq;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
-      const cloudIds = new Set(rows.map(r => r.id));
-      const pending = local.filter(s => !cloudIds.has(s.id));
-      _cloud = { ok: true, at: Date.now(), error: null, shown: local.length + rows.length };
-      return [...pending, ...rows.map(r => stamp(fromRow(r)))].sort((a,b) => new Date(b.date) - new Date(a.date));
+      const out = merge(localNow(), rows, readAt);
+      if (seq > _statusSeq) {
+        _statusSeq = seq;
+        _cache = { rows, readAt, seq, user: Auth.getUser().id };
+        _cloud = { ok: true, at: Date.now(), error: null, shown: out.length };
+      }
+      return out;
     } catch (e) {
       // Degrading to local is right — a cloud outage must never break the app.
       // Doing it SILENTLY is not. A signed-in user on a device holding three of
@@ -1680,14 +1742,21 @@ const Store = (() => {
       // to have opened the app, and most likely to have lost the local copy.
       console.error('Cloud load failed:', e);
       showDebug('CLOUD LOAD FAILED:\n' + (e?.message || JSON.stringify(e)) + '\n(showing local sessions)');
-      _cloud = { ok: false, at: Date.now(), error: (e && e.message) || 'unknown error', shown: local.length };
+      const local = localNow();
+      if (seq > _statusSeq) {
+        _statusSeq = seq;
+        // The banner tells the golfer they are looking at this device's
+        // sessions alone, so the next paint must be exactly that set.
+        _cache = null;
+        _cloud = { ok: false, at: Date.now(), error: (e && e.message) || 'unknown error', shown: local.length };
+      }
       return local;
     }
   }
   async function getSession(id) {
     const mem = MemDB.getSession(id);   // covers just-imported sessions
     if (mem) return stamp(mem);
-    if (!cloud()) return null;
+    if (!cloud() || _deleted.has(id)) return null;
     try {
       const rows = await CloudDB.getSessions(Auth.getUser().id);
       const r = rows.find(x => x.id === id);
@@ -1709,15 +1778,18 @@ const Store = (() => {
   // and folding an awaited network call into the local write would put a
   // spinner in front of a render that is currently instant.
   function saveLocal(s) {
+    if (s && s.id) { noteWrite(s.id); _deleted.delete(s.id); }
     MemDB.saveSession(s);               // instant, always works
     return LocalDB.persist(s);          // device store, if that is switched on
   }
 
   async function saveSession(s) {
     await saveLocal(s);
-    if (cloud()) await CloudDB.saveSession(s);
+    const v = _wrote.get(s.id)?.v;
+    if (cloud()) { await CloudDB.saveSession(s); noteSynced(s.id, v); }
   }
   async function deleteSession(id) {
+    _deleted.add(id);
     MemDB.deleteSession(id);
     await LocalDB.forget(id);
     if (cloud()) { try { await CloudDB.deleteSession(id); } catch (e) { console.error('Cloud delete failed:', e); } }
@@ -1744,7 +1816,8 @@ const Store = (() => {
     return sn;
   }
 
-  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp, setAlignment, cloudStatus };
+  return { getSessions, getSession, saveSession, saveLocal, deleteSession, stamp, setAlignment, cloudStatus,
+           syncing, snapshot, signature, remote: cloud };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -7865,9 +7938,20 @@ const UI = (() => {
   // harm is not the missing rows — it is a golfer seeing three sessions where
   // there should be twenty, assuming the app lost the rest, and clearing them
   // out or re-importing over the top.
-  function renderSyncBanner() {
+  function renderSyncBanner(shown) {
     const el = document.getElementById('syncBanner');
     if (!el) return;
+    // R31: the home view now paints this device's sessions before the first
+    // cloud read is back. For that moment the list may be partial, and a
+    // partial list presented as the whole account is the defect the error
+    // banner below exists for — so it says so, quietly, until the read lands.
+    if (Store.syncing()) {
+      const k = shown || 0;
+      el.hidden = false; band(el, null);
+      el.innerHTML = `<div class="tail-note" role="status">Loading your account — showing the
+        ${k} session${k === 1 ? '' : 's'} on this device until it arrives.</div>`;
+      return;
+    }
     const st = Store.cloudStatus();
     if (!st || st.ok) { el.hidden = true; el.innerHTML = ''; band(el, null); return; }
     const n = st.shown;
@@ -7889,12 +7973,12 @@ const UI = (() => {
     document.getElementById('syncRetry')?.addEventListener('click', async () => {
       const btn = document.getElementById('syncRetry');
       if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
-      try { await Router.showSessions(); } catch (_) { /* the banner re-renders either way */ }
+      try { await Router.showSessions({ fresh: true }); } catch (_) { /* the banner re-renders either way */ }
     });
   }
 
   function renderHome(sessions) {
-    try { renderSyncBanner(); } catch (e) { console.error('sync banner', e); }
+    try { renderSyncBanner((sessions || []).length); } catch (e) { console.error('sync banner', e); }
     let rankedFault = null;   // set by the ranked card below, read by the alerts
     // A tip-of-the-day and a three-cell metrics widget used to sit here.
     // Both went on 22 Sep 2026 (docs/superpowers/plans/2026-09-22-killer-plan.md
@@ -10879,46 +10963,48 @@ const Router = (() => {
     safeRender('session', () => UI.renderDetail(session), 'session-detail');
   }
 
-  async function showProgress() {
+  // R31: paint local first, merge the cloud copy behind it. Every tab tap
+  // used to await a full cloud read before painting anything. Now the view
+  // paints Store.snapshot() at once and the cloud read lands behind it:
+  //   · nothing changed (same sessions, same sync state) → no second paint;
+  //   · the golfer has moved on → the ticket drops it, as before;
+  //   · a text field in the view has focus → the repaint waits for blur, so a
+  //     search being typed is not wiped mid-word;
+  //   · nothing to paint yet (signed in, empty device, first read) → it waits
+  //     for the cloud rather than flashing "no sessions" at a full account.
+  // `fresh` skips the first paint: the banner's "Try again" wants its
+  // "Checking…" to stay up until the answer is in.
+  async function loadView(label, viewId, render, { fresh = false } = {}) {
     const t = ticket();
+    const snap = fresh ? null : Store.snapshot();
+    let painted = null;
+    if (snap) {
+      safeRender(label, () => render(snap), viewId);
+      painted = Store.signature(snap);
+      if (!Store.remote()) return;          // a guest's device copy is the whole account
+    }
     const sessions = await Store.getSessions();
     if (stale(t)) return;
-    safeRender('progress', () => UI.renderProgress(sessions), 'progress');
+    if (painted !== null && Store.signature(sessions) === painted) return;
+    const apply = () => { if (!stale(t)) safeRender(label, () => render(sessions), viewId); };
+    const view = document.getElementById(`view-${viewId}`);
+    const focus = document.activeElement;
+    if (painted !== null && view && focus && view.contains(focus) && focus.matches('input, textarea, select')) {
+      focus.addEventListener('blur', apply, { once: true });
+    } else apply();
   }
 
-  async function showYardages() {
-    const t = ticket();
-    const sessions = await Store.getSessions();
-    if (stale(t)) return;
-    safeRender('yardages', () => UI.renderYardages(sessions), 'yardages');
-  }
-
-  async function showSessions() {
-    const t = ticket();
-    const sessions = await Store.getSessions();
-    if (stale(t)) return;
-    safeRender('sessions', () => UI.renderHome(sessions), 'sessions');
-    // FirstRun no longer opens by itself (Oliver, 23 Sep): a first visit lands
-    // on the home view, not on a wall of text. It opens from Settings only.
-  }
-
-  async function showPractice() {
-    const t = ticket();
-    const sessions = await Store.getSessions();
-    if (stale(t)) return;
-    safeRender('practice', () => UI.renderPractice(sessions), 'practice');
-  }
-
+  const showProgress = () => loadView('progress', 'progress', ss => UI.renderProgress(ss));
+  const showYardages = () => loadView('yardages', 'yardages', ss => UI.renderYardages(ss));
+  // FirstRun no longer opens by itself (Oliver, 23 Sep): a first visit lands
+  // on the home view, not on a wall of text. It opens from Settings only.
+  const showSessions = (opts) => loadView('sessions', 'sessions', ss => UI.renderHome(ss), opts);
+  const showPractice = () => loadView('practice', 'practice', ss => UI.renderPractice(ss));
   // The drill library is its own view now, not a section of Practice: Practice
   // is the plan built from the last session, this is the whole catalogue.
   // Renders on a brand-new account — `renderDrills` gates each entry and shows
   // the locked ones with their reason.
-  async function showDrills() {
-    const t = ticket();
-    const sessions = await Store.getSessions();
-    if (stale(t)) return;
-    safeRender('drills', () => UI.renderDrills(sessions), 'drills');
-  }
+  const showDrills = () => loadView('drills', 'drills', ss => UI.renderDrills(ss));
 
   function showImport() {
     ticket();   // a synchronous view still supersedes any render in flight

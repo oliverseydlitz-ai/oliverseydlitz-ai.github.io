@@ -1032,7 +1032,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **83 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **84 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1138,6 +1138,20 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
   properly.
 - **Store is local-first:** always returns local sessions and merges cloud on
   top; cloud errors degrade gracefully and never break tab navigation.
+- **Views paint local first and merge the cloud behind it (R31,
+  `Router.loadView`, `local-first.js`).** A tab paints `Store.snapshot()` at
+  once (the last cloud read merged with every local change since, or the
+  device's own sessions before any read) and repaints only if the cloud reply
+  changes `Store.signature` — sessions or sync state. The navigation ticket
+  still drops a reply for a tab the golfer has left; a focused text field
+  defers the repaint to its blur; an empty device before the first read waits
+  rather than painting "no sessions" at a full account; and while that first
+  read is out the home view says it is showing the device's sessions only.
+  The merge keeps the newer copy: **a local write wins unless the cloud
+  confirmed it before the read began**, a session deleted this page life stays
+  deleted, only the newest read updates the cache, and the cache is keyed to
+  the user id. The cloud row used to win unconditionally, so a note saved
+  during a read came back as the old one.
 
 ## Cloud, auth and the database (audited September 2026)
 
@@ -1423,8 +1437,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **83 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v226**, 58 modules.
+State at handover: **84 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v227**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1908,7 +1922,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**83 test suites**, service worker **v226**. Deterministic auth, cloud sync
+**84 test suites**, service worker **v227**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

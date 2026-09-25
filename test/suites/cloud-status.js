@@ -76,8 +76,8 @@ const sess = id => ({ id, date: '2026-09-01',
   // for a reason unrelated to the banner. A code anchor cannot be deleted by
   // tidying prose.
   const home = src.slice(src.indexOf('function renderHome('));
-  ok(home.indexOf('renderSyncBanner()') > 0 &&
-     home.indexOf('renderSyncBanner()') < home.indexOf('QuickStats.renderStats('),
+  ok(home.indexOf('renderSyncBanner(') > 0 &&
+     home.indexOf('renderSyncBanner(') < home.indexOf('QuickStats.renderStats('),
      'renderHome calls it first — it changes what every number below it MEANS, not just how the page looks');
 
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
