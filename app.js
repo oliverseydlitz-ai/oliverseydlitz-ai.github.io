@@ -695,6 +695,19 @@ const Metrics = (() => {
   // rules a move real or not calls this, so the app has one bar and not three.
   const MDC_FACTOR = 2.77;
   const mdcOf = (te, n = 1) => (Number.isFinite(te) ? MDC_FACTOR * te / Math.sqrt(Math.max(1, n)) : null);
+  // The same rule for a series with one number per session (a form score, a
+  // spread): the golfer's own session-to-session SD over `baseline` is the
+  // typical error, `n` is how many sessions each side of the change averages.
+  // Under three baseline sessions, or with a baseline that never moved, there
+  // is nothing to judge against and `real` is null — never a guess.
+  function realMove(delta, baseline, n = 1) {
+    const b = (baseline || []).filter(Number.isFinite);
+    if (b.length < 3 || !Number.isFinite(delta)) return { real: null, threshold: null };
+    const te = stdDev(b);
+    if (!(te > 0)) return { real: null, threshold: null };
+    const threshold = mdcOf(te, n);
+    return { real: delta !== 0 && Math.abs(delta) >= threshold, threshold };
+  }
 
   // DEVICE ERROR IS TREATED AS ZERO, deliberately.
   //
@@ -893,7 +906,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, perShotSD, MDC_FACTOR, mdcOf, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
+  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, perShotSD, MDC_FACTOR, mdcOf, realMove, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval, weightedInterval };
 })();
@@ -6335,21 +6348,33 @@ const Analytics = (() => {
   // The record is not deleted, it is screened: the best of the kept readings
   // is the record, and if a higher reading was trimmed the card says so, so a
   // golfer can go and look at that shot rather than wonder where it went.
-  function personalBests(sessions) {
+  // C40: a record is a maximum, and a maximum that names its club is not a
+  // pooled statistic — "your longest carry, with the driver" is a fact. That
+  // holds for distance and speed, where the bag's top is simply the club that
+  // produced it. It does NOT hold for smash or apex: every club has its own
+  // smash ceiling (a 1.40 7-iron is past the tour average; a 1.45 driver is
+  // ordinary) and a higher apex is not a better one, so their bag-wide top
+  // reported which club was hit, never how. Those two are read for one club —
+  // the one hit most, the same anchor rule as QuickStats — and say which.
+  function personalBests(sessions, clubFor = null) {
     const all = sessions.flatMap(s => s.shots.map(sh => ({...sh, _date:s.date})));
     if (!all.length) return [];
-    const top = (field, label, unit, dec=0) => {
-      const vals = all.map(s => s[field]).filter(v => v > 0);
+    const counts = {};
+    all.forEach(s => { if (s.clubType) counts[s.clubType] = (counts[s.clubType] || 0) + 1; });
+    const anchor = clubFor || Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
+    const top = (field, label, unit, dec=0, oneClub=false) => {
+      const pool = oneClub ? all.filter(s => s.clubType === anchor) : all;
+      const vals = pool.map(s => s[field]).filter(v => v > 0);
       if (!vals.length) return null;
       // Impossible readings only — see Metrics.CEILING for why this screens
       // smash factor and nothing else.
       const ceiling = Metrics.peak(vals, field);
       const rawMax = Math.max(...vals);
       let best = null;
-      all.forEach(s => { if (s[field] > 0 && s[field] <= ceiling && (!best || s[field] > best[field])) best = s; });
+      pool.forEach(s => { if (s[field] > 0 && s[field] <= ceiling && (!best || s[field] > best[field])) best = s; });
       if (!best) return null;
       const excluded = rawMax > ceiling ? rawMax : null;
-      return { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType),
+      return { label, value: fmt(best[field],dec), unit, club: clubLabel(best.clubType), perClub: oneClub,
                date: formatDate(best._date),
                note: excluded === null ? null
                  : `A reading of ${fmt(excluded,dec)}${unit ? ' ' + unit : ''} is left out — that is past what ` +
@@ -6360,8 +6385,8 @@ const Analytics = (() => {
       top('totalDistance','Longest Total','yds'),
       top('ballSpeed','Top Ball Speed','mph'),
       top('clubSpeed','Top Club Speed','mph'),
-      top('smashFactor','Best Smash','',2),
-      top('apex','Highest Apex','ft'),
+      top('smashFactor','Best Smash','',2,true),
+      top('apex','Highest Apex','ft',0,true),
     ].filter(Boolean);
   }
   // Per-session mean carry for one club, oldest first. The BOOK says what you
@@ -7109,12 +7134,19 @@ const Features = (() => {
       if (sessions.length < 2) return [];
       const recent = sessions[0];
       const prev = sessions[1];
-      const recentScore = recent.shots.map(ShotScorer.score).filter(x=>x!==null).reduce((a,b)=>a+b,0)/recent.shots.length||0;
-      const prevScore = prev.shots.map(ShotScorer.score).filter(x=>x!==null).reduce((a,b)=>a+b,0)/prev.shots.length||0;
       const alerts = [];
 
-      if (recentScore > prevScore + 10) alerts.push({ type: 'improvement', msg: `+${Math.round(recentScore-prevScore)} pts! Keep it up!` });
-      if (recentScore < prevScore - 10) alerts.push({ type: 'decline', msg: `Session was -${Math.round(prevScore-recentScore)} pts. Check your setup.` });
+      // C40: a fixed 10 points was the bar, whatever this golfer's sessions
+      // usually do. It is the app's one rule now: the latest session against
+      // the one before, judged on the spread of every session before it.
+      const scoreOf = s => { const sc = s.shots.map(ShotScorer.score).filter(x=>x!==null); return sc.length ? sc.reduce((a,b)=>a+b,0)/sc.length : null; };
+      // Averaged over the shots that HAVE a score: dividing by every shot, as
+      // this did, counted an unscoreable shot as a zero.
+      const recentScore = scoreOf(recent), prevScore = scoreOf(prev);
+      const move = recentScore === null || prevScore === null ? { real: null }
+        : Metrics.realMove(recentScore - prevScore, sessions.slice(1).map(scoreOf));
+      if (move.real && recentScore > prevScore) alerts.push({ type: 'improvement', msg: `+${Math.round(recentScore-prevScore)} pts on your last session, past your usual session-to-session swing of ${Math.round(move.threshold)}.` });
+      if (move.real && recentScore < prevScore) alerts.push({ type: 'decline', msg: `-${Math.round(prevScore-recentScore)} pts on your last session, past your usual session-to-session swing of ${Math.round(move.threshold)}.` });
 
       const faults = FaultEngine.detectFaults(recent.shots, recent);
       if (faults.some(f=>f.severity==='high')) alerts.push({ type: 'fault', msg: `${faults[0].name} detected. Want to drill it?` });
@@ -7146,21 +7178,17 @@ const Features = (() => {
   }
 
   // ── 9. Session quality benchmarks ────────────────────────────
+  // C40: this was its own carry average — every shot of a club on every ball
+  // at full weight, untrimmed, a bare point — printed on Progress beside a
+  // yardage book that weights range balls x0.8, trims, and gives an interval.
+  // One golfer, one club, two carries. It now reads the book's own rows.
   function benchmarks(sessions) {
     try {
       if (!sessions.length) return {};
-      const all = sessions.flatMap(s=>s.shots);
-      const clubs = {};
-      // `|| 0` pushed a zero for every shot with no carry reading, and those
-      // zeros were then averaged in — a club with three missing carries out of
-      // ten came out 30% short.
-      all.forEach(shot => {
-        if (!(shot.carryDistance > 0)) return;
-        if (!clubs[shot.clubType]) clubs[shot.clubType] = [];
-        clubs[shot.clubType].push(shot.carryDistance);
-      });
-      return Object.entries(clubs).reduce((acc,[club,dists]) => {
-        acc[club] = { avg: Math.round(avg(dists.map(d=>({carryDistance:d})),'carryDistance')||0), count: dists.length };
+      return Analytics.yardageBook(sessions).reduce((acc, r) => {
+        acc[r.club] = { avg: r.carry ? Math.round(r.carry.mean) : null,
+                        ci: r.carry ? Math.round(r.carry.ci) : null,
+                        count: r.count, enough: r.enough };
         return acc;
       }, {});
     } catch (e) { console.error('benchmarks()', e); return {}; }
@@ -8271,7 +8299,11 @@ const UI = (() => {
     const form=recent3.length?Math.round(recent3.reduce((a,b)=>a+b,0)/recent3.length):0;
     const prevForm=prev3.length?prev3.reduce((a,b)=>a+b,0)/prev3.length:null;
     const g=ShotScorer.grade(form);
-    const trend=prevForm!==null?form-prevForm:null;
+    // C40: "▲ N pts vs prior" fired on any positive delta. The three-session
+    // form is now called a move only past Metrics.realMove — the golfer's own
+    // session-to-session wobble in the sessions before these three, n = 3.
+    const earlier=sessions.slice(3).map(sessionScore).filter(x=>x!==null);
+    const trend=prevForm!==null&&Metrics.realMove(form-prevForm, earlier, recent3.length).real?form-prevForm:null;
     const bests=Analytics.personalBests(sessions);
     const longest=bests.find(b=>b.label==='Longest Carry');
     const topBall=bests.find(b=>b.label==='Top Ball Speed');
@@ -9915,7 +9947,7 @@ const UI = (() => {
       <div class="record-card">
         <div class="record-value">${b.value}<span class="record-unit">${b.unit}</span></div>
         <div class="record-label">${b.label}</div>
-        <div class="record-meta">${b.club} · ${b.date}</div>
+        <div class="record-meta">${b.perClub ? 'Your most-hit club, ' : ''}${b.club} · ${b.date}</div>
         ${b.note ? `<div class="record-note">${Sanitize.escape(b.note)}</div>` : ''}
       </div>`).join('');
   }
@@ -9975,7 +10007,7 @@ const UI = (() => {
         if (Object.keys(benches).length) {
           benchHost.innerHTML = `<div class="section-title" style="margin-bottom:.8rem">${icon('progress')} Club Benchmarks</div>` +
             '<table class="benchmark-table"><thead><tr><th>Club</th><th>Avg Carry</th><th>Shots</th></tr></thead><tbody>' +
-            Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.count >= Metrics.MIN_SHOTS_REPORT ? b.avg + ' yds' : '—'}</td><td>${b.count}${b.count >= Metrics.MIN_SHOTS_REPORT ? '' : '/' + Metrics.MIN_SHOTS_REPORT}</td></tr>`).join('') +
+            Object.entries(benches).map(([c, b]) => `<tr><td>${clubLabel(c)}</td><td>${b.enough ? `${b.avg} ± ${b.ci} yds` : '—'}</td><td>${b.count}${b.enough ? '' : '/' + Metrics.MIN_SHOTS_REPORT}</td></tr>`).join('') +
             '</tbody></table>';
         } else {
           benchHost.innerHTML = '';
@@ -13022,22 +13054,19 @@ const PersonalCoach = (() => {
 
   function generateAssessment(recentSessions) {
     const shots = recentSessions.flatMap(s => s.shots || []);
-    // This used to be `100 - stdDev(carry)`, which is not a score: a standard
-    // deviation in yards has no upper bound, so a scattered session produced a
-    // negative number and a tight one produced ~99 regardless of the golfer.
-    // `consistencyScore()` is the corrected version already used elsewhere —
-    // a coefficient of variation, which is unit-free and bounded 0-100. It was
-    // fixed in one place and this second copy was missed.
-    //
-    // Carry is pooled across clubs here, so this describes how varied the
-    // SESSION was, not how repeatable the swing is: a bag-wide session is
-    // meant to be spread out. Hence "varied", not "inconsistent".
-    const consistency = consistencyScore(shots.map(s => s.carryDistance));
-    if (consistency === null) return 'Not enough carry data yet to say anything about your spread.';
-    if (consistency > 85) return 'Very tight distance grouping across these sessions.';
-    if (consistency > 70) return 'Reasonably tight grouping. Worth checking club by club.';
-    if (consistency > 50) return 'A varied set of sessions — expected if you worked through the bag.';
-    return 'Widely varied distances. Look club by club before reading anything into it.';
+    // C40: this ran consistencyScore over every carry in the recent sessions,
+    // driver and wedge together — the pooled bag spread bagConsistency exists
+    // to replace. A session through the bag read "widely varied" off the gap
+    // between the clubs, and a swing change could never move it. It now reads
+    // each club against itself, above the floor, weighted by shots.
+    const bag = bagConsistency(shots);
+    if (!bag) return `No club has ${Metrics.MIN_SHOTS_REPORT} shots with a carry in these sessions yet, ` +
+                     'so there is no spread to describe.';
+    const across = `across ${bag.clubs === 1 ? 'the one club' : `${bag.clubs} clubs`} with enough shots`;
+    if (bag.score > 85) return `Very tight distance grouping, each club read against itself (${across}).`;
+    if (bag.score > 70) return `Reasonably tight grouping club by club (${across}).`;
+    if (bag.score > 50) return `Your carries spread noticeably within a club (${across}).`;
+    return `Wide carry spread within a club (${across}).`;
   }
 
   // The drill comes from the gated library, not from here. This module kept a

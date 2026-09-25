@@ -617,6 +617,16 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
 - **Anchor on one club** for any single headline number. `QuickStats.pick()`
   takes the most-hit club in the recent comparable sessions and the row names
   it.
+- **Records (C40):** a maximum that names its club is a fact, so longest
+  carry/total and top ball/club speed stay bag-wide. Best smash and highest
+  apex are read for the most-hit club (`personalBests(sessions, club)`),
+  because each club has its own smash ceiling and a higher apex is not a
+  better one — their bag-wide top only said which club was hit.
+- **One carry per club per screen:** Club Benchmarks reads
+  `Analytics.yardageBook`'s rows (weighted, trimmed, an interval), and the
+  coach's assessment reads `bagConsistency`. `bag-pooling.js` pins both, and
+  the form-score arrows, which go through `Metrics.realMove` (`mdcOf` on the
+  golfer's own session-to-session SD) instead of any delta or a fixed 10.
 - **Conditions, under v2:** the home row (`QuickStats.pick`) still anchors on
   the MOST RECENT session's ball and surface (it answers "how am I hitting it
   now", and `quick-stats.js` pins it). The yardage book and the Progress trend
@@ -1032,7 +1042,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **84 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **85 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1437,8 +1447,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **84 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v227**, 58 modules.
+State at handover: **85 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v228**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1922,7 +1932,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**84 test suites**, service worker **v227**. Deterministic auth, cloud sync
+**85 test suites**, service worker **v228**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
