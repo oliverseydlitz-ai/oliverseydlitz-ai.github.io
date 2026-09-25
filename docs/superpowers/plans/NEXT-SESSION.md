@@ -29,8 +29,7 @@ at 320px) · R27 part (`theme.js`, no white flash) · R29 (observer leak) · V37
 one group, same numbers everywhere).
 
 ## What is next, in order
-1. **R37** — stale-while-revalidate for the app shell in `sw.js`, plus `reg.update()` on
-   `visibilitychange`. `service-worker.js` runs the real worker in a `vm`, so extend that suite.
+1. ~~**R37**~~ — done 25 Sep, see the killer plan's Done log.
 2. **C45 leftovers** — one significance threshold in `Rounds`; `rangeLink` vs its caveat;
    the putts plateau.
 3. **C46 leftover** — the dispersion tail trend still uses a 1-SD rule; put it on the same test.

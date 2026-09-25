@@ -1,4 +1,4 @@
-const CACHE = 'shotlab-v228';
+const CACHE = 'shotlab-v229';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
@@ -55,11 +55,31 @@ self.addEventListener('fetch', e => {
   e.respondWith(handle(req));
 });
 
+// The precached shell (R37). Repeat visits used to pay the full network for
+// every one of these even though the exact bytes were already sitting in the
+// cache from `install` — network-first-with-timeout still waits on the
+// network whenever it isn't hanging. A shell path with a cached copy is
+// answered from the cache immediately and revalidated in the background
+// instead, so a returning visit paints at cache speed and the network trip
+// only ever refreshes tomorrow's copy. Anything NOT part of the shell (or a
+// shell path with nothing cached yet, e.g. the very first visit) keeps R7's
+// network-first-with-timeout, unchanged below.
+const SHELL = new Set(ASSETS);
+
 async function handle(req) {
   const url = new URL(req.url);
   // One entry per path (R6). Every `?query` variant used to get its own copy,
   // so the cache grew without bound; nothing this app serves varies by query.
   const key = url.origin + url.pathname;
+  if (SHELL.has(url.pathname)) {
+    const cached = await caches.match(key);
+    if (cached) {
+      // Fire-and-forget: the response never waits on this. A failed or
+      // hanging revalidation just leaves the existing cached copy in place.
+      fetch(req).then(res => { if (res.ok) caches.open(CACHE).then(c => c.put(key, res)); }).catch(() => {});
+      return cached;
+    }
+  }
   const net = fetch(req).then(res => {
     // Only a real success is kept (R6). A 404 or a 500 cached here would be
     // served back offline as if it were the file.

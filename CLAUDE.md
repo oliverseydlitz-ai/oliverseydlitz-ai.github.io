@@ -1342,6 +1342,19 @@ so `cloudStatus` could never fire (R1). Now:
   awaited rather than abandoned.
 - **Offline, an unknown navigation gets `404.html` with a 404** (R26); only `/`
   and `/index.html` get the app shell.
+- **The precached shell is stale-while-revalidate, not network-first** (R37).
+  Repeat visits paid the full network for a file that was already sitting in
+  the cache from `install`, because network-first only reaches the cache after
+  the 3 s timeout or a network error — never because the copy is already
+  there. A path in `ASSETS` with a cached copy is now answered from that cache
+  immediately, with a background fetch that refreshes it for next time (a
+  failed or hanging refresh just leaves the existing copy in place). Anything
+  outside the precached shell, or a shell path with nothing cached yet (the
+  first visit), still goes through R7's network-first-with-timeout unchanged.
+  An open tab also used to never check for a new worker: `app.js`'s
+  `registerServiceWorker()` now calls `reg.update()` on `visibilitychange`
+  when the tab becomes visible again, so a tab left open for days notices a
+  new deploy instead of sitting on a stale worker indefinitely.
 
 The suite evaluates the real `sw.js` in a `vm` context with fake `caches`,
 `fetch` and `setTimeout` rather than grepping it. It sets `process.exitCode = 1`
@@ -1448,7 +1461,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **85 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v228**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v229**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1931,8 +1944,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**85 test suites**, service worker **v228**. Deterministic auth, cloud sync
+**Last updated:** 25 September 2026 — ShotLab v3, "Range" skin. 58 modules,
+**85 test suites**, service worker **v229**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

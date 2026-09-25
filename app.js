@@ -12486,7 +12486,7 @@ async function init() {
   // renders above would otherwise overwrite the deep link before it was read.
   Router.startHistory();
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  registerServiceWorker();
 
   // Initialize accessibility enhancements
   try { AccessibilityEnhancements.init(); } catch(e){ console.error('accessibility',e); }
@@ -12496,6 +12496,22 @@ async function init() {
   // Show welcome message with tips
   console.log('%cWelcome to ShotLab v3.0', 'font-size:16px;font-weight:bold;color:#0070f3');
   console.log('%cPress Ctrl+? for keyboard shortcuts', 'font-size:12px;color:#888888');
+}
+
+// R37: an open tab never checked for updates. The shell is cached (and, since
+// R37's stale-while-revalidate, served from that cache instantly), so a tab
+// left open for days could sit on a service worker from days ago with no
+// prompt ever telling the browser to look again. `register()` alone only
+// checks once, at load. Checking again each time the tab is actually looked
+// at — not on a timer — catches a returning golfer without polling an idle
+// background tab.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(() => {});
 }
 
 // ────────────────────────────────────────────────────────────────
