@@ -1091,6 +1091,16 @@ the ranked card, fault headers, shot rows and table headers. Non-native
 `AccessibilityEnhancements`. Paywalled copies are `inert` as well as
 `aria-hidden`, or their controls stay in the tab order.
 
+**And ZOOM200 (R33, added 25 Sep 2026):** resizes to 197px (200% zoom on a
+393px phone, WCAG 1.4.10's reflow bar) and checks four named components —
+the heatmap legend, the score banner's breakdown, short game's lie select,
+a drill row's state badge — against the viewport, restoring 393px after. It
+checks each element by name, not the page's whole `scrollWidth`: other
+things on these same views overflow at this width too (the focus/streak
+card, achievements, session cards, the dispersion stat grid) and widening
+this into a whole-page check would fail on those unrelated, not-yet-fixed
+bugs and hide a regression in the four it actually covers.
+
 The workflow is: edit → `bash test/browser/sync.sh` → serve
 `test/browser/site/` → run the scan. **Forgetting the sync is the classic
 mistake** — you then measure the previous version and conclude a fix did not
@@ -1461,7 +1471,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **86 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v230**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v231**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1554,8 +1564,32 @@ exist. **Measure the real element.**
 **Below 380px the nav is icon-only (R33).** At 320px five labels were 52px in
 46px slots and overlapped. The label is clipped (`clip-path: inset(50%)`),
 never `display: none`, so each button keeps its accessible name. Every view
-reflows at 320px; past WCAG's bar (200% zoom on a phone, ~197px) the heatmap,
-benchmark table, short-game fields and drill tabs still scroll sideways.
+reflows at 320px. Past WCAG's bar (200% zoom on a phone, ~197px = 393 ÷ 2),
+four components were still open — each a missing wrap or a fixed minimum
+width, not a shared root cause:
+
+- **The heatmap.** `.dash-sub-title` ("Practice Activity" + the legend's five
+  dots) was a flex row with no `flex-wrap`, so the legend spilled out of
+  `.dash-heatmap-wrap` and off the page rather than dropping to its own line.
+- **The score banner beside the benchmarks.** `.score-breakdown` carried a
+  flat `min-width: 112px` next to the fixed-size score ring; neither could
+  give, so `.score-banner-content` now wraps and stacks the ring above it.
+- **Short game's setup fields.** `.sg-setup` was a two-column grid without
+  `minmax(0, 1fr)` — the same bug `.form-row` already had, a grid item's
+  default `min-width: auto` refusing to shrink below a `<select>`'s own
+  content width. Same fix, same 380px single-column fallback.
+- **Drill rows' state/tier badge.** `.drill-row-head` had no `flex-wrap`, so
+  a badge that must not itself wrap (`white-space: nowrap`) had nowhere to go
+  but push the row wider.
+
+`render-scan.js`'s ZOOM200 check resizes to 197px and checks each of the four
+by name — `.hm-legend`, `.score-breakdown`, `#sgLie`, `.drill-row-state` —
+against the viewport, not the whole page's `scrollWidth`: other, unrelated
+things on these same views (the focus/streak card, the achievements strip,
+session cards, the dispersion stat grid) also overflow at this width and are
+not what this check is for. A whole-page check would fail on those and bury
+a regression here inside the noise; they are a newly found, not-yet-fixed
+leftover for the next pass at 200% zoom.
 
 ### `.drill-card` was two components sharing one name
 
@@ -1945,7 +1979,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 25 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**86 test suites**, service worker **v230**. Deterministic auth, cloud sync
+**86 test suites**, service worker **v231**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

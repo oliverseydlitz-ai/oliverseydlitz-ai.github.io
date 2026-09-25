@@ -39,8 +39,10 @@ one group, same numbers everywhere).
 6. **C39 / C40** — re-read under measurement v2 first. Only the *pooling across clubs*
    half survives (Club Benchmarks, personal bests).
 7. **C33 follow-up** — the Progress trend should weight range sessions ×0.8 (`Metrics.conditionWeight`).
-8. **R33 / R27 leftovers** — ~197px (200% zoom) overflow in heatmap, benchmark table,
-   short-game fields, drill tabs; the ungated shell and dead "+" before `app.js` runs.
+8. ~~**R33 leftover**~~ — done 25 Sep, see the killer plan's Done log (R33 part 2). Newly
+   found, not fixed: the focus/streak card, achievements strip, session cards and the
+   dispersion stat grid also overflow at 197px, unrelated to the four named components.
+   **R27 leftover still open:** the ungated shell and dead "+" before `app.js` runs.
 9. **R36** — performance (`defer` vendor scripts, measure first).
 
 ## Oliver's calls — propose, never ship

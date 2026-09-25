@@ -300,6 +300,66 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     await p.waitForTimeout(350);
     total += scan('drills ' + s, await p.evaluate(() => document.getElementById('drillHost')?.innerText));
   }
+
+  // 200% ZOOM ON A PHONE (~197px = 393/2): WCAG 1.4.10 reflow. R33's earlier
+  // fix covered down to 320px (icon-only nav, single-column grids) but not the
+  // point a real "pinch zoom to read this" golfer lands on halfway between
+  // 393 and 320. Four surfaces were still open at 197px, found by loading the
+  // real page at that width rather than guessing:
+  //   heatmap        — .dash-sub-title ("Practice Activity" + the legend's
+  //                    five dots) did not wrap, so the legend spilled out of
+  //                    .dash-heatmap-wrap and past the page edge.
+  //   benchmark area — .score-breakdown carried a flat `min-width: 112px`
+  //                    beside the fixed-size score ring, so the pair could
+  //                    not both fit; nothing let the ring and the breakdown
+  //                    stack instead of forcing the row wider.
+  //   short-game     — .sg-setup is a grid without minmax(0, 1fr), the same
+  //                    bug the import form's .form-row had (a grid item's
+  //                    default min-width:auto refuses to shrink below its
+  //                    <select>'s own content width).
+  //   drill tabs     — .drill-row-head (the name + the state/tier badge,
+  //                    which must stay on one line) had no flex-wrap, so the
+  //                    badge could not drop to its own line when the row
+  //                    ran out of room.
+  // Checked per-component against the VIEWPORT, not the whole page's
+  // scrollWidth — other, unrelated things on these views also overflow at
+  // this width (the focus/streak card, the achievements strip, session
+  // cards, the dispersion stat grid) and are not what this ratchet is for;
+  // widening it to a whole-page check would fail on those unrelated bugs and
+  // hide a regression here inside the noise. A fix here still needs the
+  // page checked for real width creep separately, so this only tightens.
+  {
+    await p.setViewportSize({ width: 197, height: 852 });
+    const rectOf = sel => p.evaluate(s => { const e = document.querySelector(s);
+      if (!e || !e.offsetParent) return null; const r = e.getBoundingClientRect();
+      return { right: Math.round(r.right), width: Math.round(r.width) }; }, sel);
+    const zoomCheck = async (label, sel) => {
+      const r = await rectOf(sel);
+      if (r && r.width > 0 && r.right > 198) {
+        overflow++; console.log(`  ZOOM200   ${label}: ${sel} right edge at ${r.right}px in a 197px viewport`);
+      }
+    };
+    await p.click('.bottom-nav-item[data-view="sessions"]').catch(() => {}); await p.waitForTimeout(700);
+    await zoomCheck('heatmap', '.hm-legend');
+    await p.evaluate(async () => { const ss = await Store.getSessions(); Router.showDetail(ss[0].id); });
+    await p.waitForTimeout(1000);
+    // Not .score-banner-content: a parent's own rect never reflects an
+    // overflowing child (that's what overflow means), so checking the
+    // container this way would always read as fine. .score-breakdown is the
+    // element that actually carried the fixed min-width.
+    await zoomCheck('benchmark area', '.score-breakdown');
+    await p.click('.bottom-nav-item[data-view="practice"]').catch(() => {}); await p.waitForTimeout(700);
+    // .sg-setup (the grid) never overflows its OWN box — its parent already
+    // constrains it. It is #sgLie, the <select> inside it, that used to bleed
+    // out past that box uncontained (overflow: visible all the way up), which
+    // a check on .sg-setup itself would miss entirely.
+    await zoomCheck('short-game fields', '#sgLie');
+    await zoomCheck('short-game tier badge', '.sg-tier');
+    await p.click('.bottom-nav-item[data-view="drills"]').catch(() => {}); await p.waitForTimeout(700);
+    await zoomCheck('drill tabs (row state)', '.drill-row-state');
+    await p.setViewportSize({ width: 393, height: 852 });
+  }
+
   // The guide pages (/guides/). They are not app views, so none of the passes
   // above ever load them — and they are the pages written for strangers on a
   // phone. Same three findings: page wider than the viewport, a table wider

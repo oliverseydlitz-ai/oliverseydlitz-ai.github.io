@@ -685,7 +685,7 @@ textarea { resize: vertical; }
   border-top: 2px solid var(--accent);
   border-radius: var(--radius);
   padding: var(--s5);
-  display: flex; align-items: center; gap: var(--s4);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s4);
   box-shadow: none;
   position: relative;
 }
@@ -1393,7 +1393,11 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
   border-left:3px solid var(--accent);border-radius:var(--radius)}
 .drill-row.locked{border-left-color:var(--withheld);opacity:.72}
 .drill-row.flagged{border-left-color:var(--yellow)}
-.drill-row-head{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+/* flex-wrap (R33): the name and the state/tier badge are both flex:0 auto or
+   nowrap by design (the badge must not break mid-word), so at ~197px there was
+   nowhere for the row to give — it pushed the page wider instead of dropping
+   the badge to its own line. */
+.drill-row-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.6rem;align-items:baseline}
 .drill-row-name{font-size:.86rem;font-weight:650;color:var(--text)}
 .drill-row-state{flex:0 0 auto;font-size:.62rem;letter-spacing: var(--track-caps-xs);text-transform:uppercase;
   color:var(--text-muted);font-weight:700}
@@ -2205,7 +2209,11 @@ body.modal-open {
 
 /* Heatmap */
 .dash-heatmap-wrap { margin-top:1rem; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:1rem 1.1rem; box-shadow:var(--shadow-sm); }
-.dash-sub-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing: var(--track-caps); color:var(--text-muted); margin-bottom:.7rem; display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+/* flex-wrap (R33): at ~197px (200% zoom on a phone) "Practice Activity" and
+   the legend's five dots + "less"/"more" don't both fit on one line, and
+   nothing here was letting the legend drop to its own line — it spilled past
+   .dash-heatmap-wrap and out of the page instead. */
+.dash-sub-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing: var(--track-caps); color:var(--text-muted); margin-bottom:.7rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem; }
 .hm-legend { display:flex; align-items:center; gap:3px; font-weight:600; text-transform:none; letter-spacing:0; }
 .heatmap { display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,13px); gap:3px; overflow-x:auto; padding-bottom:2px; }
 .hm-cell { width:13px; height:13px; border-radius:var(--radius-sm); background:var(--surface3); }
@@ -3146,7 +3154,13 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
 /* ── Chipping logger ──────────────────────────────────────────────
    Distance and lie are set once; the rest is two big targets you can
    hit standing on a green without looking at the phone properly. */
-.sg-setup{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+/* minmax(0,1fr), same fix as .form-row (R33): a grid item's default
+   min-width:auto refuses to shrink below its <select>'s content, which pushed
+   this past its own box at narrow widths the same way the import form's
+   .form-row once did. Single column under 380px, same breakpoint too. */
+.sg-setup{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.6rem}
+.sg-setup > .qe-field{min-width:0}
+@media (max-width: 380px) { .sg-setup { grid-template-columns: minmax(0, 1fr); } }
 .sg-tap{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:.8rem 0 .6rem}
 .sg-tap-btn{padding:1.1rem .6rem;font:inherit;font-size:1rem;font-weight:700;cursor:pointer;
   min-height:var(--tap);
