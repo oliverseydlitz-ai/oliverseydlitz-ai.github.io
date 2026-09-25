@@ -34,9 +34,8 @@ one group, same numbers everywhere).
    the putts plateau.
 3. **C46 leftover** — the dispersion tail trend still uses a 1-SD rule; put it on the same test.
 4. **R31 leftover** — render local sessions first, then merge the cloud copy behind them.
-5. **V41, V46–V49** — Settings built two ways; print dedupe; heading wrap at 393px;
-   circles in a zero-radius system; Data & Rights polish (V49 touches the 48 h / 30 day
-   promises. Those are Oliver's call, see below. Do the styling only).
+5. ~~**V41, V46–V49**~~ — done 25 Sep, see the killer plan's Done log. The 48 h / 30 day
+   wording in the Data & Rights modal was left exactly as written, per Oliver's call.
 6. **C39 / C40** — re-read under measurement v2 first. Only the *pooling across clubs*
    half survives (Club Benchmarks, personal bests).
 7. **C33 follow-up** — the Progress trend should weight range sessions ×0.8 (`Metrics.conditionWeight`).

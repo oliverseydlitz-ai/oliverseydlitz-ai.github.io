@@ -562,7 +562,7 @@
         <table id="yardageTable"></table>
       </div>
       <div id="yardageLegend" class="mt-2"></div>
-      <div class="section-block mt-6">
+      <div class="section-block mt-6 no-print">
         <h2 class="section-title">Personal Bests</h2>
         <div class="records-grid" id="recordsGrid"></div>
       </div>
@@ -601,35 +601,35 @@
         <h2 class="settings-section-title">Appearance</h2>
         <button class="settings-row" id="themeToggleBtn">
           <span>Dark mode</span>
-          <span class="theme-switch" id="themeSwitch"><span class="theme-knob"></span></span>
+          <span class="switch" id="themeSwitch"><span class="switch-knob"></span></span>
         </button>
       </div>
       <div class="settings-section">
         <h2 class="settings-section-title">View Preferences</h2>
         <button class="settings-row" id="prefHeatmap">
           <span>Show practice heatmap</span>
-          <span class="pref-toggle" id="prefHeatmapToggle">✓</span>
+          <span class="switch" id="prefHeatmapToggle"><span class="switch-knob"></span></span>
         </button>
         <button class="settings-row" id="prefFaults">
           <span>Show fault detection</span>
-          <span class="pref-toggle" id="prefFaultsToggle">✓</span>
+          <span class="switch" id="prefFaultsToggle"><span class="switch-knob"></span></span>
         </button>
         <button class="settings-row" id="prefClubBreak">
           <span>Show club gapping</span>
-          <span class="pref-toggle" id="prefClubBreakToggle">✓</span>
+          <span class="switch" id="prefClubBreakToggle"><span class="switch-knob"></span></span>
         </button>
         <button class="settings-row" id="prefComparison">
           <span>Show session comparison</span>
-          <span class="pref-toggle" id="prefComparisonToggle">✓</span>
+          <span class="switch" id="prefComparisonToggle"><span class="switch-knob"></span></span>
         </button>
         <button class="settings-row" id="prefDensity">
           <span>Compact view (more data)</span>
-          <span class="pref-toggle" id="prefDensityToggle"></span>
+          <span class="switch" id="prefDensityToggle"><span class="switch-knob"></span></span>
         </button>
       </div>
 
-      <h2 class="settings-section-title">Launch monitor</h2>
-      <div class="settings-group">
+      <div class="settings-section">
+        <h2 class="settings-section-title">Launch monitor</h2>
         <button class="settings-row" id="introBtn">
           <span>How this app reads your data</span>
           <span class="settings-arrow">→</span>
@@ -651,8 +651,8 @@
            and the monitor already showed you every number, so hiding them
            afterwards trained nothing and only made the data harder to read.
            The finding now lives where it can operate: on the range session. -->
-      <h2 class="settings-section-title">How you practise</h2>
-      <div class="settings-group">
+      <div class="settings-section">
+        <h2 class="settings-section-title">How you practise</h2>
         <p class="form-hint pad pad-y" id="feedbackNote"></p>
         <button class="settings-row" id="rangeWrapperBtn">
           <span>How to run the session itself</span>
@@ -681,11 +681,11 @@
         <h2 class="settings-section-title">Data & Export</h2>
         <button class="settings-row" id="keepLocalBtn">
           <span>Keep sessions on this device</span>
-          <span class="pref-toggle" id="keepLocalToggle"></span>
+          <span class="switch" id="keepLocalToggle"><span class="switch-knob"></span></span>
         </button>
         <p class="form-hint pad" id="keepLocalNote"></p>
         <button class="settings-row" id="dataControlsBtn">
-          <span><svg class="icon" aria-hidden="true"><use href="#i-sessions"/></svg> View my data &amp; controls (GDPR/CCPA)</span>
+          <span><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg> View my data &amp; controls (GDPR/CCPA)</span>
           <span class="settings-arrow">→</span>
         </button>
         <button class="settings-row" id="exportCsvBtn">
@@ -704,6 +704,16 @@
         </button>
         <input type="file" id="restoreInput" accept="application/json,.json" hidden>
         <div id="restoreHost" class="pad"></div>
+        <button class="settings-row danger" id="clearDataBtn">
+          <span><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Clear all local data (keep account)</span>
+          <span class="settings-arrow">→</span>
+        </button>
+      </div>
+      <!-- Split out of Data & Export (V41): these five open a report, they do
+           not manage data, and mixed in with export/restore/clear they made
+           that section 13 rows of unrelated actions. -->
+      <div class="settings-section">
+        <h2 class="settings-section-title">Reports</h2>
         <button class="settings-row" id="showAnalyticsBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-progress"/></svg> Your numbers</span>
           <span class="settings-arrow">→</span>
@@ -722,10 +732,6 @@
         </button>
         <button class="settings-row" id="showEfficiencyBtn">
           <span><svg class="icon" aria-hidden="true"><use href="#i-target"/></svg> How you practised</span>
-          <span class="settings-arrow">→</span>
-        </button>
-        <button class="settings-row danger" id="clearDataBtn">
-          <span><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg> Clear all local data (keep account)</span>
           <span class="settings-arrow">→</span>
         </button>
       </div>

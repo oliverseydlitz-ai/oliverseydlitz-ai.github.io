@@ -491,6 +491,15 @@ button:disabled, button[disabled] {
   font-size: .7rem; color: var(--text-muted);
   font-weight: 400; text-transform: none; letter-spacing: 0;
 }
+/* V47: .section-title is a flex ROW (see its rule below), so a title with a
+   .section-sub next to it — "Short Game  putting & chipping, and what the
+   trials actually found" — laid out as two flex items side by side. Neither
+   shrinks below its own content width by default, so at 393px the sub wrapped
+   inside its own narrow column beside the title instead of under it: two
+   cramped columns, not a title and a subtitle. EXTENDS V14. */
+@media (max-width: 480px) {
+  .section-title:has(.section-sub) { flex-direction: column; align-items: flex-start; gap: .15rem; }
+}
 
 /* ── Bottom nav ────────────────────────────────────────── */
 .bottom-nav {
@@ -2419,7 +2428,13 @@ body.modal-open {
 .ach-go { margin-left: auto; font-family: var(--font-display); font-size: .8rem; font-weight: 700; color: var(--pine); text-transform: uppercase; letter-spacing: var(--track-caps); }
 
 /* Achievements modal grid */
-.ach-head-count { font-family: var(--font-mono); font-size: .6rem; font-weight: 500; color: var(--text-muted); letter-spacing: .06em; margin-left: .4rem; }
+/* V49: this sat inline after "Achievements" inside the modal's h2. At modal
+   width the string wrapped, and because "unlocked" carried its own margin
+   rather than the count it went with, it broke onto its own line alone — an
+   orphan word under a heading that gave no clue what it was answering.
+   display:block puts it on its own line always, as the count it is rather
+   than a trailing fragment of the title. */
+.ach-head-count { display: block; font-family: var(--font-mono); font-size: .6rem; font-weight: 500; color: var(--text-muted); letter-spacing: .06em; margin-top: .3rem; }
 .ach-grid { display: flex; flex-direction: column; gap: .5rem; max-height: 60vh; overflow-y: auto; }
 .ach-item {
   display: flex; align-items: center; gap: .8rem;
@@ -2480,12 +2495,15 @@ body.modal-open {
 }
 #sessionSearch::placeholder { color: var(--text-dim); }
 
-/* ── Dark-mode toggle switch ───────────────────────────────────── */
-.theme-switch { width: 42px; height: 24px; border-radius: 0; background: var(--surface3); border: 1px solid var(--line-strong); position: relative; transition: background var(--dur), border-color var(--dur); flex-shrink: 0; }
-.theme-switch .theme-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 0; background: var(--text-dim); box-shadow: none; transition: transform var(--dur), background var(--dur); }
-.theme-switch.on { background: var(--accent-weak); border-color: var(--accent); }
-.theme-switch.on .theme-knob { background: var(--accent); }
-.theme-switch.on .theme-knob { transform: translateX(20px); }
+/* ── The one switch component (V41) ───────────────────────────────
+   Was .theme-switch, dark mode only; every other on/off row (View
+   Preferences, Keep sessions on this device) used a bare "✓" character in
+   .pref-toggle instead — two different idioms for the same job. Renamed and
+   reused everywhere a settings row is a toggle, so there is one switch. */
+.switch { width: 42px; height: 24px; border-radius: 0; background: var(--surface3); border: 1px solid var(--line-strong); position: relative; transition: background var(--dur), border-color var(--dur); flex-shrink: 0; }
+.switch .switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 0; background: var(--text-dim); box-shadow: none; transition: transform var(--dur), background var(--dur); }
+.switch.on { background: var(--accent-weak); border-color: var(--accent); }
+.switch.on .switch-knob { background: var(--accent); transform: translateX(20px); }
 
 /* Desktop: feature row spans cleanly */
 @media (min-width: 768px) {
@@ -2540,11 +2558,6 @@ html.dark .paywall-overlay { background: color-mix(in srgb, var(--surface) 88%, 
 /* ─────────────────────────────────────────────────────────────
    NEW FEATURES: Goals, View Preferences, Customization
    ───────────────────────────────────────────────────────────── */
-
-.pref-toggle {
-  display: inline-block; width: 20px; text-align: center; font-weight: 700;
-  color: var(--accent); transition: color var(--dur);
-}
 
 .goal-inputs {
   background: var(--surface2); padding: var(--s3); border-radius: var(--radius);
@@ -2844,12 +2857,21 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
   padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);
 }
 .rc-shell{display:flex;flex-direction:column;width:100%;max-width:560px;padding:1rem 1.2rem 1.2rem}
-.rc-x{position:absolute;top:.8rem;right:.9rem;width:2.4rem;height:2.4rem;border:none;border-radius:50%;
-  background:var(--surface);color:var(--text-muted);font-size:1.1rem;cursor:pointer}
+/* V48: this was its own circle in a system with no border-radius anywhere
+   else. It carries only its position now — .btn-icon (on the button itself,
+   in the markup) gives it the same chamfered square every other dialog's
+   close button uses, so there is one close-button style, not three. */
+.rc-x{position:absolute;top:.8rem;right:.9rem}
 .rc-dots{display:flex;gap:.4rem;justify-content:center;margin:.4rem 0 1.2rem}
-.rc-dot{width:.6rem;height:.6rem;padding:0;border:none;border-radius:50%;background:var(--border);cursor:pointer}
-.rc-dot.on{background:var(--accent);transform:scale(1.35)}
-.rc-dot.done{background:var(--green)}
+/* V48: the visible dot stays small, but the button itself is a 24px target —
+   it was a .6rem (9.6px) circle standing in for its own hit area, well under
+   any touch-target minimum. The dot is drawn on ::after so scaling the
+   "current" state (.on) scales the mark, not the tap area around it. */
+.rc-dot{width:24px;height:24px;padding:0;border:none;background:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.rc-dot::after{content:'';width:.6rem;height:.6rem;border-radius:var(--radius-sm);background:var(--border);transition:background var(--dur),transform var(--dur)}
+.rc-dot.on::after{background:var(--accent);transform:scale(1.35)}
+.rc-dot.done::after{background:var(--green)}
 .rc-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.5rem;min-height:0;overflow-y:auto}
 .rc-step{font-size:.78rem;letter-spacing: var(--track-caps);text-transform:uppercase;color:var(--text-muted)}
 .rc-name{font-size:1.75rem;font-weight:800;line-height:1.15}
@@ -2976,8 +2998,14 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
   /* `.top-bar` was a class that does not exist in this codebase, so the
      desktop nav printed on the card for as long as this rule has been here —
      the element is `.top-nav`. C4 says everything but the book is hidden. */
+  /* #yardageConditions and #yardageLegend are screen-only methodology notes
+     (V46): #yardageConditions repeats the same "Sessions: …" sentence
+     #yardagePrintHead already builds for the card, and #yardageLegend's two
+     tail-notes explain the spread/trend columns for a reader who can scroll
+     back to them — neither belongs on paper the golfer reads six months from
+     now, and printing both meant the same caveat ran 2-3 times on one page. */
   .bottom-nav, .top-nav, .view-header, .no-print, .modal-overlay, .cookie-consent,
-  #drillFinderHost, #recordsGrid, #yardages-empty, .paywall-overlay,
+  #drillFinderHost, #recordsGrid, #yardageConditions, #yardageLegend, #yardages-empty, .paywall-overlay,
   .tag-row, .search-bar, .range-card { display: none !important; }
   .view:not(#view-yardages) { display: none !important; }
   #view-yardages { display: block !important; padding: 0 !important; }

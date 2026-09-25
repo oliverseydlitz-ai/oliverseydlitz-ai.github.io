@@ -6920,17 +6920,21 @@ const Features = (() => {
       const smash = Metrics.peak(all, 'smashFactor') || 0;
       const clubs = sortedClubs(all).length;
       const st = streak(sessions);
+      // V49: every entry read icon:'star', so ten different achievements
+      // unlocked the same badge and the icon told you nothing beyond "you
+      // unlocked something" — the same information the locked/unlocked state
+      // already carries. Each now gets its own mark from the sprite.
       const defs = [
-        { id:'first',   icon:'star', name:'First Steps',     desc:'Log your first session',      got: sessions.length >= 1 },
-        { id:'dozen',   icon:'star', name:'Getting Serious',  desc:'Log 12 sessions',             got: sessions.length >= 12 },
-        { id:'century',  icon:'star', name:'Century',          desc:'Log 100 shots total',         got: all.length >= 100 },
-        { id:'grand',   icon:'star', name:'Range Rat',        desc:'Log 1,000 shots total',       got: all.length >= 1000 },
-        { id:'bag',     icon:'star', name:'Full Bag',         desc:'Track 10+ different clubs',   got: clubs >= 10 },
-        { id:'streak3', icon:'star', name:'On a Roll',        desc:'3-day practice streak',       got: st.best >= 3 },
-        { id:'streak7', icon:'star', name:'Week Warrior',     desc:'7-day practice streak',       got: st.best >= 7 },
-        { id:'smash',   icon:'star', name:'Pure Contact',     desc:'Hit 1.45+ smash factor',      got: smash >= 1.45 },
-        { id:'bomb',    icon:'star', name:'Bomber',           desc:'250+ yard carry',             got: carry >= 250 },
-        { id:'speed',   icon:'star', name:'Speed Demon',      desc:'170+ mph ball speed',         got: ball >= 170 },
+        { id:'first',   icon:'flag',     name:'First Steps',     desc:'Log your first session',      got: sessions.length >= 1 },
+        { id:'dozen',   icon:'sessions', name:'Getting Serious',  desc:'Log 12 sessions',             got: sessions.length >= 12 },
+        { id:'century', icon:'target',   name:'Century',          desc:'Log 100 shots total',         got: all.length >= 100 },
+        { id:'grand',   icon:'drop',     name:'Range Rat',        desc:'Log 1,000 shots total',       got: all.length >= 1000 },
+        { id:'bag',     icon:'bag',      name:'Full Bag',         desc:'Track 10+ different clubs',   got: clubs >= 10 },
+        { id:'streak3', icon:'sync',     name:'On a Roll',        desc:'3-day practice streak',       got: st.best >= 3 },
+        { id:'streak7', icon:'progress', name:'Week Warrior',     desc:'7-day practice streak',       got: st.best >= 7 },
+        { id:'smash',   icon:'check',    name:'Pure Contact',     desc:'Hit 1.45+ smash factor',      got: smash >= 1.45 },
+        { id:'bomb',    icon:'external', name:'Bomber',           desc:'250+ yard carry',             got: carry >= 250 },
+        { id:'speed',   icon:'chevron',  name:'Speed Demon',      desc:'170+ mph ball speed',         got: ball >= 170 },
       ];
       const unlocked = defs.filter(d => d.got).length;
       return { defs, unlocked, total: defs.length };
@@ -7356,7 +7360,7 @@ const FirstRun = (() => {
       <div class="modal modal-wide">
         <div class="modal-head">
           <h2 class="modal-title">How this app reads your data</h2>
-          <button class="modal-close" data-fr="close" aria-label="Close">✕</button>
+          <button class="btn-icon" data-fr="close" aria-label="Close">✕</button>
         </div>
         <div class="modal-body intro-body">
           <p class="intro-lead">Every number your launch monitor gives you gets used. Some just need more
@@ -7639,7 +7643,7 @@ const RangeCard = (() => {
       const balls = [..._logged].reduce((a, i) => a + (_blocks[i].balls || 0), 0);
       m.innerHTML = `
         <div class="rc-shell">
-          <button class="rc-x" data-rc="close" aria-label="Close">✕</button>
+          <button class="btn-icon rc-x" data-rc="close" aria-label="Close">✕</button>
           <div class="rc-body rc-end">
             <div class="rc-end-h" tabindex="-1">Session logged</div>
             <div class="rc-end-n">${done} of ${n} block${n === 1 ? '' : 's'}${balls ? ` · ${balls} balls` : ''}</div>
@@ -7663,7 +7667,7 @@ const RangeCard = (() => {
     const ticked = _logged.has(_i);
     m.innerHTML = `
       <div class="rc-shell">
-        <button class="rc-x" data-rc="close" aria-label="Close">✕</button>
+        <button class="btn-icon rc-x" data-rc="close" aria-label="Close">✕</button>
         <div class="rc-dots">${_blocks.map((_, i) =>
           `<button class="rc-dot${i === _i ? ' on' : ''}${_logged.has(i) ? ' done' : ''}"
              data-rc="jump" data-i="${i}" aria-label="Block ${i + 1}"></button>`).join('')}</div>
@@ -11801,10 +11805,10 @@ async function init() {
     modal.innerHTML = `
       <div class="modal modal-wide">
         <div class="modal-head">
-          <h2 class="modal-title">${icon('sessions')} Your Data &amp; Rights</h2>
+          <h2 class="modal-title">${icon('lock')} Your Data &amp; Rights</h2>
           <button class="btn-icon" data-close-modal aria-label="Close">✕</button>
         </div>
-        <div style="padding:1.2rem;color:var(--text)">
+        <div style="color:var(--text)">
           <h3 style="margin-top:0">Your Rights (GDPR / CCPA)</h3>
           <div style="background:var(--surface2);border-left:3px solid var(--green);padding:1rem;margin:1rem 0;border-radius:var(--radius-sm)">
             <strong>${icon('check')} Right to Access</strong><br>
@@ -12304,11 +12308,13 @@ async function init() {
     prefComparison: 'showComparison',
     prefDensity:    'densityMode',
   };
+  // V41: this drew a bare "✓" character in a class the switch component
+  // never used, a second on/off idiom beside the dark-mode switch. Same
+  // classList.toggle('on', …) as applyTheme() — one switch, one way to say on.
   const paintPref = (id, on) => {
     const toggle = document.getElementById(id + 'Toggle');
     if (!toggle) return;
-    toggle.textContent = on ? '✓' : '';
-    toggle.style.color = on ? 'var(--pine)' : 'var(--text-dim)';
+    toggle.classList.toggle('on', on);
   };
   {
     const prefs = ViewPrefs.getPrefs();
@@ -12329,8 +12335,7 @@ async function init() {
   function paintKeepLocal() {
     if (!keepTog) return;
     const on = LocalDB.enabled();
-    keepTog.textContent = on ? '✓' : '';
-    keepTog.style.color = on ? 'var(--pine)' : 'var(--text-dim)';
+    keepTog.classList.toggle('on', on);
     if (keepNote) keepNote.textContent = LocalDB.describe();
     const guestNote = document.getElementById('authGuestNote');
     if (guestNote) guestNote.textContent = LocalDB.describe();
