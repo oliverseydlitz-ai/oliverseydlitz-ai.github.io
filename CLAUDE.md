@@ -617,11 +617,14 @@ it measures the driver-to-wedge gap") and nothing else obeyed it.
 - **Anchor on one club** for any single headline number. `QuickStats.pick()`
   takes the most-hit club in the recent comparable sessions and the row names
   it.
-- **Anchor on conditions too**, and note the two right answers differ:
-  the yardage book uses the LARGEST comparable group (it is a reference table
-  you club off); the home row and the Progress trend use the MOST RECENT
-  session's conditions (they answer "how am I hitting it now"). A test pins
-  that they disagree on the same data.
+- **Conditions, under v2:** the home row (`QuickStats.pick`) still anchors on
+  the MOST RECENT session's ball and surface (it answers "how am I hitting it
+  now", and `quick-stats.js` pins it). The yardage book and the Progress trend
+  box (`Analytics.progressWindows`, C33) take every session with the club
+  above the floor, each shot at `Metrics.conditionWeight` (range ×0.8), with
+  the Kish effective n behind the SE. **A weight is a precision weight, not a
+  ball-offset correction:** inside a one-ball window it cancels, so a switch
+  from range balls to your own between the two windows reads as before.
 
 ### First run (`FirstRun`) — the method, stated before there is data
 
@@ -1421,7 +1424,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **82 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v224**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v225**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1898,7 +1901,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**82 test suites**, service worker **v224**. Deterministic auth, cloud sync
+**82 test suites**, service worker **v225**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

@@ -93,7 +93,52 @@ console.log('— one club at a time, oldest first, above the floor (C33) —');
   ok(!/All clubs/.test(sel.replace(/\/\/.*$/gm, '')), 'the club filter no longer offers a pooled "All clubs" line');
   ok(/sort\(\(a, b\) => new Date\(a\.date\) - new Date\(b\.date\)\)/.test(body), 'the charts run oldest to newest');
   ok(/Metrics\.MIN_SHOTS_REPORT/.test(body.slice(0, body.indexOf('const labels'))), 'a session below the per-club floor is left off');
-  ok(/rShots = recent\.flatMap\(s=>s\.shots\.filter\(mine\)\)/.test(body), 'and the trend summary reads the chosen club, not the bag');
+  ok(/Analytics\.progressWindows\(sessions, clubFilter\)/.test(body), 'and the trend summary reads the chosen club, through Analytics.progressWindows');
+}
+
+console.log('— v2: the trend counts every ball, range at x0.8 (C33 follow-up) —');
+{
+  const { Analytics } = M;
+  // Deterministic carries around a centre, one club, 12 shots a session.
+  const carryShots = (centre, club = '7i') => Array.from({ length: 12 }, (_, i) =>
+    ({ _row: i + 2, clubType: club, carryDistance: centre + [-3, 2, -1, 3, 0, -2, 1, -3, 2, 0, 1, 0][i],
+       ballSpeed: 120, smashFactor: 1.33 }));
+  const s2 = (id, date, ball, centre, club) => Store.stamp({ id, date,
+    conditions: { ball, surface: 'grass' }, shots: carryShots(centre, club) });
+  // Six sessions of 7-iron, the newest on the golfer's own ball and the five
+  // before on range balls. The old box kept only sessions on the latest ball
+  // and surface, found one, and withheld the trend: "those do not trend
+  // against each other". v2 says they do.
+  const mixed = [
+    s2('m6', '2026-09-20', 'premium', 160), s2('m5', '2026-09-13', 'range', 158),
+    s2('m4', '2026-09-06', 'range', 157), s2('m3', '2026-08-30', 'range', 150),
+    s2('m2', '2026-08-23', 'range', 149), s2('m1', '2026-08-16', 'range', 151),
+  ];
+  // And the box a golfer reads, rendered from the real Progress view.
+  const L = require('../load.js').load({});
+  L.app.UI.renderProgress(mixed.map(sn => L.app.Store.stamp(JSON.parse(JSON.stringify(sn)))));
+  const box = (L.window.document.getElementById('progressTrend') || {}).textContent || '';
+  ok(/Last 3 sessions vs previous 3/.test(box) && !/Not enough comparable/.test(box),
+     'the rendered box compares the two windows rather than withholding the trend over a ball change');
+  ok(/Carry distance/.test(box) && /↑/.test(box), 'and reports the carry move with its direction');
+  ok(!/-0\.0/.test(box), 'and an unchanged reading prints as 0, not "-0.0" from weighted rounding');
+  const w = Analytics.progressWindows ? Analytics.progressWindows(mixed, '7i') : { ok: false, recent: [], older: [], compare: () => ({ verdict: {} }) };
+  ok(w.ok === true && w.recent.length === 3 && w.older.length === 3,
+     'six sessions across two balls make two full windows instead of a withheld box');
+  ok(w.recent.map(s => s.id).join() === 'm6,m5,m4', 'newest three first, whatever the ball');
+  const c = w.compare('carryDistance');
+  // Recent: 12 premium shots at 160 (w 1) and 24 range at 157.5 (w 0.8).
+  const expect = (12 * 160 + 0.8 * 12 * 158 + 0.8 * 12 * 157) / (12 + 0.8 * 24);
+  ok(Math.abs(c.recent - expect) < 1e-9, `the recent window is the x0.8-weighted mean (${c.recent.toFixed(3)} vs unweighted ${((160 + 158 + 157) / 3).toFixed(3)})`);
+  ok(Math.abs(c.older - 150) < 1e-9, 'an all-range window is its plain mean: the weights cancel inside one ball');
+  ok(c.n < c.nShots && c.n > 0.95 * c.nShots, `the SE uses the Kish effective n (${c.n.toFixed(2)} of ${c.nShots} shots)`);
+  ok(c.verdict.real === true, `a 7-8 yard move against a +-3 yard spread is real (needs ${c.verdict.threshold && c.verdict.threshold.toFixed(1)})`);
+  // A session without enough of this club does not take a window slot.
+  const thin = [...mixed.slice(0, 2), Store.stamp({ id: 'x', date: '2026-09-10',
+    conditions: { ball: 'premium', surface: 'grass' }, shots: carryShots(160).slice(0, 5) }), ...mixed.slice(2)];
+  ok(Analytics.progressWindows && Analytics.progressWindows(thin, '7i').recent.every(s => s.id !== 'x'), `a session under ${Metrics.MIN_SHOTS_REPORT} shots of the club takes no window slot`);
+  const other = mixed.map(s => ({ ...s, shots: carryShots(200, 'd') }));
+  ok(Analytics.progressWindows && Analytics.progressWindows(other, '7i').ok === false, 'and sessions with none of this club make no trend for it');
 }
 
 console.log(fail?`\n${fail} FAILED`:'\nall passed');

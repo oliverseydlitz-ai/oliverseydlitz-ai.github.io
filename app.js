@@ -6321,7 +6321,52 @@ const Analytics = (() => {
     return { points, lo: Math.min(...vals), hi: Math.max(...vals), n: points.length };
   }
 
-  return { yardageBook, conditionGroups, personalBests, clubSeries };
+  // ── The Progress trend's two windows (C33 follow-up) ──────────
+  // The last three sessions with this club against the three before, each
+  // above the per-club floor (the rule the charts above it keep). v2: every
+  // ball counts. The box used to keep only sessions on the latest ball and
+  // surface and withhold the rest ("those do not trend against each other"),
+  // a ban v2 lifted everywhere else. Each shot now carries
+  // Metrics.conditionWeight — range and unrecorded 0.8 — as in the yardage
+  // book, and the SE behind the verdict uses the Kish effective n, so a
+  // down-weighted shot buys less certainty as well as less pull.
+  //
+  // What a weight is NOT: a correction for a ball's offset. Inside a window of
+  // one ball the weights are equal and cancel, so a switch from range balls to
+  // your own between the two windows reads exactly as it did before. The
+  // weight decides how much a range shot counts in a MIXED window, nothing more.
+  function progressWindows(sessions, club) {
+    const withClub = (sessions || [])
+      .filter(sn => (sn.shots || []).filter(x => x.clubType === club).length >= Metrics.MIN_SHOTS_REPORT)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const recent = withClub.slice(0, 3), older = withClub.slice(3, 6);
+    const pairs = (list, field) => list.flatMap(sn => (sn.shots || [])
+      .filter(x => x.clubType === club && Number.isFinite(x[field]))
+      .map(x => ({ v: x[field], w: Metrics.conditionWeight(x._ball || Conditions.ball(sn).id) })));
+    const wmean = ps => {
+      const W = ps.reduce((a, p) => a + p.w, 0);
+      return W > 0 ? ps.reduce((a, p) => a + p.w * p.v, 0) / W : null;
+    };
+    const nEff = ps => {
+      const W = ps.reduce((a, p) => a + p.w, 0), W2 = ps.reduce((a, p) => a + p.w * p.w, 0);
+      return W2 > 0 ? W * W / W2 : 0;
+    };
+    function compare(field) {
+      const r = pairs(recent, field), o = pairs(older, field);
+      if (!r.length || !o.length) return null;
+      const rm = wmean(r), om = wmean(o), n = nEff(r);
+      // Weighted sums of identical readings differ in the last bit, which
+      // printed as "-0.0 mph". Below a millionth of the reading it is zero.
+      let diff = rm - om;
+      if (Math.abs(diff) < 1e-6 * Math.max(1, Math.abs(om))) diff = 0;
+      return { recent: rm, older: om, diff, n, nShots: r.length,
+               verdict: Metrics.changeIsReal(field, diff, n, withClub, club) };
+    }
+    return { ok: recent.length >= 2 && older.length >= 1, sessions: withClub, recent, older,
+             need: Math.max(0, 3 - withClub.length), compare };
+  }
+
+  return { yardageBook, conditionGroups, personalBests, clubSeries, progressWindows };
 })();
 
 // ════════════════════════════════════════════════════════════════
@@ -10300,32 +10345,25 @@ const UI = (() => {
     const trendEl = document.getElementById('progressTrend');
     if (!trendEl) return;
 
-    // Same conditions only. Sessions are newest-first, so the run is anchored
-    // on the most recent session's ball and surface — the equipment the golfer
-    // is on now is the one worth trending.
-    const anchor = sessions[0];
-    const same = sessions.filter(s => Conditions.comparable(s, anchor));
-    const skipped = sessions.length - same.length;
-    const recent = same.slice(0,3);
-    const older  = same.slice(3,6);
-    if (recent.length<2||older.length<1) {
-      trendEl.innerHTML = skipped
-        ? `<div class="trend-box"><div class="trend-heading">Not enough comparable sessions yet</div>
-           <div class="tail-note">${skipped} of your ${sessions.length} sessions used a different ball or
-           surface, and those do not trend against each other — a ball change moves every carry at once.
-           Log ${Math.max(0, 3 - same.length)} more on ${Sanitize.escape(Conditions.ball(anchor).label.toLowerCase())}
-           and this fills in.</div></div>`
+    // v2 and C33: every session with this club above the floor, range balls
+    // weighted x0.8 like the yardage book. See Analytics.progressWindows.
+    if (clubFilter === 'all') { trendEl.innerHTML = ''; return; }
+    const win = Analytics.progressWindows(sessions, clubFilter);
+    const { recent, older } = win;
+    if (!win.ok) {
+      trendEl.innerHTML = win.sessions.length
+        ? `<div class="trend-box"><div class="trend-heading">Not enough sessions with this club yet</div>
+           <div class="tail-note">${plural(win.need, 'more session')} with ${Metrics.MIN_SHOTS_REPORT}+ shots of
+           your ${Sanitize.escape(clubLabel(clubFilter))} and this fills in.</div></div>`
         : '';
       return;
     }
 
     const compare = (field, label, higherBetter) => {
       // The club the page is showing, not the whole bag (C33).
-      const mine = sh => clubFilter==='all' || sh.clubType===clubFilter;
-      const rShots = recent.flatMap(s=>s.shots.filter(mine)), oShots = older.flatMap(s=>s.shots.filter(mine));
-      const r = avg(rShots, field), o = avg(oShots, field);
-      if (!r || !o) return '';
-      const diff = r - o;
+      const c = win.compare(field);
+      if (!c) return '';
+      const diff = c.diff, o = c.older, r = c.recent;
       const unit = field==='launchAngle'||field==='attackAngle' ? '°'
                  : field==='ballSpeed' ? ' mph'
                  : field==='smashFactor' ? '' : ' yds';
@@ -10333,12 +10371,11 @@ const UI = (() => {
       // decimals printed "needs 0.00", which reads as "any change counts".
       const dec  = field==='smashFactor' ? 2 : field==='carryDistance' ? 0 : 1;
       const tdec = field==='smashFactor' ? 3 : dec;
-      const n = rShots.filter(s => Number.isFinite(s[field])).length;
 
       // Is this bigger than your own session-to-session variation? Below the
       // threshold there is no direction to report, so there is no arrow and no
       // colour — a neutral row that says what it would take to be sure.
-      const v = Metrics.changeIsReal(field, diff, n, same, clubFilter==='all'?null:clubFilter);
+      const v = c.verdict;
       if (v.real === null) return `<div class="trend-row trend-neutral">
         <span class="trend-icon">·</span><span class="trend-label">${label}</span>
         <span class="trend-val">${fmt(diff,dec)}${unit} — ${Sanitize.escape(v.note || 'not enough history to judge')}</span></div>`;
@@ -10373,11 +10410,9 @@ const UI = (() => {
         ${compare('smashFactor','Smash factor', true)}
         ${compare('launchAngle','Launch angle', null)}
         ${compare('attackAngle','Attack angle', null)}
-        <div class="tail-note">On ${Sanitize.escape(Conditions.ball(anchor).label.toLowerCase())}${
-          skipped ? `, ${skipped} session${skipped>1?'s':''} on other conditions left out` : ''}.
+        <div class="tail-note">Sessions with ${Metrics.MIN_SHOTS_REPORT}+ shots of this club, every ball counted.
           A move is only called a move when it is larger than your own session-to-session variation.
-          Launch and attack angle are shown without a verdict${clubFilter==='all'
-            ? ' because a bag has no single right answer for either' : ''} — they are display-only metrics.</div>
+          Launch and attack angle are judged against this club's target band, not a fixed direction.</div>
       </div>`;
   }
 
