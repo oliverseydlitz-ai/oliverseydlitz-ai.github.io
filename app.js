@@ -3844,17 +3844,35 @@ const Rounds = (() => {
   // flagged when clamped — a golfer better than the 0 row or worse than the 25
   // row is off the table, and saying "you are a 25" to someone who is a 34 is
   // just wrong.
+  //
+  // C45, the putts plateau: the 15 and 20 rows both average 33.1 putts. Read
+  // row by row, 33.1 placed at 15 and 33.12 at 20 — five handicap points for
+  // two hundredths of a putt, a cliff inside anyone's round-to-round noise.
+  // Rows that share a value are one point on the value axis, so they are
+  // merged at their mean handicap (17.5): the least-committal single reading
+  // of "a 15 and a 20 putt the same", and the mapping is continuous again.
+  function axis(stat) {
+    const spec = PLACEABLE[stat];
+    const pts = NORMS.map(n => ({ hcp: n.hcp, v: n[stat] }))
+      .sort((a, b) => a.v - b.v || a.hcp - b.hcp);
+    const out = [];
+    for (const p of pts) {
+      const last = out[out.length - 1];
+      if (last && last.v === p.v) { last.sum += p.hcp; last.k++; last.hcp = last.sum / last.k; }
+      else out.push({ v: p.v, hcp: p.hcp, sum: p.hcp, k: 1 });
+    }
+    return spec ? out : [];
+  }
   function place(stat, value) {
     const spec = PLACEABLE[stat];
     if (!spec || !Number.isFinite(value)) return null;
-    const pts = NORMS.map(n => ({ hcp: n.hcp, v: n[stat] }));
-    const asc = spec.higherBetter ? [...pts].reverse() : pts;   // v ascending
+    const asc = axis(stat);                                     // v ascending
     // `better` means "off the good end of the table", which is the SCRATCH row
     // whichever direction the stat runs. Deriving it from the value's position
     // rather than the handicap got it backwards for greens in regulation: 80%
     // is better than scratch and clamps at hcp 0, but sits at the HIGH end of
     // an ascending value axis.
-    const best = Math.min(...pts.map(x => x.hcp));
+    const best = Math.min(...NORMS.map(x => x.hcp));
     const clampAt = row => ({ hcp: row.hcp, clamped: true, better: row.hcp === best });
     if (value <= asc[0].v) return clampAt(asc[0]);
     const last = asc[asc.length - 1];
@@ -3862,12 +3880,31 @@ const Rounds = (() => {
     for (let i = 0; i < asc.length - 1; i++) {
       const a = asc[i], b = asc[i + 1];
       if (value >= a.v && value <= b.v) {
-        const t = (value - a.v) / (b.v - a.v || 1);
+        const t = (value - a.v) / (b.v - a.v);
         return { hcp: a.hcp + t * (b.hcp - a.hcp), clamped: false };
       }
     }
     return null;
   }
+  // Handicap points per unit of the stat where `value` sits (the end segment's
+  // slope when it is off the table). Turns a spread in putts or percent into a
+  // spread in handicap points, so categories can be compared on one scale.
+  function slopeAt(stat, value) {
+    const asc = axis(stat);
+    if (asc.length < 2 || !Number.isFinite(value)) return null;
+    let i = asc.findIndex((p, j) => j < asc.length - 1 && value <= asc[j + 1].v);
+    if (i < 0) i = asc.length - 2;
+    return Math.abs((asc[i + 1].hcp - asc[i].hcp) / (asc[i + 1].v - asc[i].v));
+  }
+
+  // Tukey's studentized range at the 95% level, infinite df, for k groups.
+  // Naming the worst and best of k categories is picking the extreme pair, and
+  // the largest of several noisy gaps is bigger than a single gap by chance
+  // alone — with four categories the plain two-reading bar would name a fake
+  // outlier about one time in five. q/sqrt(2) x the SE of the gap is the
+  // Tukey-Kramer bar; at k = 2 it is exactly Metrics.mdcOf's 2.77, the app's
+  // one rule, and it only gets stricter as there are more pairs to pick from.
+  const Q95 = { 2: 2.77, 3: 3.31, 4: 3.63 };
 
   const MIN_ROUNDS = 3;
 
@@ -3905,10 +3942,42 @@ const Rounds = (() => {
     const worst = sorted[0], best = sorted[sorted.length - 1];
     const spread = worst.implied - best.implied;
     result.worst = worst; result.best = best; result.spread = spread;
-    // Under about five points of implied handicap the categories are level and
-    // there is no outlier to name. Saying "this is your weakness" about a
-    // two-point gap would be reading noise.
+    // Under five points of implied handicap (one row of the table) the
+    // categories are level and there is no outlier worth naming, however
+    // certain the gap is. That is a SIZE rule, not a significance one.
     result.even = spread < 5;
+    // C45: and a gap of five or more is only named once it clears the noise.
+    // Each category's mean carries its own round-to-round spread, converted to
+    // handicap points at the slope of the table where it sits; the gap is real
+    // when it clears Q95 / sqrt(2) x the SE of the difference. Three rounds of
+    // putts can easily sit six points apart from greens by chance — the old
+    // rule named that "where your strokes are" off the size alone.
+    const se = st => {
+      const v = rs.map(r => r[st.key]).filter(Number.isFinite);
+      return { n: v.length, se: v.length > 1 ? stdDev(v) * slopeAt(st.key, st.value) / Math.sqrt(v.length) : 0 };
+    };
+    const sw = se(worst), sb = se(best);
+    const seGap = Math.sqrt(sw.se ** 2 + sb.se ** 2);
+    const bar = (Q95[list.length] || Q95[4]) / Math.SQRT2 * seGap;
+    result.gapBar = bar;
+    // A zero SE is rounds that did not vary at all in either category. Like
+    // trend()'s flat baseline, a gap off it is taken as real (the size rule
+    // still applies) rather than declared unknowable.
+    result.unresolved = !result.even && seGap > 0 && spread < bar;
+    result.outlier = !result.even && !result.unresolved;
+    if (result.unresolved) {
+      // Rounds needed for this gap to clear the bar, if it holds: the SE falls
+      // with the square root of the rounds.
+      const need = Math.max(1, Math.ceil(rs.length * (bar / spread) ** 2) - rs.length);
+      result.needRounds = need;
+      result.note = `Across ${rs.length} rounds your ${worst.label.toLowerCase()} plays like a ` +
+        `${fmt(worst.implied, 0)} handicap and your ${best.label.toLowerCase()} like a ${fmt(best.implied, 0)}. ` +
+        `Your rounds vary too much from one to the next for a ${fmt(spread, 0)}-point gap to be told apart ` +
+        `from a run of good and bad days yet — it needs about ${fmt(bar, 0)}. ` + (need > 20
+          ? 'At this gap it would take more rounds than most golfers log in a season, so treat the categories as level for now.'
+          : `If the gap holds, about ${need} more round${need === 1 ? '' : 's'} would settle it.`);
+      return result;
+    }
     result.note = result.even
       ? `Across ${rs.length} rounds your categories sit within ${fmt(spread, 0)} points of each other on the ` +
         `Shot Scope table — no single part of your game is dragging. That is a real answer: the way down from ` +
@@ -3936,17 +4005,23 @@ const Rounds = (() => {
     if (!tail || !tail.ok) {
       return { ok: false, penalties: pen,
                note: `You are averaging ${fmt(pen.value, 1)} penalties a round, which is about a ` +
-                     `${fmt(pen.implied, 0)}-handicap rate. The range side of this needs 30 shots of one club ` +
-                     `on a premium ball before the app can show you the dispersion tail that produces them.` };
+                     `${fmt(pen.implied, 0)}-handicap rate. The range side of this needs ` +
+                     `${Metrics.MIN_SHOTS_TAIL} shots with your driver before the app can put your ` +
+                     'directional spread beside it.' };
     }
+    // C45: this note used to say the two were "the same problem measured in
+    // two places" and that the tail "is what puts a ball somewhere you have to
+    // take a drop from" — a causal claim, one line above a caveat saying the
+    // pair is not correlated. It now states the two measurements and stops.
+    // It also asked for a premium ball, which v2 stopped requiring.
     return {
       ok: true, penalties: pen, sigma: tail.sigma, p95: tail.p95,
-      note: `${fmt(pen.value, 1)} penalties a round on the course, and a ${fmt(tail.sigma, 1)}° directional ` +
-            `spread with a ${fmt(tail.p95, 1)}° tail on the range. Those are the same problem measured in two ` +
-            `places — the tail is what puts a ball somewhere you have to take a drop from.`,
-      caveat: 'Shown side by side, not correlated. Establishing that your range spread predicts your penalty ' +
-              'count would take far more rounds than anyone logs, and a number claiming it from a handful ' +
-              'would be invented.',
+      note: `${fmt(pen.value, 1)} penalties a round on the course. On the range, your driver's directional ` +
+            `spread is ${fmt(tail.sigma, 1)}°, and 95% of its shots finish within ${fmt(tail.p95, 1)}° of your ` +
+            'usual line.',
+      caveat: 'Shown side by side, not linked. Whether your range spread drives your penalty count is exactly ' +
+              'what these two numbers cannot show: that would take far more rounds than anyone logs, and a ' +
+              'number claiming it from a handful would be invented.',
     };
   }
 
@@ -3995,8 +4070,11 @@ const Rounds = (() => {
     if (!p || !p.ok || !p.worst) return null;
     const w = workFor(p.worst.key);
     if (!w) return null;
-    const out = { category: p.worst, ...w, even: !!p.even };
-    if (p.even) {
+    const out = { category: p.worst, ...w, even: !!p.even, unresolved: !!p.unresolved };
+    if (p.unresolved) {
+      out.headline = `${p.worst.label} looks weakest, but not yet by more than your rounds vary. If you work ` +
+                     'on one thing before that settles, this is the likeliest one — hold it loosely.';
+    } else if (p.even) {
       out.headline = 'No category is dragging, so there is no single fix to point at. The nearest thing to a ' +
                      'weakness is ' + p.worst.label.toLowerCase() + ', and it is barely one.';
     } else {
@@ -4045,6 +4123,11 @@ const Rounds = (() => {
     const vals = pts.map(r => r[stat]);
     const delta = vals[vals.length - 1] - vals[0];
     const noise = stdDev(vals.slice(0, -1));
+    // C45: the bar was one SD of the earlier rounds. Latest minus first is the
+    // difference of two single rounds, each carrying that noise, so a 1-SD bar
+    // is crossed about half the time with nothing changed. It is now the app's
+    // one rule, Metrics.mdcOf with n = 1 (one reading per round): 2.77 x SD.
+    const threshold = Metrics.mdcOf(noise);
     const improved = spec.higherBetter ? delta > 0 : delta < 0;
     // A zero-variance baseline must not mean "no change is detectable" — it is
     // the opposite. A golfer who took exactly three penalties in five straight
@@ -4052,26 +4135,27 @@ const Rounds = (() => {
     // of this guard told them nothing had happened because it required
     // `noise > 0`. With no observed variation, any real difference clears it.
     const flat = !(noise > 0);
-    const real = flat ? Math.abs(delta) > 0 : Math.abs(delta) > noise;
+    const real = flat ? Math.abs(delta) > 0 : Math.abs(delta) >= threshold;
     return {
       ok: true, stat, label: spec.label, unit: spec.unit, points: pts, values: vals,
-      delta, noise, real, improved,
+      delta, noise, threshold, real, improved,
       first: place(stat, vals[0]), last: place(stat, vals[vals.length - 1]),
       flat,
       note: !real
-        ? `${fmt(Math.abs(delta), 1)}${spec.unit} of movement across ${pts.length} rounds, inside your own ` +
-          `round-to-round variation of ${fmt(noise, 1)}${spec.unit}. No detectable change — which is not the ` +
-          `same as no change.`
+        ? `${fmt(Math.abs(delta), 1)}${spec.unit} of movement across ${pts.length} rounds. With your own ` +
+          `round-to-round variation, a move needs ${fmt(threshold, 1)}${spec.unit} to stand out. No detectable ` +
+          `change — which is not the same as no change.`
         : `${improved ? 'Better' : 'Worse'} by ${fmt(Math.abs(delta), 1)}${spec.unit} across ${pts.length} ` +
           `rounds` + (flat
             ? `, off a baseline that had not moved at all. Treat it as real and watch whether it holds — a ` +
               `run of identical rounds is a small sample looking steadier than it is.`
-            : `, beyond your own round-to-round variation of ${fmt(noise, 1)}${spec.unit}. That is a real move.`),
+            : `. A move needs ${fmt(threshold, 1)}${spec.unit} to stand out from your own round-to-round ` +
+              'variation, so that is a real one.'),
     };
   }
 
-  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS, MIN_TREND_ROUNDS, CATEGORY_WORK, validate,
-           all, record, remove, clear, per18, place, profile, rangeLink, workFor, prescribe, trend };
+  return { KEY, NORMS, PLACEABLE, FIR_NOTE, MIN_ROUNDS, MIN_TREND_ROUNDS, CATEGORY_WORK, Q95, validate,
+           all, record, remove, clear, per18, place, slopeAt, profile, rangeLink, workFor, prescribe, trend };
 })();
 
 // ────────────────────────────────────────────────────────────────
@@ -6446,7 +6530,7 @@ const SmartRecommendations = (() => {
     //    range, so a category that is genuinely out of line outranks a fault.
     try {
       const p = Rounds.profile();
-      if (p.ok && !p.even && p.worst) return {
+      if (p.ok && p.outlier && p.worst) return {
         type: 'category',
         title: `Your ${p.worst.label.toLowerCase()} is the outlier`,
         desc: `It plays like a ${fmt(p.worst.implied, 0)} handicap while the rest of your game plays like a ` +
@@ -9831,7 +9915,7 @@ const UI = (() => {
           <span class="tail-n">${rounds.length} round${rounds.length === 1 ? '' : 's'}</span></div>
         ${p.ok
           ? `${Object.values(p.stats).sort((a, b) => b.implied - a.implied).map(bar).join('')}
-             <div class="tail-item${p.even ? '' : ' heavy'}">${esc(p.note)}</div>
+             <div class="tail-item${p.outlier ? ' heavy' : ''}">${esc(p.note)}</div>
              ${Number.isFinite(p.fir) ? `<div class="tail-note"><strong>Fairways hit ${fmt(p.fir, 0)}%.</strong>
                ${esc(p.firNote)}</div>` : ''}`
           : `<div class="tail-note">${esc(p.note)}</div>`}
@@ -9850,10 +9934,10 @@ const UI = (() => {
         const club = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
         const rx = R.prescribe(p, { shots, clubType: club, sessions: (sessions || []).length });
         if (!rx) return '';
-        return `<div class="tail-block${rx.even ? ' pending' : ''}">
+        return `<div class="tail-block${rx.even || rx.unresolved ? ' pending' : ''}">
             <div class="tail-head">So work on this
               <span class="tail-n">${esc(rx.sectionName || '')}</span></div>
-            <div class="tail-item${rx.even ? '' : ' heavy'}">${esc(rx.headline)}</div>
+            <div class="tail-item${rx.even || rx.unresolved ? '' : ' heavy'}">${esc(rx.headline)}</div>
             <div class="tail-note">${esc(rx.why)}</div>
             ${rx.drills && rx.drills.length
               ? rx.drills.map(d => `<div class="tail-item"><strong>${esc(d.name)}.</strong>

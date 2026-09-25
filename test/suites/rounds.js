@@ -72,12 +72,63 @@ ok(p.worst.key !== 'fir' && p.best.key !== 'fir', 'so it can never be named best
 console.log('— the link back to the range —');
 const noTail = R.rangeLink(lopsided, null);
 ok(noTail.ok === false, 'without a measured tail it still reports the penalty rate');
-ok(/needs 30 shots of one club/.test(noTail.note), 'and says what the range side needs');
+ok(new RegExp(`needs ${M.Metrics.MIN_SHOTS_TAIL} shots with your driver`).test(noTail.note),
+   'and says what the range side needs, off the real floor');
+ok(!/premium/i.test(noTail.note), 'without asking for a premium ball, which v2 stopped requiring (C45)');
 const withTail = R.rangeLink(lopsided, { ok: true, sigma: 8.2, p95: 15.4 });
-ok(withTail.ok === true && /same problem measured in two places/.test(withTail.note),
-   'with one, it puts the two side by side');
-ok(/not correlated/.test(withTail.caveat), 'and refuses to call it a correlation');
+ok(withTail.ok === true && /8\.2°/.test(withTail.note) && /15\.4°/.test(withTail.note),
+   'with one, it puts the two measurements side by side');
+ok(/not linked/.test(withTail.caveat), 'and refuses to call it a link');
 ok(/would be invented/.test(withTail.caveat), 'saying plainly what such a number would be');
+// C45: the note used to call them "the same problem measured in two places"
+// and say the tail "is what puts a ball somewhere you have to take a drop
+// from" — a causal claim one line above the caveat denying any link.
+ok(!/same problem|is what puts|produces them|causes?|because/i.test(withTail.note + noTail.note),
+   'and neither note claims the range spread causes the penalties its caveat will not link it to');
+
+console.log('— the putts plateau (C45) —');
+// The 15 and 20 rows both average 33.1 putts. Row by row, 33.1 placed at 15
+// and a hair more at 20: five handicap points for 0.02 of a putt.
+{
+  const at = v => R.place('putts', v).hcp;
+  ok(Math.abs(at(33.12) - at(33.08)) < 0.5,
+     `0.04 of a putt moves the implied handicap by a fraction, not a row (${at(33.08).toFixed(2)} -> ${at(33.12).toFixed(2)})`);
+  ok(Math.abs(at(33.1) - 17.5) < 1e-9, 'the shared value places at the midpoint of the two rows that share it');
+  ok(Math.abs(at(31.2) - 10) < 1e-9 && Math.abs(at(33.8) - 25) < 1e-9, 'every other row still places exactly');
+  let mono = true;
+  for (let v = 29.4; v < 33.8; v += 0.01) if (at(v + 0.01) < at(v) - 1e-9) mono = false;
+  ok(mono, 'and the mapping only ever rises with more putts');
+}
+
+console.log('— a gap is named only when it clears the round-to-round noise (C45) —');
+{
+  // Three rounds where putting swings from 30 to 36: the per-round implied
+  // handicap for putts runs from a 5 to off the table. The mean gap to the best
+  // category is ~9 points, over the 5-point size rule, so the old code named
+  // putting "where your strokes are". Three rounds that noisy cannot tell a
+  // weak category from a bad day.
+  const noisy = [
+    rd({ girHit: 2, penalties: 1, putts: 36, upDowns: 2, upDownAttempts: 14 }),
+    rd({ girHit: 7, penalties: 3, putts: 30, upDowns: 5, upDownAttempts: 11 }),
+    rd({ girHit: 4, penalties: 2, putts: 34, upDowns: 3, upDownAttempts: 12 }),
+  ];
+  const np = R.profile(noisy);
+  ok(np.spread >= 5, `the gap is over the size rule (${np.spread.toFixed(1)} points)`);
+  ok(np.outlier === false && np.unresolved === true,
+     `but under its noise bar (${np.gapBar?.toFixed(1)}), so no outlier is named`);
+  ok(!/where your strokes are/.test(np.note) && /vary too much/.test(np.note), 'and the note says why, not "where your strokes are"');
+  const nrx = R.prescribe(np, {});
+  ok(nrx.unresolved === true && !/worth a winter/.test(nrx.headline), 'the prescription holds it loosely rather than calling it the one worth a winter');
+  // The bar is the app's one rule, corrected for picking the extreme pair.
+  ok((R.Q95 || {})[2] === M.Metrics.MDC_FACTOR, 'with two categories the bar is exactly Metrics.mdcOf\'s 2.77');
+  ok(R.Q95 && R.Q95[3] > R.Q95[2] && R.Q95[4] > R.Q95[3], 'and it only gets stricter with more categories to pick the extreme pair from');
+  // Positive control: the same size of gap, held steadily over eight rounds.
+  const steady = Array.from({ length: 8 }, (_, i) => rd({ girHit: [6, 7][i % 2], penalties: [4, 5][i % 2],
+    putts: [31, 32][i % 2], upDowns: 5, upDownAttempts: 16 }));
+  const sp = R.profile(steady);
+  ok(sp.outlier === true && sp.worst.key === 'penalties',
+     `a gap that holds round after round is named (${sp.spread.toFixed(1)} points, bar ${sp.gapBar?.toFixed(1)})`);
+}
 
 console.log('— storage —');
 R.clear();
@@ -160,6 +211,15 @@ ok(offFlat.real === true, 'and a move off it still counts as real');
 ok(/had not moved at all/.test(offFlat.note), 'the note says the baseline was flat');
 ok(/looking steadier than it is/.test(offFlat.note), 'and warns that a short identical run flatters itself');
 ok(R.trend('penalties', series([5,5,5,5,5,5])).real === false, 'while no movement at all is still no movement');
+{
+  // C45: the bar was one SD of the earlier rounds. Here the golfer's fifth
+  // round is 5 penalties, the same count as their third — nothing new — yet it
+  // sits 1 above the first round, past the 0.84 SD. The old rule read it as
+  // "Worse ... a real move"; 2.77 x 0.84 = 2.3 (Metrics.mdcOf, n = 1) does not.
+  const t = R.trend('penalties', series([4,3,5,4,3,5]));
+  ok(t.real === false, `a count the golfer has already had is not a real move (delta ${t.delta}, bar ${t.threshold?.toFixed(2)})`);
+  ok(Math.abs(t.threshold - M.Metrics.mdcOf(t.noise)) < 1e-12, 'and the bar is the app\'s one rule');
+}
 ok(better.first.hcp > better.last.hcp, 'and the implied handicap moved the right way');
 
 const worse = R.trend('putts', series([30,30,30,30,30,38]).map((r,i) => ({ ...r, putts: [30,30,30,30,30,38][i] })));

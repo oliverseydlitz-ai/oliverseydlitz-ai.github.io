@@ -382,10 +382,20 @@ are my strokes going" rather than reasoning about it from range shots.
   28-stroke range. Grading it manufactures a weakness out of a rounding error.
   `PLACEABLE` deliberately omits it; `FIR_NOTE` says why.
 - Under 5 points of spread it says the categories are level and calls that a
-  real answer rather than hunting for a weakness.
+  real answer rather than hunting for a weakness. That is a size rule. A gap of
+  5+ is named only if it also clears the noise (C45): each category's
+  round-to-round SD, converted to handicap points at the table's slope where it
+  sits, gives the SE of the gap, and the bar is Tukey's `Q95[k]/√2 × SE` —
+  exactly `Metrics.mdcOf`'s 2.77 at two categories, stricter with more, because
+  worst-vs-best is the extreme pair of k. Under the bar the profile is
+  `unresolved`, `outlier` is false, and `getNextStep` does not route to it.
+- **The 15 and 20 rows share 33.1 putts**, so tied rows are merged at their mean
+  handicap (17.5). Read row by row, 0.02 of a putt moved the golfer five points.
 - `rangeLink()` puts penalties/round beside the measured dispersion tail —
   **side by side, explicitly not correlated.** A few rounds cannot establish
-  that, and an r printed on it would be invented.
+  that, and an r printed on it would be invented. The note states the two
+  measurements and nothing else: it used to call them "the same problem", a
+  causal claim one line above the caveat denying any link (C45).
 - Nine-hole rounds are doubled, flagged `scaled`, and the assumption is stated.
 - **It closes its own loop.** `prescribe()` turns the worst category into the
   practice work for it; `trend()` tracks that category across rounds. `trend()`
@@ -393,6 +403,8 @@ are my strokes going" rather than reasoning about it from range shots.
   spread — a golfer with an identical run of rounds would otherwise be told "no
   detectable change" after a large real move. Any non-zero delta off a flat
   baseline is real, with the warning that a short identical run flatters itself.
+  Otherwise the bar is `Metrics.mdcOf` (2.77 × the earlier rounds' SD, n = 1),
+  not 1 SD, which two noisy rounds cross about half the time (C45).
 
 ### Short game (`ShortGame`) — see `docs/short-game-evidence.md`
 
@@ -1409,7 +1421,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **82 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v223**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v224**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1886,7 +1898,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**82 test suites**, service worker **v223**. Deterministic auth, cloud sync
+**82 test suites**, service worker **v224**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
