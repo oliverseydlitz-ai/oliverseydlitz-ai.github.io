@@ -1032,7 +1032,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **82 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **83 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1423,8 +1423,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **82 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v225**, 58 modules.
+State at handover: **83 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v226**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1853,9 +1853,16 @@ cannot fail at all.
   verified for this project.** Do not claim they are configured; the honest
   statement is "documented default, unverified". Testing it by hammering the
   live auth endpoint is not acceptable.
-- **The logo and the app disagree.** `favicon.svg` (and the PNGs rendered from
-  it) are pine green `#0b4d2e`; the app is `#0c0c0d` with a `#dc2626` accent.
-  Oliver has not chosen a direction — do not unify it unprompted.
+- ~~**The logo and the app disagree.**~~ Settled 25 Sep: Oliver chose "1a, the
+  green" — a graphite pin and waving flag, cup and ball on an orange field.
+  `tools/build-icons.js` draws it from style.css's dark tokens (no typed colour)
+  in two cuts: DETAILED (`brand/logo.svg`, `icon-192/512.png`,
+  `icon-maskable-512.png` scaled into the launcher's safe zone,
+  `apple-touch-icon.png`) and SIMPLE for 16-48px (`favicon.svg`,
+  `favicon-48.png`, the raster Google's result favicon prefers). Every shape sits
+  inside the circle Google crops to. `icons.js` rebuilds the SVGs and fails on a
+  byte of drift, checks each PNG's IHDR size, the links, the manifest and the
+  precache. The in-app header mark is still the line-art `i-flag` icon.
 
 ### Things this session got wrong, so the next one does not repeat them
 
@@ -1901,7 +1908,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**82 test suites**, service worker **v225**. Deterministic auth, cloud sync
+**83 test suites**, service worker **v226**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
