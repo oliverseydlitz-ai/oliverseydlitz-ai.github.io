@@ -1,86 +1,87 @@
 # Next session — start here
 
-> **SCOPE OF THE NEXT SESSION (Oliver, 23 Sep): the guide pages ONLY (Phase 10.2).**
-> Do not start Phase 9 or anything else. Phase 9 is the session after.
-> Oliver calls them "redirect sites" — they are content pages ON the site, never
-> redirects or doorway pages (Google penalises those). See "Guide pages" below
-> and plan Phase 10.2 for the list of eight.
+Written 25 Sep 2026, at the end of the 24 Sep session (overnight run plus a day of
+interactive work). Replaces the 23 Sep version.
 
+## Read first, in this order
+1. `CLAUDE.md` — the authority on every rule. Where anything else disagrees, it wins.
+2. `docs/superpowers/plans/2026-09-24-next-plan.md` — **the working list.** Section A is
+   done; section B is the queue; section C is the list of Oliver's decisions; section D covers what changed.
+3. `docs/superpowers/plans/2026-09-22-killer-plan.md` — the findings table (every item
+   ID like R37, C45, V41 is defined there) and the **Done log** (one row per shipped item).
+4. `docs/superpowers/plans/OVERNIGHT.md` — only for its **hard limits**, which still apply.
 
-Read `CLAUDE.md` (the authority), then the killer plan's STATUS table, Decisions
-block, Suggested order and Done log (`docs/superpowers/plans/2026-09-22-killer-plan.md`).
+## State at handover
+- `main` at `f17bab8` (V38/V39). **82 suites green.** The render scan exits 0 both plain
+  and with `SM_NO_IO=1`. Service worker `shotlab-v222`. 58 modules.
+- Branch `claude/guide-pages-phase-10-2-1mfcfo` mirrors `main`. **Push to `main`**
+  (Oliver's rule). If the session is on a feature branch, push with `git push origin HEAD:main`,
+  not `git push origin main`. The latter pushes the stale local `main` and gets rejected.
 
-## State
-- `main` at the commit that added this file. 72 suites green, render scan exit 0
-  (both with and without `SM_NO_IO=1`), service worker `shotlab-v183`.
-- Branch `claude/project-tasks-dowlrx` mirrors `main`. Oliver's rule: push to `main`.
-- 26 Phase 7 items shipped overnight; each is one row in the plan's Done log with its commit.
-
-## Oliver has to do (only he can)
-1. ~~Keep-alive~~ **DONE** — Oliver ran it manually 23 Sep 04:21 UTC, run #1 green
-   (21 s). The schedule takes over from here; just confirm scheduled runs appear.
-2. Supabase dashboard: redirect allowlist check, leaked-password protection.
-3. ~~Search Console + Bing~~ DONE 23 Sep (Domain property, verified via DNS — no tag needed in the code).
-   (CLAUDE.md "Open, and NOT fixable from this repo").
+## Shipped 24 Sep (each has a Done-log row with its commit)
+A1–A8 (clean badge, plurals, zero-delta colour, unsourced superlatives, sample SD app-wide,
+premium label, left edges, chart ticks) · C30 (measured causes are opt-in, exactly 7) ·
+C45 part (round validation, date field, visible without imports) · C46 part (repeatability
+verdict, sign test on one-way misses) · R25 (storage flag read back) · R30 (Back/Forward,
+`#session/<id>`) · R31 part (stale renders dropped) · R33 part (icon-only nav < 380px, reflow
+at 320px) · R27 part (`theme.js`, no white flash) · R29 (observer leak) · V37 (confirm verbs)
+· V40 (plan cards open the range card) · V38/V39 (Settings dialogs on the `.modal` shell,
+one group, same numbers everywhere).
 
 ## What is next, in order
-0. **Rename: drop "TOUR" ("ShotLab TOUR" → "ShotLab").** Decided by Oliver 23 Sep; the scope
-   checklist is in the killer plan under "Decided, queued". Small, own commit, legal version bump.
-1. ~~**Phase 9 — measurement model v2**~~ **DONE 23 Sep** (see the plan's Phase 9
-   STATUS block for the decisions taken while building; CLAUDE.md "Measurement model v2").
-   Follow-up worth doing: plain-English the Broadie & Ko caveats now shown in Settings.
-2. **Home screen: one fault, one form, one priority** (queue item 4: V5/C11, V4,
-   C13, C14, C21) — a design decision; show Oliver options first.
-3. ~~Remaining 7C polish~~ **Done 23 Sep** except V14 (heading patterns) and R16 (manifest theme), both
-   Oliver's design calls. Still open: the rest of 7D/7E/7F not in the Done log.
-4. Rerun the QC agents (`qc-agent-briefs.md`) on the NOT YET COVERED lists.
-5. **Phase 10 — discoverability.** Domain decided: `shotlab.oliverseydlitz.com` Oliver added the Cloudflare CNAME `shotlab` → `oliverseydlitz-ai.github.io` (grey cloud) on 23 Sep — the repo side of 10.3 is DONE (CNAME file + every URL moved, SW v184); what is left is Oliver's side:, then walk him through Enforce HTTPS, the verified-domain TXT, Supabase URLs and Search Console. (The sandbox cannot resolve DNS, so confirm the record via GitHub Settings → Pages, which checks it.) (plan section "Phase 10"). 10.1 (Search Console
-   tag) and 10.2 (guide pages) can run alongside anything; 10.4 (posting) waits.
+1. **R37** — stale-while-revalidate for the app shell in `sw.js`, plus `reg.update()` on
+   `visibilitychange`. `service-worker.js` runs the real worker in a `vm`, so extend that suite.
+2. **C45 leftovers** — one significance threshold in `Rounds`; `rangeLink` vs its caveat;
+   the putts plateau.
+3. **C46 leftover** — the dispersion tail trend still uses a 1-SD rule; put it on the same test.
+4. **R31 leftover** — render local sessions first, then merge the cloud copy behind them.
+5. **V41, V46–V49** — Settings built two ways; print dedupe; heading wrap at 393px;
+   circles in a zero-radius system; Data & Rights polish (V49 touches the 48 h / 30 day
+   promises. Those are Oliver's call, see below. Do the styling only).
+6. **C39 / C40** — re-read under measurement v2 first. Only the *pooling across clubs*
+   half survives (Club Benchmarks, personal bests).
+7. **C33 follow-up** — the Progress trend should weight range sessions ×0.8 (`Metrics.conditionWeight`).
+8. **R33 / R27 leftovers** — ~197px (200% zoom) overflow in heatmap, benchmark table,
+   short-game fields, drill tabs; the ungated shell and dead "+" before `app.js` runs.
+9. **R36** — performance (`defer` vendor scripts, measure first).
 
-## Habits that paid off overnight (keep them)
-- Prove every guard fails on the old code before trusting it (restore the bug).
-- A check that cannot fail is not a check: async suites set `process.exitCode = 1`
-  up front; `test/run.js` fails a suite with no result line.
-- Plan edits by script: anchor on a line unique to the Done log — `| R3 |` also
-  matches the findings table, which is how 21 rows landed in the wrong table once.
-- CLAUDE.md headings: no backticked names in `###` headings (module-map.js).
-- Re-run `npm test` AFTER editing CLAUDE.md, before pushing.
+## Oliver's calls — propose, never ship
+- **Decided but not done: drop "TOUR" → "ShotLab".** Scope checklist is in the killer
+  plan under "Decided, queued". It touches `index.html` (9 hits), `manifest.json` and the
+  legal documents, so it needs a legal version bump. **Confirm with Oliver before
+  touching `TERMS.md` / `PRIVACY.md` / `Agreement.VERSION`.**
+- Data & Rights "within 48 hours" / "within 30 days" promises: keep, change or remove?
+- V14 heading style · R16 default theme / manifest colours · R35 "system" theme (after R16)
+  · the logo colour · collapsing the Practice view · home screen "one fault / one form /
+  one priority" · the affiliate link · the tuning numbers (0.30/0.35/0.40, ×0.8, +0.05).
+- Guide photos and the Rapsodo CSV-export screenshots (the guide suite lists the open slots).
+- Supabase dashboard: redirect allowlist check; leaked-password protection.
 
-## Guide pages (Phase 10.2) — 7 of 8 SHIPPED, 23 Sep
-- Live under `/guides/`: mlm2pro-accuracy, launch-monitor-spin-accuracy,
-  smash-factor-by-club, driver-attack-angle, range-balls-vs-premium-balls,
-  how-many-shots, gapping-chart-from-launch-monitor. Sources in `docs/guides/`,
-  generator `tools/build-guide-pages.js`, guard `test/suites/guide-pages.js`
-  (CLAUDE.md "Guide pages" section has the rules). SW v188, 73 suites.
-- **Still open:** guide 1 (Rapsodo CSV export) waits for Oliver's screenshots;
-  one `[[photo: ...]]` slot per guide waits for his photos (the suite lists them).
-  The generator has no image syntax yet — add it when the first photo arrives
-  (self-hosted under `/guides/img/`, `img-src 'self'` already allows it).
-- **Phase 9 check:** after Phase 9 lands, re-read the guides' app-behaviour lines
-  (floors, "ShotLab asks for the ball", range-ball wording) against the new rules.
+## The loop for every item (do not skip steps)
+1. Read the item's row in the killer plan; read the code it names.
+2. Fix it. Write or extend a suite that **fails on the old code**. Prove that by swapping the
+   old `app.js` back in (`git show HEAD:app.js > app.js`), running the suite, then restoring.
+3. `node --check app.js` → `npm test` (all green).
+4. `bash test/browser/sync.sh`. Serve `test/browser/site` on port 8766 (check with curl first; restart
+   with `nohup python3 -m http.server 8766` from that directory). Then
+   `node test/browser/render-scan.js` and `SM_NO_IO=1 node test/browser/render-scan.js`,
+   both must exit 0 (each takes ~2 min, so use a 300 s timeout).
+5. Anything visual: screenshot at 393px and 1440px (and dark) with Playwright
+   (`executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`). To get past
+   the gates: tick `#agreementCheckbox` + `#agreementRiskCheckbox`, click
+   `#agreementAcceptBtn`, `#cookieAcceptBtn`, then `#authGuestWrap button`.
+6. Bump `sw.js` (`shotlab-vNNN`) and every version and suite count in `CLAUDE.md`. If CSS
+   changed, run `node tools/build-design-md.js` (design-md.js fails otherwise).
+7. Done-log row in the killer plan + strike the item in the next-plan. Re-run `npm test`.
+8. Commit ending in the session's attribution trailer, then push to `main` and the branch mirror.
+9. Report to Oliver: what was wrong, what changed, what was verified, what is next.
 
-### Original brief (Oliver's go-ahead, 23 Sep)
-- **Build all 8 from the plan's 10.2 list, two per batch.** Push each pair, then
-  give Oliver a short "read these two" note before starting the next pair.
-- First batch also builds the generator (same pattern as `tools/build-legal-pages.js`)
-  under `/guides/<slug>/`, adds each page to `sitemap.xml`, and adds a guard suite.
-- **Guide 1 (Rapsodo CSV export) waits for Oliver's screenshots** — the Rapsodo app's
-  menus can't be verified from the sandbox. Do the research guides first.
-- Oliver will send range/app photos when he can; leave a clearly marked spot for them.
-- Quality over count: stop at the 8 unless a real new search question appears.
-- Scope: guides only this session; Phase 9 is the NEXT one.
-
-## Domain + indexing — DONE by Oliver, 23 Sep (~09:15 local)
-- GitHub Pages custom domain `shotlab.oliverseydlitz.com`, **Enforce HTTPS on**.
-- Supabase Site URL = `https://shotlab.oliverseydlitz.com`; redirect list = the new
-  domain with and without `/`, plus `https://oliverseydlitz-ai.github.io` kept
-  temporarily. **Remove the github.io entry** once Oliver confirms the old address
-  redirects with the padlock and Google sign-in works on the new one.
-- `oliverseydlitz.com` verified on Oliver's GitHub account (takeover protection;
-  covers future project subdomains). The root domain is his multi-project hub —
-  never redirect it to ShotLab.
-- Google Search Console: Domain property `oliverseydlitz.com`, sitemap
-  `https://shotlab.oliverseydlitz.com/sitemap.xml` submitted. Bing Webmaster Tools
-  imported from GSC (processing, up to 48 h).
-- Still open on Supabase: leaked-password protection (Auth → Providers → Email).
-
+## Traps that cost time on 24 Sep
+- `dom-ids.js` and `focus-trap.js` scan app.js source for ids. Anything built through a
+  helper (`runtimeModal('xModal', …)`) is recognised by pattern; keep that call shape.
+- Test fixtures with fractional round stats (4.6 penalties) are now refused by
+  `Rounds.validate`. Build rounds from whole numbers and assert they were logged.
+- A suite asserting one number off shots near the trim boundary moves when `stdDev` or
+  the trim changes. Use seeded or hand-written jitter, never `Math.random()`.
+- CLAUDE.md: no backticked names in `###` headings (`module-map.js`).
+- Source scans match their own comments. Strip comments, or anchor on the claim.
