@@ -43,6 +43,9 @@ one group, same numbers everywhere).
    found, not fixed: the focus/streak card, achievements strip, session cards and the
    dispersion stat grid also overflow at 197px, unrelated to the four named components.
    ~~**R27 leftover**~~ — done 25 Sep, see the killer plan's Done log (R27 part 2).
+9. ~~**R36**~~ — measured 25 Sep, not shipped. `defer` on the vendor scripts made no
+   measurable difference on the audit's own throttling profile (bandwidth-bound, not
+   latency-bound) — see CLAUDE.md's Performance Notes and the killer plan's Done log.
 9. **R36** — performance (`defer` vendor scripts, measure first).
 
 ## Oliver's calls — propose, never ship

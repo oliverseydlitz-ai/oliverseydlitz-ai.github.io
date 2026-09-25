@@ -1144,6 +1144,34 @@ Pushes to `main` automatically deploy via GitHub Pages. No build step needed.
 - **Charts** render on-demand in a view; don't render all charts at page load
 - **Service Worker** (sw.js) caches assets for offline; update cache version if changing files
 
+### R36 — `defer` measured, not shipped
+
+The finding named `defer` for the five blocking `<script>` tags (four vendor
+files plus `app.js`, itself unminified — no build step, by design) as a
+candidate fix for the long first load. Measured rather than assumed, on the
+same profile the original audit used (Chrome DevTools protocol: 1.6 Mbps /
+400ms RTT, 4× CPU throttle), five runs each, blocking vs. `defer`:
+
+- **Time to the nav becoming visible:** ~1.03–1.06s either way. The nav's
+  markup sits BEFORE the script tags in `index.html`, so the parser has
+  already painted it by the time it reaches them — blocking vs. deferred
+  changes nothing here.
+- **Time to the nav actually working** (`booting` removed, R27's marker):
+  blocking averaged ~8462ms, deferred ~8446ms — a 16ms difference on an
+  8.4-second load, well inside the ~70ms run-to-run noise. `defer` DID make
+  the browser fetch all five files in parallel (confirmed: all five requests
+  start within the same tick) — it just didn't matter, because the
+  throttled connection is bandwidth-bound, not latency-bound: ~1.2 MB of
+  payload over a shared, capped pipe takes the same total time whether it
+  crosses that pipe as five interleaved streams or five sequential ones.
+- **Conclusion: don't ship it.** `defer` is usually a free win and rarely a
+  regression, but here it measurably changes nothing while adding a
+  deviation from the plainest possible markup for no benefit. The instruction
+  was "defer if it helps" precisely to cover this case — it doesn't, so it
+  stays as it was. A real fix for the long load has to cut total payload
+  (minify, or load Chart.js/Supabase on demand instead of up front), which is
+  a materially bigger change than adding an attribute to five tags.
+
 ## Auth & Cloud Sync (current implementation)
 
 - **OAuth (Google):** implicit flow. The redirect token in the URL `#hash` is
