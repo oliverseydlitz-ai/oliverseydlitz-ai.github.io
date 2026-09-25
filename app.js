@@ -687,6 +687,15 @@ const Metrics = (() => {
   // shot-to-shot sigma; mdc() is for a change in a mean and cannot (C46).
   const perShotSD = metric => (MDC_N10[metric] ? MDC_N10[metric] * Math.sqrt(10) / 2.77 : null);
 
+  // THE significance rule, one copy. Hopkins' MDC95 is 1.96 x sqrt(2) x the
+  // typical error: 1.96 for 95%, sqrt(2) because a change is the difference of
+  // two noisy readings, each carrying the error once. `n` is how many readings
+  // each side averages — shots for a session mean, 1 for a number there is one
+  // of per session or per round (a spread, a round's putts). Anything that
+  // rules a move real or not calls this, so the app has one bar and not three.
+  const MDC_FACTOR = 2.77;
+  const mdcOf = (te, n = 1) => (Number.isFinite(te) ? MDC_FACTOR * te / Math.sqrt(Math.max(1, n)) : null);
+
   // DEVICE ERROR IS TREATED AS ZERO, deliberately.
   //
   // Not because it is zero — it is not — but because carrying it as a separate
@@ -844,7 +853,7 @@ const Metrics = (() => {
                note: 'Every session in this history has the same reading for this metric shot after shot, ' +
                      'so there is no spread to measure a change against.' };
     }
-    const threshold = 2.77 * te.value / Math.sqrt(Math.max(1, n));
+    const threshold = mdcOf(te.value, n);
     // A delta of nothing is never a change, whatever the threshold says.
     return { real: delta !== 0 && Math.abs(delta) >= threshold, threshold, source: 'personal' };
   }
@@ -884,7 +893,7 @@ const Metrics = (() => {
     };
   }
 
-  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, perShotSD, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
+  return { TIER, tier, TIER_RATES, tierRates, CONDITION_WEIGHT, CONDITION_RATE_BUMP, conditionWeight, rateBump, MDC_N10, mdc, perShotSD, MDC_FACTOR, mdcOf, DEVICE_ERROR, shotSpread, read, CEILING, peak, impossible,
            MIN_SHOTS_REPORT, MIN_SHOTS_DELIVERY, MIN_SHOTS_TAIL,
            trimOutliers, typicalError, changeIsReal, interval, weightedInterval };
 })();
@@ -2309,9 +2318,17 @@ const Dispersion = (() => {
 
   // ── Trend ─────────────────────────────────────────────────────
   // Directional spread per session, and whether the latest move is bigger than
-  // this golfer's own session-to-session wobble. Sessions measured under
-  // different conditions are dropped rather than compared: a range-ball session
-  // next to a premium-ball one shows a change in the ball, not the swing.
+  // this golfer's own session-to-session wobble. Every ball counts (v2).
+  //
+  // C46: the bar was ONE between-session SD. The latest-minus-previous
+  // difference of two sessions that differ by nothing but noise has an SD of
+  // sqrt(2) x that wobble, so a 1-SD bar is crossed about half the time with
+  // no change at all — it called a spread the golfer had already hit before
+  // "a real move". It is now the app's one rule, Metrics.mdcOf: 2.77 x the
+  // wobble, the MDC95 of a single reading (n = 1: a session has one sigma).
+  // The wobble is the golfer's own SD of sigma across the earlier sessions —
+  // Hopkins' typical error, the research base's "compute each user's own
+  // typical error" (s1.4 rule 3) — so it already contains the device's share.
   function trend(sessions, clubType) {
     const points = (sessions || [])
       .map(sn => {
@@ -2331,17 +2348,22 @@ const Dispersion = (() => {
     // sessions it is not established well enough to rule on, and saying so is
     // the honest output — a population figure would describe other people.
     const noise = points.length >= 5 ? stdDev(sigmas.slice(0, -1)) : null;
+    const threshold = noise === null ? null : Metrics.mdcOf(noise);
+    // A wobble of exactly zero is four identical spreads to many decimals:
+    // generated data, not a golfer. There is nothing to judge against.
+    const real = threshold === null || !(threshold > 0) ? null : Math.abs(delta) >= threshold;
     return {
-      ok: true, points, delta, noise,
-      real: noise === null ? null : Math.abs(delta) > noise,
+      ok: true, points, delta, noise, threshold, real,
       note: noise === null
         ? `${points.length} qualifying session${points.length === 1 ? '' : 's'}. It takes five before your own ` +
           'session-to-session variation is known well enough to say whether a move in the tail is real.'
-        : Math.abs(delta) > noise
-          ? `${delta < 0 ? 'Tighter' : 'Wider'} by ${fmt(Math.abs(delta), 1)}°, which is more than your own ` +
-            `session-to-session variation of ${fmt(noise, 1)}°. That is a real move.`
-          : `${fmt(Math.abs(delta), 1)}° of movement, inside your own session-to-session variation of ` +
-            `${fmt(noise, 1)}°. No detectable change — which is not the same as no change.`,
+        : real === null
+          ? 'Your earlier sessions all have the same spread to the decimal, so there is no variation to measure a move against.'
+        : real
+          ? `${delta < 0 ? 'Tighter' : 'Wider'} by ${fmt(Math.abs(delta), 1)}°. A move needs ${fmt(threshold, 1)}° ` +
+            `to stand out from your own session-to-session variation, so that is a real one.`
+          : `${fmt(Math.abs(delta), 1)}° of movement. A move needs ${fmt(threshold, 1)}° to stand out from your own ` +
+            'session-to-session variation. No detectable change — which is not the same as no change.',
     };
   }
 

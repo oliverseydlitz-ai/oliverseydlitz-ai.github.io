@@ -169,6 +169,24 @@ const flat = [...wobble, 4.05].map((sd, i) => sess(i, sd));
 ok(D.trend(flat).real === false, 'a move inside it does not');
 ok(/not the same as no change/.test(D.trend(flat).note), 'and refuses to call that no change');
 ok(D.trend([sess(1, 4.0)]).ok === false, 'one session is not a trend');
+{
+  // C46: the bar was one between-session SD. A difference of two readings
+  // carries the noise twice, so that bar is crossed about half the time when
+  // nothing changed. Here the latest spread, 5.6, is one this golfer already
+  // hit in the third session — nothing new happened — yet it sits 0.8 below
+  // the session before, past the 0.52 wobble. The old rule called it
+  // "Tighter ... a real move"; the MDC95 (2.77 x 0.52 = 1.43) does not.
+  const seen = [6.0, 6.8, 5.6, 6.4, 5.6].map((sd, i) => sess(i, sd));
+  const t = D.trend(seen);
+  ok(t.real === false, `a spread the golfer has already hit is not a real move (delta ${t.delta.toFixed(2)}, bar ${t.threshold && t.threshold.toFixed(2)})`);
+  ok(Math.abs(t.threshold - Metrics.mdcOf(t.noise)) < 1e-12 && Metrics.MDC_FACTOR === 2.77,
+     'the bar is the app\'s one rule: 2.77 x the golfer\'s own wobble (Hopkins MDC95, n = 1)');
+  ok(Math.abs(t.threshold - 2.77 * t.noise) < 1e-12 && t.noise > 0, 'computed off the earlier sessions, not a population figure');
+  const drop = D.trend([6.0, 6.8, 5.6, 6.4, 3.8].map((sd, i) => sess(i, sd)));
+  ok(drop.real === true && /Tighter/.test(drop.note), 'a spread well below anything in the history still reads as real');
+  const same = D.trend([4, 4, 4, 4, 3.9].map((sd, i) => sess(i, sd)));
+  ok(same.real === null, 'identical earlier spreads give no variation to judge against, and it says so rather than calling any move real');
+}
 const ranged = [1,2].map(i => ({ ...sess(i, 4.0), conditions: { ball: 'range', surface: 'grass' } }));
 ok(D.trend(ranged).ok === true, 'v2: range-ball sessions enter the trend like any other');
 

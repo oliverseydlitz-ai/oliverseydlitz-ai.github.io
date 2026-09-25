@@ -334,6 +334,11 @@ curvature amplifies start-line error non-linearly.
   shots, per club.
 - **Sigma survives a misaligned unit** (a constant offset cancels out of a
   spread); **absolute bias does not** and is withheld until alignment is confirmed.
+- **The tail trend uses the app's one significance rule, `Metrics.mdcOf`** —
+  Hopkins' MDC95, 2.77 × the golfer's own between-session SD of σ (n = 1: a
+  session has one σ). It was 1 SD, which the difference of two noisy sessions
+  crosses about half the time with nothing changed (C46). Anything new that
+  rules a move real calls `mdcOf`; do not type another bar.
 - **Valuation is driver-only** — the published curves are driver curves — and
   refuses outside 5.5°–7.9° ±1.5°, clamping with a note inside that margin.
   Every valuation carries `Dispersion.CAVEATS`; do not render one without them.
@@ -1404,7 +1409,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **82 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v222**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v223**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1881,7 +1886,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 23 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**82 test suites**, service worker **v222**. Deterministic auth, cloud sync
+**82 test suites**, service worker **v223**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero
