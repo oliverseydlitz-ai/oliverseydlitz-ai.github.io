@@ -1042,7 +1042,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **86 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **87 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1380,6 +1380,25 @@ loudly — it fails as a parse error somewhere unrelated. Only a request whose
 `mode === 'navigate'` falls back to the app shell now; everything else gets
 `Response.error()`.
 
+### The shell is inert until it can actually answer a tap (R27)
+
+The nav is static markup — it paints as soon as the HTML and CSS have loaded,
+which on a slow connection can be a couple of seconds before `app.js` (behind
+~300 KB of vendor scripts, all blocking, none deferred) has even finished
+downloading, let alone run. A nav that looks tappable and does nothing when
+tapped reads as broken, not "still loading".
+
+`<html class="booting">` ships in the markup itself — no script has to run to
+disable anything — and the stylesheet gives `.bottom-nav`/`.top-nav`
+`pointer-events: none` plus a dim `opacity: .5` while it is present.
+`app.js` removes the class the instant its own click delegation exists to
+actually answer a tap, **not** at the end of `init()`: `Auth.init()` and
+`LocalDB.hydrate()` are awaited later in that function, both with their own
+network dependency, and gating the nav on those would leave it dead for
+longer than it needs to be. `boot-nav.js` pins the ordering directly — it
+wraps `Auth.init()` and asserts `booting` is already gone by the time that
+call fires, not the other way round.
+
 ### No PII in the console
 
 The auth path logged the signed-in **email address** on every `getUser()` and
@@ -1470,8 +1489,8 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **86 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v231**, 58 modules.
+State at handover: **87 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v232**, 58 modules.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -1979,7 +1998,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 25 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**86 test suites**, service worker **v231**. Deterministic auth, cloud sync
+**87 test suites**, service worker **v232**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

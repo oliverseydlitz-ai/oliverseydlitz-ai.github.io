@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- `booting`: the nav paints from this markup long before app.js has even
+     finished downloading on a slow connection, and it stays inert (R27)
+     until app.js removes this class the instant its click delegation can
+     actually answer a tap — see the removal site in app.js for why there,
+     not at the end of init(). -->
+<html lang="en" class="booting">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">

@@ -11548,6 +11548,17 @@ async function init() {
     }
   });
 
+  // R27: `<html>` carries `booting` from the static markup, which the
+  // stylesheet uses to dim the nav and refuse it pointer events. On a slow
+  // connection the vendor scripts and this file can take seconds to arrive,
+  // and everything above them has already painted — a nav that LOOKS ready
+  // and does nothing when tapped reads as broken, not "still loading". The
+  // class comes off HERE, the instant the click delegation above exists to
+  // actually answer a tap, not at the end of `init()` (which still has
+  // network-dependent awaits — Auth, LocalDB — below this line, and a nav
+  // gated on those would stay dead for longer than it needs to).
+  document.documentElement.classList.remove('booting');
+
   // ── Delegated action handler (CSP-safe replacement for inline onclick) ──
   // Every dynamically-rendered button/card uses a data-* attribute instead of
   // an inline onclick handler. This lets us keep a strict CSP (no

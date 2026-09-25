@@ -501,6 +501,13 @@ button:disabled, button[disabled] {
   .section-title:has(.section-sub) { flex-direction: column; align-items: flex-start; gap: .15rem; }
 }
 
+/* R27: the nav is static markup, painted long before app.js has finished
+   downloading and wiring up its click delegation on a slow connection —
+   dimmed and inert until then, rather than looking tappable and doing
+   nothing. `html.booting` comes off in app.js the instant that delegation
+   exists to answer a tap; see the removal site there for why not later. */
+html.booting .bottom-nav, html.booting .top-nav { pointer-events: none; opacity: .5; }
+
 /* ── Bottom nav ────────────────────────────────────────── */
 .bottom-nav {
   position: fixed; bottom: 0; left: 0; right: 0;

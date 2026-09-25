@@ -42,7 +42,7 @@ one group, same numbers everywhere).
 8. ~~**R33 leftover**~~ — done 25 Sep, see the killer plan's Done log (R33 part 2). Newly
    found, not fixed: the focus/streak card, achievements strip, session cards and the
    dispersion stat grid also overflow at 197px, unrelated to the four named components.
-   **R27 leftover still open:** the ungated shell and dead "+" before `app.js` runs.
+   ~~**R27 leftover**~~ — done 25 Sep, see the killer plan's Done log (R27 part 2).
 9. **R36** — performance (`defer` vendor scripts, measure first).
 
 ## Oliver's calls — propose, never ship
