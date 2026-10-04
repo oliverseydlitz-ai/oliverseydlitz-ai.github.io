@@ -149,6 +149,41 @@ process.exitCode = 1;
     }
   }
 
+  console.log('— registration leaves the boot critical path (payload plan, Task 1) —');
+  {
+    const { load } = require('../load.js');
+    let registerCalls = 0;
+    const loadListeners = [];
+    const mockReg = { update: async () => {} };
+    const R = load({ before: bw => {
+      bw.navigator.serviceWorker = { register: async () => { registerCalls++; return mockReg; } };
+      // Intercept window 'load' registrations rather than letting jsdom's own
+      // automatic `load` dispatch fire them — jsdom fires `load` itself
+      // almost immediately regardless of what app.js does, so racing against
+      // it proves nothing. Capturing the callback and firing it ourselves,
+      // on our own schedule, is what actually distinguishes "wired through a
+      // load listener" from "called directly during boot".
+      const origAdd = bw.addEventListener.bind(bw);
+      bw.addEventListener = (type, fn, opts) => {
+        if (type === 'load') { loadListeners.push(fn); return; }
+        return origAdd(type, fn, opts);
+      };
+    } });
+    if (!R.ok) { ok(false, 'app.js did not load: ' + R.errors.join('; ')); }
+    else {
+      // Let the DOMContentLoaded-driven init() fully settle (several awaits).
+      await flush(); await flush(); await flush();
+      ok(registerCalls === 0, 'registerServiceWorker is not reached synchronously from boot/init()');
+      ok(loadListeners.length >= 1, 'it is wired through a window `load` listener instead');
+      loadListeners.forEach(fn => fn());
+      // jsdom has no requestIdleCallback, so the fallback is a real
+      // setTimeout(fn, 0) — a macrotask flush() (setImmediate) alone does not
+      // reliably run before it; a short real timer does.
+      await new Promise(r => setTimeout(r, 20));
+      ok(registerCalls === 1, 'and firing `load` (then an idle/setTimeout tick) is what actually triggers it');
+    }
+  }
+
   console.log('— offline —');
   w = worker({ net: offline, cached: { '/index.html': res('<shell>'), '/404.html': res('<not found>'), '/app.js': res('js') } });
   ok((await (await w.get('/app.js')).text()) === 'js', 'a cached asset is served');
@@ -157,6 +192,20 @@ process.exitCode = 1;
   ok((await (await w.get('/', { mode: 'navigate' })).text()) === '<shell>', 'the app path gets the app');
   const bad = await w.get('/some/bad/path', { mode: 'navigate' });
   ok(bad.status === 404 && (await bad.text()) === '<not found>', 'an unknown path gets 404.html with a 404 (R26)');
+
+  console.log('— precache drops the font the app never uses (payload plan, Task 3) —');
+  {
+    const assetsMatch = src.match(/const ASSETS = \[([\s\S]*?)\];/);
+    const assets = assetsMatch ? assetsMatch[1] : '';
+    ok(assets.includes('archivo-latin.woff2'), 'ASSETS still precaches the render-blocking latin font');
+    ok(!assets.includes('archivo-latin-ext.woff2'), 'ASSETS no longer precaches the never-requested extended-latin font');
+    const css = fs.readFileSync(path.join(__dirname, '..', '..', 'style.css'), 'utf8');
+    const fontFaceBlocks = css.match(/@font-face\s*\{[^}]*\}/g) || [];
+    ok(fontFaceBlocks.length === 4, `all 4 @font-face blocks are still in style.css (found ${fontFaceBlocks.length})`);
+    ok(fontFaceBlocks.some(b => b.includes('archivo-latin.woff2')) &&
+       fontFaceBlocks.some(b => b.includes('archivo-latin-ext.woff2')),
+       'both the latin and the extended-latin @font-face blocks still reference their files — only the SW precache changed, fetch-on-demand still works');
+  }
 
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   process.exitCode = fail ? 1 : 0;

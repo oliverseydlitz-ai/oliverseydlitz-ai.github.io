@@ -889,7 +889,11 @@
      Consequence worth knowing: these no longer receive upstream security
      fixes automatically. Check them when updating. -->
 <script src="vendor/papaparse.min.js"></script>
-<script src="vendor/chart.umd.js"></script>
+<!-- vendor/chart.umd.js is deliberately NOT here (payload plan, Task 2,
+     4 Oct 2026): it is 70 KB gzip paid on every load for a library untouched
+     until a chart renders. ScrollMotion.ensureChart() in app.js injects it on
+     demand, the first time ScrollMotion.chart() is called with no Chart.js
+     loaded yet, and app.js also warms it on idle after boot. -->
 <script src="vendor/idb-keyval.js"></script>
 <script src="vendor/supabase.js"></script>
 <script src="app.js"></script>

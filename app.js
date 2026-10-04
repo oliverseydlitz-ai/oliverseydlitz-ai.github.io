@@ -7771,22 +7771,49 @@ const ScrollMotion = (() => {
   // observer never fires is simply a finished chart, which is today's
   // behaviour exactly — the data is on screen either way.
   const CHART_MS = 700;
+
+  // Payload plan, Task 2 (4 Oct 2026): Chart.js (70 KB gzip, 208 KB raw) used
+  // to load via a blocking <script> tag, paid on every single visit — for a
+  // library that is not touched until a chart actually renders. It is now
+  // fetched on demand, the first time something needs it, by injecting the
+  // same vendor file as a <script> element. `ensureChart()` caches the
+  // in-flight promise so a flurry of charts on one render triggers exactly
+  // one fetch. Resolves on the script's `load`, rejects on `error`.
+  //
+  // Safe with no real browser: in jsdom (`test/run.js`) a dynamically
+  // injected <script> never fires `load` or `error` at all — this promise
+  // simply never settles, which is fine, because nothing here blocks on it,
+  // and the `.catch(() => {})` below means it can never surface as an
+  // unhandled rejection either, on the off chance it one day does settle.
+  let _chartLoad = null;
+  function ensureChart() {
+    if (typeof Chart === 'function') return Promise.resolve(Chart);
+    if (!_chartLoad) {
+      _chartLoad = new Promise((resolve, reject) => {
+        try {
+          const s = document.createElement('script');
+          s.src = 'vendor/chart.umd.js';
+          s.addEventListener('load', () => {
+            if (typeof Chart === 'function') resolve(Chart);
+            else reject(new Error('chart.umd.js loaded but did not define Chart'));
+          });
+          s.addEventListener('error', () => reject(new Error('failed to load vendor/chart.umd.js')));
+          document.head.appendChild(s);
+        } catch (e) { reject(e); }
+      });
+      _chartLoad.catch(() => {});
+    }
+    return _chartLoad;
+  }
+
   function chart(canvas, cfg) {
-    if (!canvas || typeof Chart !== 'function') return null;
+    if (!canvas) return null;
     cfg.options = cfg.options || {};
-    const live = SUPPORTED && !reduced();
-    const wanted = cfg.options.animation === undefined ? { duration: CHART_MS } : cfg.options.animation;
-    // Built finished in every path that has an opinion: held for the observer
-    // when motion is live, switched off outright when the golfer asked for
-    // less. Without IntersectionObserver and without that preference the
-    // config is left alone, which is the behaviour before this existed.
-    if (live || reduced()) cfg.options.animation = false;
-    // The ONE construction site in the file. A `new Chart(` anywhere else is a
-    // chart that animates below the fold, unseen — the bug this fixes — and it
-    // would look perfectly fine while never drawing on. The suite counts them.
     // A canvas is a picture to a screen reader, and an unnamed one is nothing
     // at all (R8). Named from the chart's own title or dataset labels, set
-    // here because this is the one place every chart passes through.
+    // here because this is the one place every chart passes through — and set
+    // regardless of whether Chart.js has arrived yet, since the canvas exists
+    // either way.
     try {
       if (!canvas.getAttribute('role')) canvas.setAttribute('role', 'img');
       if (!canvas.getAttribute('aria-label')) {
@@ -7796,21 +7823,60 @@ const ScrollMotion = (() => {
           (sets.length ? `Chart: ${sets.join(', ')}` : 'Chart'));
       }
     } catch (_) {}
-    const inst = new Chart(canvas, cfg);
-    if (!live) return inst;
-    const stop = observe(canvas, () => {
-      // reset() returns it to the pre-animation state; update() then animates
-      // to the finished one. Without the reset there is nothing to animate —
-      // the chart is already where update() would take it.
-      try { inst.options.animation = wanted; inst.reset(); inst.update(); } catch (_) {}
-    });
-    // Destroying the chart ends its watch too: most charts are destroyed by
-    // the render that replaces them, before prune() would see the canvas go.
-    if (stop) {
-      const destroy = inst.destroy.bind(inst);
-      inst.destroy = (...a) => { stop(); return destroy(...a); };
+
+    // The actual construction. Nested here (rather than a module-level sibling)
+    // so the "Chart already there" path and the "it just arrived" path below
+    // both build through the exact same code, and it stays part of this one
+    // chart() path — the whole point of keeping it textually inside here.
+    function buildReal() {
+      const live = SUPPORTED && !reduced();
+      const wanted = cfg.options.animation === undefined ? { duration: CHART_MS } : cfg.options.animation;
+      // Built finished in every path that has an opinion: held for the observer
+      // when motion is live, switched off outright when the golfer asked for
+      // less. Without IntersectionObserver and without that preference the
+      // config is left alone, which is the behaviour before this existed.
+      if (live || reduced()) cfg.options.animation = false;
+      // The ONE construction site in the file. A `new Chart(` anywhere else is a
+      // chart that animates below the fold, unseen — the bug this fixes — and it
+      // would look perfectly fine while never drawing on. The suite counts them.
+      const inst = new Chart(canvas, cfg);
+      if (!live) return inst;
+      const stop = observe(canvas, () => {
+        // reset() returns it to the pre-animation state; update() then animates
+        // to the finished one. Without the reset there is nothing to animate —
+        // the chart is already where update() would take it.
+        try { inst.options.animation = wanted; inst.reset(); inst.update(); } catch (_) {}
+      });
+      // Destroying the chart ends its watch too: most charts are destroyed by
+      // the render that replaces them, before prune() would see the canvas go.
+      if (stop) {
+        const destroy = inst.destroy.bind(inst);
+        inst.destroy = (...a) => { stop(); return destroy(...a); };
+      }
+      return inst;
     }
-    return inst;
+
+    if (typeof Chart === 'function') return buildReal();
+
+    // Chart.js is not here yet: hand back a small pending handle — same
+    // shape the caller already treats `_charts[id]` as (`.destroy()`, and
+    // `.options` for retintCharts) — and kick the loader. `cancelled` covers
+    // the render-replaced-this-chart-before-the-library-arrived case: a
+    // destroy() on the handle before the library resolves just stops it from
+    // ever building the real instance.
+    let cancelled = false, real = null;
+    const handle = {
+      destroy() { cancelled = true; if (real) { try { real.destroy(); } catch (_) {} } },
+      get options() { return real ? real.options : undefined; },
+      get data() { return real ? real.data : undefined; },
+    };
+    ensureChart().then(() => {
+      if (cancelled) return;
+      real = buildReal();
+    }).catch(() => { /* offline, blocked, or never settles in a test — the
+      chart simply stays absent, same end state as today's old `return null`
+      guard when Chart had failed to load at all. */ });
+    return handle;
   }
 
   // Effect 2 — the view header condenses. A zero-height sentinel above the
@@ -7861,7 +7927,7 @@ const ScrollMotion = (() => {
 
   function init() { header(); scan(); watch(); }
 
-  return { init, scan, observe, chart, reduced, SUPPORTED, watching: () => pending.size };
+  return { init, scan, observe, chart, ensureChart, reduced, SUPPORTED, watching: () => pending.size };
 })();
 
 const UI = (() => {
@@ -12502,7 +12568,9 @@ async function init() {
   // renders above would otherwise overwrite the deep link before it was read.
   Router.startHistory();
 
-  registerServiceWorker();
+  // Service-worker registration is scheduled below, past `load` — see the
+  // comment on scheduleServiceWorkerRegistration() for why it no longer
+  // happens here.
 
   // Initialize accessibility enhancements
   try { AccessibilityEnhancements.init(); } catch(e){ console.error('accessibility',e); }
@@ -12529,6 +12597,42 @@ function registerServiceWorker() {
     });
   }).catch(() => {});
 }
+
+// Payload plan, Task 1 (4 Oct 2026): this call used to run synchronously
+// inside init(), so the SW's `install` handler started pulling its ~1.7 MB
+// precache down the same pipe the app was still fetching and parsing its own
+// first-load payload on — on a capped connection that is contention, not
+// parallelism. `registerServiceWorker` itself (including the R37
+// visibilitychange -> reg.update() behaviour) is untouched; only the call is
+// moved: past the window `load` event, then one idle tick
+// (`requestIdleCallback` — Safari has none, hence the `setTimeout` fallback).
+// Cost, stated plainly: on the very first visit ever, offline capability
+// arrives a few seconds later than it used to. On every later visit nothing
+// changes — the SW is already installed and serves the shell from cache.
+function scheduleServiceWorkerRegistration() {
+  const runWhenIdle = () => {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(registerServiceWorker);
+    else setTimeout(registerServiceWorker, 0);
+  };
+  window.addEventListener('load', runWhenIdle);
+}
+scheduleServiceWorkerRegistration();
+
+// Payload plan, Task 2 (4 Oct 2026): warm Chart.js in on idle after boot, the
+// same way — so by the time a golfer actually opens Progress or a session
+// detail the library is almost always already there. On-demand (inside
+// ScrollMotion.chart()) remains the correctness path; this is only latency.
+// `.catch(() => {})` here too: a warm-up nobody awaits must never surface as
+// an unhandled rejection if the fetch fails or never settles.
+function scheduleChartWarmup() {
+  const runWhenIdle = () => {
+    const warm = () => { try { ScrollMotion.ensureChart().catch(() => {}); } catch (_) {} };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(warm);
+    else setTimeout(warm, 0);
+  };
+  window.addEventListener('load', runWhenIdle);
+}
+scheduleChartWarmup();
 
 // ────────────────────────────────────────────────────────────────
 // Bulletproofing — global safety net

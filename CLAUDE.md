@@ -1042,7 +1042,7 @@ npm install     # once; jsdom only, dev-only. The SITE still has no build step.
 npm test
 ```
 
-`npm test` runs **87 suites**, all green. (`contrast.js` was shipped red by
+`npm test` runs **88 suites**, all green. (`contrast.js` was shipped red by
 design and is now green — see "Where things stand".) `test/browser/` holds checks that are **not** in
 it — they need Playwright (`npm i --no-save playwright-core`) and a served
 mirror.
@@ -1171,6 +1171,59 @@ same profile the original audit used (Chrome DevTools protocol: 1.6 Mbps /
   stays as it was. A real fix for the long load has to cut total payload
   (minify, or load Chart.js/Supabase on demand instead of up front), which is
   a materially bigger change than adding an attribute to five tags.
+
+### Payload plan (4 Oct 2026) — contention cut, minification measured and declined
+
+Three real cuts shipped, none of them touching a threshold, gate, caveat or
+claim:
+
+1. **Service-worker registration left the boot critical path.** It ran
+   synchronously inside `init()`, so the SW's `install` handler started
+   pulling its ~1.7 MB precache down the same pipe the app was still fetching
+   and parsing its own first-load payload on. The call (not `registerServiceWorker`
+   itself, which is unchanged, R37 behaviour included) is now deferred past
+   the window `load` event, then one `requestIdleCallback` tick
+   (`setTimeout` fallback for Safari). Cost: on the very first visit ever,
+   offline capability arrives a few seconds later. Every later visit is
+   unaffected — the SW is already installed.
+2. **Chart.js (70 KB gzip / 208 KB raw) came off the critical path.** The
+   blocking `<script src="vendor/chart.umd.js">` tag is gone.
+   `ScrollMotion.ensureChart()` injects it on demand, the first time
+   `ScrollMotion.chart()` is called with no `Chart` global yet, returning a
+   small pending handle (`destroy()`, `.options`) that builds the real
+   instance once the library resolves; the app also warms it on idle after
+   boot so it is almost always already there by the time a chart is opened.
+   Exactly one `new Chart(` construction site survives, still the literal
+   line `const inst = new Chart(canvas, cfg);` scroll-motion.js pins.
+   Verified with real Chrome at 393px: both session-detail charts (dispersion,
+   gapping) and all seven Progress charts render actual pixels, not blank
+   canvases.
+3. **The service worker stopped precaching a font nothing requests.**
+   `archivo-latin-ext.woff2` (86 KB) covers extended-latin codepoints that
+   never appear in the app's own text — a grep of every codepoint in its
+   `unicode-range` across `app.js` and `index.html` returns nothing — so a
+   browser never asks for it. It is no longer in `sw.js`'s `ASSETS`. Both
+   `@font-face` blocks in `style.css` are untouched; a golfer's own note can
+   still contain an extended-latin glyph, and that still fetches on demand.
+
+**Minification was measured, not shipped** (`npm i --no-save terser`, the
+artefact thrown away immediately after measuring):
+
+| | raw | gzip | brotli |
+|---|---|---|---|
+| `app.js`, as shipped | 792,945 | 247,170 | 195,647 |
+| `app.js`, terser `--compress --mangle` | 378,518 (−52%) | 121,992 (−51%) | 98,786 (−49%) |
+
+Roughly half the bytes, in both the raw file and every compressed form —
+genuinely the single biggest lever available. **Still not shipped**, and that
+stays Oliver's call to reverse: the comments in `app.js` are load-bearing
+documentation (this file points at line numbers and quoted comments inside
+it), and several test suites scan its source text directly
+(`rules-are-wired.js`, the colour and emoji scans, `module-map.js`...). Serving
+a minified copy while every suite scans the unminified one is a second copy
+of the truth — the same defect class as the target bands once having twelve
+disagreeing copies — and it would desync silently, with no suite able to
+catch it, the day someone edited one without the other.
 
 ## Auth & Cloud Sync (current implementation)
 
@@ -1517,8 +1570,16 @@ to re-enable the on-screen banner.
 **Handoff note for the next session:** `docs/superpowers/plans/NEXT-SESSION.md`
 (what Oliver has to do, what is next, and the habits worth keeping).
 
-State at handover: **87 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v232**, 58 modules.
+State at handover: **88 suites, all green**, render scan exit 0 both with and
+without `SM_NO_IO=1`, service worker at **v233**, 58 modules.
+
+**4 Oct 2026 — payload plan shipped.** Service-worker registration moved off
+the boot critical path (Task 1), Chart.js is now lazy-loaded instead of a
+blocking `<script>` tag (Task 2), and the service worker stopped precaching a
+font nothing requests (Task 3) — see "Payload plan" under Performance Notes
+for the measured numbers and `test/suites/chart-lazy.js` plus the extended
+`test/suites/service-worker.js` for the new coverage. Minification was
+measured and deliberately not shipped (Task 4) — same section.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -2025,8 +2086,8 @@ significant UI work. It drives a real browser (Playwright MCP, or adapt to the
 complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
-**Last updated:** 25 September 2026 — ShotLab v3, "Range" skin. 58 modules,
-**87 test suites**, service worker **v232**. Deterministic auth, cloud sync
+**Last updated:** 4 October 2026 — ShotLab v3, "Range" skin. 58 modules,
+**88 test suites**, service worker **v233**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

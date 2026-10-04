@@ -1,16 +1,26 @@
-const CACHE = 'shotlab-v232';
+const CACHE = 'shotlab-v233';
 // Precached so a first visit that goes offline before any icon has been
 // fetched still paints the installed-app icon and the favicon rather than a
 // broken image. og-image.png is deliberately absent — it is only ever read by
 // a crawler or a share sheet, never by the app itself.
-// The two font files are precached because they are now self-hosted and
-// render-blocking: without them an offline first paint falls back to
-// system-ui, which is the one thing self-hosting was meant to stop. The
-// legal documents are precached because they are fetched at runtime and an
-// offline user is still entitled to read the terms they agreed to.
+// archivo-latin.woff2 is precached because it is self-hosted and
+// render-blocking: without it an offline first paint falls back to
+// system-ui, which is the one thing self-hosting was meant to stop.
+// archivo-latin-ext.woff2 is NOT precached (payload plan, Task 3, 4 Oct
+// 2026): its unicode-range covers extended-latin codepoints that never
+// appear in the app's own text — a grep of every codepoint in that range
+// across app.js and index.html returns nothing — so a browser never
+// requests it on its own. Precaching it anyway cost 86 KB on every first
+// install for a file nothing asks for. A golfer's own note CAN still contain
+// an extended-latin glyph; that fetches on demand (or falls back, which
+// font-display: swap already handles) exactly as it would if this file were
+// simply slow rather than absent from the cache. The @font-face blocks in
+// style.css for BOTH files stay untouched — only the precache changes.
+// The legal documents are precached because they are fetched at runtime and
+// an offline user is still entitled to read the terms they agreed to.
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/theme.js', '/favicon.svg',
                 '/404.html', '/manifest.json',
-                '/fonts/archivo-latin.woff2', '/fonts/archivo-latin-ext.woff2',
+                '/fonts/archivo-latin.woff2',
                 '/vendor/papaparse.min.js', '/vendor/chart.umd.js',
                 '/vendor/idb-keyval.js', '/vendor/supabase.js',
                 '/PRIVACY.md', '/TERMS.md',
