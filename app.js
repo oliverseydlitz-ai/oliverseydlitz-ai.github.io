@@ -8188,7 +8188,10 @@ const UI = (() => {
             <div style="margin-top:1.5rem;padding:1.2rem;background:var(--surface);border-radius:var(--radius-md);border:1px solid var(--line)">
               <div style="font-weight:700;margin-bottom:.5rem;font-size:1.05rem">${coach.greeting}</div>
               <div style="font-size:.9rem;color:var(--text-dim);margin-bottom:.8rem">${coach.assessment}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem">
+              <!-- Classed, not an inline grid, for the same reason as
+                   .session-stat-row: a media query cannot reach a style
+                   attribute, so this pair kept overflowing at 200% zoom. -->
+              <div class="coach-split">
                 <div style="background:var(--surface2);padding:.8rem;border-radius:var(--radius-sm)">
                   <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.3rem">Overall Grade</div>
                   <div style="font-size:1.8rem;font-weight:800;color:var(--green)">${grade.grade}</div>
@@ -8495,7 +8498,11 @@ const UI = (() => {
             <div>
               <button type="button" class="session-card-date session-open" data-key-proxy>${Sanitize.escape(sessionLabel(s, sessions))}</button>
               <div class="session-card-meta">${s.shots.length} shots · ${clubBreakdown(s.shots)}</div>
-              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.6rem">
+              <!-- The three tiles were laid out by an inline grid style here,
+                   which no media query can reach — which is why they went on
+                   overflowing at 200% zoom after R33's CSS pass fixed
+                   everything around them. The rule lives in style.css now. -->
+              <div class="session-stat-row">
                 ${(() => {
                   // C44: no club mean below the floor — 10 shots for speed and
                   // carry, 15 for launch (a tier-2 angle). Below it the tile
@@ -12492,7 +12499,7 @@ async function init() {
     list.innerHTML = Object.entries(goals).map(([metric, goal]) => {
       const progress = Goals.getProgress(metric, sessions);
       const pct = Math.round((progress / goal.target) * 100);
-      return `<div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:.5rem">
+      return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.6rem;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:.5rem">
         <div>
           <div style="font-weight:600;color:var(--text);font-size:.9rem">${metricLabels[metric]}</div>
           <div style="font-size:.75rem;color:var(--text-muted)"><strong>${progress}${goal.unit}</strong> of <strong>${goal.target}${goal.unit}</strong></div>

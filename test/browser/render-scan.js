@@ -321,13 +321,17 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
   //                    which must stay on one line) had no flex-wrap, so the
   //                    badge could not drop to its own line when the row
   //                    ran out of room.
-  // Checked per-component against the VIEWPORT, not the whole page's
-  // scrollWidth — other, unrelated things on these views also overflow at
-  // this width (the focus/streak card, the achievements strip, session
-  // cards, the dispersion stat grid) and are not what this ratchet is for;
-  // widening it to a whole-page check would fail on those unrelated bugs and
-  // hide a regression here inside the noise. A fix here still needs the
-  // page checked for real width creep separately, so this only tightens.
+  // Each named component is still checked against the VIEWPORT rather than
+  // its own parent, because a parent's rect never reflects an overflowing
+  // child — that is what overflow means.
+  //
+  // This block used to stop there, and said so: the focus/streak card, the
+  // achievements strip, the session cards and the dispersion stat grid were
+  // also open at this width, so a whole-page check would have failed every
+  // run on those and hidden any regression here inside the noise. All four
+  // were fixed on 4 Oct (every one of them the same min-width:auto refusal,
+  // two of them inside an inline `style` attribute that no media query could
+  // reach), so the page-level check that comment asked for now runs below.
   {
     await p.setViewportSize({ width: 197, height: 852 });
     const rectOf = sel => p.evaluate(s => { const e = document.querySelector(s);
@@ -357,6 +361,29 @@ const CHROME = process.env.PW_CHROME || '/opt/pw-browsers/chromium-1194/chrome-l
     await zoomCheck('short-game tier badge', '.sg-tier');
     await p.click('.bottom-nav-item[data-view="drills"]').catch(() => {}); await p.waitForTimeout(700);
     await zoomCheck('drill tabs (row state)', '.drill-row-state');
+
+    // The whole-page check the block above was waiting for. It could not
+    // exist while the focus/streak card, the achievements strip, the session
+    // cards and the dispersion stat grid were still open at this width — it
+    // would have failed on those every run and buried any new regression.
+    // Those four are fixed (4 Oct), so the page itself can be held to the
+    // viewport now, which is the check that actually generalises: the named
+    // selectors above each had to be found by hand first, and four surfaces
+    // were missed precisely because nothing measured the page.
+    //
+    // What is deliberately NOT a failure: a child wider than the viewport
+    // INSIDE a horizontal scroller. The activity heatmap (53 weeks of cells)
+    // and the drill tab row are meant to scroll sideways within their own
+    // box. Only the document scrolling sideways is the WCAG 1.4.10 defect.
+    for (const v of ['sessions', 'yardages', 'progress', 'practice', 'drills', 'settings']) {
+      await p.click(`.bottom-nav-item[data-view="${v}"]`).catch(() => {});
+      await p.waitForTimeout(800);
+      const m = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, vw: window.innerWidth }));
+      if (m.sw > m.vw + 1) {
+        overflow++;
+        console.log(`  ZOOM200   ${v}: page is ${m.sw}px wide in a ${m.vw}px viewport (200% zoom reflow)`);
+      }
+    }
     await p.setViewportSize({ width: 393, height: 852 });
   }
 

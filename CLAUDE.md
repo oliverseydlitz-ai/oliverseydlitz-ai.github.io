@@ -1604,7 +1604,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **88 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v233**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v234**, 58 modules.
 
 **4 Oct 2026 — payload plan shipped.** Service-worker registration moved off
 the boot critical path (Task 1), Chart.js is now lazy-loaded instead of a
@@ -1613,6 +1613,38 @@ font nothing requests (Task 3) — see "Payload plan" under Performance Notes
 for the measured numbers and `test/suites/chart-lazy.js` plus the extended
 `test/suites/service-worker.js` for the new coverage. Minification was
 measured and deliberately not shipped (Task 4) — same section.
+
+**4 Oct 2026 — R33 is finished: no view scrolls sideways at 200% zoom.** The
+24 Sep pass fixed four named components at ~197px and recorded, in
+`render-scan.js`'s own comment, four more it had found and left open (the
+focus/streak card, the achievements strip, the session cards, the dispersion
+stat grid). All of them, plus three nobody had named, were **one defect**: a
+grid or flex item's default `min-width: auto`, which refuses to shrink below
+its own content — the same bug CLAUDE.md already documented for `.form-row`.
+Every one is now `minmax(0, 1fr)` (or `min-width: 0` on a flex child), with
+the sub-300px stacking in the existing `@media (max-width: 299px)` block.
+
+Two of them could not have been fixed in the stylesheet at all: the session
+card's three stat tiles and the coach card's grade/focus pair were laid out by
+an **inline `style="display:grid;grid-template-columns:repeat(3,1fr)"`
+attribute in `app.js`**, and no media query can reach a style attribute. They
+are `.session-stat-row` and `.coach-split` now. **If a layout rule resists
+every CSS fix you try, check for an inline style before doubting the CSS** —
+that is why these survived a pass that fixed everything visually adjacent.
+
+The guard is the point: `render-scan.js` now holds the **whole page** to the
+viewport at 197px across all six views, which is the check its own comment
+said was waiting on these fixes. The six per-component checks stay — each had
+to be found by hand, and four surfaces were missed precisely because nothing
+measured the page. A child wider than the viewport **inside a horizontal
+scroller** is deliberately not a failure: the activity heatmap and the drill
+tab row are meant to scroll within their own box.
+
+It also surfaced a defect that was invisible before, and only under
+`SM_NO_IO=1`: `.view-title` at 1.7rem uppercase is 200–206px wide, wider than
+the whole viewport, and single words ("PROGRESS") cannot wrap out of it. With
+IntersectionObserver present the condensing header drops it to 1.05rem on
+scroll, which **masked it on five views**. Run the scan both ways, always.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -2120,7 +2152,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 4 October 2026 — ShotLab v3, "Range" skin. 58 modules,
-**88 test suites**, service worker **v233**. Deterministic auth, cloud sync
+**88 test suites**, service worker **v234**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

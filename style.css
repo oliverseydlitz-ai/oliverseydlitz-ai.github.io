@@ -577,7 +577,10 @@ html.booting .bottom-nav, html.booting .top-nav { pointer-events: none; opacity:
 /* V12: the card's Share / Export pair, on the button system rather than
    4px-radius inline styles in green and blue text. */
 .session-card-actions { display: flex; gap: var(--s2); margin-top: var(--s3); }
-.session-card-actions .btn-sm { flex: 1; min-height: var(--tap); }
+/* min-width:0 alongside flex:1 — a flex item's default min-width:auto makes it
+   refuse to shrink below its own label, which pushed the action row past the
+   viewport at 200% zoom. Same defect as the minmax(0,1fr) grids. */
+.session-card-actions .btn-sm { flex: 1; min-width: 0; min-height: var(--tap); }
 
 .session-list { list-style: none; display: flex; flex-direction: column; gap: .55rem; }
 
@@ -1176,7 +1179,9 @@ a.settings-row { text-decoration: none; }
 
 /* ── Dispersion stats ──────────────────────────────────── */
 .dispersion-stats {
-  display: grid; grid-template-columns: repeat(3,1fr);
+  /* minmax(0,1fr) (R33 leftover): three 1fr columns would not shrink below
+     their own numbers, so the grid stood 256px wide at 200% zoom. */
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .5rem; margin-top: .875rem;
 }
 .disp-stat {
@@ -1299,7 +1304,10 @@ a.settings-row { text-decoration: none; }
 .tail-head{font-size:.7rem;letter-spacing: var(--track-caps);text-transform:uppercase;font-weight:700;
   color:var(--text-dim);margin-bottom:.6rem;display:flex;justify-content:space-between;gap:.5rem}
 .tail-n{color:var(--text-muted);font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums}
-.tail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.7rem}
+/* minmax(0,1fr), not 1fr: the same refusal-to-shrink as .dispersion-stats,
+   which this one sits beside and shares .disp-stat tiles with. It was the
+   last thing still scrolling the Progress view sideways at 200% zoom. */
+.tail-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-bottom:.7rem}
 .tail-item{position:relative;padding-left:1rem;font-size:.83rem;line-height:1.55;
   color:var(--text);margin-bottom:.5rem}
 .tail-item::before{content:'·';position:absolute;left:.2rem;color:var(--pine);font-weight:700}
@@ -1416,7 +1424,10 @@ html.pref-dense table td, html.pref-dense table th { padding: .3rem .45rem; }
 .next-step{border-left:4px solid var(--pine)}
 .next-why{margin-top:.45rem;padding-left:.7rem;border-left:2px solid var(--border);
   font-size:.73rem;line-height:1.5;color:var(--text-muted);text-wrap:pretty}
-.rd-form{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.7rem}
+/* minmax(0,1fr) (R33 leftover): the round-log fields would not shrink below
+   their own labels, putting them 237px out at 200% zoom on a phone. */
+.rd-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.55rem;margin-bottom:.7rem}
+.rd-form > .qe-field{min-width:0}
 .rd-form .qe-field input,.rd-form .qe-field select{width:100%}
 .rd-stat{margin-bottom:.7rem}
 .rd-stat-head{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline;
@@ -2373,7 +2384,11 @@ body.modal-open {
 
 /* ── Feature row on dashboard ──────────────────────────────────── */
 .feature-row { margin-top: 1rem; display: flex; flex-direction: column; gap: .7rem; }
-.streak-focus { display: grid; grid-template-columns: auto 1fr; gap: .7rem; align-items: stretch; }
+/* minmax(0,1fr), not 1fr (R33 leftover): a grid item's default min-width:auto
+   means the focus card refuses to shrink below its own text, so at 200% zoom
+   on a phone (~197px) it pushed the whole home view to 291px and the page
+   scrolled sideways. Same defect, same fix, as .form-row and .sg-setup. */
+.streak-focus { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .7rem; align-items: stretch; }
 
 /* Streak chip */
 .streak-chip {
@@ -2657,7 +2672,10 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
    in exactly one place, in the Session list section. */
 .session-card {
   overflow: visible;
-  display: grid; grid-template-columns: 1fr auto; gap: .8rem;
+  /* minmax(0,1fr) for the same reason as .streak-focus above: the text column
+     would not shrink below its content, so each card sat 232px wide in a
+     197px viewport. */
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .8rem;
 }
 .session-card-date { font-weight: 600; color: var(--text); font-size: 1rem; }
 .session-card-meta { font-size: .8rem; color: var(--text-muted); margin: .3rem 0; }
@@ -2694,6 +2712,19 @@ body, .session-card, .dash-tile, .chart-card, .metric-card, .settings-section,
 .drill-title { font-weight: 700; color: var(--text); margin-bottom: .2rem; }
 .drill-desc { font-size: .85rem; color: var(--text-muted); line-height: 1.4; }
 .drill-time { font-size: .75rem; color: var(--text-dim); margin-top: .4rem; }
+/* The session card's three summary tiles. This was an inline grid style in
+   app.js, so no media query could reach it and it kept overflowing at 200%
+   zoom while every rule around it had been fixed. minmax(0,1fr) for the usual
+   reason: 1fr alone will not shrink below its own content. */
+.session-stat-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .6rem; margin-top: .6rem;
+}
+/* The coach card's grade//focus pair — also an inline grid until now. */
+.coach-split {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .8rem; margin-bottom: .8rem;
+}
 .stat-card {
   padding: var(--s3); background: var(--surface); border-radius: var(--radius);
   border: 1px solid var(--line); text-align: center;
@@ -3387,4 +3418,42 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
   .dash-hero { flex-direction: column; align-items: flex-start; }
   .sg-tier { white-space: normal; }
   .cmp-row { grid-template-columns: 1fr auto; }
+  /* R33 leftover, measured at 197px: the four surfaces the 24 Sep pass found
+     and did not fix. The minmax(0,1fr) corrections above stop each one
+     refusing to shrink; these stack them, because below ~300px two columns of
+     anything legible do not fit however willing they are to narrow. */
+  .streak-focus { grid-template-columns: minmax(0, 1fr); }
+  .session-card { grid-template-columns: minmax(0, 1fr); }
+  /* The score ring is absolutely positioned in the card's corner below 640px
+     and the text reserves room for it. 88px of that reservation is 45% of a
+     197px viewport, which crushed the date and meta lines into a column too
+     narrow to read; the ring itself is only 40px. */
+  .session-card .session-card-date, .session-card .session-card-meta { padding-right: 52px; }
+  .ach-strip { flex-wrap: wrap; }
+  .ach-go { margin-left: 0; }
+  .dispersion-stats, .tail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .session-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .coach-split { grid-template-columns: minmax(0, 1fr); }
+  .session-card-actions { flex-wrap: wrap; }
+  .rd-form { grid-template-columns: minmax(0, 1fr); }
+  /* A three-column table of numbers cannot reflow to 197px and still be a
+     table. It scrolls inside its own host instead, which keeps the table
+     semantics a screen reader needs — `display:block` on a <table> would
+     drop them — and keeps the page itself from scrolling. */
+  #benchHost { overflow-x: auto; }
+  /* The view title at 1.7rem uppercase is 200-206px wide — wider than the
+     whole viewport — and the single-word ones ("PROGRESS", "SETTINGS")
+     cannot wrap out of it. It only showed once the page-level zoom check
+     existed AND IntersectionObserver was absent: with the observer the
+     condensing header already drops it to 1.05rem on scroll, which masked it
+     on five views. `!important` because the base rule is itself `!important`
+     (see the note on .view-title) and a bare override silently loses. */
+  .view-title { font-size: 1.25rem !important; letter-spacing: var(--track-caps-lg); min-width: 0; }
+  /* ...and the header itself may wrap here, so the action button drops to its
+     own line instead of squeezing the title against the gutter. `.view-header`
+     is nowrap by design everywhere else — that is what keeps a stray block
+     from becoming a flex item beside the title (the 605px phone bug) — but at
+     this width its own two children genuinely do not fit on one line, and the
+     blocks that caused that bug are siblings below it now, not inside it. */
+  .view-header { flex-wrap: wrap; }
 }
