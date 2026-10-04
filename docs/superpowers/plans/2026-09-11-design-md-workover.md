@@ -15,7 +15,13 @@ D3 follow-up ruling and two new suites. All merged to `main`; render scan exit 0
 - **Task 5 — ship, partially.** `DESIGN.md` regeneration, the `sw.js` bump, the
   CLAUDE.md suite-count update and the push all happened (see below). The
   `@agent-design-review` pass did not.
-- **Task 7 — the drift sweep.** Not started; brief written. This is the plan's
+- **Task 7 — the drift sweep. DONE (4 Oct).** Its headline item (`.drill-card`
+  declared twice) had already been resolved into `.drill-card--inset`. The sweep
+  proper parsed `style.css` into rules and compared every selector declared twice
+  in the same media context: `.session-card`'s dead `display:flex` /
+  `justify-content` / `gap`, a bare `min-height: 44px` beside `--tap: 44px`, and
+  the iOS 16px guard not covering tablets. See CLAUDE.md, "the drift sweep".
+  Original brief below. This is the plan's
   Task 5 Step 2 dead-CSS sweep plus the collisions a read-only audit found.
   Highest-value item in it: **`.drill-card` is defined twice** (`style.css` ~844
   and ~2396) and the later rule wins, so the fault-drill card's inset styling has

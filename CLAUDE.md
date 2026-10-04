@@ -1604,7 +1604,7 @@ to re-enable the on-screen banner.
 (what Oliver has to do, what is next, and the habits worth keeping).
 
 State at handover: **88 suites, all green**, render scan exit 0 both with and
-without `SM_NO_IO=1`, service worker at **v234**, 58 modules.
+without `SM_NO_IO=1`, service worker at **v235**, 58 modules.
 
 **4 Oct 2026 — payload plan shipped.** Service-worker registration moved off
 the boot critical path (Task 1), Chart.js is now lazy-loaded instead of a
@@ -1645,6 +1645,30 @@ It also surfaced a defect that was invisible before, and only under
 the whole viewport, and single words ("PROGRESS") cannot wrap out of it. With
 IntersectionObserver present the condensing header drops it to 1.05rem on
 scroll, which **masked it on five views**. Run the scan both ways, always.
+
+**4 Oct 2026 — the drift sweep (workover Task 7).** Its headline item, the
+duplicate `.drill-card`, had already been resolved into `.drill-card--inset`.
+What the sweep actually found, by parsing `style.css` into rules and comparing
+every selector declared twice in the SAME media context:
+
+- **`.session-card` declared `display: flex`, `justify-content: space-between`
+  and `gap: .75rem`, all three dead**, overridden by the `display: grid` rule
+  ~2000 lines below — while the comment above that grid rule claimed the
+  card's appearance "now lives in exactly one place". Removed, with a pointer
+  to where the layout really is. `align-items` **stayed**: it is not
+  overridden and does apply to a grid, so deleting it would have moved the
+  card. The rest of the collisions are later `!important` rules in the v3
+  sections deliberately re-styling a base rule; those read as intended.
+- **A bare `min-height: 44px`** sitting beside `--tap: 44px`. The literal is
+  now the token.
+- **The iOS 16px rule did not cover tablets.** iOS zooms on focus for any
+  control under 16px on ANY iOS device, not only a narrow one, and the guard
+  was keyed on `max-width: 640px` — so an iPad got the
+  zoom-and-never-zoom-back bug the block exists to prevent. `(pointer: coarse)`
+  is now ORed in. The **width clause stays first and is still the tested one**,
+  because headless Chromium does not emulate the pointer feature reliably —
+  which is exactly why it was avoided originally, and why removing the width
+  clause in favour of it would make the behaviour unverifiable.
 
 **The palette now clears its own contrast floor.** `test/suites/contrast.js` was
 shipped red on purpose — 47 text-on-ground pairs below 4.5:1 — and is now green
@@ -2152,7 +2176,7 @@ complements `frontend-design` (direction) and overlaps `render-scan.js` only on
 overflow/NaN; it adds design judgement, a11y and interaction states.
 
 **Last updated:** 4 October 2026 — ShotLab v3, "Range" skin. 58 modules,
-**88 test suites**, service worker **v234**. Deterministic auth, cloud sync
+**88 test suites**, service worker **v235**. Deterministic auth, cloud sync
 behind row-level security verified live against production, dark mode,
 installable PWA, printable yardage card, printable legal documents, standalone
 `/terms` `/privacy` `/contact` pages, full SEO and crawlability layer, and zero

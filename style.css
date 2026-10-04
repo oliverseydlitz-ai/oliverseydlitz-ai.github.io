@@ -593,7 +593,14 @@ html.booting .bottom-nav, html.booting .top-nav { pointer-events: none; opacity:
   padding: var(--s4);
   cursor: pointer;
   transition: border-color var(--dur), background var(--dur);
-  display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
+  /* The LAYOUT of this card is not here — it is the `display: grid` rule in
+     the Session list section ~2000 lines below, which wins. This rule used to
+     declare `display: flex`, `justify-content: space-between` and
+     `gap: .75rem` as well, all three of them dead on arrival and all three
+     describing a layout the card has not had: the same defect `.drill-card`
+     had, where a rule reads as live and never applies. `align-items` stays
+     because it is NOT overridden and does apply to the grid. */
+  align-items: flex-start;
   box-shadow: none;
 }
 /* No lift, no shadow: the row is a row. Hover moves the hairline, which is
@@ -2794,7 +2801,9 @@ select::-webkit-inner-spin-button {
 .btn-primary, .btn-secondary, .btn-danger, .btn-back,
 .bottom-nav-item, .nav-link, .top-nav-links .nav-link,
 [data-view], [data-close-modal], [data-close] {
-  min-height: 44px;
+  /* var(--tap), not a bare 44px: the token already holds this value, and a
+     literal beside it is a second copy that drifts the day the token moves. */
+  min-height: var(--tap);
 }
 /* Fast tap on all interactive elements — removes 300ms delay on mobile */
 a, button { touch-action: manipulation; }
@@ -3351,7 +3360,16 @@ a, button, .bottom-nav-item, .chip, [role="button"] { -webkit-tap-highlight-colo
    happens anyway. Last in the file so it beats the per-component rules that set
    .88rem. Checkboxes, radios and file inputs are excluded: they never trigger
    the zoom, and a file input's font-size drives its button size. */
-@media (max-width: 640px) {
+/* `(pointer: coarse)` is ORed in deliberately, and the width clause is the one
+   that is tested. iOS zooms on focus for any control under 16px on ANY iOS
+   device, not only a narrow one — so an iPad, which is comfortably past 640px,
+   got the zoom-and-never-zoom-back bug this block exists to prevent. The width
+   clause stays first and unchanged because headless Chromium does not emulate
+   the pointer media feature reliably, so a rule written on `pointer` alone
+   could not be verified by the browser checks (that is why it was avoided
+   originally). Keeping both means the tested path still proves the behaviour
+   at 393px, and tablets stop being the one place it does not hold. */
+@media (max-width: 640px), (pointer: coarse) {
   /* !important is deliberate and is the right tool here. This is a platform
      constraint, not a design preference: component rules legitimately set their
      own type scale (there are two separate `.form-group select` rules alone,
