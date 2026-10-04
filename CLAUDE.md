@@ -1269,6 +1269,39 @@ sees nothing and can insert nothing. All pass. **This was never broken.** Re-run
 them after any policy change — a policy that reads correctly and does not hold
 is the same defect class as a gate nothing calls.
 
+**Re-verified 4 Oct 2026 against the live project** (`ACTIVE_HEALTHY`, so the
+readings are trustworthy — a `COMING_UP` project returns nonsense, see "Things
+this session got wrong"). Every control below was read back from the database
+rather than assumed, and all of them hold:
+
+- **RLS enabled AND forced** on `sessions` and `terms_acceptances`.
+- **All six policies scoped `TO authenticated`**, never `public`, each gated on
+  `user_id = (SELECT auth.uid())`. The UPDATE policy carries **both** `USING`
+  and `WITH CHECK`, so a row cannot be re-assigned to another user.
+  `terms_acceptances` still has only INSERT and SELECT — append-only, as designed.
+- **`anon` holds no grant at all** on either table, and `authenticated` has no
+  **TRUNCATE** — the two September findings have not regressed.
+- **Payload ceilings intact**: shots a JSON array of 1–5000 and ≤ 4 MB, notes
+  ≤ 2000 chars, id format-checked, conditions must be an object. The 2000-row
+  cap is the `sessions_cap` BEFORE INSERT trigger, which exists and raises.
+- **All three functions are `SECURITY INVOKER` with `search_path` pinned to `''`**
+  — including `keepalive()`. No `SECURITY DEFINER` anywhere in `public`.
+- **Exactly one security advisor**: leaked-password protection (item 2 below).
+  Performance advisors report only `sessions_user_date_idx` as unused, which is
+  expected on a 9-row table — Postgres seq-scans something that small. **Do not
+  drop it**; it exists for the row count this table will have later, not now.
+- **The keepalive is not just wired, it is running**: the last eight scheduled
+  runs of `.github/workflows/keepalive.yml` all succeeded, roughly 3×/day.
+
+**New, and NOT fixable from this repo: the CDN serves gzip, not brotli.** With
+`Accept-Encoding: br, gzip` the live site answers `Content-Encoding: gzip` for
+every text asset — `app.js` 250,258 bytes on the wire where brotli would be
+194,035, `style.css` 49,513 vs 39,429, `chart.umd.js` 71,316 vs 61,035. That is
+roughly **75 KB per cold load** left on the table, more than the entire Chart.js
+and font work in the 4 Oct payload plan recovered, and no change in this
+repository can reach it — it is a GitHub Pages / CDN setting. Worth knowing
+before anyone spends another session shaving bytes in `app.js`.
+
 ### What was actually wrong
 
 1. **The project pauses itself.** Free-tier Supabase suspends after ~7 days
